@@ -6,6 +6,7 @@ import { Modal } from './Modal'
 import { gameInstructions, type InstructionKind } from './gameInstructions'
 import { GuessWhoVisualDemo } from './GuessWhoVisualDemo'
 import { flagsDemoExample, type GuessWhoDemoExample } from './guessWhoDemoExamples'
+import { DominoVisualDemo } from './DominoVisualDemo'
 
 /** El juego no se monta hasta continuar: no hay relojes, controles ni salas activos detrás. */
 export function GameInstructionsGate({ kind, children, guessWhoExample = flagsDemoExample }: { kind: InstructionKind; children: ReactNode; guessWhoExample?: GuessWhoDemoExample }) {
@@ -14,14 +15,16 @@ export function GameInstructionsGate({ kind, children, guessWhoExample = flagsDe
   const content = gameInstructions[kind]
   const onContinue = () => setAccepted(true)
   const isGuessWho = kind === 'GUESS_WHO' || kind === 'GUESS_WHO_GROUP'
+  const isDomino = kind === 'DOMINO'
+  const hasVisualDemo = isGuessWho || isDomino
   return (
-    <Modal onClose={onContinue} maxWidthClassName={isGuessWho ? 'max-w-[1120px]' : 'max-w-[520px]'} maxHeightClassName={isGuessWho ? 'max-h-[calc(100dvh-40px)]' : undefined} ariaLabel={isGuessWho ? 'Cómo jugar a Identidad Oculta' : undefined}>
+    <Modal onClose={onContinue} maxWidthClassName={hasVisualDemo ? 'max-w-[1120px]' : 'max-w-[520px]'} maxHeightClassName={hasVisualDemo ? 'max-h-[calc(100dvh-40px)]' : undefined} ariaLabel={isGuessWho ? 'Cómo jugar a Identidad Oculta' : isDomino ? 'Cómo jugar a Dominexo' : undefined}>
       <div className="space-y-5" data-game-instructions={kind}>
         <div className="rounded-2xl bg-gradient-to-r from-accent/12 via-accent/5 to-transparent p-4">
           <p className="text-[11px] font-semibold tracking-[0.18em] text-accent uppercase">Nexus Play</p>
           <h2 className="mt-2 text-[24px] font-bold tracking-tight text-text-h">Cómo jugar</h2>
         </div>
-        {isGuessWho ? <GuessWhoVisualDemo example={guessWhoExample} onContinue={onContinue} /> : <>
+        {isGuessWho ? <GuessWhoVisualDemo example={guessWhoExample} onContinue={onContinue} /> : isDomino ? <DominoVisualDemo onContinue={onContinue} /> : <>
         <p className="text-[13.5px] leading-relaxed text-text">{content.text}</p>
         <div className="rounded-2xl border border-border bg-code-bg p-4">
           <p className="mb-3 text-[12px] font-semibold uppercase tracking-wide text-accent">{content.exampleTitle}</p>
