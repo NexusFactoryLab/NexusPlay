@@ -684,6 +684,60 @@ code {
   }
 }
 
+/* La identidad propia se revela al iniciar o reiniciar una partida. */
+@keyframes secret-card-reveal {
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.92);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent);
+  }
+  58% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.035);
+    box-shadow: 0 0 28px -6px color-mix(in srgb, var(--accent) 68%, transparent);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    box-shadow: 0 10px 28px -18px var(--accent);
+  }
+}
+
+/* Secuencia breve de la guía de Dominexo: muestra cada acción sin usar el juego real. */
+@keyframes domino-demo-board {
+  0% { opacity: 0; transform: translateY(18px) rotate(-4deg) scale(0.9); }
+  100% { opacity: 1; transform: translateY(0) rotate(0) scale(1); }
+}
+
+@keyframes domino-demo-select {
+  0% { transform: translateY(14px) scale(0.92); }
+  60% { transform: translateY(-12px) scale(1.08); }
+  100% { transform: translateY(-6px) scale(1.04); }
+}
+
+@keyframes domino-demo-connect {
+  0% { opacity: 0; transform: translate(58px, 76px) scale(0.8); }
+  20% { opacity: 1; transform: translate(48px, 64px) scale(0.84); }
+  70% { opacity: 1; transform: translate(-3px, -2px) scale(1.03); }
+  100% { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+@keyframes domino-demo-well {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  35% { transform: translateY(-5px) rotate(-4deg); }
+  65% { transform: translateY(0) rotate(3deg); }
+}
+
+@keyframes domino-demo-card-peek {
+  0% { opacity: 0; transform: translateY(18px) rotate(-10deg) scale(0.75); }
+  100% { opacity: 1; transform: translateY(0) rotate(0) scale(1); }
+}
+
+@keyframes domino-demo-draw {
+  0% { opacity: 0; transform: translateX(-42px) rotate(-12deg) scale(0.75); }
+  100% { opacity: 1; transform: translateX(0) rotate(0) scale(1); }
+}
+
 /* Indicador de "es tu turno" (GuessWhoRoom.tsx): un resplandor que respira
  * para que el cambio de turno sea imposible de pasar por alto. */
 /* Usadas por TurnPopBanner (MatchBoard.tsx): el aviso de cambio de turno

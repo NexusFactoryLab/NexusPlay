@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { CircleHelp, Clock3, SkipForward, Sparkles, Volume2 } from 'lucide-react'
 import { MIN_DISCARDS_TO_ACCUSE, type GuessWhoCard, type RoomPlayerView } from './guessWhoTypes'
 import { CardInfoBubble } from './CardInfoBubble'
+import { playGuessWhoCardToggle, playGuessWhoCountdownTick, playGuessWhoTurnCue } from '../../../utils/gameFeedback'
 
 /**
  * Cuenta el tiempo restante hasta `deadline` (epoch ms) y se refresca cada
@@ -57,6 +58,10 @@ export function TurnBanner({
   const viewBox = isInline ? '0 0 48 48' : '0 0 52 52'
   const center = isInline ? 24 : 26
   const strokeWidth = isInline ? 4 : 4
+
+  useEffect(() => {
+    if (secondsLeft > 0 && secondsLeft <= 5) playGuessWhoCountdownTick(secondsLeft)
+  }, [secondsLeft])
 
   return (
     <div
@@ -130,6 +135,7 @@ export function TurnPopBanner({
 
   useEffect(() => {
     setVisible(true)
+    playGuessWhoTurnCue(isMyTurn)
     const timeout = setTimeout(() => setVisible(false), 1700)
     return () => clearTimeout(timeout)
   }, [isMyTurn, accusationMessage])
@@ -327,7 +333,6 @@ export function MatchBoard({
   const [accusing, setAccusing] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
   const turnRemainingMs = useCountdown(turnDeadline)
-  const remainingForSelf = cards.length - self.discardedCardIds.length
   const secretCard = cards.find((card) => card.cardId === self.secretCardId)
   const discardsMissing = Math.max(0, MIN_DISCARDS_TO_ACCUSE - self.discardedCardIds.length)
   const guessAvailable = canAccuse && isMyTurn && discardsMissing === 0
@@ -350,25 +355,29 @@ export function MatchBoard({
 
       <div className="guess-who-board-columns flex flex-col gap-4 sm:flex-row sm:items-start">
         <div className="guess-who-board-actions flex shrink-0 flex-col gap-3 sm:w-[210px]">
-          <div className="rounded-xl border border-accent/40 bg-accent/5 p-3.5">
-            <p className="text-[10.5px] font-semibold tracking-wide text-accent uppercase">Tu tarjeta secreta</p>
+          <div
+            key={self.secretCardId}
+            className="rounded-xl border border-accent/60 bg-gradient-to-br from-accent/20 via-surface to-accent-2/10 p-3.5 shadow-[0_10px_28px_-18px_var(--accent)] animate-[secret-card-reveal_0.72s_cubic-bezier(0.16,1,0.3,1)_both] motion-reduce:animate-none"
+          >
+            <div className="flex items-center gap-1.5 text-accent">
+              <Sparkles className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden="true" />
+              <p className="text-[11px] font-extrabold tracking-[0.12em] uppercase">Tú eres…</p>
+            </div>
             {/* Se muestra la imagen real (no solo el nombre) para que sea
                 más intuitivo y pedagógico: quien juega ve la bandera/tarjeta
                 que su rival debe adivinar, no solo su etiqueta de texto. */}
+            <p className="mt-1 text-[11px] font-bold tracking-wide text-accent-2 uppercase">Tu bandera es</p>
             {secretCard?.imageUrl && (
               <div className="relative mt-2">
                 <img
                   src={secretCard.imageUrl}
                   alt=""
-                  className="h-20 w-full rounded-lg border border-border object-cover"
+                  className="h-20 w-full rounded-lg border border-accent/35 object-cover shadow-[0_6px_16px_-10px_var(--accent)]"
                 />
                 {secretCard.info && <CardInfoBubble info={secretCard.info} label={secretCard.label} />}
               </div>
             )}
             <p className="mt-2 text-[14px] font-semibold text-text-h">{secretCard?.label ?? '—'}</p>
-            <p className="mt-1.5 text-[11.5px] text-text">
-              Quedan {remainingForSelf} de {cards.length}
-            </p>
           </div>
 
           <div className="rounded-xl border border-accent/40 bg-accent/5 p-2.5">
@@ -444,7 +453,11 @@ export function MatchBoard({
                       ? undefined
                       : `card-pop-in 0.3s ease-out ${Math.min(index, 12) * 0.03}s backwards`,
                   }}
-                  onClick={() => !locked && onDiscard(card.cardId)}
+                  onClick={() => {
+                    if (locked) return
+                    playGuessWhoCardToggle(discarded)
+                    onDiscard(card.cardId)
+                  }}
                 >
                   <img src={card.imageUrl} alt="" className="h-20 w-full object-cover" />
                   <p className="truncate bg-surface px-1.5 py-1 text-[11px] font-medium text-text-h">{card.label}</p>

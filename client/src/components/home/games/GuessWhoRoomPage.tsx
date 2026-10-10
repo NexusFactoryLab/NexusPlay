@@ -3,7 +3,7 @@ import { MultiplayerLobby } from './MultiplayerLobby'
 import { ChatPanel } from './ChatPanel'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Copy, LogOut, Trophy, XCircle } from 'lucide-react'
+import { Copy, LogOut, Trophy, Volume2, VolumeX, XCircle } from 'lucide-react'
 import { useAuth } from '../../../hooks/useAuth'
 import { useGuessWhoRoom } from './useGuessWhoRoom'
 import { MIN_DISCARDS_TO_ACCUSE } from './guessWhoTypes'
@@ -11,6 +11,7 @@ import { Modal } from './Modal'
 import { DealCountdownOverlay, MatchBoard, useCountdown } from './MatchBoard'
 import { ConfettiBurst } from '../../kids/ConfettiBurst'
 import { CardInfoBubble } from './CardInfoBubble'
+import { setGuessWhoSoundMuted, startGuessWhoAmbience, stopGuessWhoAmbience } from '../../../utils/gameFeedback'
 
 /**
  * Sala 1v1 de "¿Quién Es?" en página propia (ruta `/quien-es/sala/:code?`,
@@ -79,6 +80,17 @@ function GuessWhoRoomSession() {
   }, [room?.code])
 
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null)
+  const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('guess-who-sound-muted') !== 'true')
+
+  useEffect(() => {
+    setGuessWhoSoundMuted(!soundEnabled)
+    localStorage.setItem('guess-who-sound-muted', String(!soundEnabled))
+  }, [soundEnabled])
+
+  useEffect(() => {
+    if (room?.phase !== 'PLAYING') stopGuessWhoAmbience()
+    return () => stopGuessWhoAmbience()
+  }, [room?.phase])
 
   const [dealDeadline, setDealDeadline] = useState<number | null>(null)
   useEffect(() => {
@@ -91,6 +103,7 @@ function GuessWhoRoomSession() {
   const dealRemainingMs = useCountdown(dealDeadline)
 
   function handleExit() {
+    stopGuessWhoAmbience()
     leaveRoom()
     navigate('/')
   }
@@ -215,6 +228,20 @@ function GuessWhoRoomSession() {
             }}
           >
             <Copy className="h-4 w-4" strokeWidth={2} />
+          </button>
+          <button
+            type="button"
+            aria-label={soundEnabled ? 'Silenciar efectos de sonido' : 'Activar efectos de sonido'}
+            title={soundEnabled ? 'Silenciar efectos de sonido' : 'Activar efectos de sonido'}
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-surface text-text-h transition-colors hover:border-accent hover:text-accent"
+            onClick={() => {
+              const nextSoundEnabled = !soundEnabled
+              setGuessWhoSoundMuted(!nextSoundEnabled)
+              if (nextSoundEnabled) startGuessWhoAmbience()
+              setSoundEnabled(nextSoundEnabled)
+            }}
+          >
+            {soundEnabled ? <Volume2 className="h-4 w-4" strokeWidth={2} /> : <VolumeX className="h-4 w-4" strokeWidth={2} />}
           </button>
           <button
             type="button"
