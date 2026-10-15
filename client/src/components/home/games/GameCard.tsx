@@ -96,7 +96,7 @@ export function GameCard({
       </span>
       {isTypeArchived && (
         <span
-          className={`absolute right-12 z-10 flex items-center gap-1 rounded-full bg-surface/95 px-2 py-1 text-[10.5px] font-medium text-text shadow-[var(--shadow)] ${justCreated ? 'top-9' : 'top-2'}`}
+          className={`game-card-archived absolute right-12 z-10 flex items-center gap-1 rounded-full bg-surface/95 px-2 py-1 text-[10.5px] font-medium text-text shadow-[var(--shadow)] ${justCreated ? 'top-9' : 'top-2'}`}
           title="Este tipo de juego está archivado: solo lo ven los administradores y no admite juegos nuevos."
         >
           <Archive className="h-3 w-3" strokeWidth={2.5} />

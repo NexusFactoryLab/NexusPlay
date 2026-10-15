@@ -4,7 +4,6 @@ import { useAuth } from '../../hooks/useAuth'
 import { Sidebar } from './Sidebar'
 import { SearchBar } from './SearchBar'
 import { SettingsButton } from './SettingsButton'
-import { ThemeToggle } from '../ThemeToggle'
 import { SettingsPanel } from './SettingsPanel'
 import { trackEvent } from '../../services/analytics.service'
 import { HomeSearchContext } from './homeSearchContext'
@@ -72,7 +71,7 @@ export function HomeLayout() {
           <SearchBar value={searchInput} onChange={setSearchInput} onSearch={handleSearch} />
           <div className="ml-auto flex shrink-0 items-center gap-2">
             <WelcomeTour key={`${user.id}:${user.role}`} user={user} canAccessOrganization={canAccessOrganization || canManageUsers} />
-            <ThemeToggle />
+            {/* El tema ya no tiene botones aquí (issue #47): se elige en la tuerca → Temas. */}
             <SettingsButton onClick={() => setSettingsOpen(true)} />
           </div>
         </header>

@@ -4,14 +4,17 @@ import type { Theme } from '../../hooks/useTheme'
 import previewLight from '../../assets/themes/preview-light.webp'
 import previewDark from '../../assets/themes/preview-dark.webp'
 import previewKids from '../../assets/themes/preview-kids.webp'
+import previewFantasy from '../../assets/themes/preview-fantasy.webp'
 
 type ThemeOption = {
   value: Theme
   label: string
   description: string
   icon: typeof Sun
-  /** Captura real de la página con este tema — si falta, se usa `preview` (por ejemplo Fantasía, que no trae captura para no sumar archivos). */
+  /** Captura real de la página con este tema — si falta, se usa `preview`. */
   previewImage?: string
+  /** Muestra la etiqueta "Nuevo" sobre la vista previa (el tema Fantasía, issue #47). */
+  isNew?: boolean
   /**
    * Colores propios de ESTE tema (no del tema activo ahora mismo): la tarjeta
    * de "Claro" debe verse clara aunque estés en Oscuro, y viceversa, para que
@@ -24,8 +27,10 @@ const THEME_OPTIONS: ThemeOption[] = [
   {
     value: 'fantasy',
     label: 'Fantasía',
-    description: 'El tema por defecto: cielo nocturno, piedra, madera y pergamino, como un mundo de aventura.',
+    description: 'Nuevo y el tema por defecto: cielo nocturno, piedra, madera y pergamino, como un mundo de aventura.',
     icon: Wand2,
+    previewImage: previewFantasy,
+    isNew: true,
     preview: { bg: '#1b1546', surface: '#2a2350', accent: '#7b5cff', accent2: '#ffc83d', text: '#f4f1ff' },
   },
   {
@@ -126,6 +131,14 @@ export function ThemesSection() {
                       <Icon className="h-5 w-5" strokeWidth={2} />
                     </span>
                   </div>
+                )}
+                {option.isNew && (
+                  <span
+                    className="absolute top-3 left-3 rounded-full px-2.5 py-0.5 text-[11px] font-bold shadow-[0_4px_10px_-3px_rgba(0,0,0,0.5)]"
+                    style={{ background: '#ffc83d', color: '#3f230e' }}
+                  >
+                    ✨ Nuevo
+                  </span>
                 )}
                 {active && (
                   <span

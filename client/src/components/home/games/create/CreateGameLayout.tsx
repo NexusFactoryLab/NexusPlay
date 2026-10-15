@@ -11,8 +11,8 @@ function CreateGameLayoutContent() {
   const { label, step, total } = stepFromPath(location.pathname, subPhase)
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-bg">
-      <header className="flex shrink-0 items-center gap-4 border-b border-border px-5 py-4 sm:px-8">
+    <div className="create-game-layout fixed inset-0 flex flex-col bg-bg">
+      <header className="create-game-header flex shrink-0 items-center gap-4 border-b border-border px-5 py-4 sm:px-8">
         <button
           type="button"
           className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[13.5px] font-medium text-text-h transition-colors hover:bg-code-bg"
@@ -28,7 +28,8 @@ function CreateGameLayoutContent() {
           </p>
         </div>
       </header>
-      <main className="flex-1 overflow-y-auto">
+      {/* `app-main`: mismas piezas de Fantasía que las secciones del inicio (ver index.css). */}
+      <main className="app-main flex-1 overflow-y-auto">
         <Outlet />
         <ScrollMoreHint />
       </main>

@@ -56,13 +56,13 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-5 backdrop-blur-sm animate-[modal-backdrop-in_0.2s_ease-out]"
+      className="app-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-5 backdrop-blur-sm animate-[modal-backdrop-in_0.2s_ease-out]"
       onClick={onClose}
       role="presentation"
     >
       <div
         ref={panelRef}
-        className={`w-full ${maxWidthClassName} ${maxHeightClassName} ${
+        className={`app-modal-panel w-full ${maxWidthClassName} ${maxHeightClassName} ${
           fitContent && scale > MIN_FIT_SCALE ? 'overflow-hidden' : 'overflow-y-auto'
         } rounded-2xl bg-surface p-6 shadow-[var(--shadow)] animate-[modal-panel-in_0.25s_cubic-bezier(0.16,1,0.3,1)] sm:p-8 ${
           accentBorder ? 'border-[3px] border-transparent' : 'border border-border'

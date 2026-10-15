@@ -2579,6 +2579,24 @@ code {
 }
 
 /* En pantallas bajas el banner se compacta para dejarle alto a las tarjetas. */
+@media (max-height: 700px) {
+  .home-fit .home-section-subtitle,
+  .games-carousel .game-card-author {
+    display: none;
+  }
+}
+
+@media (max-height: 640px) {
+  .home-fit .home-hero-eyebrow {
+    display: none;
+  }
+
+  .home-fit .home-hero {
+    padding-top: 18px;
+    padding-bottom: 18px;
+  }
+}
+
 @media (max-height: 820px) {
   .home-fit .home-hero-desc {
     display: none;
@@ -2598,10 +2616,14 @@ code {
 }
 
 .games-carousel-item {
-  /* 36px = padding vertical de la pista (pt-2 + pb-7). */
-  --card-h: min(100cqh - 36px, 400px);
+  /* Ancho pensado para ver unas 3,4 tarjetas (la última asomando invita a
+   * deslizar) sin saturar: 60px = 3 espacios de 20px entre tarjetas. El alto
+   * sale del espacio libre (36px = padding vertical de la pista). */
+  --card-w: clamp(220px, (100cqw - 60px) / 3.4, 400px);
+  --card-h: min(100cqh - 36px, var(--card-w) * 1.25);
+  width: var(--card-w);
   height: var(--card-h);
-  width: calc(var(--card-h) * 0.76);
+  container-type: inline-size;
 }
 
 .games-carousel-track {
@@ -2662,6 +2684,230 @@ code {
 
 [data-theme='fantasy'] .home-hero-title-break {
   display: inline;
+}
+
+/* --- Resto de secciones y ventanas ---
+ * Las páginas internas (Materias, Tipos de juego, Comunidad, Usuarios, IA,
+ * Organización, Mis clases…) y las ventanas (Configuración, detalle de un
+ * juego, Unirme con código…) se arman con piezas comunes de Tailwind; aquí
+ * reciben el mismo lenguaje del inicio: tarjetas de piedra con marco de
+ * madera, botones de piedra, botón principal azul con borde dorado, campos
+ * tallados y tablas con cabecera de madera. Los selectores van envueltos en
+ * :where() para que las reglas propias de cada pieza (más abajo) manden.
+ */
+:root[data-theme='fantasy'] {
+  --fx-panel-bg: radial-gradient(ellipse at 20% 0%, rgba(255, 255, 255, 0.07), transparent 55%), linear-gradient(180deg, #332f45 0%, #262236 100%);
+  --fx-stone-panel: radial-gradient(ellipse at 20% 0%, rgba(255, 255, 255, 0.06), transparent 60%), linear-gradient(180deg, #363345 0%, #2a2738 100%);
+  --fx-blue-btn: linear-gradient(180deg, #5aa5ff 0%, #2f6ff0 50%, #1f4fd1 100%);
+}
+
+/* Títulos de cada página y de las ventanas. */
+[data-theme='fantasy'] :where(.app-main) :where(h1, h2).text-\[22px\],
+[data-theme='fantasy'] .app-modal-panel :where(h1, h2) {
+  font-family: var(--fx-display);
+  font-weight: 700;
+  color: #f4f0ff;
+  text-shadow: 0 3px 0 rgba(20, 8, 50, 0.65), 0 0 18px rgba(170, 140, 255, 0.45);
+}
+
+[data-theme='fantasy'] :where(.app-main) :where(h1, h2).text-\[22px\] {
+  font-size: 30px;
+  line-height: 1.15;
+}
+
+[data-theme='fantasy'] :where(.app-main) h3.uppercase {
+  color: #f1d17a;
+  letter-spacing: 0.1em;
+}
+
+/* Tarjetas de primer nivel: piedra con marco de madera. */
+[data-theme='fantasy'] :where(.app-main) div:where(.rounded-2xl.border-border):not(.app-modal-panel, .app-modal-panel *, .border-dashed, div.rounded-2xl.border-border *, div.rounded-xl.border-border *) {
+  border: 6px solid transparent !important;
+  background:
+    var(--fx-panel-bg) padding-box,
+    var(--fx-wood-grain) border-box,
+    var(--fx-wood-grad) border-box !important;
+  box-shadow:
+    0 0 0 2px #2b1608,
+    inset 0 0 0 1px rgba(255, 214, 140, 0.35),
+    0 14px 26px -14px rgba(0, 0, 0, 0.85);
+}
+
+[data-theme='fantasy'] :where(.app-main) div:where(.rounded-2xl.border-border):where(.group, [role='button']):not(.app-modal-panel *):hover {
+  box-shadow:
+    0 0 0 2px #2b1608,
+    inset 0 0 0 1px rgba(255, 214, 140, 0.5),
+    0 0 24px -4px rgba(255, 200, 61, 0.55);
+}
+
+/* Cajas internas, tarjetas pequeñas y cajas dentro de ventanas: piedra tallada. */
+[data-theme='fantasy'] :where(.app-main) :where(div.rounded-2xl.border-border, div.rounded-xl.border-border) div:where(.rounded-2xl.border-border, .rounded-xl.border-border):not(.app-modal-panel *),
+[data-theme='fantasy'] :where(.app-main) div:where(.rounded-xl.border-border):not(.app-modal-panel *, .border-dashed),
+[data-theme='fantasy'] .app-modal-panel div:where(.rounded-2xl.border-border, .rounded-xl.border-border, .rounded-lg.border-border):not(.border-dashed) {
+  border: 2px solid #15141b !important;
+  background: var(--fx-stone-panel) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 6px 14px -8px rgba(0, 0, 0, 0.7);
+}
+
+[data-theme='fantasy'] :where(.app-main) div:where(.rounded-lg.border-border[role='group']) {
+  border-color: #15141b;
+  background: rgba(20, 17, 30, 0.7);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.5);
+}
+
+/* Avisos vacíos (borde punteado): pergamino oscuro con borde dorado. */
+[data-theme='fantasy'] :where(.app-main, .app-modal-panel) div:where(.border-dashed) {
+  border-color: rgba(255, 215, 106, 0.45);
+  background-color: rgba(30, 26, 46, 0.75);
+}
+
+/* Botones secundarios: losas de piedra. */
+[data-theme='fantasy'] :where(.app-main, .app-modal-panel) button:where(.border-border) {
+  border-color: #15141b;
+  border-width: 2px;
+  background:
+    radial-gradient(ellipse at 30% 0%, rgba(255, 255, 255, 0.12), transparent 60%),
+    var(--fx-stone-grad);
+  box-shadow: var(--fx-stone-shadow);
+  color: #f4f1ff;
+}
+
+[data-theme='fantasy'] :where(.app-main, .app-modal-panel) button:where(.border-border):not(:disabled):hover {
+  filter: brightness(1.15);
+}
+
+[data-theme='fantasy'] :where(.app-main, .app-modal-panel) button:where([class*='border-danger']) {
+  border-width: 2px;
+  border-color: rgba(255, 107, 125, 0.65);
+  background:
+    radial-gradient(ellipse at 30% 0%, rgba(255, 255, 255, 0.1), transparent 60%),
+    var(--fx-stone-grad);
+  box-shadow: var(--fx-stone-shadow);
+}
+
+[data-theme='fantasy'] :where(.app-main, .app-modal-panel) button:where(.border-accent, [class~='border-accent/40'], [class~='border-accent/50']):not(:where(.bg-accent)) {
+  border-color: #ffd76a;
+  background: rgba(30, 24, 52, 0.75);
+  color: #ffe58a;
+}
+
+/* Botón principal (degradado de la marca): azul con borde dorado, como en el banner. */
+[data-theme='fantasy'] :where(button, a)[style*='var(--accent), var(--accent-2)'] {
+  background: var(--fx-blue-btn) !important;
+  border: 2px solid #ffd76a;
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.3), 0 3px 0 #142f86, 0 10px 20px -10px rgba(0, 0, 0, 0.7);
+  font-family: var(--fx-display);
+  font-weight: 700;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.28);
+}
+
+[data-theme='fantasy'] :where(.app-main, .app-modal-panel) button:where(.bg-accent) {
+  background: linear-gradient(180deg, #8f74ff, #6a4be0);
+  box-shadow: inset 0 0 0 1.5px #ffd76a, 0 3px 0 #3b2a8a;
+}
+
+/* Íconos con el degradado de la marca: gema con aro dorado. */
+[data-theme='fantasy'] span[style*='linear-gradient(135deg, var(--accent), var(--accent-2))'] {
+  box-shadow: 0 0 0 2px #ffd76a, 0 6px 14px -6px rgba(0, 0, 0, 0.6) !important;
+}
+
+/* Campos de texto y listas: piedra tallada. */
+[data-theme='fantasy'] :where(.app-main, .app-modal-panel) :where(input:not([type='checkbox'], [type='radio'], [type='range'], [type='file'], [type='color']), select, textarea) {
+  background-color: #1d1a29;
+  border-color: #121118;
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.55);
+  color: #f4f1ff;
+}
+
+[data-theme='fantasy'] :where(.app-main, .app-modal-panel) :where(input, select, textarea):focus {
+  border-color: #7c5cff;
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.55), 0 0 0 3px rgba(124, 92, 255, 0.28);
+}
+
+/* Tablas: cabecera de madera y filas sobre piedra. */
+[data-theme='fantasy'] :where(.app-main, .app-modal-panel) thead tr {
+  background: var(--fx-wood-grain), var(--fx-wood-grad);
+}
+
+[data-theme='fantasy'] :where(.app-main, .app-modal-panel) thead th {
+  color: #fff3dc;
+  font-family: var(--fx-display);
+  font-size: 13.5px;
+  font-weight: 700;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
+}
+
+[data-theme='fantasy'] :where(.app-main, .app-modal-panel) tbody tr {
+  border-color: rgba(255, 255, 255, 0.07);
+}
+
+[data-theme='fantasy'] :where(.app-main, .app-modal-panel) tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+/* Ventanas: marco de madera, interior de piedra nocturna y fondo violeta. */
+[data-theme='fantasy'] .app-modal-backdrop {
+  background-color: rgba(10, 6, 30, 0.62);
+}
+
+[data-theme='fantasy'] .app-modal-panel {
+  border: 8px solid transparent !important;
+  border-radius: 20px;
+  background:
+    var(--fx-panel-bg) padding-box,
+    var(--fx-wood-grain) border-box,
+    var(--fx-wood-grad) border-box !important;
+  box-shadow:
+    0 0 0 2px #2b1608,
+    inset 0 0 0 1px rgba(255, 214, 140, 0.45),
+    0 0 44px -10px rgba(123, 92, 255, 0.5),
+    0 30px 60px -20px rgba(0, 0, 0, 0.85);
+}
+
+/* La tarjeta de la guía y la bienvenida también van enmarcadas en madera. */
+[data-theme='fantasy'] .welcome-tour-card,
+[data-theme='fantasy'] .welcome-card-panel {
+  border: 7px solid transparent !important;
+  background:
+    var(--fx-panel-bg) padding-box,
+    var(--fx-wood-grain) border-box,
+    var(--fx-wood-grad) border-box !important;
+  box-shadow:
+    0 0 0 2px #2b1608,
+    inset 0 0 0 1px rgba(255, 214, 140, 0.45),
+    0 0 40px -12px rgba(123, 92, 255, 0.5),
+    0 24px 50px -18px rgba(0, 0, 0, 0.85);
+}
+
+/* Crear juego: deja ver el cielo y su barra superior queda como el encabezado del inicio. */
+[data-theme='fantasy'] .create-game-layout {
+  background: transparent;
+}
+
+[data-theme='fantasy'] .create-game-header {
+  border-bottom-color: rgba(255, 214, 140, 0.18);
+  background: linear-gradient(180deg, rgba(20, 16, 40, 0.85), rgba(20, 16, 40, 0.35));
+}
+
+[data-theme='fantasy'] .create-game-header p:first-of-type {
+  font-family: var(--fx-display);
+  font-size: 19px;
+  font-weight: 700;
+  color: #f4f0ff;
+}
+
+/* Menú de Configuración: losas de piedra grandes. */
+[data-theme='fantasy'] .settings-menu-item {
+  border: 2px solid #15141b !important;
+  background:
+    radial-gradient(ellipse at 30% 0%, rgba(255, 255, 255, 0.1), transparent 60%),
+    var(--fx-stone-grad) !important;
+  box-shadow: var(--fx-stone-shadow);
+}
+
+[data-theme='fantasy'] .settings-menu-item:hover {
+  border-color: #7c5cff !important;
+  box-shadow: var(--fx-stone-shadow), 0 0 16px -3px rgba(140, 100, 255, 0.85);
 }
 
 /* --- Cielo --- */
@@ -2898,6 +3144,8 @@ code {
 [data-theme='fantasy'] nav[data-tour='navigation'] {
   gap: 9px;
   padding: 2px 2px 34px;
+  scrollbar-width: thin;
+  scrollbar-color: #6e4321 transparent;
 }
 
 [data-theme='fantasy'] .sidebar-item {
@@ -3066,15 +3314,6 @@ code {
   box-shadow: 0 0 0 2px #2b1608, 0 4px 10px rgba(0, 0, 0, 0.5);
 }
 
-[data-theme='fantasy'] .app-header [data-tour='theme-toggle'] {
-  gap: 8px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  box-shadow: none;
-}
-
-[data-theme='fantasy'] .app-header [data-tour='theme-toggle'] button,
 [data-theme='fantasy'] .app-header [data-tour='settings'] {
   width: 44px;
   height: 44px;
@@ -3087,15 +3326,8 @@ code {
   color: #e9e6f5;
 }
 
-[data-theme='fantasy'] .app-header [data-tour='theme-toggle'] button:hover,
 [data-theme='fantasy'] .app-header [data-tour='settings']:hover {
   filter: brightness(1.15);
-}
-
-[data-theme='fantasy'] .app-header [data-tour='theme-toggle'] button[aria-pressed='true'] {
-  color: #ffd84a;
-  border-color: #7c5cff;
-  box-shadow: var(--fx-stone-shadow), 0 0 14px -2px rgba(140, 100, 255, 0.85);
 }
 
 /* --- Banner: neón dentro de un marco de madera con esquinas doradas --- */
@@ -3611,12 +3843,15 @@ code {
 /* --- Tarjetas dentro del carrusel del inicio (todos los temas) --- */
 .games-carousel .game-card-cover {
   flex: 1 1 0;
-  min-height: 0;
+  /* La portada nunca se aplasta: en pantallas bajas el texto se recorta antes. */
+  min-height: 42%;
   height: auto;
 }
 
 .games-carousel .game-card-body {
   flex: 0 0 auto;
+  gap: 4px;
+  padding: 12px 14px;
 }
 
 .games-carousel .game-card-title {
@@ -3628,9 +3863,32 @@ code {
 
 .games-carousel .game-card-desc {
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* El título crece o se achica con el ancho de la tarjeta (cqi) para que quepa entero. */
+.games-carousel .game-card-title {
+  font-size: clamp(16px, 7.4cqi, 22px);
+  overflow-wrap: break-word;
+}
+
+/* "Tipo archivado" baja bajo la etiqueta de modo para no taparla. */
+.games-carousel .game-card-archived {
+  top: 40px;
+  right: auto;
+  left: 8px;
+}
+
+.games-carousel .game-card[data-just-created='true'] .game-card-archived {
+  top: 68px;
+}
+
+[data-theme='fantasy'] .game-card-archived {
+  border: 1px solid rgba(255, 215, 106, 0.5);
+  background: rgba(24, 12, 44, 0.9);
+  color: #f3e3cc;
 }
 
 /* Descripción completa sobre la portada al pasar el cursor o enfocar la tarjeta. */
@@ -3739,9 +3997,32 @@ code {
   [data-theme='fantasy'] .home-section-title {
     font-size: 26px;
   }
+}
+
+@media (max-height: 760px) {
+  [data-theme='fantasy'] .sidebar-header {
+    padding-top: 12px;
+    padding-bottom: 10px;
+  }
+
+  [data-theme='fantasy'] .profile-card {
+    padding-top: 24px;
+    padding-bottom: 20px;
+  }
+
+  [data-theme='fantasy'] .profile-card:not(.is-collapsed) .profile-avatar > span {
+    width: 52px;
+    height: 52px;
+    font-size: 19px;
+  }
+
+  [data-theme='fantasy'] nav[data-tour='navigation'] {
+    gap: 6px;
+  }
 
   [data-theme='fantasy'] .sidebar-item {
-    min-height: 44px;
+    min-height: 42px;
+    font-size: 15px;
   }
 }
 

@@ -53,7 +53,7 @@ export function GamesCarousel({ children, itemCount }: GamesCarouselProps) {
         onScroll={updateArrows}
         tabIndex={0}
         aria-label="Juegos, desliza hacia los lados para ver más"
-        className="games-carousel-track flex h-full snap-x snap-mandatory scroll-px-1 items-start gap-5 overflow-x-auto scroll-smooth rounded-2xl px-1 pt-2 pb-7 outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+        className="games-carousel-track flex h-full snap-x snap-mandatory scroll-px-1 items-start gap-5 overflow-x-auto overflow-y-hidden scroll-smooth rounded-2xl px-1 pt-2 pb-7 outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
         role="region"
       >
         {children}
