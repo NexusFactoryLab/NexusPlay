@@ -60,3 +60,38 @@ export function FantasyCloudBank() {
     </span>
   )
 }
+
+/**
+ * Paisaje de fondo del tema Pradera (issue #47): montañas lilas, una isla
+ * flotante con árboles, colinas con árboles y nubes pastel. Va detrás de toda
+ * la página (z-index -1 dentro del layout) y solo se ve con
+ * [data-theme='meadow']; ver el bloque "Tema Pradera" en index.css.
+ */
+export function MeadowScenery() {
+  return (
+    <span className="mw-scenery" aria-hidden="true">
+      <span className="mw-cloud mw-cloud-1" />
+      <span className="mw-cloud mw-cloud-2" />
+      <span className="mw-cloud mw-cloud-3" />
+      <span className="mw-cloud mw-cloud-4" />
+      <span className="mw-mountains" />
+      <span className="mw-mountains mw-mountains-near" />
+      <span className="mw-sky-island">
+        <span className="mw-tree mw-tree-a">🌳</span>
+        <span className="mw-tree mw-tree-b">🌲</span>
+        <span className="mw-tree mw-tree-c">🌳</span>
+      </span>
+      <span className="mw-sky-island mw-sky-island-small">
+        <span className="mw-tree mw-tree-a">🌲</span>
+      </span>
+      <span className="mw-hill mw-hill-back" />
+      <span className="mw-hill mw-hill-front" />
+      <span className="mw-tree mw-ground-tree mw-ground-1">🌳</span>
+      <span className="mw-tree mw-ground-tree mw-ground-2">🌲</span>
+      <span className="mw-tree mw-ground-tree mw-ground-3">🌳</span>
+      <span className="mw-tree mw-ground-tree mw-ground-4">🌲</span>
+      <span className="mw-cloud mw-cloud-low-1" />
+      <span className="mw-cloud mw-cloud-low-2" />
+    </span>
+  )
+}

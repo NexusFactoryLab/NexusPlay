@@ -4158,17 +4158,8 @@ code {
 
 /* --- Cielo de día con nubes y colinas lejanas --- */
 [data-theme='meadow'] body {
-  background:
-    var(--mw-puff) 6% 18% / 260px 90px no-repeat,
-    var(--mw-puff-pink) 30% 8% / 220px 70px no-repeat,
-    var(--mw-puff) 78% 12% / 300px 100px no-repeat,
-    var(--mw-puff-pink) 94% 40% / 240px 80px no-repeat,
-    radial-gradient(ellipse 40% 18% at 20% 100%, #a9d39a 0%, #8cc27f 60%, transparent 61%),
-    radial-gradient(ellipse 45% 22% at 75% 104%, #9bcb8d 0%, #7fb773 60%, transparent 61%),
-    radial-gradient(ellipse 30% 26% at 48% 108%, #b9dcaa 0%, #9ccd8d 60%, transparent 61%),
-    var(--mw-puff) 50% 96% / 900px 160px no-repeat,
-    linear-gradient(180deg, #9fd0f3 0%, #c7e5f8 55%, #e9f4fb 100%) fixed,
-    #bfe0f7;
+  /* Solo el cielo: montañas, isla, colinas y nubes van en MeadowScenery. */
+  background: linear-gradient(180deg, #8ec8f0 0%, #b9def6 45%, #e3f1fb 100%) fixed, #bfe0f7;
 }
 
 /* --- Barra lateral oscura con íconos a color --- */
@@ -4318,11 +4309,11 @@ code {
 /* --- El gran panel blanco que contiene la página --- */
 [data-theme='meadow'] .app-main {
   margin: 0 18px 16px 6px;
+  border: 6px solid rgba(255, 255, 255, 0.95);
   border-radius: 36px;
-  background: rgba(255, 252, 246, 0.82);
-  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.95), 0 24px 50px -24px rgba(50, 90, 140, 0.55);
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
+  /* Translúcido para que el paisaje (montañas, isla, árboles) se vea a través, como en la referencia. */
+  background: linear-gradient(180deg, rgba(255, 253, 248, 0.5), rgba(255, 253, 248, 0.38));
+  box-shadow: 0 24px 50px -24px rgba(50, 90, 140, 0.55);
 }
 
 [data-theme='meadow'] .create-game-layout {
@@ -4736,5 +4727,164 @@ code {
 
   [data-theme='meadow'] .home-hero {
     margin-top: 0;
+  }
+}
+
+/* --- Paisaje de fondo de Pradera (MeadowScenery en FantasyDecor.tsx) --- */
+.mw-scenery {
+  display: none;
+}
+
+[data-theme='meadow'] .mw-scenery {
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Nubes pastel grandes, en capas rosa y celeste. */
+[data-theme='meadow'] .mw-cloud {
+  position: absolute;
+  background:
+    radial-gradient(closest-side, #ffffff 0 60%, rgba(255, 255, 255, 0) 100%) 8% 100% / 38% 72% no-repeat,
+    radial-gradient(closest-side, #ffffff 0 60%, rgba(255, 255, 255, 0) 100%) 34% 18% / 44% 100% no-repeat,
+    radial-gradient(closest-side, #fdf3ff 0 60%, rgba(253, 243, 255, 0) 100%) 66% 38% / 42% 90% no-repeat,
+    radial-gradient(closest-side, #ffffff 0 60%, rgba(255, 255, 255, 0) 100%) 94% 100% / 36% 70% no-repeat,
+    radial-gradient(closest-side, #fbe2ef 0 55%, rgba(251, 226, 239, 0) 100%) 50% 100% / 96% 60% no-repeat;
+  filter: drop-shadow(0 10px 18px rgba(120, 150, 200, 0.25));
+  animation: mw-drift 26s ease-in-out infinite alternate;
+}
+
+[data-theme='meadow'] .mw-cloud-1 { top: 2%; left: 22%; width: 340px; height: 120px; }
+[data-theme='meadow'] .mw-cloud-2 { top: 6%; right: 2%; width: 420px; height: 150px; animation-duration: 32s; }
+[data-theme='meadow'] .mw-cloud-3 { top: 34%; left: 14%; width: 300px; height: 100px; opacity: 0.85; animation-duration: 30s; }
+[data-theme='meadow'] .mw-cloud-4 { top: 30%; right: 30%; width: 260px; height: 90px; opacity: 0.75; animation-duration: 36s; }
+[data-theme='meadow'] .mw-cloud-low-1 { bottom: -40px; left: 18%; width: 620px; height: 170px; animation-duration: 40s; }
+[data-theme='meadow'] .mw-cloud-low-2 { bottom: -50px; right: -40px; width: 700px; height: 190px; animation-duration: 44s; }
+
+/* Cordillera lila con nieve, detrás de las colinas. */
+[data-theme='meadow'] .mw-mountains {
+  position: absolute;
+  left: 18%;
+  right: 8%;
+  bottom: 18%;
+  height: 38%;
+  background:
+    linear-gradient(180deg, #f4f2fb 0 14%, transparent 14.5%),
+    linear-gradient(180deg, #b7b3d4 0%, #9d9cc4 55%, #a9b8d2 100%);
+  clip-path: polygon(0 100%, 9% 52%, 15% 64%, 26% 18%, 34% 46%, 41% 34%, 52% 0, 61% 40%, 68% 28%, 79% 58%, 88% 42%, 100% 100%);
+  opacity: 0.9;
+}
+
+[data-theme='meadow'] .mw-mountains-near {
+  left: 2%;
+  right: 46%;
+  bottom: 16%;
+  height: 28%;
+  background: linear-gradient(180deg, #c6c3e0 0%, #aab3d6 100%);
+  clip-path: polygon(0 100%, 14% 44%, 24% 58%, 40% 6%, 55% 50%, 66% 30%, 82% 70%, 100% 100%);
+  opacity: 0.85;
+}
+
+/* Isla flotante con árboles (a la derecha, como en la referencia). */
+[data-theme='meadow'] .mw-sky-island {
+  position: absolute;
+  /* En el hueco entre el banner y las tarjetas, para que asomen sus árboles. */
+  top: 44%;
+  right: 7%;
+  width: 250px;
+  height: 130px;
+  filter: drop-shadow(0 14px 16px rgba(80, 110, 160, 0.35));
+  animation: mw-bob 6s ease-in-out infinite;
+}
+
+[data-theme='meadow'] .mw-sky-island::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 38%;
+  height: 26%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 30%, #b8e78f 0%, #7fca63 55%, #5aa44a 100%);
+  z-index: 1;
+}
+
+[data-theme='meadow'] .mw-sky-island::after {
+  content: '';
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  top: 50%;
+  bottom: 0;
+  background: linear-gradient(180deg, #b48a63 0%, #8a6444 60%, #6b4b33 100%);
+  clip-path: polygon(0 0, 100% 0, 78% 55%, 55% 100%, 32% 60%);
+}
+
+[data-theme='meadow'] .mw-sky-island-small {
+  top: 47%;
+  right: 40%;
+  width: 110px;
+  height: 64px;
+  opacity: 0.9;
+  animation-duration: 7.5s;
+}
+
+[data-theme='meadow'] .mw-tree {
+  position: absolute;
+  z-index: 2;
+  line-height: 1;
+  filter: saturate(0.85) drop-shadow(0 3px 2px rgba(40, 80, 40, 0.3));
+}
+
+[data-theme='meadow'] .mw-sky-island .mw-tree-a { left: 20%; bottom: 58%; font-size: 52px; }
+[data-theme='meadow'] .mw-sky-island .mw-tree-b { left: 44%; bottom: 60%; font-size: 64px; }
+[data-theme='meadow'] .mw-sky-island .mw-tree-c { left: 66%; bottom: 58%; font-size: 46px; }
+[data-theme='meadow'] .mw-sky-island-small .mw-tree-a { left: 34%; bottom: 56%; font-size: 34px; }
+
+/* Colinas verdes con árboles al pie. */
+[data-theme='meadow'] .mw-hill {
+  position: absolute;
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+}
+
+[data-theme='meadow'] .mw-hill-back {
+  left: -10%;
+  right: 30%;
+  bottom: -8%;
+  height: 30%;
+  background: linear-gradient(180deg, #a8d98c 0%, #86c472 100%);
+}
+
+[data-theme='meadow'] .mw-hill-front {
+  left: 40%;
+  right: -12%;
+  bottom: -10%;
+  height: 34%;
+  background: linear-gradient(180deg, #9bd27f 0%, #78b864 100%);
+}
+
+[data-theme='meadow'] .mw-ground-tree { bottom: 15%; font-size: 54px; }
+[data-theme='meadow'] .mw-ground-1 { left: 26%; }
+[data-theme='meadow'] .mw-ground-2 { left: 31%; bottom: 13%; font-size: 64px; }
+[data-theme='meadow'] .mw-ground-3 { right: 22%; bottom: 19%; font-size: 48px; }
+[data-theme='meadow'] .mw-ground-4 { right: 17%; bottom: 17%; font-size: 60px; }
+
+@keyframes mw-drift {
+  from { translate: -14px 0; }
+  to { translate: 14px 0; }
+}
+
+@keyframes mw-bob {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-theme='meadow'] .mw-cloud,
+  [data-theme='meadow'] .mw-sky-island {
+    animation: none;
   }
 }

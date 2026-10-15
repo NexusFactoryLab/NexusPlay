@@ -3,6 +3,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { stepFromPath } from './steps'
 import { CreateGameProgressProvider, useCreateGameProgress } from './CreateGameProgressContext'
 import { ScrollMoreHint } from '../../../ScrollMoreHint'
+import { MeadowScenery } from '../../FantasyDecor'
 
 function CreateGameLayoutContent() {
   const navigate = useNavigate()
@@ -12,6 +13,7 @@ function CreateGameLayoutContent() {
 
   return (
     <div className="create-game-layout fixed inset-0 flex flex-col bg-bg">
+      <MeadowScenery />
       <header className="create-game-header flex shrink-0 items-center gap-4 border-b border-border px-5 py-4 sm:px-8">
         <button
           type="button"

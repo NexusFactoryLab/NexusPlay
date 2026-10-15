@@ -12,6 +12,7 @@ import { KidsHomeShell } from './kids/KidsHomeShell'
 import { WelcomeTour } from './WelcomeTour'
 import { isKidsMode } from '../../utils/kidsMode'
 import { ScrollMoreHint } from '../ScrollMoreHint'
+import { MeadowScenery } from './FantasyDecor'
 
 export function HomeLayout() {
   const { user, token, signOut } = useAuth()
@@ -58,6 +59,7 @@ export function HomeLayout() {
 
   return (
     <div className="fixed inset-0 flex text-left">
+      <MeadowScenery />
       <Sidebar
         user={user}
         onSignOut={signOut}
