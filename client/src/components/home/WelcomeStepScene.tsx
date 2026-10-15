@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react'
-import { ArrowLeft, BookOpen, Building2, ChevronLeft, Compass, Gamepad2, KeyRound, Lock, LogOut, Moon, Palette, Plus, Search, Settings, Sun, UserRound, Users, Users2, Zap } from 'lucide-react'
+import { ArrowLeft, BookOpen, Bot, Building2, ChevronLeft, Compass, Gamepad2, KeyRound, Lock, LogOut, Moon, Palette, Plus, Search, Settings, Sun, UserRound, Users, Users2, Zap } from 'lucide-react'
 
 /** Duración de cada bucle: el dedo va al elemento, lo toca y se ve el resultado. */
 const LOOP = '4s'
@@ -14,8 +14,12 @@ const NAV: NavItem[] = [
   { target: 'nav-community', label: 'Comunidad', icon: Users2 },
   { target: 'nav-own-games', label: 'Mis juegos', icon: Lock },
   { target: 'nav-users', label: 'Usuarios', icon: Users },
+  { target: 'nav-ai-providers', label: 'IA', icon: Bot },
   { target: 'nav-organization', label: 'Organización', icon: Building2 },
 ]
+
+/** Solo las cuentas administrativas ven estos pasos (ver getWelcomeSteps). */
+const ADMIN_TARGETS = ['nav-users', 'nav-ai-providers', 'nav-organization']
 
 const GAMES = [
   { emoji: '🧠', name: 'MatchMente', color: '#a78bfa' },
@@ -52,7 +56,7 @@ export function WelcomeStepScene({ target }: { target: string }) {
   const theming = target === 'theme-toggle'
   const collapsing = target === 'menu-toggle'
   const spot: [string, string] | undefined = navItem
-    ? ['9%', `${24 + showNav.indexOf(navItem) * 15}px`]
+    ? ['9%', `${24 + showNav.indexOf(navItem) * 15 + (ADMIN_TARGETS.includes(navItem.target) ? 9 : 0)}px`]
     : SPOTS[target]
 
   return (
@@ -72,14 +76,18 @@ export function WelcomeStepScene({ target }: { target: string }) {
           <Label collapsing={collapsing} className="text-[7.5px] font-bold text-text-h">NexusPlay</Label>
         </span>
         {showNav.map((item, i) => {
+          const firstAdmin = ADMIN_TARGETS.includes(item.target) && !ADMIN_TARGETS.includes(showNav[i - 1]?.target ?? '')
           const Icon = item.icon
           const style: CSSProperties | undefined = target === 'navigation'
             ? { animation: `tour-scene-nav-walk ${LOOP} ease-in-out ${i * 0.8}s infinite` }
             : item === navItem ? { animation: `tour-scene-nav-lit ${LOOP} ease-in-out infinite` } : undefined
           return (
-            <span key={item.target} className="flex h-[12px] items-center gap-1 rounded-[4px] px-1 text-text" style={style}>
-              <Icon className="h-2 w-2 shrink-0" strokeWidth={2.5} />
-              <Label collapsing={collapsing} className="text-[6.5px] font-medium">{item.label}</Label>
+            <span key={item.target} className="contents">
+              {firstAdmin && <span className="mt-1 px-1 text-[5px] font-semibold tracking-wide text-text/60 uppercase">Administración</span>}
+              <span className="flex h-[12px] items-center gap-1 rounded-[4px] px-1 text-text" style={style}>
+                <Icon className="h-2 w-2 shrink-0" strokeWidth={2.5} />
+                <Label collapsing={collapsing} className="text-[6.5px] font-medium">{item.label}</Label>
+              </span>
             </span>
           )
         })}
@@ -244,20 +252,154 @@ function GameRow({ filtering }: { filtering: boolean }) {
   )
 }
 
-/** Al tocar un ítem del menú, el contenido pasa a esa sección. */
+/** Títulos de cada sección, como los encabezados reales de cada página. */
+const SECTION_TITLES: Record<string, string> = {
+  'nav-home': 'Inicio',
+  'nav-subjects': 'Materias',
+  'nav-classes': 'Mis clases',
+  'nav-community': 'Comunidad',
+  'nav-own-games': 'Mis juegos privados',
+  'nav-users': 'Usuarios',
+  'nav-ai-providers': 'Proveedores de IA',
+  'nav-organization': 'Organización',
+}
+
+/** Al tocar un ítem del menú, el contenido pasa a esa sección, con lo que de verdad se ve ahí. */
 function SectionView({ item }: { item: NavItem }) {
   const Icon = item.icon
   const appear = { animation: `tour-scene-result ${LOOP} ease-in-out infinite` }
   return (
     <>
       <span className="flex items-center gap-1 text-[8px] font-bold text-text-h" style={appear}>
-        <Icon className="h-2.5 w-2.5 text-accent" /> {item.label}
+        <Icon className="h-2.5 w-2.5 text-accent" /> {SECTION_TITLES[item.target] ?? item.label}
       </span>
-      <div className="grid flex-1 grid-cols-3 gap-1" style={appear}>
-        {GAMES.map((game) => <GameCard key={game.name} game={game} />)}
+      <div className="flex min-h-0 flex-1 flex-col" style={appear}>
+        <SectionBody target={item.target} />
       </div>
     </>
   )
+}
+
+const CHIP = 'rounded-full px-1 py-[1px] text-[5px] font-bold'
+const rowIn = (i: number, step = 0.08) => ({ animation: `tour-scene-row 0.4s ease-out ${i * step}s both` })
+const tint = (color: string, amount = 22) => `color-mix(in srgb, ${color} ${amount}%, transparent)`
+
+const USERS = [
+  ['AM', 'Ana Martínez', 'Docente', '#06b6d4'],
+  ['JP', 'Juan Pérez', 'Estudiante', '#22c55e'],
+  ['LR', 'Laura Ríos', 'Admin', '#a78bfa'],
+  ['CG', 'Carlos Gómez', 'Estudiante', '#22c55e'],
+  ['SV', 'Sofía Vargas', 'Docente', '#06b6d4'],
+]
+const AI_REQUESTS = [
+  ['Juego de fracciones para 5°', 'Ana M.', 'Listo', '#22c55e'],
+  ['Opuestos: emociones', 'Sofía V.', 'Generando…', '#f59e0b'],
+  ['Laberinto del sistema solar', 'Juan P.', 'Listo', '#22c55e'],
+  ['Verbos en inglés', 'Carlos G.', 'Error', '#ef4444'],
+]
+const SCHOOLS = [['🏫', 'Colegio San José', '#06b6d4'], ['🎓', 'Liceo Nacional', '#a78bfa'], ['📚', 'Instituto Andino', '#ff7a1a'], ['🌱', 'Escuela Nueva Era', '#22c55e']]
+const SUBJECTS = [['🔢', 'Matemáticas', '#ff7a1a'], ['🔬', 'Ciencias', '#22c55e'], ['🌎', 'Sociales', '#06b6d4'], ['📖', 'Lenguaje', '#a78bfa'], ['🎨', 'Arte', '#ff4d6d'], ['🎵', 'Música', '#ffcc4d']]
+const CLASSES = [['5°A', 'Matemáticas', '28', '#ff7a1a'], ['6°B', 'Ciencias', '31', '#22c55e'], ['7°A', 'Inglés', '25', '#a78bfa']]
+
+/** Contenido de cada sección en miniatura. Usuarios, IA y Organización solo salen en cuentas administrativas. */
+function SectionBody({ target }: { target: string }) {
+  if (target === 'nav-users') {
+    return (
+      <div className="flex flex-col overflow-hidden rounded-md border border-border">
+        <span className="flex bg-code-bg px-1 py-[2px] text-[5px] font-semibold text-text/70 uppercase"><span className="flex-1">Nombre</span>Rol</span>
+        {USERS.map(([initials, name, role, color], i) => (
+          <span key={name} className="flex items-center gap-1 border-t border-border px-1 py-[2px]" style={rowIn(i)}>
+            <span className="flex h-2.5 w-2.5 shrink-0 items-center justify-center rounded-full text-[4px] font-bold text-white" style={{ background: color }}>{initials}</span>
+            <span className="flex-1 truncate text-[6px] font-semibold text-text-h">{name}</span>
+            <span className={CHIP} style={{ background: tint(color), color }}>{role}</span>
+          </span>
+        ))}
+      </div>
+    )
+  }
+  if (target === 'nav-ai-providers') {
+    return (
+      <div className="flex flex-col gap-[3px]">
+        <span className="flex items-center gap-1 text-[5.5px] text-text/70">
+          <span className="h-1.5 w-1.5 rounded-full bg-[#22c55e]" style={{ animation: 'tour-scene-blink 1.2s ease-in-out infinite' }} /> Peticiones de creación con IA
+        </span>
+        {AI_REQUESTS.map(([prompt, who, status, color], i) => (
+          <span key={prompt} className="flex items-center gap-1 rounded-md border border-border bg-surface px-1 py-[2px]" style={rowIn(i, 0.1)}>
+            <Bot className="h-2 w-2 shrink-0 text-accent" />
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="truncate text-[6px] font-semibold text-text-h">“{prompt}”</span>
+              <span className="text-[5px] text-text/60">{who}</span>
+            </span>
+            <span className={CHIP} style={{ background: tint(color), color, animation: status === 'Generando…' ? 'tour-scene-blink 1.2s ease-in-out infinite' : undefined }}>{status}</span>
+          </span>
+        ))}
+      </div>
+    )
+  }
+  if (target === 'nav-organization') {
+    return (
+      <div className="grid flex-1 grid-cols-2 gap-1">
+        {SCHOOLS.map(([emoji, name, color], i) => (
+          <span key={name} className="flex items-center gap-1 rounded-md border border-border p-1" style={{ background: `linear-gradient(135deg, ${tint(color, 28)}, transparent)`, ...rowIn(i, 0.1) }}>
+            <span className="text-[12px]">{emoji}</span>
+            <span className="flex min-w-0 flex-col">
+              <span className="truncate text-[6px] font-bold text-text-h">{name}</span>
+              <span className="text-[5px] text-text/60">{12 + i * 7} miembros</span>
+            </span>
+          </span>
+        ))}
+      </div>
+    )
+  }
+  if (target === 'nav-subjects') {
+    return (
+      <div className="grid flex-1 grid-cols-3 gap-1">
+        {SUBJECTS.map(([emoji, name, color], i) => (
+          <span key={name} className="flex flex-col items-center justify-center rounded-md" style={{ background: tint(color, 28), ...rowIn(i, 0.06) }}>
+            <span className="text-[12px]">{emoji}</span>
+            <span className="text-[5.5px] font-bold text-text-h">{name}</span>
+            <span className="text-[4.5px] text-text/60">{3 + i} juegos</span>
+          </span>
+        ))}
+      </div>
+    )
+  }
+  if (target === 'nav-classes') {
+    return (
+      <div className="flex flex-col gap-1">
+        {CLASSES.map(([group, subject, count, color], i) => (
+          <span key={group} className="flex items-center gap-1.5 rounded-md border border-border bg-surface px-1.5 py-1" style={rowIn(i, 0.1)}>
+            <span className="flex h-3.5 w-5 items-center justify-center rounded text-[6px] font-bold text-white" style={{ background: color }}>{group}</span>
+            <span className="flex-1 text-[6px] font-semibold text-text-h">{subject}</span>
+            <span className="flex items-center gap-0.5 text-[5px] text-text/70"><Users2 className="h-1.5 w-1.5" />{count} estudiantes</span>
+          </span>
+        ))}
+      </div>
+    )
+  }
+  if (target === 'nav-community' || target === 'nav-own-games') {
+    const own = target === 'nav-own-games'
+    const footers = own ? [['Privado', '#a78bfa'], ['Borrador', '#f59e0b'], ['Privado', '#a78bfa']] : [['por Ana M.', ''], ['por Juan P.', ''], ['por Sofía V.', '']]
+    return (
+      <div className="grid flex-1 grid-cols-3 gap-1">
+        {GAMES.map((game, i) => (
+          <span key={game.name} className="relative flex flex-col overflow-hidden rounded-md border border-border bg-surface" style={rowIn(i, 0.1)}>
+            <span className="flex flex-1 items-center justify-center text-[14px]" style={{ background: tint(game.color, 30) }}>{game.emoji}</span>
+            {own && <Lock className="absolute top-0.5 right-0.5 h-2 w-2 text-text-h" />}
+            <span className="px-1 py-[2px]">
+              <span className="block text-[5.5px] font-bold text-text-h">{game.name}</span>
+              {own ? (
+                <span className={CHIP} style={{ background: tint(footers[i][1]), color: footers[i][1] }}>{footers[i][0]}</span>
+              ) : (
+                <span className="flex justify-between text-[4.5px] text-text/60">{footers[i][0]}<span className="text-[#ff4d6d]">♥ {24 - i * 7}</span></span>
+              )}
+            </span>
+          </span>
+        ))}
+      </div>
+    )
+  }
+  return <GameRow filtering={false} />
 }
 
 function Result({ className, children }: { className: string; children: ReactNode }) {
