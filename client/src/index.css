@@ -2,8 +2,9 @@
 @import 'tailwindcss';
 
 /* Toggle manual de tema: dark: se activa por [data-theme=dark] en <html>,
- * no solo por prefers-color-scheme (ver useTheme.ts). */
-@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+ * no solo por prefers-color-scheme (ver useTheme.ts). Fantasía también es un
+ * tema de fondo oscuro, así que comparte la variante. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *, [data-theme="fantasy"], [data-theme="fantasy"] *));
 
 @theme {
   --color-text: #5b5a66;
@@ -65,6 +66,24 @@
   --color-accent: #ff7a1a;
   --color-accent-2: #06b6d4;
   --color-danger: #ff4d6d;
+}
+
+/*
+ * Fantasía (issue #47, tema predeterminado): cielo nocturno índigo, superficies
+ * de piedra violácea y acentos violeta + rosa para que los botones con texto
+ * blanco sigan teniendo buen contraste; el dorado queda para decoraciones
+ * (títulos, marcos, avatar) en el bloque "Tema Fantasía" al final del archivo.
+ */
+:root[data-theme='fantasy'] {
+  --color-text: #c9c2e8;
+  --color-text-h: #fbf8ff;
+  --color-bg: #17123a;
+  --color-surface: #272148;
+  --color-border: #463c70;
+  --color-code-bg: #312959;
+  --color-accent: #7b5cff;
+  --color-accent-2: #ff3d7f;
+  --color-danger: #ff6b7d;
 }
 
 :root {
@@ -178,6 +197,32 @@
   /* Tipografía redondeada y juguetona, distinta al resto de temas. */
   --sans: 'Quicksand', var(--font-sans);
   --heading: 'Baloo 2', var(--font-heading);
+}
+
+:root[data-theme='fantasy'] {
+  --text: #c9c2e8;
+  --text-h: #fbf8ff;
+  --bg: #17123a;
+  --surface: #272148;
+  --border: #463c70;
+  --code-bg: #312959;
+  --accent: #7b5cff;
+  --accent-2: #ff3d7f;
+  --accent-bg: rgba(123, 92, 255, 0.16);
+  --accent-border: rgba(123, 92, 255, 0.5);
+  --social-bg: rgba(49, 41, 89, 0.6);
+  --shadow: 0 22px 50px -22px rgba(4, 2, 20, 0.75);
+  --glow: 0 0 32px -6px rgba(123, 92, 255, 0.5);
+  color-scheme: dark;
+
+  --fantasy-gold: #ffc83d;
+  --fantasy-gold-light: #ffe58a;
+  --fantasy-gold-dark: #b8730f;
+  --fantasy-wood: #7a4a24;
+  --fantasy-wood-light: #9a6534;
+  --fantasy-wood-dark: #3f230e;
+  --fantasy-stone: #393350;
+  --fantasy-stone-dark: #221d33;
 }
 
 :root[data-theme='light'] {
@@ -2499,4 +2544,295 @@ code {
 @keyframes tour-scene-blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }
+}
+
+/* ============================================================
+ * Tema Fantasía (issue #47) — el predeterminado.
+ * Todo con CSS, emojis e íconos, sin imágenes nuevas: cielo nocturno con
+ * estrellas y nubes, barra lateral de piedra con borde de madera, avatar con
+ * marco dorado, banner que brilla dentro de un marco de madera y tarjetas de
+ * juego enmarcadas en madera. Las portadas siguen siendo las de cada juego
+ * (game.theme.coverImageUrl): aquí solo cambia el marco.
+ * Claro y Oscuro no usan nada de esto: son las versiones minimalistas.
+ * ============================================================ */
+
+/* Elementos que solo existen en Fantasía (trofeo en emoji y destellos del banner). */
+.home-hero-trophy-emoji,
+.home-hero-spark {
+  display: none;
+}
+
+/* Cielo: estrellas en dos capas repetidas, nubes violetas abajo y degradado nocturno. */
+[data-theme='fantasy'] body {
+  background-color: #17123a;
+  background-image:
+    radial-gradient(1.6px 1.6px at 24px 36px, rgba(255, 255, 255, 0.95) 50%, transparent 52%),
+    radial-gradient(1.2px 1.2px at 140px 90px, rgba(255, 255, 255, 0.8) 50%, transparent 52%),
+    radial-gradient(1px 1px at 210px 190px, rgba(255, 236, 170, 0.9) 50%, transparent 52%),
+    radial-gradient(1.4px 1.4px at 80px 230px, rgba(255, 255, 255, 0.7) 50%, transparent 52%),
+    radial-gradient(1px 1px at 60px 120px, rgba(196, 180, 255, 0.9) 50%, transparent 52%),
+    radial-gradient(1.2px 1.2px at 300px 60px, rgba(255, 255, 255, 0.85) 50%, transparent 52%),
+    radial-gradient(ellipse 22% 12% at 8% 100%, rgba(186, 160, 255, 0.55), transparent 70%),
+    radial-gradient(ellipse 26% 14% at 32% 104%, rgba(214, 186, 255, 0.45), transparent 70%),
+    radial-gradient(ellipse 24% 13% at 62% 102%, rgba(176, 150, 255, 0.5), transparent 70%),
+    radial-gradient(ellipse 28% 15% at 92% 100%, rgba(220, 196, 255, 0.5), transparent 70%),
+    radial-gradient(circle at 75% 10%, rgba(123, 92, 255, 0.35), transparent 40%),
+    radial-gradient(circle at 20% 40%, rgba(255, 61, 127, 0.16), transparent 45%),
+    linear-gradient(180deg, #110d2e 0%, #1d1650 55%, #2b2068 100%);
+  background-size:
+    260px 260px, 260px 260px, 260px 260px, 260px 260px, 340px 340px, 340px 340px,
+    100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-repeat:
+    repeat, repeat, repeat, repeat, repeat, repeat,
+    no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat;
+  background-attachment: fixed;
+}
+
+/* Barra lateral de piedra con borde de madera y filete dorado. */
+[data-theme='fantasy'] .app-sidebar {
+  background:
+    repeating-linear-gradient(0deg, transparent 0 46px, rgba(0, 0, 0, 0.18) 46px 48px),
+    radial-gradient(circle at 30% 0%, rgba(123, 92, 255, 0.18), transparent 55%),
+    linear-gradient(180deg, #2d2842 0%, #211c31 100%);
+  border-right: 6px solid var(--fantasy-wood);
+  box-shadow:
+    inset -2px 0 0 var(--fantasy-gold-dark),
+    6px 0 18px -6px rgba(0, 0, 0, 0.6);
+}
+
+[data-theme='fantasy'] .sidebar-brand {
+  font-family: var(--heading);
+  font-size: 22px;
+  font-weight: 800;
+  background: linear-gradient(180deg, var(--fantasy-gold-light), var(--fantasy-gold) 55%, #f08a1c);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 2px 0 #6b3a08);
+}
+
+[data-theme='fantasy'] .sidebar-logo {
+  border-radius: 12px 12px 18px 18px;
+  box-shadow:
+    0 0 0 2px var(--fantasy-gold),
+    0 4px 12px -2px rgba(123, 92, 255, 0.7);
+}
+
+/* Bloque del avatar: placa de madera con borde dorado. */
+[data-theme='fantasy'] .profile-card > button {
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.08) 0 2px, transparent 2px 14px),
+    linear-gradient(180deg, #3a2f52, #2a2340);
+  border: 2px solid color-mix(in srgb, var(--fantasy-gold) 55%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 6px 16px -8px rgba(0, 0, 0, 0.7);
+}
+
+[data-theme='fantasy'] .profile-card > button:hover {
+  border-color: var(--fantasy-gold);
+}
+
+[data-theme='fantasy'] .profile-avatar {
+  box-shadow: 0 0 14px -2px rgba(255, 200, 61, 0.65);
+}
+
+/* Ítems del menú como losas de piedra. */
+[data-theme='fantasy'] nav[data-tour='navigation'] {
+  gap: 8px;
+}
+
+[data-theme='fantasy'] .sidebar-item {
+  background: linear-gradient(180deg, var(--fantasy-stone), #2b2640);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 3px 0 #15121f;
+  color: #fbf8ff;
+}
+
+[data-theme='fantasy'] .sidebar-item:hover {
+  background: linear-gradient(180deg, #443d5e, #322c4a);
+}
+
+[data-theme='fantasy'] .sidebar-item[aria-current='page'] {
+  color: #d9c8ff;
+  border-color: color-mix(in srgb, var(--accent) 70%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 3px 0 #15121f,
+    0 0 16px -4px var(--accent);
+}
+
+/* Encabezado: sin franja, el cielo se ve de punta a punta. */
+[data-theme='fantasy'] .app-header {
+  border-bottom-color: transparent;
+}
+
+[data-theme='fantasy'] .app-header form[role='search'] {
+  background: linear-gradient(180deg, #2f2946, #241f37);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+
+/* Banner: brillo rosa → violeta → celeste dentro de un marco de madera con filete dorado. */
+[data-theme='fantasy'] .home-hero {
+  background:
+    radial-gradient(circle at 82% 30%, rgba(255, 255, 255, 0.4), transparent 38%),
+    radial-gradient(circle at 10% 90%, rgba(255, 255, 255, 0.18), transparent 40%),
+    linear-gradient(115deg, #ff4fa3 0%, #c45bff 42%, #6f8dff 74%, #5fe0ff 100%) !important;
+  border: 6px solid var(--fantasy-wood);
+  box-shadow:
+    0 0 0 2px var(--fantasy-gold),
+    inset 0 0 0 2px rgba(255, 229, 138, 0.7),
+    0 0 40px -8px rgba(255, 79, 163, 0.65),
+    0 20px 40px -18px rgba(0, 0, 0, 0.8);
+  padding: 26px 36px;
+}
+
+[data-theme='fantasy'] .home-hero-grid {
+  display: none;
+}
+
+[data-theme='fantasy'] .home-hero p {
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(60, 10, 70, 0.55);
+}
+
+[data-theme='fantasy'] .home-hero-title {
+  font-family: var(--heading);
+  font-size: clamp(26px, 2.7vw, 38px);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  color: var(--fantasy-gold-light);
+  -webkit-text-stroke: 1px #8a3d00;
+  paint-order: stroke fill;
+  text-shadow:
+    0 3px 0 #c2580f,
+    0 7px 16px rgba(60, 0, 50, 0.45);
+}
+
+[data-theme='fantasy'] .home-hero [data-tour='create'] {
+  background: linear-gradient(180deg, #4b95ff, #1f4fd1) !important;
+  border: 2px solid var(--fantasy-gold-light);
+  box-shadow:
+    0 4px 0 #13307f,
+    0 12px 22px -10px rgba(0, 0, 0, 0.7);
+}
+
+[data-theme='fantasy'] .home-hero [data-tour='join'] {
+  background: linear-gradient(180deg, #ff5a86, #d61f55) !important;
+  border: 2px solid var(--fantasy-gold-light);
+}
+
+[data-theme='fantasy'] .home-hero-trophy {
+  width: 140px;
+  height: 140px;
+  border: none;
+  background: transparent !important;
+}
+
+[data-theme='fantasy'] .home-hero-trophy-icon {
+  display: none;
+}
+
+[data-theme='fantasy'] .home-hero-trophy-emoji {
+  display: block;
+  font-size: 92px;
+  line-height: 1;
+  filter: drop-shadow(0 0 18px rgba(255, 200, 61, 0.85)) drop-shadow(0 8px 10px rgba(80, 20, 60, 0.45));
+  animation: fantasy-float 3.2s ease-in-out infinite;
+}
+
+[data-theme='fantasy'] .home-hero-spark {
+  display: block;
+  position: absolute;
+  font-size: 22px;
+  animation: fantasy-twinkle 2.4s ease-in-out infinite;
+}
+
+.home-hero-spark-1 { top: 4px; left: 6px; }
+.home-hero-spark-2 { top: 18px; right: 0; font-size: 18px; animation-delay: 0.8s; }
+.home-hero-spark-3 { bottom: 10px; right: 14px; font-size: 16px; animation-delay: 1.5s; }
+
+/* Títulos de sección claros y con sombra para que se lean sobre el cielo. */
+[data-theme='fantasy'] .home-section-title {
+  font-family: var(--heading);
+  font-weight: 700;
+  font-size: 26px;
+  text-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+}
+
+/* Tarjetas de juego: marco de madera, portada encajada y placa de madera con el título. */
+[data-theme='fantasy'] .game-card {
+  background: var(--fantasy-wood-dark);
+  border: 5px solid var(--fantasy-wood);
+  border-radius: 18px;
+  box-shadow:
+    inset 0 0 0 2px var(--fantasy-wood-light),
+    0 0 0 2px #2b170a,
+    0 16px 30px -14px rgba(0, 0, 0, 0.85);
+}
+
+[data-theme='fantasy'] .game-card[data-just-created='true'] {
+  border-color: var(--fantasy-gold);
+}
+
+[data-theme='fantasy'] .game-card-cover {
+  height: 150px;
+  margin: 6px 6px 0;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.35);
+}
+
+[data-theme='fantasy'] .game-card-body {
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.07) 0 2px, transparent 2px 11px),
+    linear-gradient(180deg, #8a5a30, #6b4220);
+  margin: 6px;
+  border-radius: 10px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 220, 170, 0.35),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.3);
+}
+
+[data-theme='fantasy'] .game-card-body h3 {
+  color: #fff8ec;
+  text-shadow: 0 2px 0 rgba(60, 30, 5, 0.7);
+}
+
+[data-theme='fantasy'] .game-card-body p {
+  color: #f3e3cc;
+}
+
+/* Carrusel: flechas doradas y barra de desplazamiento discreta. */
+[data-theme='fantasy'] .games-carousel-arrow {
+  background: linear-gradient(180deg, var(--fantasy-gold-light), var(--fantasy-gold) 60%, var(--fantasy-gold-dark));
+  border: 2px solid #6b3a08;
+  color: #3f230e;
+}
+
+.games-carousel-track {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--accent) 55%, transparent) transparent;
+}
+
+@keyframes fantasy-float {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-8px) rotate(2deg); }
+}
+
+@keyframes fantasy-twinkle {
+  0%, 100% { opacity: 0.35; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-theme='fantasy'] .home-hero-trophy-emoji,
+  [data-theme='fantasy'] .home-hero-spark {
+    animation: none;
+  }
 }

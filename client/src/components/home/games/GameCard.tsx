@@ -61,7 +61,7 @@ export function GameCard({
       type="button"
       onClick={handleClick}
       data-just-created={justCreated ? 'true' : undefined}
-      className={`group relative flex h-full min-w-0 w-full flex-col overflow-hidden rounded-2xl border bg-surface text-left shadow-[var(--shadow)] transition-transform hover:-translate-y-1 ${
+      className={`game-card group relative flex h-full min-w-0 w-full flex-col overflow-hidden rounded-2xl border bg-surface text-left shadow-[var(--shadow)] transition-transform hover:-translate-y-1 ${
         justCreated
           ? 'border-accent ring-2 ring-accent/60 shadow-[0_0_0_4px_rgba(var(--accent-rgb,59,130,246),0.15),0_0_28px_-4px_var(--accent)] animate-[glow-pulse_1.8s_ease-in-out_infinite]'
           : 'border-border'
@@ -103,7 +103,7 @@ export function GameCard({
         </span>
       )}
       <div
-        className="flex h-28 shrink-0 items-center justify-center text-3xl transition-[filter] group-hover:brightness-110"
+        className="game-card-cover flex h-28 shrink-0 items-center justify-center text-3xl transition-[filter] group-hover:brightness-110"
         style={{
           background: `linear-gradient(135deg, ${accentColor}55, ${accentColor}15)`,
         }}
@@ -127,7 +127,7 @@ export function GameCard({
           </span>
         )}
       </div>
-      <div className="flex flex-1 flex-col gap-1.5 p-4">
+      <div className="game-card-body flex flex-1 flex-col gap-1.5 p-4">
         {edition ? (
           <div className="space-y-1">
             <h3 className="text-[22px] font-bold leading-tight text-text-h [overflow-wrap:anywhere]">{game.title}</h3>

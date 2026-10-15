@@ -2,7 +2,12 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { BarChart3, BookOpen, Bot, Building2, ChevronLeft, Gamepad2, LayoutGrid, Lock, Plus, Users, Users2, Zap } from 'lucide-react'
+import type { AuthUser } from '../../services/auth.service'
+import { ProfileMenu } from './ProfileMenu'
+
 type SidebarProps = {
+  user: AuthUser
+  onSignOut: () => void
   userRole: string
   canManageUsers: boolean
   /** ADMIN de al menos una organización, o ADMIN global (ver HomeLayout). */
@@ -22,7 +27,7 @@ function readStoredCollapsed(): boolean {
   }
 }
 
-export function Sidebar({ userRole, canManageUsers, canAccessOrganization }: SidebarProps) {
+export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOrganization }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(readStoredCollapsed)
   const navigate = useNavigate()
   const location = useLocation()
@@ -41,7 +46,7 @@ export function Sidebar({ userRole, canManageUsers, canAccessOrganization }: Sid
 
   return (
     <aside
-      className={`relative flex shrink-0 flex-col gap-1 border-r border-border bg-bg p-4 transition-[width] duration-200 ease-out ${
+      className={`app-sidebar relative flex shrink-0 flex-col gap-1 border-r border-border bg-bg p-4 transition-[width] duration-200 ease-out ${
         collapsed ? 'w-[76px]' : 'w-[240px]'
       }`}
     >
@@ -61,18 +66,20 @@ export function Sidebar({ userRole, canManageUsers, canAccessOrganization }: Sid
 
       <div className="mb-4 flex items-center gap-2.5 px-1.5">
         <span
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white"
+          className="sidebar-logo flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white"
           style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
           aria-hidden="true"
         >
           <Zap className="h-[18px] w-[18px]" fill="currentColor" strokeWidth={0} />
         </span>
         {!collapsed && (
-          <span className="truncate text-[17px] font-semibold tracking-tight text-text-h">
+          <span className="sidebar-brand truncate text-[17px] font-semibold tracking-tight text-text-h">
             NexusPlay
           </span>
         )}
       </div>
+
+      <ProfileMenu user={user} onSignOut={onSignOut} placement="sidebar" collapsed={collapsed} />
 
       {userRole.toUpperCase() === 'TEACHER' && (
         <button
@@ -215,7 +222,7 @@ function SidebarItem({
       type="button"
       data-tour={tourTarget}
       title={collapsed ? label : undefined}
-      className={`${BASE_ITEM_CLASS} ${collapsed ? 'justify-center px-0' : ''} ${
+      className={`sidebar-item ${BASE_ITEM_CLASS} ${collapsed ? 'justify-center px-0' : ''} ${
         active ? 'bg-accent/10 text-accent' : 'text-text-h hover:bg-code-bg'
       }`}
       aria-current={active ? 'page' : undefined}

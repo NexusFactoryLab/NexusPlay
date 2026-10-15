@@ -3,7 +3,6 @@ import { Outlet } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { Sidebar } from './Sidebar'
 import { SearchBar } from './SearchBar'
-import { ProfileMenu } from './ProfileMenu'
 import { SettingsButton } from './SettingsButton'
 import { ThemeToggle } from '../ThemeToggle'
 import { SettingsPanel } from './SettingsPanel'
@@ -61,19 +60,20 @@ export function HomeLayout() {
   return (
     <div className="fixed inset-0 flex text-left">
       <Sidebar
+        user={user}
+        onSignOut={signOut}
         userRole={user.role}
         canManageUsers={canManageUsers}
         canAccessOrganization={canAccessOrganization || canManageUsers}
       />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex shrink-0 flex-wrap items-center justify-between gap-4 border-b border-border px-6 py-4">
+        <header className="app-header flex shrink-0 flex-wrap items-center justify-between gap-4 border-b border-border px-6 py-4">
           <SearchBar value={searchInput} onChange={setSearchInput} onSearch={handleSearch} />
           <div className="ml-auto flex shrink-0 items-center gap-2">
             <WelcomeTour key={`${user.id}:${user.role}`} user={user} canAccessOrganization={canAccessOrganization || canManageUsers} />
             <ThemeToggle />
             <SettingsButton onClick={() => setSettingsOpen(true)} />
-            <ProfileMenu user={user} onSignOut={signOut} />
           </div>
         </header>
 

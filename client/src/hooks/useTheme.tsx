@@ -3,13 +3,24 @@ import type { ReactNode } from 'react'
 import { useAuth } from './useAuth'
 import { isKidsMode } from '../utils/kidsMode'
 
-export type Theme = 'light' | 'dark' | 'kids'
+/**
+ * 'fantasy' es el predeterminado (issue #47): cielo nocturno, piedra, madera y
+ * pergamino. 'light' y 'dark' quedan como las versiones minimalistas.
+ */
+export type Theme = 'fantasy' | 'light' | 'dark' | 'kids'
+
+export const DEFAULT_THEME: Theme = 'fantasy'
+
+/** Temas con fondo oscuro: deciden, por ejemplo, el botón de Google o el cielo de MatchMente. */
+export function isDarkTheme(theme: Theme): boolean {
+  return theme === 'dark' || theme === 'fantasy'
+}
 
 const STORAGE_KEY = 'nexusplay-theme'
 
 function readStoredTheme(): Theme | null {
   const stored = localStorage.getItem(STORAGE_KEY)
-  return stored === 'light' || stored === 'dark' || stored === 'kids' ? stored : null
+  return stored === 'fantasy' || stored === 'light' || stored === 'dark' || stored === 'kids' ? stored : null
 }
 
 function applyTheme(theme: Theme) {
@@ -44,7 +55,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // `ThemeProvider` solo se monta dentro del árbol de <AuthProvider> (ver
   // main.tsx).
   const { user } = useAuth()
-  const [theme, setThemeState] = useState<Theme>(() => readStoredTheme() ?? 'light')
+  const [theme, setThemeState] = useState<Theme>(() => readStoredTheme() ?? DEFAULT_THEME)
   const effectiveTheme: Theme = isKidsMode(user) ? 'kids' : theme
 
   useEffect(() => {

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { AlertTriangle, KeyRound, PlusCircle, Sparkles, Trash2, Trophy } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
@@ -22,6 +23,7 @@ import {
 import { ApiError } from '../../utils/http'
 import { trackEvent } from '../../services/analytics.service'
 import { GameCard } from './games/GameCard'
+import { GamesCarousel } from './games/GamesCarousel'
 import { playTargetFor, UNSUPPORTED_GAME_MESSAGE } from './games/gamePlayRoute'
 import { JustCreatedFocus } from './JustCreatedFocus'
 import { parseCreatedKind } from './games/create/justCreatedRedirect'
@@ -919,11 +921,18 @@ export function GamesSection({
     )
   }
 
+  // En el Home los juegos van en una fila horizontal (issue #47); el resto de
+  // pantallas (Comunidad, Mis juegos, un tipo de juego) mantiene la grilla.
+  function renderGameList(cards: ReactNode[]) {
+    if (mode === 'all') return <GamesCarousel itemCount={cards.length}>{cards}</GamesCarousel>
+    return <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{cards}</div>
+  }
+
   return (
-    <section className="flex flex-col gap-10">
+    <section className={`flex flex-col ${mode === 'all' ? 'gap-7' : 'gap-10'}`}>
       {mode === 'all' && (
         <div
-          className="relative overflow-hidden rounded-3xl border border-border p-8 sm:p-10"
+          className="home-hero relative overflow-hidden rounded-3xl border border-border p-8 sm:p-10"
           style={{
             background:
               'radial-gradient(circle at 15% 20%, color-mix(in srgb, var(--accent) 35%, transparent), transparent 55%), radial-gradient(circle at 85% 85%, color-mix(in srgb, var(--accent-2) 30%, transparent), transparent 50%), var(--surface)',
@@ -931,7 +940,7 @@ export function GamesSection({
         >
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 opacity-[0.15]"
+            className="home-hero-grid pointer-events-none absolute inset-0 opacity-[0.15]"
             style={{
               backgroundImage:
                 'linear-gradient(var(--accent) 1px, transparent 1px), linear-gradient(90deg, var(--accent) 1px, transparent 1px)',
@@ -942,12 +951,12 @@ export function GamesSection({
           />
 
           <div className="relative flex flex-wrap items-center justify-between gap-8">
-            <div className="max-w-[440px]">
+            <div className="max-w-[560px]">
               <p className="mb-3 flex items-center gap-2 text-[12px] font-semibold tracking-wide text-accent uppercase">
                 <Sparkles className="h-3.5 w-3.5" strokeWidth={2.5} />
                 Modo creación · Cualquier materia
               </p>
-              <h2 className="text-[30px] leading-[1.1] font-bold tracking-tight text-text-h">
+              <h2 className="home-hero-title text-[30px] leading-[1.1] font-bold tracking-tight text-text-h">
                 Convierte cualquier tema en un juego
               </h2>
               <p className="mt-3 text-[14.5px] leading-relaxed text-text">
@@ -978,11 +987,17 @@ export function GamesSection({
               </div>
             </div>
 
+            {/* En Fantasía el ícono se cambia por un trofeo dorado con destellos (solo CSS + emoji, ver .home-hero-trophy en index.css). */}
             <div
-              className="flex h-[130px] w-[130px] shrink-0 items-center justify-center rounded-3xl border border-border"
+              aria-hidden="true"
+              className="home-hero-trophy relative flex h-[130px] w-[130px] shrink-0 items-center justify-center rounded-3xl border border-border"
               style={{ background: 'var(--bg)' }}
             >
-              <Trophy className="h-14 w-14 text-accent-2" strokeWidth={1.5} />
+              <Trophy className="home-hero-trophy-icon h-14 w-14 text-accent-2" strokeWidth={1.5} />
+              <span className="home-hero-trophy-emoji">🏆</span>
+              <span className="home-hero-spark home-hero-spark-1">✨</span>
+              <span className="home-hero-spark home-hero-spark-2">⭐</span>
+              <span className="home-hero-spark home-hero-spark-3">✨</span>
             </div>
           </div>
         </div>
@@ -1027,19 +1042,11 @@ export function GamesSection({
       <div ref={resultsRef} className="scroll-mt-6">
         {mode === 'all' && (
           <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            {/* Sin botón "Crear juego" aquí (issue #47): repetía al "Crear un juego nuevo" del banner. */}
             <div>
-              <h2 className="mb-1 text-[22px] tracking-tight text-text-h">Juegos</h2>
+              <h2 className="home-section-title mb-1 text-[22px] tracking-tight text-text-h">Juegos</h2>
               <p className="text-[14px] text-text">Elige un juego para empezar a aprender jugando.</p>
             </div>
-            <button
-              type="button"
-              className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl px-6 py-3 text-[15px] font-bold text-white shadow-[0_12px_30px_-10px_var(--accent)] transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg sm:w-auto"
-              style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
-              onClick={() => navigate('/juegos/crear')}
-            >
-              <PlusCircle className="h-5 w-5" strokeWidth={2.25} />
-              {isTeacher ? 'Crear actividad' : 'Crear juego'}
-            </button>
           </div>
         )}
 
@@ -1146,11 +1153,13 @@ export function GamesSection({
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {filteredGames.map((game, index) => (
+              renderGameList(
+                filteredGames.map((game, index) => (
                   <div
                     key={game.id}
-                    className="animate-[fade-in-up_0.35s_ease-out_backwards]"
+                    className={`animate-[fade-in-up_0.35s_ease-out_backwards] ${
+                      mode === 'all' ? 'w-[260px] shrink-0 snap-start sm:w-[280px]' : ''
+                    }`}
                     style={{ animationDelay: `${Math.min(index, 8) * 40}ms` }}
                   >
                     <GameCard
@@ -1167,8 +1176,8 @@ export function GamesSection({
                       onDismissJustCreated={dismissJustCreatedHighlight}
                     />
                   </div>
-                ))}
-              </div>
+                )),
+              )
             )}
           </div>
         )}

@@ -30,7 +30,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
   return (
     <Modal
       onClose={onClose}
-      // "Temas" necesita más ancho: con 3 tarjetas conviene un recuadro más
+      // "Temas" necesita más ancho: con 4 tarjetas (2×2) conviene un recuadro más
       // amplio que el del menú o el formulario de perfil.
       maxWidthClassName={view === 'themes' ? 'max-w-[760px]' : 'max-w-[560px]'}
       maxHeightClassName="max-h-[92vh]"
