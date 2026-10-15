@@ -5,6 +5,7 @@ import previewLight from '../../assets/themes/preview-light.webp'
 import previewDark from '../../assets/themes/preview-dark.webp'
 import previewKids from '../../assets/themes/preview-kids.webp'
 import previewFantasy from '../../assets/themes/preview-fantasy.webp'
+import previewMeadow from '../../assets/themes/preview-meadow.webp'
 
 type ThemeOption = {
   value: Theme
@@ -38,6 +39,7 @@ const THEME_OPTIONS: ThemeOption[] = [
     label: 'Pradera',
     description: 'Nuevo: la aventura de día, con cielo claro, nubes, madera clara y colores suaves.',
     icon: CloudSun,
+    previewImage: previewMeadow,
     isNew: true,
     preview: { bg: '#bfe0f7', surface: '#fbe7c8', accent: '#4f8fe0', accent2: '#f2705e', text: '#4a2c17' },
   },
