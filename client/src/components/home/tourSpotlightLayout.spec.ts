@@ -27,8 +27,8 @@ describe('pickCardCorner (issue #240)', () => {
 })
 
 describe('tourCardBounds', () => {
-  it('respeta los topes de la tarjeta (360 px de ancho, 440 px o 55% del alto)', () => {
-    expect(tourCardBounds({ width: 1280, height: 800 })).toEqual({ width: 360, height: 440 })
-    expect(tourCardBounds({ width: 300, height: 600 })).toEqual({ width: 276, height: 330 })
+  it('respeta los topes de la tarjeta (360 px de ancho, 480 px o 60% del alto)', () => {
+    expect(tourCardBounds({ width: 1280, height: 800 })).toEqual({ width: 360, height: 480 })
+    expect(tourCardBounds({ width: 300, height: 600 })).toEqual({ width: 276, height: 360 })
   })
 })

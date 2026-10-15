@@ -2354,3 +2354,149 @@ code {
 @media (prefers-reduced-motion: reduce) {
   [style*='memory-city-'] { animation: none !important; }
 }
+
+
+/*
+ * Recorrido de bienvenida (issue #45): cada paso entra con un rebote, su
+ * ícono salta y una mini escena (WelcomeStepScene.tsx) copia el inicio real.
+ * Bucle de 4 s: el dedo viaja (0–35 %), toca (40 %) y se ve el resultado
+ * (45–92 %). Todas las animaciones llevan el prefijo tour-.
+ */
+.tour-step-in {
+  animation: tour-step-in 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+.tour-step-icon {
+  animation: tour-step-icon 0.6s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+@keyframes tour-step-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes tour-step-icon {
+  0% { transform: scale(0.4) rotate(-20deg); }
+  70% { transform: scale(1.15) rotate(6deg); }
+  100% { transform: none; }
+}
+.tour-scene {
+  box-shadow: 0 10px 24px -16px var(--accent);
+}
+/* La tarjeta del recorrido se desliza a otra esquina en vez de saltar. */
+.welcome-tour-card {
+  transition: left 0.5s cubic-bezier(0.3, 1.2, 0.4, 1), top 0.5s cubic-bezier(0.3, 1.2, 0.4, 1);
+}
+
+@keyframes tour-scene-cursor {
+  0% { left: 55%; top: 140px; opacity: 0; transform: scale(1); }
+  10% { opacity: 1; }
+  35% { left: var(--tour-x); top: var(--tour-y); transform: scale(1); }
+  40% { left: var(--tour-x); top: var(--tour-y); transform: scale(0.8); }
+  46%, 85% { left: var(--tour-x); top: var(--tour-y); transform: scale(1); opacity: 1; }
+  95%, 100% { left: var(--tour-x); top: var(--tour-y); opacity: 0; }
+}
+/* El elemento tocado se hunde y brilla al momento del toque. */
+@keyframes tour-scene-tap-target {
+  0%, 36% { transform: none; box-shadow: none; }
+  40% { transform: scale(0.92); }
+  46%, 88% { transform: scale(1.06); box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--accent); }
+  96%, 100% { transform: none; box-shadow: none; }
+}
+@keyframes tour-scene-result {
+  0%, 42% { opacity: 0; transform: translateY(-4px) scale(0.94); }
+  50%, 90% { opacity: 1; transform: none; }
+  98%, 100% { opacity: 0; transform: translateY(-4px) scale(0.94); }
+}
+@keyframes tour-scene-nav-lit {
+  0%, 38% { background: transparent; color: var(--text); }
+  44%, 92% { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent); }
+  100% { background: transparent; color: var(--text); }
+}
+@keyframes tour-scene-nav-walk {
+  0%, 18% { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent); }
+  22%, 100% { background: transparent; color: var(--text); }
+}
+@keyframes tour-scene-collapse {
+  0%, 40% { width: 80px; }
+  50%, 88% { width: 26px; }
+  98%, 100% { width: 80px; }
+}
+@keyframes tour-scene-label {
+  0%, 40% { opacity: 1; }
+  46%, 90% { opacity: 0; }
+  98%, 100% { opacity: 1; }
+}
+@keyframes tour-scene-flip {
+  0%, 40% { transform: none; }
+  50%, 88% { transform: rotate(180deg); }
+  98%, 100% { transform: none; }
+}
+.tour-scene-theme {
+  animation: tour-scene-theme 4s ease-in-out infinite;
+}
+@keyframes tour-scene-theme {
+  0%, 40% { background-color: #f8fafc; color-scheme: light; }
+  50%, 90% { background-color: #0f172a; }
+  100% { background-color: #f8fafc; }
+}
+@keyframes tour-scene-sun {
+  0%, 40% { opacity: 1; transform: rotate(0) scale(1); }
+  50%, 90% { opacity: 0; transform: rotate(90deg) scale(0.4); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes tour-scene-moon {
+  0%, 40% { opacity: 0; transform: rotate(-90deg) scale(0.4); }
+  50%, 90% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: rotate(-90deg) scale(0.4); }
+}
+@keyframes tour-scene-type {
+  0%, 40% { width: 0; }
+  70%, 92% { width: var(--tour-type-width); }
+  100% { width: 0; }
+}
+@keyframes tour-scene-type-late {
+  0%, 50% { width: 0; }
+  75%, 92% { width: var(--tour-type-width); }
+  100% { width: 0; }
+}
+@keyframes tour-scene-press {
+  0%, 76% { transform: none; box-shadow: none; }
+  80% { transform: scale(0.88); }
+  84%, 94% { transform: scale(1.08); box-shadow: 0 0 0 2px #22c55e; }
+  100% { transform: none; }
+}
+@keyframes tour-scene-filter {
+  0%, 70% { opacity: 1; transform: none; }
+  76%, 92% { opacity: 0.15; transform: scale(0.88); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes tour-scene-world {
+  0%, 60%, 100% { transform: none; }
+  20% { transform: translateY(-8px) scale(1.08) rotate(-4deg); }
+  40% { transform: scale(0.98); }
+}
+@keyframes tour-scene-back {
+  0%, 100% { transform: none; }
+  50% { transform: translateX(-5px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tour-step-in,
+  .tour-step-icon,
+  .tour-scene,
+  .tour-scene * {
+    animation: none !important;
+  }
+  .welcome-tour-card {
+    transition: none;
+  }
+  .tour-scene .tour-cursor {
+    display: none;
+  }
+}
+/* Filas de las listas de la guía (usuarios, peticiones de IA…) que entran una tras otra. */
+@keyframes tour-scene-row {
+  from { opacity: 0; transform: translateX(-6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes tour-scene-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
