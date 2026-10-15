@@ -5,9 +5,10 @@ import { isKidsMode } from '../utils/kidsMode'
 
 /**
  * 'fantasy' es el predeterminado (issue #47): cielo nocturno, piedra, madera y
- * pergamino. 'light' y 'dark' quedan como las versiones minimalistas.
+ * pergamino. 'meadow' (Pradera) es su versión de día: cielo claro, nubes y
+ * madera clara. 'light' y 'dark' quedan como las versiones minimalistas.
  */
-export type Theme = 'fantasy' | 'light' | 'dark' | 'kids'
+export type Theme = 'fantasy' | 'meadow' | 'light' | 'dark' | 'kids'
 
 export const DEFAULT_THEME: Theme = 'fantasy'
 
@@ -20,7 +21,7 @@ const STORAGE_KEY = 'nexusplay-theme'
 
 function readStoredTheme(): Theme | null {
   const stored = localStorage.getItem(STORAGE_KEY)
-  return stored === 'fantasy' || stored === 'light' || stored === 'dark' || stored === 'kids' ? stored : null
+  return stored === 'fantasy' || stored === 'meadow' || stored === 'light' || stored === 'dark' || stored === 'kids' ? stored : null
 }
 
 function applyTheme(theme: Theme) {

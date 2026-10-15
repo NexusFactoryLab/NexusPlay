@@ -1,4 +1,4 @@
-import { Check, Moon, Sparkles, Sun, Wand2 } from 'lucide-react'
+import { Check, CloudSun, Moon, Sparkles, Sun, Wand2 } from 'lucide-react'
 import { useTheme } from '../../hooks/useTheme'
 import type { Theme } from '../../hooks/useTheme'
 import previewLight from '../../assets/themes/preview-light.webp'
@@ -13,7 +13,7 @@ type ThemeOption = {
   icon: typeof Sun
   /** Captura real de la página con este tema — si falta, se usa `preview`. */
   previewImage?: string
-  /** Muestra la etiqueta "Nuevo" sobre la vista previa (el tema Fantasía, issue #47). */
+  /** Muestra la etiqueta "Nuevo" sobre la vista previa (Fantasía y Pradera, issue #47). */
   isNew?: boolean
   /**
    * Colores propios de ESTE tema (no del tema activo ahora mismo): la tarjeta
@@ -32,6 +32,14 @@ const THEME_OPTIONS: ThemeOption[] = [
     previewImage: previewFantasy,
     isNew: true,
     preview: { bg: '#1b1546', surface: '#2a2350', accent: '#7b5cff', accent2: '#ffc83d', text: '#f4f1ff' },
+  },
+  {
+    value: 'meadow',
+    label: 'Pradera',
+    description: 'Nuevo: la aventura de día, con cielo claro, nubes, madera clara y colores suaves.',
+    icon: CloudSun,
+    isNew: true,
+    preview: { bg: '#bfe0f7', surface: '#fbe7c8', accent: '#4f8fe0', accent2: '#f2705e', text: '#4a2c17' },
   },
   {
     value: 'light',

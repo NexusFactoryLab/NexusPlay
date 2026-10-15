@@ -69,7 +69,7 @@ export function getWelcomeSteps(role: string, isKids: boolean, options: WelcomeO
   steps.push(
     { title: 'Encuentra un juego', text: 'Escribe en Buscar juegos y pulsa Enter o la lupa. Borra el texto para volver a ver el listado completo.', target: 'search', icon: 'explore', action: 'Probar la búsqueda' },
     { title: 'Más espacio para jugar', text: 'Usa esta flecha para contraer o expandir el menú. Sus opciones siguen disponibles como iconos.', target: 'menu-toggle', icon: 'explore', action: 'Cambiar tamaño del menú' },
-    { title: '¡Hay un tema nuevo!', text: 'La tuerca de arriba abre tu configuración. En Temas está el nuevo tema Fantasía, y también Claro y Oscuro si prefieres algo minimalista. La elección se recuerda en este dispositivo.', target: 'settings', icon: 'explore', action: 'Abrir configuración' },
+    { title: '¡Hay un tema nuevo!', text: 'La tuerca de arriba abre tu configuración. En Temas están los nuevos temas Fantasía y Pradera, y también Claro y Oscuro si prefieres algo minimalista. La elección se recuerda en este dispositivo.', target: 'settings', icon: 'explore', action: 'Abrir configuración' },
     profile,
   )
   return steps

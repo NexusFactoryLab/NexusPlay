@@ -13,7 +13,7 @@ type SettingsView = 'menu' | 'profile' | 'themes'
 const SECTIONS: { value: Exclude<SettingsView, 'menu'>; label: string; description: string; icon: typeof User; badge?: string }[] = [
   { value: 'profile', label: 'Configuración del perfil', description: 'Tus datos de cuenta', icon: User },
   // La guía de bienvenida anuncia el tema Fantasía aquí (issue #47).
-  { value: 'themes', label: 'Temas', description: 'Apariencia de la página', icon: Palette, badge: '✨ Nuevo tema' },
+  { value: 'themes', label: 'Temas', description: 'Apariencia de la página', icon: Palette, badge: '✨ Nuevos temas' },
 ]
 
 /**

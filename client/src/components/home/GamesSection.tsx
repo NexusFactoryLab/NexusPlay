@@ -958,7 +958,7 @@ export function GamesSection({
     <section
       className={
         mode === 'all'
-          ? 'home-fit relative flex flex-col gap-5 lg:h-full lg:min-h-[460px]'
+          ? 'home-fit relative flex flex-col gap-5 lg:h-full lg:min-h-[420px]'
           : 'flex flex-col gap-10'
       }
     >

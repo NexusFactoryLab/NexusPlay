@@ -183,6 +183,10 @@ export function WelcomeStepScene({ target }: { target: string }) {
                   ✨ Fantasía
                   <span className="ml-auto rounded-full px-1 text-[4.5px] font-bold" style={{ background: '#ffc83d', color: '#3f230e' }}>Nuevo</span>
                 </span>
+                <span className="flex items-center gap-1 px-1">
+                  🌤️ Pradera
+                  <span className="ml-auto rounded-full px-1 text-[4.5px] font-bold" style={{ background: '#ffc83d', color: '#3f230e' }}>Nuevo</span>
+                </span>
                 <span className="flex items-center gap-1 px-1">☀️ Claro</span>
                 <span className="flex items-center gap-1 px-1">🌙 Oscuro</span>
               </span>
