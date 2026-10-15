@@ -2482,3 +2482,18 @@ code {
     animation: none !important;
   }
 }
+/* Escenas más vistosas: destellos que titilan y portadas que flotan. */
+.tour-scene {
+  background-image:
+    radial-gradient(circle at 85% 0%, color-mix(in srgb, var(--accent) 28%, transparent), transparent 55%),
+    radial-gradient(circle at 0% 100%, color-mix(in srgb, #06b6d4 22%, transparent), transparent 55%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent), 0 10px 24px -14px var(--accent);
+}
+@keyframes tour-scene-sparkle {
+  0%, 100% { opacity: 0; transform: scale(0.4) rotate(0); }
+  50% { opacity: 1; transform: scale(1.2) rotate(20deg); }
+}
+@keyframes tour-scene-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}

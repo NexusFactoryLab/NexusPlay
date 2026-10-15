@@ -1,9 +1,28 @@
-import { ArrowLeft, Compass, Gamepad2, Moon, Plus, Search, Settings, Sun, UserRound } from 'lucide-react'
+import { ArrowLeft, Compass, Moon, Plus, Search, Settings, Sun, UserRound } from 'lucide-react'
 
 /** Orden de los ítems del menú en miniatura; el resaltado se mueve al que explica el paso. */
 const NAV_ITEMS = ['nav-home', 'nav-subjects', 'nav-classes', 'nav-community', 'nav-own-games', 'nav-users', 'nav-organization']
 
 const CARD_COLORS = ['#ff7a1a', '#06b6d4', '#a78bfa', '#22c55e', '#ff4d6d', '#ffcc4d']
+/** Portadas de juego en miniatura, como las tarjetas reales del inicio. */
+const CARD_EMOJIS = ['🧩', '🧠', '🎲', '🚀', '🎯', '⭐']
+
+/** Destellos que flotan sobre cada escena para darle vida. */
+function Sparkles() {
+  return (
+    <>
+      {[['8%', '70%', '✨', 0], ['46%', '8%', '⭐', 0.9], ['90%', '60%', '✨', 1.6], ['70%', '84%', '💫', 2.3]].map(([left, top, emoji, delay]) => (
+        <span
+          key={`${left}-${top}`}
+          className="pointer-events-none absolute z-10 text-[11px]"
+          style={{ left: left as string, top: top as string, animation: `tour-scene-sparkle 3s ease-in-out ${delay}s infinite` }}
+        >
+          {emoji}
+        </span>
+      ))}
+    </>
+  )
+}
 
 /**
  * Mini escena animada de cada paso del recorrido de bienvenida: una versión
@@ -23,7 +42,7 @@ export function WelcomeStepScene({ target }: { target: string }) {
   return (
     <div
       aria-hidden="true"
-      className={`tour-scene relative mb-3 flex h-[118px] overflow-hidden rounded-2xl border border-border bg-bg ${theming ? 'tour-scene-theme' : ''}`}
+      className={`tour-scene relative mb-3 flex h-[158px] overflow-hidden rounded-2xl border border-border bg-bg ${theming ? 'tour-scene-theme' : ''}`}
     >
       {/* Menú lateral */}
       <div
@@ -109,11 +128,12 @@ export function WelcomeStepScene({ target }: { target: string }) {
               key={color}
               className="flex items-center justify-center rounded-lg"
               style={{
-                background: `color-mix(in srgb, ${color} 30%, transparent)`,
+                background: `linear-gradient(145deg, color-mix(in srgb, ${color} 55%, transparent), color-mix(in srgb, ${color} 18%, transparent))`,
+                boxShadow: `0 3px 8px -4px ${color}`,
                 animation: target === 'search' && i % 2 === 1 ? 'tour-scene-filter 3.6s ease-in-out infinite' : `tour-scene-card-in 0.5s ease-out ${i * 0.07}s both`,
               }}
             >
-              <Gamepad2 className="h-3.5 w-3.5" style={{ color }} />
+              <span className="text-[20px] drop-shadow-sm" style={{ animation: `tour-scene-float 2.6s ease-in-out ${i * 0.3}s infinite` }}>{CARD_EMOJIS[i]}</span>
             </span>
           ))}
           {target === 'create' && (
@@ -149,10 +169,11 @@ export function WelcomeStepScene({ target }: { target: string }) {
         </div>
       </div>
 
+      <Sparkles />
       {/* Cursor que "toca" el elemento del paso */}
       {cursorAt(target, navIndex) && (
         <span
-          className="pointer-events-none absolute text-[16px] drop-shadow"
+          className="pointer-events-none absolute text-[20px] drop-shadow"
           style={{ ...cursorAt(target, navIndex), animation: 'tour-scene-tap 1.6s ease-in-out infinite' }}
         >
           👆
@@ -168,11 +189,11 @@ function cursorAt(target: string, navIndex: number): { left: string; top: string
   const spots: Record<string, { left: string; top: string }> = {
     join: { left: '58%', top: '18px' },
     search: { left: '34%', top: '18px' },
-    create: { left: '84%', top: '82px' },
+    create: { left: '84%', top: '118px' },
     'theme-toggle': { left: '77%', top: '18px' },
     settings: { left: '84%', top: '18px' },
     profile: { left: '91%', top: '18px' },
-    'menu-toggle': { left: '14%', top: '92px' },
+    'menu-toggle': { left: '14%', top: '128px' },
   }
   return spots[target] ?? null
 }
@@ -193,7 +214,7 @@ function TypedText({ text, seconds }: { text: string; seconds: number }) {
 function WorldsScene({ back }: { back: boolean }) {
   const worlds = ['🔢', '🌎', '🔬', '🎨']
   return (
-    <div aria-hidden="true" className="tour-scene relative mb-3 flex h-[118px] flex-col gap-2 overflow-hidden rounded-2xl border border-border bg-bg p-2.5">
+    <div aria-hidden="true" className="tour-scene relative mb-3 flex h-[158px] flex-col gap-2 overflow-hidden rounded-2xl border border-border bg-bg p-2.5">
       <span className="flex items-center gap-1.5 text-[10px] font-bold text-text-h">
         {back ? (
           <span className="flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-white" style={{ animation: 'tour-scene-back 2s ease-in-out infinite' }}>
@@ -207,7 +228,7 @@ function WorldsScene({ back }: { back: boolean }) {
         {worlds.map((emoji, i) => (
           <span
             key={emoji}
-            className="flex items-center justify-center rounded-xl text-[24px]"
+            className="flex items-center justify-center rounded-xl text-[32px]"
             style={{
               background: `color-mix(in srgb, ${CARD_COLORS[i]} 28%, transparent)`,
               animation: `tour-scene-world 2.8s ease-in-out ${i * 0.35}s infinite`,
@@ -218,6 +239,7 @@ function WorldsScene({ back }: { back: boolean }) {
           </span>
         ))}
       </div>
+      <Sparkles />
     </div>
   )
 }

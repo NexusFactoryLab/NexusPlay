@@ -75,7 +75,7 @@ export function pickCardCorner(
 export function tourCardBounds(viewport: { width: number; height: number }) {
   return {
     width: Math.min(360, viewport.width - 24),
-    height: Math.min(440, viewport.height * 0.55),
+    height: Math.min(480, viewport.height * 0.6),
   }
 }
 
