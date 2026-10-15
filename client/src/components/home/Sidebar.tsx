@@ -47,7 +47,7 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
   return (
     <aside
       className={`app-sidebar relative flex shrink-0 flex-col gap-1 border-r border-border bg-bg p-4 transition-[width] duration-200 ease-out ${
-        collapsed ? 'w-[76px]' : 'w-[240px]'
+        collapsed ? 'is-collapsed w-[76px]' : 'w-[240px]'
       }`}
     >
       <button
@@ -64,7 +64,11 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
         />
       </button>
 
-      <div className="mb-4 flex items-center gap-2.5 px-1.5">
+      <span className="sidebar-gem sidebar-gem-bl fx-gem fx-gem-blue" aria-hidden="true" />
+      <span className="sidebar-gem sidebar-gem-br fx-gem fx-gem-pink" aria-hidden="true" />
+      <span className="sidebar-vine" aria-hidden="true">🌿</span>
+
+      <div className="sidebar-header mb-4 flex items-center gap-2.5 px-1.5">
         <span
           className="sidebar-logo flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white"
           style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
@@ -86,7 +90,7 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
           type="button"
           title={collapsed ? 'Crear actividad' : undefined}
           aria-label="Crear actividad"
-          className={`mb-3 flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-[13.5px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)] transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_24px_-10px_var(--accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg active:translate-y-0 ${
+          className={`sidebar-create-btn mb-3 flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-[13.5px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)] transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_24px_-10px_var(--accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg active:translate-y-0 ${
             collapsed ? 'justify-center px-0' : ''
           }`}
           style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
@@ -100,6 +104,7 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
       <nav data-tour="navigation" className="scroll-fade flex flex-1 flex-col gap-1 overflow-y-auto" aria-label="Navegación principal">
         <SidebarItem
           tourTarget="nav-home"
+          emoji="🗡️"
           label="Inicio"
           collapsed={collapsed}
           active={location.pathname === '/'}
@@ -108,6 +113,7 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
         />
         <SidebarItem
           tourTarget="nav-subjects"
+          emoji="📕"
           label="Materias"
           collapsed={collapsed}
           active={location.pathname.startsWith('/materias')}
@@ -116,6 +122,7 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
         />
         <SidebarItem
           tourTarget="nav-game-types"
+          emoji="🎲"
           label="Tipos de juego"
           collapsed={collapsed}
           active={location.pathname.startsWith('/tipos-de-juego')}
@@ -125,6 +132,7 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
         {userRole.toUpperCase() === 'TEACHER' && (
           <SidebarItem
             tourTarget="nav-classes"
+            emoji="🏫"
             label="Mis clases"
             collapsed={collapsed}
             active={location.pathname.startsWith('/mis-clases')}
@@ -135,6 +143,7 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
         {userRole.toUpperCase() === 'STUDENT' && (
           <SidebarItem
             tourTarget="nav-my-metrics"
+            emoji="📊"
             label="Mis métricas"
             collapsed={collapsed}
             active={location.pathname.startsWith('/mis-metricas')}
@@ -144,6 +153,7 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
         )}
         <SidebarItem
           tourTarget="nav-community"
+          emoji="🧑‍🤝‍🧑"
           label="Comunidad"
           collapsed={collapsed}
           active={location.pathname === '/comunidad'}
@@ -152,6 +162,7 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
         />
         <SidebarItem
           tourTarget="nav-own-games"
+          emoji="🔒"
           label={userRole.toUpperCase() === 'TEACHER' ? 'Mis actividades' : 'Mis juegos privados'}
           collapsed={collapsed}
           active={location.pathname === '/mis-juegos'}
@@ -161,13 +172,14 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
         {(canManageUsers || canAccessOrganization) && (
           <>
             {!collapsed && (
-              <p className="mt-4 mb-1 px-3.5 text-[11px] font-semibold tracking-wide text-text/60 uppercase">
+              <p className="sidebar-section-label mt-4 mb-1 px-3.5 text-[11px] font-semibold tracking-wide text-text/60 uppercase">
                 Administración
               </p>
             )}
             {canManageUsers && (
               <SidebarItem
                 tourTarget="nav-users"
+                emoji="🧑‍💼"
                 label="Usuarios"
                 collapsed={collapsed}
                 active={location.pathname === '/usuarios'}
@@ -178,6 +190,7 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
             {canManageUsers && (
               <SidebarItem
                 tourTarget="nav-ai-providers"
+                emoji="🤖"
                 label="IA"
                 collapsed={collapsed}
                 active={location.pathname === '/ia'}
@@ -188,6 +201,7 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
             {canAccessOrganization && (
               <SidebarItem
                 tourTarget="nav-organization"
+                emoji="🏰"
                 label="Organización"
                 collapsed={collapsed}
                 active={location.pathname === '/organizacion'}
@@ -204,6 +218,7 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
 
 function SidebarItem({
   tourTarget,
+  emoji,
   label,
   active,
   collapsed,
@@ -211,6 +226,8 @@ function SidebarItem({
   icon,
 }: {
   tourTarget: string
+  /** Ícono a color del tema Fantasía (en los demás temas se ve el ícono de línea). */
+  emoji: string
   label: string
   active: boolean
   collapsed: boolean
@@ -228,7 +245,8 @@ function SidebarItem({
       aria-current={active ? 'page' : undefined}
       onClick={onClick}
     >
-      {icon}
+      <span className="fx-line-icon flex shrink-0">{icon}</span>
+      <span className="fx-emoji sidebar-emoji" aria-hidden="true">{emoji}</span>
       {!collapsed && <span className="truncate">{label}</span>}
     </button>
   )

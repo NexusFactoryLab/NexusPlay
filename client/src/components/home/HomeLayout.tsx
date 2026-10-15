@@ -77,7 +77,7 @@ export function HomeLayout() {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-6 sm:p-8">
+        <main className="app-main flex-1 overflow-y-auto p-6 sm:p-8">
           <HomeSearchContext.Provider
             value={{ searchQuery: submittedQuery, searchNonce, onSectionViewed: trackSection }}
           >

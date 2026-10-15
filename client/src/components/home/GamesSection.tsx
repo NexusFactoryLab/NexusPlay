@@ -24,6 +24,7 @@ import { ApiError } from '../../utils/http'
 import { trackEvent } from '../../services/analytics.service'
 import { GameCard } from './games/GameCard'
 import { GamesCarousel } from './games/GamesCarousel'
+import { FantasyCloudBank, FantasyGamesDecor, FantasyHeroDecor } from './FantasyDecor'
 import { playTargetFor, UNSUPPORTED_GAME_MESSAGE } from './games/gamePlayRoute'
 import { JustCreatedFocus } from './JustCreatedFocus'
 import { parseCreatedKind } from './games/create/justCreatedRedirect'
@@ -921,6 +922,28 @@ export function GamesSection({
     )
   }
 
+  const filtersPanel = (
+    <GameFiltersPanel
+      soloCount={soloFilterCount}
+      multiCount={multiFilterCount}
+      activeModes={activeModes}
+      onToggleMode={toggleModeFilter}
+      typeOptions={typeFilterOptions}
+      activeTypes={activeTypes}
+      onToggleType={toggleTypeFilter}
+      onClear={() => {
+        setActiveModes(new Set())
+        setActiveTypes(new Set())
+      }}
+    />
+  )
+  const gamesCount = (
+    <p className="home-games-count text-[12.5px] text-text/70">
+      {filteredGames.length} {filteredGames.length === 1 ? 'juego' : 'juegos'}
+      {filteredGames.length !== games.length ? ` de ${games.length}` : ''}
+    </p>
+  )
+
   // En el Home los juegos van en una fila horizontal (issue #47); el resto de
   // pantallas (Comunidad, Mis juegos, un tipo de juego) mantiene la grilla.
   function renderGameList(cards: ReactNode[]) {
@@ -929,10 +952,19 @@ export function GamesSection({
   }
 
   return (
-    <section className={`flex flex-col ${mode === 'all' ? 'gap-7' : 'gap-10'}`}>
+    // En el inicio, banner y juegos comparten la misma pantalla (issue #47): en
+    // escritorio la sección ocupa justo el alto del <main> y el carrusel toma
+    // lo que queda, así no hay que bajar para ver los juegos.
+    <section
+      className={
+        mode === 'all'
+          ? 'home-fit relative flex flex-col gap-5 lg:h-full lg:min-h-[460px]'
+          : 'flex flex-col gap-10'
+      }
+    >
       {mode === 'all' && (
         <div
-          className="home-hero relative overflow-hidden rounded-3xl border border-border p-8 sm:p-10"
+          className="home-hero relative shrink-0 overflow-hidden rounded-3xl border border-border p-8 sm:p-10"
           style={{
             background:
               'radial-gradient(circle at 15% 20%, color-mix(in srgb, var(--accent) 35%, transparent), transparent 55%), radial-gradient(circle at 85% 85%, color-mix(in srgb, var(--accent-2) 30%, transparent), transparent 50%), var(--surface)',
@@ -950,20 +982,25 @@ export function GamesSection({
             }}
           />
 
-          <div className="relative flex flex-wrap items-center justify-between gap-8">
-            <div className="max-w-[560px]">
-              <p className="mb-3 flex items-center gap-2 text-[12px] font-semibold tracking-wide text-accent uppercase">
+          <FantasyHeroDecor />
+
+          <div className="home-hero-inner relative flex flex-wrap items-center justify-between gap-8">
+            <div className="home-hero-copy min-w-0 max-w-[560px]">
+              <p className="home-hero-eyebrow mb-3 flex items-center gap-2 text-[12px] font-semibold tracking-wide text-accent uppercase">
                 <Sparkles className="h-3.5 w-3.5" strokeWidth={2.5} />
                 Modo creación · Cualquier materia
               </p>
               <h2 className="home-hero-title text-[30px] leading-[1.1] font-bold tracking-tight text-text-h">
-                Convierte cualquier tema en un juego
+                {/* El salto de línea solo se usa en Fantasía, para partir el título como en la referencia. */}
+                <span className="home-hero-title-text">
+                  Convierte cualquier<br className="home-hero-title-break" /> tema en un juego
+                </span>
               </h2>
-              <p className="mt-3 text-[14.5px] leading-relaxed text-text">
+              <p className="home-hero-desc mt-3 text-[14.5px] leading-relaxed text-text">
                 Matemáticas, biología, geografía, medicina — arma retos, invita a tu equipo y
                 compite en tiempo real.
               </p>
-              <div className="mt-6 flex flex-wrap items-center gap-3">
+              <div className="home-hero-actions mt-6 flex flex-wrap items-center gap-3">
                 <button
                   type="button"
                   className="flex items-center gap-2 rounded-xl px-5 py-3 text-[14px] font-semibold text-white shadow-[0_10px_28px_-10px_var(--accent)] transition-transform hover:-translate-y-0.5"
@@ -971,7 +1008,8 @@ export function GamesSection({
                   onClick={() => navigate('/juegos/crear')}
                   data-tour="create"
                 >
-                  <PlusCircle className="h-[18px] w-[18px]" strokeWidth={2} />
+                  <PlusCircle className="fx-line-icon h-[18px] w-[18px]" strokeWidth={2} />
+                  <span className="fx-emoji" aria-hidden="true">🗡️</span>
                   Crear un juego nuevo
                 </button>
                 <button
@@ -981,7 +1019,8 @@ export function GamesSection({
                   onClick={() => setJoinByCodeOpen(true)}
                   data-tour="join"
                 >
-                  <KeyRound className="h-[18px] w-[18px]" strokeWidth={2.5} />
+                  <KeyRound className="fx-line-icon h-[18px] w-[18px]" strokeWidth={2.5} />
+                  <span className="fx-emoji" aria-hidden="true">🔑</span>
                   Unirme con código
                 </button>
               </div>
@@ -995,9 +1034,11 @@ export function GamesSection({
             >
               <Trophy className="home-hero-trophy-icon h-14 w-14 text-accent-2" strokeWidth={1.5} />
               <span className="home-hero-trophy-emoji">🏆</span>
-              <span className="home-hero-spark home-hero-spark-1">✨</span>
-              <span className="home-hero-spark home-hero-spark-2">⭐</span>
-              <span className="home-hero-spark home-hero-spark-3">✨</span>
+              <span className="home-hero-spark home-hero-spark-1">⭐</span>
+              <span className="home-hero-spark home-hero-spark-2">✨</span>
+              <span className="home-hero-spark home-hero-spark-3">⭐</span>
+              <span className="home-hero-spark home-hero-spark-4">✨</span>
+              <span className="home-hero-spark home-hero-spark-5">⭐</span>
             </div>
           </div>
         </div>
@@ -1039,14 +1080,26 @@ export function GamesSection({
         </div>
       )}
 
-      <div ref={resultsRef} className="scroll-mt-6">
+      <div
+        ref={resultsRef}
+        className={`scroll-mt-6 ${mode === 'all' ? 'home-results flex flex-col lg:min-h-0 lg:flex-1' : ''}`}
+      >
         {mode === 'all' && (
-          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            {/* Sin botón "Crear juego" aquí (issue #47): repetía al "Crear un juego nuevo" del banner. */}
-            <div>
-              <h2 className="home-section-title mb-1 text-[22px] tracking-tight text-text-h">Juegos</h2>
-              <p className="text-[14px] text-text">Elige un juego para empezar a aprender jugando.</p>
+          // Sin botón "Crear juego" aquí (issue #47): repetía al "Crear un juego
+          // nuevo" del banner. El filtro y el conteo van en la misma fila que el
+          // título para que las tarjetas quepan en la pantalla.
+          <div className="home-games-header relative mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+            <FantasyGamesDecor />
+            <div className="min-w-0">
+              <h2 className="home-section-title text-[22px] tracking-tight text-text-h">Juegos</h2>
+              <p className="home-section-subtitle text-[14px] text-text">Elige un juego para empezar a aprender jugando.</p>
             </div>
+            {!loading && games.length > 0 && (
+              <div className="relative flex items-center gap-3">
+                {filtersPanel}
+                {gamesCount}
+              </div>
+            )}
           </div>
         )}
 
@@ -1113,30 +1166,18 @@ export function GamesSection({
               )}
           </div>
         ) : (
-          <div className="flex flex-col gap-4">
+          <div className={mode === 'all' ? 'flex flex-col lg:min-h-0 lg:flex-1' : 'flex flex-col gap-4'}>
             {/* El botón de filtro va literalmente arriba de la grilla de
                 juegos (issue #216/corrección), no a un lado como un panel
                 lateral — al abrirse, su recuadro flota encima del contenido
-                sin empujarlo (ver GameFiltersPanel). */}
-            <div className="flex items-center justify-between gap-4">
-              <GameFiltersPanel
-                soloCount={soloFilterCount}
-                multiCount={multiFilterCount}
-                activeModes={activeModes}
-                onToggleMode={toggleModeFilter}
-                typeOptions={typeFilterOptions}
-                activeTypes={activeTypes}
-                onToggleType={toggleTypeFilter}
-                onClear={() => {
-                  setActiveModes(new Set())
-                  setActiveTypes(new Set())
-                }}
-              />
-              <p className="text-[12.5px] text-text/70">
-                {filteredGames.length} {filteredGames.length === 1 ? 'juego' : 'juegos'}
-                {filteredGames.length !== games.length ? ` de ${games.length}` : ''}
-              </p>
-            </div>
+                sin empujarlo (ver GameFiltersPanel). En el inicio va en la
+                fila del título "Juegos", que también queda justo encima. */}
+            {mode !== 'all' && (
+              <div className="flex items-center justify-between gap-4">
+                {filtersPanel}
+                {gamesCount}
+              </div>
+            )}
 
             {filteredGames.length === 0 ? (
               <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-16 text-center">
@@ -1158,7 +1199,7 @@ export function GamesSection({
                   <div
                     key={game.id}
                     className={`animate-[fade-in-up_0.35s_ease-out_backwards] ${
-                      mode === 'all' ? 'w-[260px] shrink-0 snap-start sm:w-[280px]' : ''
+                      mode === 'all' ? 'games-carousel-item shrink-0 snap-start' : ''
                     }`}
                     style={{ animationDelay: `${Math.min(index, 8) * 40}ms` }}
                   >
@@ -1182,6 +1223,8 @@ export function GamesSection({
           </div>
         )}
       </div>
+
+      {mode === 'all' && <FantasyCloudBank />}
 
       {justCreatedGame && !loading && !justCreatedFiltered && (
         <JustCreatedFocus

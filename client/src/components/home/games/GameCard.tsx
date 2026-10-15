@@ -56,7 +56,8 @@ export function GameCard({
   const isMultiplayer = LIVE_ROOM_GAME_TYPES.includes(game.gameType)
   const modeColor = modeColorForGameType(game.gameType)
   return (
-    <div className="relative h-full min-w-0 w-full">
+    <div className="game-card-frame relative h-full min-w-0 w-full">
+    <span className="fx-card-vine" aria-hidden="true">🌿</span>
     <button
       type="button"
       onClick={handleClick}
@@ -127,18 +128,24 @@ export function GameCard({
           </span>
         )}
       </div>
+      {/* En el carrusel del inicio la tarjeta tiene alto fijo: la descripción
+          completa aparece sobre la portada al pasar el cursor o enfocar (el
+          texto de abajo sigue disponible para lectores de pantalla). */}
+      {game.description && (
+        <span className="game-card-desc-overlay" aria-hidden="true">{game.description}</span>
+      )}
       <div className="game-card-body flex flex-1 flex-col gap-1.5 p-4">
         {edition ? (
           <div className="space-y-1">
-            <h3 className="text-[22px] font-bold leading-tight text-text-h [overflow-wrap:anywhere]">{game.title}</h3>
+            <h3 className="game-card-title text-[22px] font-bold leading-tight text-text-h [overflow-wrap:anywhere]">{game.title}</h3>
             <p className="text-[14px] font-medium text-text">{edition}</p>
           </div>
         ) : (
-          <h3 className="text-[15px] font-semibold text-text-h">{game.title}</h3>
+          <h3 className="game-card-title text-[15px] font-semibold text-text-h">{game.title}</h3>
         )}
-        <p className="text-[13px] leading-snug text-text [overflow-wrap:anywhere]">{game.description}</p>
+        <p className="game-card-desc text-[13px] leading-snug text-text [overflow-wrap:anywhere]">{game.description}</p>
         {game.creatorDisplayName && (
-          <p className="mt-auto pt-1 text-[11.5px] font-medium text-text/70">
+          <p className="game-card-author mt-auto pt-1 text-[11.5px] font-medium text-text/70">
             Por {game.creatorDisplayName}
           </p>
         )}

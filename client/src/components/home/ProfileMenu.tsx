@@ -99,7 +99,19 @@ export function ProfileMenu({ user, onSignOut, placement = 'header', collapsed =
   }
 
   return (
-    <div className="profile-card relative mb-4" ref={containerRef}>
+    <div className={`profile-card relative mb-4 ${collapsed ? 'is-collapsed' : ''}`} ref={containerRef}>
+      <span className="fx-decor" aria-hidden="true">
+        <span className="profile-bunting">
+          <span>★</span>
+          <span>✿</span>
+          <span>✦</span>
+          <span>♥</span>
+        </span>
+        <span className="fx-crystal profile-crystal-l" />
+        <span className="fx-crystal profile-crystal-r" />
+        <span className="fx-gem fx-gem-purple profile-gem-l" />
+        <span className="fx-gem fx-gem-blue profile-gem-r" />
+      </span>
       <button
         type="button"
         className={`flex w-full items-center gap-2.5 rounded-2xl border border-border bg-surface text-left transition-colors hover:bg-code-bg ${
@@ -129,8 +141,8 @@ export function ProfileMenu({ user, onSignOut, placement = 'header', collapsed =
         {!collapsed && (
           <>
             <span className="flex min-w-0 flex-1 flex-col leading-tight">
-              <span className="line-clamp-2 text-[14px] font-semibold break-words text-text-h">{user.displayName}</span>
-              {roleLabel && <span className="mt-0.5 text-[11.5px] text-text">{roleLabel}</span>}
+              <span className="profile-name line-clamp-2 text-[14px] font-semibold break-words text-text-h">{user.displayName}</span>
+              {roleLabel && <span className="profile-role mt-0.5 text-[11.5px] text-text">{roleLabel}</span>}
             </span>
             <ChevronDown
               className={`h-3.5 w-3.5 shrink-0 text-text transition-transform ${open ? 'rotate-180' : ''}`}

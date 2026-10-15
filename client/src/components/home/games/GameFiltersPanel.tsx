@@ -62,7 +62,7 @@ export function GameFiltersPanel({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex items-center gap-1.5 rounded-xl border border-border bg-surface px-4 py-2.5 text-[13px] font-semibold text-text-h transition-colors hover:border-accent"
+        className="game-filters-btn flex items-center gap-1.5 rounded-xl border border-border bg-surface px-4 py-2.5 text-[13px] font-semibold text-text-h transition-colors hover:border-accent"
       >
         <SlidersHorizontal className="h-4 w-4" strokeWidth={2.5} />
         Filtro

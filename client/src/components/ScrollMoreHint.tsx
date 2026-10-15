@@ -118,7 +118,7 @@ export function ScrollMoreHint({ scope = 'container', fade = 'bg', minHiddenPx =
         onClick={scrollDown}
         tabIndex={visible ? 0 : -1}
         aria-hidden={!visible}
-        className={`absolute bottom-3 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full border-2 border-accent bg-text-h py-1.5 pr-3.5 pl-3 text-[12.5px] font-semibold whitespace-nowrap text-bg shadow-lg transition-opacity duration-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${visible ? 'pointer-events-auto opacity-100' : 'opacity-0'}`}
+        className={`scroll-more-hint-btn absolute bottom-3 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full border-2 border-accent bg-text-h py-1.5 pr-3.5 pl-3 text-[12.5px] font-semibold whitespace-nowrap text-bg shadow-lg transition-opacity duration-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${visible ? 'pointer-events-auto opacity-100' : 'opacity-0'}`}
       >
         <ChevronDown className="h-4 w-4 animate-bounce" strokeWidth={2.75} aria-hidden="true" />
         Desliza para ver más
