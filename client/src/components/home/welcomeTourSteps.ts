@@ -61,6 +61,7 @@ export function getWelcomeSteps(role: string, isKids: boolean, options: WelcomeO
   )
   if (role === 'ADMIN') steps.push(
     { title: 'Gestiona los usuarios', text: 'En Usuarios puedes consultar y administrar las cuentas de NexusPlay.', target: 'nav-users', icon: 'profile', action: 'Ver usuarios' },
+    { title: 'La IA, bajo control', text: 'En IA revisas las peticiones de creación con IA y el estado de cada una.', target: 'nav-ai-providers', icon: 'create', action: 'Ver IA' },
   )
   if (role === 'ADMIN' || options.canAccessOrganization) steps.push({
     title: 'Tu organización', text: 'Abre Organización para consultar y gestionar las organizaciones a las que tienes acceso.', target: 'nav-organization', icon: 'explore', action: 'Ver organización',

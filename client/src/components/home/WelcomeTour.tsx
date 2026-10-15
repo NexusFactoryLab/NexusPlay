@@ -6,8 +6,9 @@ import type { AuthUser } from '../../services/auth.service'
 import { getWelcomeSteps, hasGreetedThisSession, hasSeenWelcome, initialWelcomePhase, markGreetedThisSession, markWelcomeSeen, phaseAfterGreeting, welcomeStorageKey } from './welcomeTourSteps'
 import type { WelcomeOptions, WelcomePhase } from './welcomeTourSteps'
 import { WelcomeCard } from './WelcomeCard'
+import { WelcomeStepScene } from './WelcomeStepScene'
 import { TourSpotlight } from './TourSpotlight'
-import { cardCornerClasses, pickCardCorner, tourCardBounds, useSpotlightRect } from './tourSpotlightLayout'
+import { pickCardCorner, tourCardBounds, useSpotlightRect } from './tourSpotlightLayout'
 import { isKidsMode } from '../../utils/kidsMode'
 
 const icons = { play: Gamepad2, create: Plus, explore: Compass, profile: UserRound }
@@ -41,6 +42,15 @@ export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds }: 
   const triggerRef = useRef<HTMLButtonElement>(null)
   const headingRef = useRef<HTMLHeadingElement>(null)
   // Fijar los pasos al abrir evita desplazarlos si los permisos terminan de cargar durante la guía.
+  // Alto real de la tarjeta (cambia por paso): sirve para elegir la esquina libre y deslizarla hasta ahí.
+  const [cardHeight, setCardHeight] = useState<number | null>(null)
+  const [cardNode, setCardNode] = useState<HTMLElement | null>(null)
+  useEffect(() => {
+    if (!cardNode) return
+    const observer = new ResizeObserver(() => setCardHeight(cardNode.offsetHeight))
+    observer.observe(cardNode)
+    return () => observer.disconnect()
+  }, [cardNode])
   const [steps, setSteps] = useState(() => getWelcomeSteps(user.role, isKids, { canAccessOrganization, canGoBackToWorlds }))
   const step = steps[index]
   const visible = atHome && phase !== 'closed'
@@ -130,7 +140,16 @@ export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds }: 
   const spotlightRect = useSpotlightRect(inTour ? `[data-tour="${step.target}"]` : null)
   // La tarjeta se aparta a otra esquina si taparía el elemento iluminado.
   const viewport = { width: window.innerWidth, height: window.innerHeight }
-  const cardCorner = pickCardCorner(spotlightRect, tourCardBounds(viewport), viewport, viewport.width >= 640 ? 24 : 12)
+  const margin = viewport.width >= 640 ? 24 : 12
+  const bounds = tourCardBounds(viewport)
+  const card = { width: bounds.width, height: cardHeight ?? bounds.height }
+  const cardCorner = pickCardCorner(spotlightRect, card, viewport, margin)
+  // Posición en píxeles (no clases de esquina) para que la tarjeta se deslice
+  // con transición hacia la esquina libre y no tape lo que se está mostrando.
+  const cardPosition = {
+    left: cardCorner.endsWith('right') ? viewport.width - margin - card.width : margin,
+    top: cardCorner.startsWith('bottom') ? Math.max(margin, viewport.height - margin - card.height) : margin,
+  }
   return <>
     {forcedInvite && (
       <div className="fixed inset-0 z-40 bg-black/55 backdrop-blur-sm" aria-hidden="true" />
@@ -168,25 +187,52 @@ export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds }: 
     )}
 
     {visible && phase === 'tour' && createPortal(
-      <section aria-label="Recorrido de NexusPlay" className={`welcome-tour-card fixed ${cardCornerClasses[cardCorner]} z-[45] w-[min(360px,calc(100vw-24px))] rounded-3xl border border-border bg-surface p-5 text-left text-text shadow-[var(--shadow)]`}>
+      <section ref={setCardNode} style={cardPosition} aria-label="Recorrido de NexusPlay" className={`welcome-tour-card fixed z-[45] w-[min(360px,calc(100vw-24px))] rounded-3xl border border-border bg-surface p-5 text-left text-text shadow-[var(--shadow)]`}>
         <div className="mb-3 flex items-center justify-between gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-accent/15 text-accent"><Icon className="h-6 w-6" aria-hidden="true" /></span>
+          <span key={`icon-${index}`} className="tour-step-icon flex h-10 w-10 items-center justify-center rounded-2xl text-white shadow-md" style={{ background: 'linear-gradient(135deg, var(--accent), var(--color-accent-2, var(--accent)))' }}><Icon className="h-6 w-6" aria-hidden="true" /></span>
           <span className="flex-1 text-xs font-semibold text-accent">{index + 1} de {steps.length} · A tu ritmo</span>
           <button type="button" onClick={() => close()} aria-label="Cerrar recorrido" className="rounded-full p-2 text-text hover:bg-code-bg focus-visible:outline-2 focus-visible:outline-accent"><X className="h-5 w-5" /></button>
         </div>
-        <div aria-live="polite" aria-atomic="true">
+        <div key={index} className="tour-step-in" aria-live="polite" aria-atomic="true">
+          <WelcomeStepScene target={step.target} />
+          {index === steps.length - 1 && <FinishConfetti />}
           <h2 ref={headingRef} tabIndex={-1} className="text-xl font-bold text-text-h outline-none">{step.title}</h2>
           <p className="mt-2 text-sm leading-relaxed">{step.text}</p>
         </div>
-        <div className="mt-4 flex gap-1.5" aria-hidden="true">{steps.map((item, i) => <span key={item.title} className={`h-1.5 flex-1 rounded-full ${i <= index ? 'bg-accent' : 'bg-code-bg'}`} />)}</div>
+        <div className="mt-4 flex gap-1.5" aria-hidden="true">{steps.map((item, i) => <span key={item.title} className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${i <= index ? 'bg-accent' : 'bg-code-bg'} ${i === index ? 'scale-y-150' : ''}`} />)}</div>
         {step.action && <button type="button" onClick={tryAction} className="mt-4 w-full rounded-xl border border-accent/40 px-3 py-2 text-sm font-semibold text-accent hover:bg-accent/10">{step.action} ↗</button>}
         <div className="mt-4 flex items-center justify-between gap-2">
           <button type="button" disabled={index === 0} onClick={() => setIndex(index - 1)} className="rounded-lg px-2 py-2 text-sm hover:bg-code-bg disabled:opacity-40">Atrás</button>
           <button type="button" onClick={() => index === steps.length - 1 ? close() : setIndex(index + 1)} className="rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90">
-            {index === steps.length - 1 ? '¡Listo!' : 'Siguiente'}
+            {index === steps.length - 1 ? '¡Listo! 🎉' : 'Siguiente →'}
           </button>
         </div>
       </section>, document.body,
     )}
   </>
+}
+
+const CONFETTI_COLORS = ['#ff7a1a', '#06b6d4', '#ffcc4d', '#ff4d6d', '#22c55e', '#a78bfa']
+
+/** Explosión de confeti al llegar al último paso: el recorrido termina con celebración. */
+function FinishConfetti() {
+  return (
+    <span aria-hidden="true" className="tour-scene pointer-events-none absolute top-[70px] left-1/2 block">
+      {CONFETTI_COLORS.concat(CONFETTI_COLORS).map((color, i) => {
+        const angle = (Math.PI * 2 * i) / 12
+        return (
+          <span
+            key={i}
+            className="absolute h-2 w-2 rounded-sm"
+            style={{
+              background: color,
+              animation: 'kids-confetti-piece 1s cubic-bezier(0.2, 0.8, 0.4, 1) forwards',
+              ['--kids-confetti-dx' as string]: `${Math.cos(angle) * 110}px`,
+              ['--kids-confetti-dy' as string]: `${Math.sin(angle) * 80}px`,
+            }}
+          />
+        )
+      })}
+    </span>
+  )
 }
