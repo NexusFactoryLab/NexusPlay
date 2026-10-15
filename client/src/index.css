@@ -464,29 +464,71 @@ code {
 
 /* Sala de Dominexo: paleta y composición propias, aisladas del resto de juegos. */
 .domino-premium-room {
-  --color-accent: #813cff;
-  --color-accent-2: #3487ff;
-  --accent: #813cff;
-  --accent-2: #3487ff;
-  --accent-bg: rgba(129, 60, 255, 0.14);
-  --accent-border: rgba(129, 60, 255, 0.46);
-  --shadow: 0 18px 42px -28px rgba(0, 0, 0, 0.9);
-  --glow: 0 0 24px -8px rgba(129, 60, 255, 0.5);
-  background: linear-gradient(145deg, #30385f 0%, #262e50 46%, #1e2542 100%);
+  /* Identidad propia de la sala: separada de los tokens de las fichas. */
+  --domino-room-indigo: #495aa0;
+  --domino-room-lavender: #9294db;
+  --domino-room-violet: #8854f5;
+  --domino-room-turquoise: #17b9bb;
+  --domino-room-gold: #e8b64f;
+  --domino-room-surface: rgba(48, 61, 133, 0.78);
+  --domino-room-surface-raised: rgba(66, 79, 160, 0.82);
+  --domino-room-border: rgba(219, 222, 255, 0.28);
+  --domino-room-text: #f5f5ff;
+  --domino-room-muted: #d9dcff;
+  --color-accent: var(--domino-room-violet);
+  --color-accent-2: var(--domino-room-turquoise);
+  --accent: var(--domino-room-violet);
+  --accent-2: var(--domino-room-turquoise);
+  --accent-bg: rgba(136, 84, 245, 0.16);
+  --accent-border: rgba(179, 150, 255, 0.7);
+  --shadow: 0 20px 46px -30px rgba(24, 32, 93, 0.85);
+  --glow: 0 0 28px -10px rgba(136, 84, 245, 0.54);
+  background:
+    radial-gradient(circle at 12% 5%, rgba(146, 148, 219, 0.42), transparent 31%),
+    radial-gradient(circle at 92% 88%, rgba(23, 185, 187, 0.2), transparent 30%),
+    linear-gradient(145deg, #6472bb 0%, var(--domino-room-indigo) 47%, #3d4d8d 100%);
 }
 
 .domino-premium-shell { min-height: 100%; }
 
+@media (min-width: 1024px) {
+  .domino-premium-shell { height: 100%; }
+}
+
 .domino-premium-header,
 .domino-premium-hand-dock {
-  border-color: rgba(137, 163, 211, 0.2);
-  background: #111d38;
-  box-shadow: 0 14px 32px -26px rgba(0, 0, 0, 0.9);
+  border-color: var(--domino-room-border);
+  background: linear-gradient(135deg, var(--domino-room-surface-raised), var(--domino-room-surface));
+  box-shadow: 0 14px 32px -26px rgba(24, 32, 93, 0.82), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .domino-premium-header {
-  min-height: 48px;
+  min-height: 42px;
+  padding-block: 4px !important;
+  flex: 0 0 auto;
 }
+
+.domino-premium-header-actions { flex: 0 0 auto; }
+
+.domino-premium-exit { padding: 6px 9px; }
+
+/* En partida, el encabezado se comporta como un HUD y no como una tarjeta. */
+.domino-premium-header--playing {
+  min-height: 36px;
+  padding-block: 3px !important;
+  gap: 6px;
+}
+
+.domino-premium-header--playing .domino-premium-match-facts { margin-right: auto; }
+
+.domino-premium-header--playing .domino-premium-exit {
+  width: 30px;
+  height: 30px;
+  justify-content: center;
+  padding: 0;
+}
+
+.domino-premium-header--playing .domino-premium-exit-label { display: none; }
 
 .domino-premium-match-facts {
   display: flex;
@@ -501,17 +543,17 @@ code {
   max-width: 220px;
   align-items: center;
   gap: 5px;
-  border: 1px solid rgba(137, 163, 211, 0.2);
+  border: 1px solid rgba(221, 224, 255, 0.25);
   border-radius: 999px;
-  background: rgba(8, 15, 36, 0.46);
-  padding: 4px 7px;
-  color: #aab8cf;
+  background: rgba(40, 51, 116, 0.58);
+  padding: 3px 7px;
+  color: var(--domino-room-muted);
   font-size: 10px;
   line-height: 1;
 }
 
 .domino-premium-match-fact small {
-  color: #8292ae;
+  color: #c2c7f2;
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -522,7 +564,7 @@ code {
   min-width: 0;
   max-width: 104px;
   overflow: hidden;
-  color: #e4edff;
+  color: var(--domino-room-text);
   font-size: 11px;
   font-weight: 700;
   text-overflow: ellipsis;
@@ -535,31 +577,31 @@ code {
   height: 17px;
   place-items: center;
   border-radius: 999px;
-  background: rgba(52, 135, 255, 0.16);
-  color: #cfe2ff;
+  background: rgba(23, 185, 187, 0.2);
+  color: #e7ffff;
   font-size: 10px;
   font-weight: 800;
 }
 
 .domino-premium-match-fact--boneyard b {
-  background: rgba(129, 60, 255, 0.2);
-  color: #e4d5ff;
+  background: rgba(232, 182, 79, 0.22);
+  color: #fff1c9;
 }
 
 .domino-premium-status {
-  color: #bfa6ff;
-  border: 1px solid rgba(129, 60, 255, 0.38);
-  background: rgba(129, 60, 255, 0.14);
+  color: #efe9ff;
+  border: 1px solid rgba(200, 177, 255, 0.68);
+  background: rgba(136, 84, 245, 0.25);
 }
 
 .domino-premium-exit {
-  color: #d8e4ff;
-  border-color: rgba(137, 163, 211, 0.28);
-  background: rgba(52, 135, 255, 0.06);
+  color: var(--domino-room-text);
+  border-color: rgba(218, 224, 255, 0.36);
+  background: rgba(73, 90, 160, 0.42);
 }
 
 .domino-premium-exit:hover {
-  border-color: rgba(52, 135, 255, 0.75);
+  border-color: rgba(23, 185, 187, 0.86);
   color: #ffffff;
 }
 
@@ -568,42 +610,65 @@ code {
   align-items: center;
   position: relative;
   min-width: 0;
-  border: 1px solid rgba(137, 163, 211, 0.25);
-  border-radius: 0.8rem;
-  background: rgba(8, 15, 36, 0.55);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+  min-width: 184px;
+  border: 2px solid rgba(215, 220, 255, 0.54);
+  border-radius: 0.9rem;
+  background: rgba(46, 58, 132, 0.78);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 8px 18px -16px rgba(24, 32, 93, 0.95);
 }
 
 .domino-premium-turn--self {
-  border-color: rgba(129, 60, 255, 0.62);
-  background: linear-gradient(135deg, rgba(129, 60, 255, 0.18), rgba(52, 135, 255, 0.08));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 0 18px -11px rgba(129, 60, 255, 0.95);
+  border-color: rgba(224, 207, 255, 0.96);
+  background: linear-gradient(135deg, rgba(136, 84, 245, 0.58), rgba(23, 185, 187, 0.3));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.23), 0 0 22px -9px rgba(136, 84, 245, 0.95);
 }
 
 .domino-premium-turn-dot {
-  width: 6px;
-  height: 6px;
-  margin-left: 9px;
+  width: 8px;
+  height: 8px;
+  margin-left: 10px;
   flex: 0 0 auto;
   border-radius: 999px;
-  background: #6c7a95;
+  background: #b9c2ee;
 }
 
 .domino-premium-turn--self .domino-premium-turn-dot {
-  background: #b794ff;
-  box-shadow: 0 0 9px rgba(183, 148, 255, 0.95);
+  background: var(--domino-room-gold);
+  box-shadow: 0 0 9px rgba(232, 182, 79, 0.9);
 }
 
 .domino-premium-turn > div {
-  min-width: auto;
+  min-width: 0;
+  min-height: 46px;
+  padding: 4px 9px;
   border-color: transparent;
   background: transparent;
   box-shadow: none;
   animation: none;
-  transition: color 180ms ease, background-color 180ms ease;
+  transition: color 180ms ease, background-color 180ms ease, transform 180ms ease;
+}
+
+.domino-premium-turn--self > div > div:first-child { transform: scale(1.1); }
+
+.domino-premium-turn > div > span {
+  color: var(--domino-room-text);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.domino-premium-turn--self > div > span { color: #ffffff; }
+
+.domino-premium-turn svg circle:first-child { stroke: rgba(238, 241, 255, 0.42); }
+
+.domino-premium-turn--self svg circle:last-child {
+  stroke: var(--domino-room-gold);
+  filter: drop-shadow(0 0 3px rgba(232, 182, 79, 0.82));
 }
 
 .domino-premium-stage { min-height: 0; }
+
+.domino-premium-game { min-height: 0; }
 
 .domino-premium-table-meta {
   min-height: 42px;
@@ -688,16 +753,22 @@ code {
 .domino-premium-board {
   position: relative;
   isolation: isolate;
-  border-color: rgba(129, 60, 255, 0.25);
+  border: 0;
   background:
-    radial-gradient(ellipse at 50% 42%, rgba(132, 139, 245, 0.18), transparent 46%),
-    linear-gradient(145deg, #454f7e 0%, #37416b 46%, #2c355a 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.035),
-    inset 0 0 0 1px rgba(52, 135, 255, 0.05),
-    inset 0 -28px 50px -42px rgba(0, 0, 0, 0.95),
-    0 18px 42px -32px rgba(0, 0, 0, 0.9),
-    0 0 28px -20px rgba(129, 60, 255, 0.8);
+    radial-gradient(ellipse at 50% 42%, rgba(219, 214, 255, 0.18), transparent 48%),
+    radial-gradient(ellipse at 12% 94%, rgba(23, 185, 187, 0.13), transparent 35%);
+  box-shadow: none;
+}
+
+/* La barra vive fuera del viewport: nunca cubre fichas ni extremos interactivos. */
+.domino-premium-stage > .domino-board-camera-controls {
+  position: relative;
+  top: auto;
+  right: auto;
+  z-index: 2;
+  align-self: flex-end;
+  width: min(410px, 100%);
+  margin: 0 2px 2px auto;
 }
 
 .domino-premium-board > :not(.domino-premium-board-mark) {
@@ -708,13 +779,13 @@ code {
 .domino-premium-chain-viewport {
   padding: 16px 10px;
   scrollbar-width: thin;
-  scrollbar-color: rgba(129, 60, 255, 0.5) transparent;
+  scrollbar-color: rgba(23, 185, 187, 0.68) transparent;
 }
 
 .domino-premium-chain-viewport::-webkit-scrollbar { height: 6px; }
 .domino-premium-chain-viewport::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  background: rgba(129, 60, 255, 0.45);
+  background: rgba(23, 185, 187, 0.62);
 }
 
 .domino-premium-chain {
@@ -732,10 +803,10 @@ code {
   z-index: 0;
   width: 118px;
   height: 118px;
-  border: 1px solid rgba(52, 135, 255, 0.12);
+  border: 1px solid rgba(245, 243, 255, 0.18);
   border-radius: 55% 45% 58% 42%;
   transform: translate(-50%, -50%) rotate(-28deg);
-  box-shadow: inset 0 0 24px rgba(129, 60, 255, 0.05), 0 0 34px rgba(52, 135, 255, 0.04);
+  box-shadow: inset 0 0 24px rgba(136, 84, 245, 0.11), 0 0 34px rgba(23, 185, 187, 0.08);
   opacity: 0.6;
   pointer-events: none;
 }
@@ -744,7 +815,7 @@ code {
 .domino-premium-board-mark::after {
   position: absolute;
   content: '';
-  border: 1px solid rgba(129, 60, 255, 0.11);
+  border: 1px solid rgba(232, 182, 79, 0.2);
   pointer-events: none;
 }
 
@@ -776,12 +847,12 @@ code {
 }
 
 .domino-chain-connector {
-  stroke: rgba(129, 60, 255, 0.36);
+  stroke: rgba(220, 207, 255, 0.48);
   stroke-width: 3;
 }
 
 .domino-chain-connector--turn {
-  stroke: rgba(52, 135, 255, 0.3);
+  stroke: rgba(23, 185, 187, 0.42);
 }
 
 .domino-premium-board > .domino-serpentine-stage {
@@ -801,33 +872,39 @@ code {
 }
 
 .domino-board-camera-controls {
-  position: absolute;
-  top: 12px;
-  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  position: relative;
+  top: auto;
+  right: auto;
   z-index: 4;
   width: min(300px, calc(100% - 24px));
-  padding: 4px;
-  border: 1px solid rgba(129, 60, 255, 0.35);
-  border-radius: 12px;
-  background: rgba(8, 15, 36, 0.84);
-  box-shadow: 0 8px 24px -16px rgba(0, 0, 0, 0.95);
-  backdrop-filter: blur(8px);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
 }
 
 .domino-board-camera-controls__header {
   display: flex;
-  min-height: 24px;
+  min-height: 29px;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 1px 4px 4px;
-  color: rgba(224, 232, 255, 0.92);
+  padding: 0 4px;
+  color: rgba(245, 245, 255, 0.84);
   font-size: 11px;
   font-weight: 700;
 }
 
 .domino-board-camera-controls__actions {
   display: grid;
+  min-width: 0;
+  flex: 1 1 auto;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 4px;
 }
@@ -835,13 +912,14 @@ code {
 .domino-board-camera-control {
   display: inline-flex;
   min-width: 0;
-  min-height: 32px;
+  min-height: 29px;
   align-items: center;
   justify-content: center;
   gap: 3px;
-  border: 1px solid transparent;
+  border: 1px solid rgba(220, 225, 255, 0.26);
   border-radius: 8px;
-  color: rgba(224, 232, 255, 0.9);
+  background: rgba(57, 69, 146, 0.42);
+  color: rgba(245, 245, 255, 0.92);
   font-size: 10px;
   font-weight: 650;
   line-height: 1.1;
@@ -851,13 +929,13 @@ code {
 
 .domino-board-camera-control:hover,
 .domino-board-camera-control[aria-pressed='true'] {
-  border-color: rgba(129, 60, 255, 0.7);
-  background: rgba(129, 60, 255, 0.18);
+  border-color: rgba(172, 236, 235, 0.86);
+  background: linear-gradient(135deg, rgba(136, 84, 245, 0.38), rgba(23, 185, 187, 0.24));
   color: white;
 }
 
 .domino-board-camera-control:focus-visible {
-  outline: 2px solid #3487ff;
+  outline: 2px solid var(--domino-room-gold);
   outline-offset: 2px;
 }
 
@@ -867,23 +945,28 @@ code {
   font-weight: 600;
 }
 
-.domino-board-camera-help summary {
+.domino-board-camera-help button {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
   cursor: pointer;
-  color: #a98bff;
-  list-style: none;
+  border: 1px solid rgba(225, 219, 255, 0.48);
+  border-radius: 999px;
+  background: rgba(57, 69, 146, 0.54);
+  color: #f2ecff;
+  transition: background-color 150ms ease, border-color 150ms ease, transform 150ms ease;
 }
 
-.domino-board-camera-help summary::-webkit-details-marker {
-  display: none;
-}
+.domino-board-camera-help button span { font-size: 15px; font-weight: 800; line-height: 1; }
+.domino-board-camera-help button:hover { border-color: rgba(172, 236, 235, 0.86); background: rgba(23, 185, 187, 0.2); }
 
-.domino-board-camera-help summary:focus-visible {
-  outline: 2px solid #3487ff;
+.domino-board-camera-help button:focus-visible {
+  outline: 2px solid var(--domino-room-gold);
   outline-offset: 2px;
-  border-radius: 4px;
 }
 
-.domino-board-camera-help p {
+.domino-board-camera-help-popover {
   position: absolute;
   top: calc(100% + 8px);
   right: -4px;
@@ -891,22 +974,40 @@ code {
   width: min(250px, calc(100vw - 36px));
   margin: 0;
   padding: 9px 10px;
-  border: 1px solid rgba(129, 60, 255, 0.52);
+  border: 1px solid rgba(219, 204, 255, 0.7);
   border-radius: 9px;
-  background: rgba(8, 15, 36, 0.97);
-  box-shadow: 0 12px 28px -18px rgba(0, 0, 0, 0.95);
-  color: rgba(224, 232, 255, 0.95);
+  background: rgba(52, 63, 139, 0.98);
+  box-shadow: 0 12px 28px -18px rgba(25, 32, 92, 0.95);
+  color: var(--domino-room-text);
   font-size: 11px;
   font-weight: 500;
   line-height: 1.35;
 }
 
+.domino-board-camera-help-popover strong {
+  display: block;
+  margin-bottom: 3px;
+  color: #ffffff;
+  font-size: 11px;
+}
+
+.domino-board-camera-help-popover p { margin: 0; }
+
 @media (max-width: 420px) {
   .domino-board-camera-controls {
-    top: 8px;
-    right: 8px;
+    margin-right: 0;
     width: calc(100% - 16px);
   }
+}
+
+@media (max-width: 760px) {
+  .domino-board-camera-controls {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .domino-board-camera-controls__header { min-height: 20px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -924,6 +1025,27 @@ code {
 
 .domino-serpentine-end {
   z-index: 2;
+}
+
+.domino-end-drop-zone--active {
+  border-color: #eadcff;
+  background: linear-gradient(145deg, rgba(136, 84, 245, 0.5), rgba(23, 185, 187, 0.26));
+  color: #ffffff;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.48), 0 0 0 3px rgba(136, 84, 245, 0.2), 0 0 22px rgba(182, 147, 255, 0.9);
+  text-shadow: 0 1px 4px rgba(35, 21, 100, 0.92);
+  animation: domino-end-drop-zone-pulse 1.8s ease-in-out infinite;
+}
+
+.domino-end-drop-zone--active:hover { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7), 0 0 0 3px rgba(23, 185, 187, 0.3), 0 0 26px rgba(194, 166, 255, 1); }
+
+.domino-end-drop-zone--active:focus-visible {
+  outline: 3px solid var(--domino-room-gold);
+  outline-offset: 3px;
+}
+
+@keyframes domino-end-drop-zone-pulse {
+  0%, 100% { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.48), 0 0 0 3px rgba(136, 84, 245, 0.2), 0 0 18px rgba(182, 147, 255, 0.72); }
+  50% { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7), 0 0 0 4px rgba(23, 185, 187, 0.32), 0 0 28px rgba(194, 166, 255, 1); }
 }
 
 /* Fichas de Dominexo: el mismo formato físico para mano y tablero. */
@@ -1140,17 +1262,18 @@ code {
 }
 
 .domino-premium-hand-dock {
-  background: linear-gradient(145deg, rgba(17, 29, 56, 0.98), rgba(13, 25, 50, 0.98));
-  border-top-color: rgba(129, 60, 255, 0.48);
-  box-shadow: inset 0 1px 0 rgba(183, 148, 255, 0.1), 0 -14px 30px -28px rgba(0, 0, 0, 0.9);
+  flex: 0 0 auto;
+  background: linear-gradient(145deg, rgba(67, 80, 161, 0.94), rgba(47, 60, 132, 0.96));
+  border-top-color: rgba(211, 192, 255, 0.68);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 -14px 30px -28px rgba(24, 32, 93, 0.9);
 }
 
 .domino-premium-hand-layout {
   display: grid;
   grid-template-areas: 'player hand actions';
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(82px, auto) minmax(0, 1fr) max-content;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
 }
 
 .domino-premium-local-player {
@@ -1202,21 +1325,22 @@ code {
 .domino-premium-hand-scroll {
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 14px 12px 10px;
+  padding: 12px 18px 8px;
+  scroll-padding-inline: 18px;
   scrollbar-width: thin;
-  scrollbar-color: rgba(129, 60, 255, 0.48) transparent;
+  scrollbar-color: rgba(23, 185, 187, 0.62) transparent;
 }
 
 .domino-premium-hand-scroll::-webkit-scrollbar { height: 6px; }
 .domino-premium-hand-scroll::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  background: rgba(129, 60, 255, 0.45);
+  background: rgba(23, 185, 187, 0.58);
 }
 
 .domino-premium-hand-tiles {
   width: max-content;
-  min-width: 100%;
-  justify-content: center;
+  min-width: max-content;
+  justify-content: flex-start;
 }
 
 .domino-premium-header .text-text-h,
@@ -1233,8 +1357,22 @@ code {
   align-items: center;
   gap: 6px;
   color: #d8e4ff;
-  border-color: rgba(137, 163, 211, 0.28);
-  background: rgba(52, 135, 255, 0.09);
+  border-color: rgba(220, 225, 255, 0.36);
+  background: rgba(73, 90, 160, 0.5);
+}
+
+.domino-premium-actions {
+  min-width: 142px;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 6px;
+}
+
+.domino-premium-actions button {
+  min-height: 32px;
+  justify-content: center;
+  padding-block: 5px;
 }
 
 .domino-premium-actions button:disabled {
@@ -1257,7 +1395,7 @@ code {
 
 .domino-premium-actions button:hover:not(:disabled) {
   color: #ffffff;
-  border-color: rgba(52, 135, 255, 0.75);
+  border-color: rgba(23, 185, 187, 0.86);
 }
 
 @media (max-width: 960px) {
@@ -1280,7 +1418,7 @@ code {
     gap: 8px;
   }
 
-  .domino-premium-hand-scroll { padding-top: 18px; }
+  .domino-premium-hand-scroll { padding: 18px 14px 8px; }
 }
 
 @media (max-width: 470px) {
@@ -1300,7 +1438,7 @@ code {
 }
 
 @media (min-width: 640px) {
-  .domino-premium-game { min-height: calc(100dvh - 126px); }
+  .domino-premium-game { min-height: 0; }
 }
 
 @keyframes trophy-pop-in {

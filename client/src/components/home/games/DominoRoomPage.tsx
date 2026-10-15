@@ -65,11 +65,21 @@ function DominoRoomPageSession() {
   const [boardNeedsScroll, setBoardNeedsScroll] = useState(false)
   const [boardViewport, setBoardViewport] = useState({ width: 0, height: 0 })
   const [cameraDestination, setCameraDestination] = useState<DominoCameraDestination>('opening')
+  const [isBoardHelpOpen, setIsBoardHelpOpen] = useState(false)
   const [draggedTileId, setDraggedTileId] = useState<string | null>(null)
   const boardViewportRef = useRef<HTMLDivElement>(null)
   const startedRef = useRef(false)
 
   const remainingMs = useCountdown(room?.turnDeadline ?? null)
+
+  useEffect(() => {
+    if (!isBoardHelpOpen) return
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsBoardHelpOpen(false)
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [isBoardHelpOpen])
 
   // Arranque de la sala: si la URL trae ?gameId= crea una sala nueva; si trae
   // un código en el path, se une a esa sala. Se hace una sola vez (guard con
@@ -240,17 +250,21 @@ function DominoRoomPageSession() {
     <div className="domino-premium-room fixed inset-0 z-50 overflow-y-auto bg-[#080F24]">
       {dealCountdownMs !== null && <DealCountdownOverlay remainingMs={dealCountdownMs} />}
 
-      <div className="domino-premium-shell mx-auto flex min-h-full w-full max-w-[1600px] flex-col p-3 sm:p-5">
-        <header className="domino-premium-header mb-1.5 flex flex-wrap items-center justify-between gap-2 rounded-2xl border px-3 py-1.5 sm:flex-nowrap">
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-accent">
-              {room?.gameTitle ?? 'Dominó'}
-            </p>
-            <div className="flex items-center gap-1.5">
-              <h1 className="text-[15px] font-bold tracking-tight text-text-h">Sala en vivo</h1>
-              {room && <span className="domino-premium-status rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">{room.phase === 'PLAYING' ? 'En partida' : room.phase === 'FINISHED' ? 'Finalizada' : 'Esperando'}</span>}
+      <div className="domino-premium-shell mx-auto flex min-h-full w-full max-w-[1600px] flex-col p-3 sm:h-full sm:p-5">
+        <header className={`domino-premium-header ${room?.phase === 'PLAYING' ? 'domino-premium-header--playing' : ''} mb-1.5 flex flex-wrap items-center justify-between gap-2 rounded-2xl border px-3 py-1.5 sm:flex-nowrap`}>
+          {room?.phase === 'PLAYING' ? (
+            <span className="sr-only">{room.gameTitle ?? 'Dominó'}, sala en vivo. {isMyTurn ? 'Es tu turno.' : 'Es el turno del rival.'}</span>
+          ) : (
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-accent">
+                {room?.gameTitle ?? 'Dominó'}
+              </p>
+              <div className="flex items-center gap-1.5">
+                <h1 className="text-[15px] font-bold tracking-tight text-text-h">Sala en vivo</h1>
+                {room && <span className="domino-premium-status rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">{room.phase === 'FINISHED' ? 'Finalizada' : 'Esperando'}</span>}
+              </div>
             </div>
-          </div>
+          )}
           {room && room.phase === 'PLAYING' && opponent && (
             <div className="domino-premium-match-facts" aria-label={`Rival: ${opponent.displayName}, ${opponent.handCount} fichas. Pozo: ${room.boneyardCount} fichas`}>
               <span className="domino-premium-match-fact">
@@ -264,7 +278,7 @@ function DominoRoomPageSession() {
               </span>
             </div>
           )}
-          <div className="flex items-center gap-2">
+          <div className="domino-premium-header-actions flex items-center gap-2">
           {room?.phase === 'PLAYING' && (
             <div className={`domino-premium-turn ${isMyTurn ? 'domino-premium-turn--self' : 'domino-premium-turn--rival'}`}>
               <span className="domino-premium-turn-dot" aria-hidden="true" />
@@ -275,9 +289,10 @@ function DominoRoomPageSession() {
             type="button"
             className="domino-premium-exit flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[12px] font-semibold"
             onClick={handleExit}
+            aria-label="Salir de la sala"
           >
             <LogOut className="h-4 w-4" strokeWidth={2} />
-            Salir
+            <span className="domino-premium-exit-label">Salir</span>
           </button>
           </div>
         </header>
@@ -324,8 +339,64 @@ function DominoRoomPageSession() {
             <TurnPopBanner isMyTurn={isMyTurn} opponentName={opponent.displayName} />
 
             <section className="domino-premium-stage flex min-h-0 flex-1 flex-col">
+            {boardPresentation.kind === 'bidirectional' && (
+              <div className="domino-board-camera-controls" role="group" aria-label="Navegación del tablero virtual">
+                <div className="domino-board-camera-controls__header">
+                  <span>Explorar tablero</span>
+                  <div className="domino-board-camera-help">
+                    <button
+                      type="button"
+                      aria-label="Cómo explorar el tablero"
+                      aria-expanded={isBoardHelpOpen}
+                      aria-controls="domino-board-navigation-help"
+                      onClick={() => setIsBoardHelpOpen((open) => !open)}
+                    >
+                      <span aria-hidden="true">?</span>
+                    </button>
+                    {isBoardHelpOpen && (
+                      <div id="domino-board-navigation-help" role="tooltip" className="domino-board-camera-help-popover">
+                        <strong>Moverse por el tablero</strong>
+                        <p>Usa Extremo A, Inicio y Extremo B para recorrer la cadena. La vista permanece en el punto elegido hasta que cambies de destino.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="domino-board-camera-controls__actions">
+                  <button
+                    type="button"
+                    className="domino-board-camera-control"
+                    aria-label="Ir al extremo A de la cadena"
+                    aria-pressed={cameraDestination === 'left'}
+                    onClick={() => setCameraDestination('left')}
+                  >
+                    <ChevronLeft aria-hidden="true" size={17} />
+                    <span>Extremo A</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="domino-board-camera-control"
+                    aria-label="Centrar en la ficha inicial"
+                    aria-pressed={cameraDestination === 'opening'}
+                    onClick={() => setCameraDestination('opening')}
+                  >
+                    <Crosshair aria-hidden="true" size={15} />
+                    <span>Inicio</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="domino-board-camera-control"
+                    aria-label="Ir al extremo B de la cadena"
+                    aria-pressed={cameraDestination === 'right'}
+                    onClick={() => setCameraDestination('right')}
+                  >
+                    <ChevronRight aria-hidden="true" size={17} />
+                    <span>Extremo B</span>
+                  </button>
+                </div>
+              </div>
+            )}
             {/* Tablero */}
-            <div ref={boardViewportRef} className="domino-premium-board flex min-h-[260px] flex-1 overflow-hidden rounded-2xl border p-3 sm:min-h-[340px] sm:p-5">
+            <div ref={boardViewportRef} className="domino-premium-board flex min-h-[260px] flex-1 overflow-hidden p-3 sm:min-h-[340px] sm:p-5">
               <span className="domino-premium-board-mark" aria-hidden="true" />
               {board.length === 0 ? (
                 <p className="m-auto text-center text-[13px] text-text">
@@ -333,49 +404,6 @@ function DominoRoomPageSession() {
                 </p>
               ) : boardPresentation.kind !== 'linear' ? (
                 <div className="domino-serpentine-stage">
-                  {boardPresentation.kind === 'bidirectional' && (
-                    <div className="domino-board-camera-controls" role="group" aria-label="Navegación del tablero virtual">
-                      <div className="domino-board-camera-controls__header">
-                        <span>Explorar tablero</span>
-                        <details className="domino-board-camera-help">
-                          <summary aria-label="Cómo explorar el tablero">Ayuda</summary>
-                          <p>Usa estos botones para recorrer el dominó. La vista seguirá el extremo que elijas.</p>
-                        </details>
-                      </div>
-                      <div className="domino-board-camera-controls__actions">
-                        <button
-                          type="button"
-                          className="domino-board-camera-control"
-                          aria-label="Ir al extremo A de la cadena"
-                          aria-pressed={cameraDestination === 'left'}
-                          onClick={() => setCameraDestination('left')}
-                        >
-                          <ChevronLeft aria-hidden="true" size={17} />
-                          <span>Extremo A</span>
-                        </button>
-                        <button
-                          type="button"
-                          className="domino-board-camera-control"
-                          aria-label="Centrar en la ficha inicial"
-                          aria-pressed={cameraDestination === 'opening'}
-                          onClick={() => setCameraDestination('opening')}
-                        >
-                          <Crosshair aria-hidden="true" size={15} />
-                          <span>Inicio</span>
-                        </button>
-                        <button
-                          type="button"
-                          className="domino-board-camera-control"
-                          aria-label="Ir al extremo B de la cadena"
-                          aria-pressed={cameraDestination === 'right'}
-                          onClick={() => setCameraDestination('right')}
-                        >
-                          <ChevronRight aria-hidden="true" size={17} />
-                          <span>Extremo B</span>
-                        </button>
-                      </div>
-                    </div>
-                  )}
                   <div
                     className="domino-virtual-board-world"
                     style={boardPresentation.kind === 'bidirectional' && boardCamera
@@ -803,9 +831,9 @@ export function EndDropZone({
         if (active) onDrop()
       }}
       aria-label="Colocar ficha en este extremo"
-      className={`flex h-[68px] w-10 shrink-0 items-center justify-center rounded-lg border-2 border-dashed text-[13px] font-semibold transition-all ${className} ${
+      className={`domino-end-drop-zone flex h-[68px] w-10 shrink-0 items-center justify-center rounded-lg border-2 border-dashed text-[13px] font-semibold transition-all ${className} ${
         active
-          ? 'animate-[result-glow-pulse_2s_ease-in-out_infinite] border-accent bg-accent/10 text-accent hover:scale-105'
+          ? 'domino-end-drop-zone--active border-accent bg-accent/10 text-accent hover:scale-105'
           : 'border-transparent text-transparent'
       }`}
       style={visualPosition ? { position: 'absolute', left: visualPosition.x, top: visualPosition.y } : undefined}
