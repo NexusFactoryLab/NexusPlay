@@ -1,9 +1,9 @@
 import { GameInstructionsGate } from './GameInstructionsGate'
 import { MultiplayerLobby } from './MultiplayerLobby'
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Crosshair, Hand, LogOut, PackageOpen, RotateCcw, SkipForward, Trophy } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Crosshair, Hand, LogOut, PackageOpen, RotateCcw, SkipForward, Trophy, Volume2, VolumeX } from 'lucide-react'
 import { useAuth } from '../../../hooks/useAuth'
 import { useDominoRoom } from './useDominoRoom'
 import { iconForConcept, type DominoConcept } from './dominoTypes'
@@ -13,11 +13,22 @@ import type { DominoPlacedTileView, DominoTileView } from './dominoRoomTypes'
 import type { DominoVisualOrientation, Point } from './dominoChainLayout'
 import { DEFAULT_DOMINO_BOARD_RENDER_MODE, resolveDominoBoardPresentation } from './dominoBoardRenderMode'
 import {
+  canStartDominoMousePan,
+  clampDominoManualCameraFocus,
+  dominoCameraContentBounds,
   dominoEndDropZoneFocus,
   dominoBoardCameraTransform,
+  dominoManualCameraFocusBounds,
   focusDominoBoardCamera,
+  hasDominoBoardPanExceededThreshold,
+  hasDominoManualCameraPanRange,
+  manualDominoBoardCamera,
+  panDominoManualCameraFocus,
   resolveDominoLogicalViewport,
+  shouldShowDominoBoardPanHint,
+  type DominoCameraFocusBounds,
   type DominoCameraDestination,
+  type DominoCameraState,
 } from './dominoBoardCamera'
 import { DealCountdownOverlay, TurnBanner, TurnPopBanner, useCountdown } from './MatchBoard'
 import { Modal } from './Modal'
@@ -64,11 +75,30 @@ function DominoRoomPageSession() {
   const [boardScale, setBoardScale] = useState(1)
   const [boardNeedsScroll, setBoardNeedsScroll] = useState(false)
   const [boardViewport, setBoardViewport] = useState({ width: 0, height: 0 })
-  const [cameraDestination, setCameraDestination] = useState<DominoCameraDestination>('opening')
+  const [cameraState, setCameraState] = useState<DominoCameraState>({ mode: 'follow', destination: 'opening' })
   const [isBoardHelpOpen, setIsBoardHelpOpen] = useState(false)
   const [draggedTileId, setDraggedTileId] = useState<string | null>(null)
+  const [isBoardPanning, setIsBoardPanning] = useState(false)
+  const [isBoardPanHintVisible, setIsBoardPanHintVisible] = useState(false)
+  const [isDominoSoundMuted, setIsDominoSoundMuted] = useState(() => {
+    try {
+      return localStorage.getItem('nexusplay-dominexo-sound-muted') === 'true'
+    } catch {
+      return false
+    }
+  })
   const boardViewportRef = useRef<HTMLDivElement>(null)
   const startedRef = useRef(false)
+  const openingTileIdRef = useRef<string | null>(null)
+  const boardPanHintRoomRef = useRef<string | null>(null)
+  const boardPanHintTimerRef = useRef<number | null>(null)
+  const boardPanGestureRef = useRef<{
+    pointerId: number
+    start: Point
+    initialFocus: Point
+    hasPanned: boolean
+  } | null>(null)
+  const suppressBoardClickRef = useRef(false)
 
   const remainingMs = useCountdown(room?.turnDeadline ?? null)
 
@@ -111,6 +141,18 @@ function DominoRoomPageSession() {
     navigate('/')
   }
 
+  function toggleDominoSound() {
+    setIsDominoSoundMuted((muted) => {
+      const nextMuted = !muted
+      try {
+        localStorage.setItem('nexusplay-dominexo-sound-muted', String(nextMuted))
+      } catch {
+        // La preferencia es local y opcional; la partida no depende de ella.
+      }
+      return nextMuted
+    })
+  }
+
   function handleJoinSubmit() {
     const code = joinCodeInput.trim().toUpperCase()
     if (!code) return
@@ -132,17 +174,160 @@ function DominoRoomPageSession() {
     () => resolveDominoBoardPresentation(DEFAULT_DOMINO_BOARD_RENDER_MODE, board, logicalBoardViewport, room?.openingTileId),
     [board, logicalBoardViewport, room?.openingTileId],
   )
+  const manualCameraBounds = useMemo<DominoCameraFocusBounds | null>(() => {
+    if (boardPresentation.kind !== 'bidirectional') return null
+    return dominoManualCameraFocusBounds(
+      boardViewport,
+      logicalBoardViewport,
+      dominoCameraContentBounds(boardPresentation.layout, logicalBoardViewport),
+    )
+  }, [boardPresentation, boardViewport, logicalBoardViewport])
   const boardCamera = useMemo(() => {
     if (boardPresentation.kind !== 'bidirectional') return null
     const opening = boardPresentation.layout.tiles.find((tile) => tile.id === room?.openingTileId)
     if (!opening) return null
-    const focus = cameraDestination === 'left'
+    if (cameraState.mode === 'manual' && manualCameraBounds) {
+      return manualDominoBoardCamera(boardViewport, logicalBoardViewport, cameraState.focus, manualCameraBounds)
+    }
+    const followDestination = cameraState.mode === 'follow' ? cameraState.destination : 'opening'
+    const focus = followDestination === 'left'
       ? dominoEndDropZoneFocus(boardPresentation.layout.leftEnd)
-      : cameraDestination === 'right'
+      : followDestination === 'right'
         ? dominoEndDropZoneFocus(boardPresentation.layout.rightEnd)
         : { x: opening.x + opening.width / 2, y: opening.y + opening.height / 2 }
     return focusDominoBoardCamera(boardViewport, logicalBoardViewport, focus)
-  }, [boardPresentation, boardViewport, cameraDestination, logicalBoardViewport, room?.openingTileId])
+  }, [boardPresentation, boardViewport, cameraState, logicalBoardViewport, manualCameraBounds, room?.openingTileId])
+
+  const cameraDestination = cameraState.mode === 'follow' ? cameraState.destination : null
+  const hasManualPanRange = Boolean(manualCameraBounds && hasDominoManualCameraPanRange(manualCameraBounds))
+
+  function showBoardPanHint() {
+    if (boardPanHintTimerRef.current !== null) window.clearTimeout(boardPanHintTimerRef.current)
+    setIsBoardPanHintVisible(true)
+    boardPanHintTimerRef.current = window.setTimeout(() => {
+      boardPanHintTimerRef.current = null
+      setIsBoardPanHintVisible(false)
+    }, 5000)
+  }
+
+  function hideBoardPanHint() {
+    if (boardPanHintTimerRef.current !== null) {
+      window.clearTimeout(boardPanHintTimerRef.current)
+      boardPanHintTimerRef.current = null
+    }
+    setIsBoardPanHintVisible(false)
+  }
+
+  useEffect(() => () => {
+    if (boardPanHintTimerRef.current !== null) window.clearTimeout(boardPanHintTimerRef.current)
+  }, [])
+
+  useEffect(() => {
+    const roomCode = room?.code ?? null
+    const isPlaying = room?.phase === 'PLAYING'
+    const isViewportReady = boardViewport.width > 0 && boardViewport.height > 0
+    if (!roomCode || !isPlaying || boardPresentation.kind !== 'bidirectional' || !isViewportReady) {
+      return
+    }
+    if (!shouldShowDominoBoardPanHint(isPlaying, true, isViewportReady, boardPanHintRoomRef.current === roomCode)) return
+
+    boardPanHintRoomRef.current = roomCode
+    showBoardPanHint()
+  }, [boardPresentation.kind, boardViewport.height, boardViewport.width, room?.code, room?.phase])
+
+  const isBoardPanHintDisplayed = isBoardPanHintVisible && boardPresentation.kind === 'bidirectional'
+
+  useEffect(() => {
+    const openingTileId = room?.openingTileId ?? null
+    if (openingTileId && openingTileId !== openingTileIdRef.current) {
+      setCameraState({ mode: 'follow', destination: 'opening' })
+    }
+    openingTileIdRef.current = openingTileId
+  }, [room?.openingTileId])
+
+  useEffect(() => {
+    if (!manualCameraBounds) return
+    setCameraState((current) => {
+      if (current.mode !== 'manual') return current
+      const focus = clampDominoManualCameraFocus(current.focus, manualCameraBounds)
+      return focus.x === current.focus.x && focus.y === current.focus.y ? current : { mode: 'manual', focus }
+    })
+  }, [manualCameraBounds])
+
+  useEffect(() => () => {
+    boardPanGestureRef.current = null
+  }, [])
+
+  function followBoardCamera(destination: DominoCameraDestination) {
+    boardPanGestureRef.current = null
+    setIsBoardPanning(false)
+    setCameraState({ mode: 'follow', destination })
+  }
+
+  function finishBoardPanGesture(pointerId?: number, suppressClick = false) {
+    const gesture = boardPanGestureRef.current
+    if (!gesture || (pointerId !== undefined && gesture.pointerId !== pointerId)) return
+    if (gesture.hasPanned && suppressClick) suppressBoardClickRef.current = true
+    boardPanGestureRef.current = null
+    setIsBoardPanning(false)
+  }
+
+  function handleBoardPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    const target = event.target as HTMLElement
+    if (!canStartDominoMousePan({
+      pointerType: event.pointerType,
+      button: event.button,
+      isExcludedTarget: Boolean(target.closest('[data-domino-pan-exclude]')),
+      isCameraReady: Boolean(boardCamera && manualCameraBounds && hasManualPanRange),
+    })) return
+    if (!boardCamera || !manualCameraBounds) return
+    const initialFocus = clampDominoManualCameraFocus({
+      x: boardViewport.width / 2 - boardCamera.x,
+      y: boardViewport.height / 2 - boardCamera.y,
+    }, manualCameraBounds)
+    boardPanGestureRef.current = {
+      pointerId: event.pointerId,
+      start: { x: event.clientX, y: event.clientY },
+      initialFocus,
+      hasPanned: false,
+    }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  function handleBoardPointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    const gesture = boardPanGestureRef.current
+    if (!gesture || gesture.pointerId !== event.pointerId || !manualCameraBounds) return
+    const viewportDelta = { x: event.clientX - gesture.start.x, y: event.clientY - gesture.start.y }
+    if (!gesture.hasPanned && !hasDominoBoardPanExceededThreshold(viewportDelta)) return
+
+    if (!gesture.hasPanned) {
+      gesture.hasPanned = true
+      setIsBoardPanning(true)
+      hideBoardPanHint()
+    }
+    event.preventDefault()
+    setCameraState({
+      mode: 'manual',
+      focus: panDominoManualCameraFocus(gesture.initialFocus, viewportDelta, manualCameraBounds),
+    })
+  }
+
+  function handleBoardPointerUp(event: ReactPointerEvent<HTMLDivElement>) {
+    finishBoardPanGesture(event.pointerId, true)
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+  }
+
+  function handleBoardPointerCancel(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    finishBoardPanGesture(event.pointerId)
+  }
+
+  function handleBoardClickCapture(event: ReactMouseEvent<HTMLDivElement>) {
+    if (!suppressBoardClickRef.current) return
+    suppressBoardClickRef.current = false
+    event.preventDefault()
+    event.stopPropagation()
+  }
 
   function tileMatchesEnd(tile: DominoTileView, end: number | undefined): boolean {
     if (end === undefined) return true
@@ -285,6 +470,18 @@ function DominoRoomPageSession() {
               <TurnBanner isMyTurn={isMyTurn} remainingMs={remainingMs} turnDurationSeconds={room.turnDurationSeconds} variant="inline" />
             </div>
           )}
+          {room?.phase === 'PLAYING' && (
+            <button
+              type="button"
+              className={`domino-premium-sound flex items-center justify-center rounded-xl border px-3 py-2 text-[12px] font-semibold ${isDominoSoundMuted ? 'domino-premium-sound--muted' : ''}`}
+              onClick={toggleDominoSound}
+              aria-label={isDominoSoundMuted ? 'Activar sonidos de Dominexo' : 'Silenciar sonidos de Dominexo'}
+              aria-pressed={isDominoSoundMuted}
+              title={isDominoSoundMuted ? 'Activar sonidos' : 'Silenciar sonidos'}
+            >
+              {isDominoSoundMuted ? <VolumeX className="h-4 w-4" strokeWidth={2} /> : <Volume2 className="h-4 w-4" strokeWidth={2} />}
+            </button>
+          )}
           <button
             type="button"
             className="domino-premium-exit flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[12px] font-semibold"
@@ -356,7 +553,7 @@ function DominoRoomPageSession() {
                     {isBoardHelpOpen && (
                       <div id="domino-board-navigation-help" role="tooltip" className="domino-board-camera-help-popover">
                         <strong>Moverse por el tablero</strong>
-                        <p>Usa Extremo A, Inicio y Extremo B para recorrer la cadena. La vista permanece en el punto elegido hasta que cambies de destino.</p>
+                        <p>Arrastra el fondo de la mesa para explorar libremente la cadena. Usa Extremo A, Inicio y Extremo B para enfocar un punto y recuperar su seguimiento.</p>
                       </div>
                     )}
                   </div>
@@ -367,7 +564,7 @@ function DominoRoomPageSession() {
                     className="domino-board-camera-control"
                     aria-label="Ir al extremo A de la cadena"
                     aria-pressed={cameraDestination === 'left'}
-                    onClick={() => setCameraDestination('left')}
+                    onClick={() => followBoardCamera('left')}
                   >
                     <ChevronLeft aria-hidden="true" size={17} />
                     <span>Extremo A</span>
@@ -377,7 +574,7 @@ function DominoRoomPageSession() {
                     className="domino-board-camera-control"
                     aria-label="Centrar en la ficha inicial"
                     aria-pressed={cameraDestination === 'opening'}
-                    onClick={() => setCameraDestination('opening')}
+                    onClick={() => followBoardCamera('opening')}
                   >
                     <Crosshair aria-hidden="true" size={15} />
                     <span>Inicio</span>
@@ -387,7 +584,7 @@ function DominoRoomPageSession() {
                     className="domino-board-camera-control"
                     aria-label="Ir al extremo B de la cadena"
                     aria-pressed={cameraDestination === 'right'}
-                    onClick={() => setCameraDestination('right')}
+                    onClick={() => followBoardCamera('right')}
                   >
                     <ChevronRight aria-hidden="true" size={17} />
                     <span>Extremo B</span>
@@ -398,12 +595,33 @@ function DominoRoomPageSession() {
             {/* Tablero */}
             <div ref={boardViewportRef} className="domino-premium-board flex min-h-[260px] flex-1 overflow-hidden p-3 sm:min-h-[340px] sm:p-5">
               <span className="domino-premium-board-mark" aria-hidden="true" />
+              {isBoardPanHintDisplayed && (
+                <div className="domino-board-pan-hint" role="status" aria-live="polite">
+                  <div className="domino-board-pan-hint__content">
+                    <div className="domino-board-pan-hint__gesture" aria-hidden="true">
+                      <span className="domino-board-pan-hint__arrow domino-board-pan-hint__arrow--horizontal">↔</span>
+                      <Hand className="domino-board-pan-hint__icon" size={58} strokeWidth={1.7} />
+                      <span className="domino-board-pan-hint__arrow domino-board-pan-hint__arrow--vertical">↕</span>
+                    </div>
+                    <strong>¡Explora el tablero!</strong>
+                    <span>Mantén presionado y arrastra el fondo para moverte</span>
+                  </div>
+                </div>
+              )}
               {board.length === 0 ? (
                 <p className="m-auto text-center text-[13px] text-text">
                   {isMyTurn ? 'Toca una ficha de tu mano para abrir la partida.' : 'Esperando la primera jugada…'}
                 </p>
               ) : boardPresentation.kind !== 'linear' ? (
-                <div className="domino-serpentine-stage">
+                <div
+                  className={`domino-serpentine-stage${boardPresentation.kind === 'bidirectional' && hasManualPanRange ? ' domino-serpentine-stage--pannable' : ''}${isBoardPanning ? ' domino-serpentine-stage--panning' : ''}`}
+                  onPointerDown={boardPresentation.kind === 'bidirectional' ? handleBoardPointerDown : undefined}
+                  onPointerMove={boardPresentation.kind === 'bidirectional' ? handleBoardPointerMove : undefined}
+                  onPointerUp={boardPresentation.kind === 'bidirectional' ? handleBoardPointerUp : undefined}
+                  onPointerCancel={boardPresentation.kind === 'bidirectional' ? handleBoardPointerCancel : undefined}
+                  onLostPointerCapture={boardPresentation.kind === 'bidirectional' ? () => finishBoardPanGesture() : undefined}
+                  onClickCapture={boardPresentation.kind === 'bidirectional' ? handleBoardClickCapture : undefined}
+                >
                   <div
                     className="domino-virtual-board-world"
                     style={boardPresentation.kind === 'bidirectional' && boardCamera
@@ -423,6 +641,7 @@ function DominoRoomPageSession() {
                       <div
                         key={placement.id}
                         className="domino-serpentine-tile"
+                        data-domino-pan-exclude
                         style={{ left: placement.x, top: placement.y }}
                       >
                         <BoardTileView
@@ -543,28 +762,28 @@ function DominoRoomPageSession() {
         )}
 
         {room && room.phase === 'FINISHED' && opponent && self && (
-          <div className="flex flex-col items-center gap-4 py-6 text-center">
+          <div className="domino-premium-finish flex flex-col items-center gap-4 py-6 text-center">
             <span
               className="flex h-14 w-14 items-center justify-center rounded-full text-white animate-[trophy-pop-in_0.5s_cubic-bezier(0.16,1,0.3,1)]"
               style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
             >
               <Trophy className="h-7 w-7" strokeWidth={1.75} />
             </span>
-            <p className="text-[18px] font-semibold text-text-h animate-[fade-in-up_0.4s_ease-out_0.1s_backwards]">
+            <p className="domino-premium-finish__result text-[18px] font-semibold animate-[fade-in-up_0.4s_ease-out_0.1s_backwards]">
               {room.winnerUserId === null
                 ? 'Empate — bloqueo con las mismas fichas'
                 : room.winnerUserId === user?.id
                   ? '¡Ganaste!'
                   : `Ganó ${opponent.displayName}`}
             </p>
-            <p className="text-[13px] text-text animate-[fade-in-up_0.4s_ease-out_0.2s_backwards]">
+            <p className="domino-premium-finish__detail text-[13px] animate-[fade-in-up_0.4s_ease-out_0.2s_backwards]">
               {room.endedByBlock
                 ? 'La partida se bloqueó: nadie tenía jugada posible.'
                 : 'Se quedó sin fichas primero.'}
             </p>
 
             <div className="mt-2 flex flex-col items-center gap-2">
-              <p className="text-[12.5px] text-text">
+              <p className="domino-premium-finish__rematch text-[12.5px]">
                 {self.hasVotedRematch
                   ? 'Esperando a que el rival acepte la revancha…'
                   : '¿Quieres una revancha?'}
@@ -822,6 +1041,7 @@ export function EndDropZone({
   return (
     <button
       type="button"
+      data-domino-pan-exclude
       onClick={onClick}
       onDragOver={(event) => {
         if (active) event.preventDefault()

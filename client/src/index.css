@@ -528,7 +528,37 @@ code {
   padding: 0;
 }
 
+.domino-premium-header--playing .domino-premium-sound {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+}
+
 .domino-premium-header--playing .domino-premium-exit-label { display: none; }
+
+.domino-premium-sound {
+  border-color: rgba(220, 225, 255, 0.34);
+  background: rgba(57, 69, 146, 0.44);
+  color: #f5f5ff;
+  transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
+}
+
+.domino-premium-sound:hover {
+  border-color: rgba(172, 236, 235, 0.86);
+  background: rgba(23, 185, 187, 0.2);
+}
+
+.domino-premium-sound--muted {
+  border-color: rgba(248, 217, 130, 0.76);
+  background: rgba(232, 182, 79, 0.18);
+  color: #fff0bc;
+}
+
+.domino-premium-sound:focus-visible,
+.domino-premium-exit:focus-visible {
+  outline: 2px solid var(--domino-room-gold);
+  outline-offset: 2px;
+}
 
 .domino-premium-match-facts {
   display: flex;
@@ -569,6 +599,22 @@ code {
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Resultado y revancha: contraste propio para no heredar texto tenue del lobby. */
+.domino-premium-finish__result {
+  color: #ffffff;
+  text-shadow: 0 2px 10px rgba(28, 34, 100, 0.4);
+}
+
+.domino-premium-finish__detail {
+  color: #eef0ff;
+  font-weight: 550;
+}
+
+.domino-premium-finish__rematch {
+  color: #f7f7ff;
+  font-weight: 650;
 }
 
 .domino-premium-match-fact b {
@@ -862,13 +908,106 @@ code {
   overflow: hidden;
 }
 
+.domino-serpentine-stage--pannable { cursor: grab; }
+.domino-serpentine-stage--panning { cursor: grabbing; user-select: none; }
+.domino-serpentine-stage--pannable [data-domino-pan-exclude] { cursor: auto; }
+
+.domino-premium-board > .domino-board-pan-hint {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background:
+    radial-gradient(circle at center, rgba(151, 133, 247, 0.24), transparent 48%),
+    linear-gradient(120deg, rgba(57, 71, 161, 0.48), rgba(111, 78, 202, 0.34));
+  color: #ffffff;
+  pointer-events: none;
+  animation: domino-board-pan-hint-fade 5s ease both;
+}
+
+.domino-board-pan-hint__content {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  width: min(360px, 100%);
+  padding: 19px 24px 17px;
+  border: 1px solid rgba(240, 235, 255, 0.74);
+  border-radius: 24px;
+  background: rgba(54, 52, 139, 0.8);
+  box-shadow: 0 18px 42px rgba(25, 24, 83, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  text-align: center;
+  backdrop-filter: blur(5px);
+}
+
+.domino-board-pan-hint__content strong {
+  font-size: clamp(18px, 2.2vw, 24px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.domino-board-pan-hint__content > span:last-child {
+  max-width: 270px;
+  color: rgba(255, 255, 255, 0.94);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.domino-board-pan-hint__gesture {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 126px;
+  height: 76px;
+  color: #c9fff8;
+}
+
+.domino-board-pan-hint__icon {
+  z-index: 1;
+  filter: drop-shadow(0 5px 10px rgba(12, 26, 86, 0.42));
+  animation: domino-board-pan-hint-drag 1.45s ease-in-out 3;
+}
+
+.domino-board-pan-hint__arrow {
+  position: absolute;
+  color: #f8d982;
+  font-size: 33px;
+  font-weight: 800;
+  line-height: 1;
+  text-shadow: 0 2px 8px rgba(49, 35, 112, 0.58);
+}
+
+.domino-board-pan-hint__arrow--horizontal { left: 0; top: 20px; }
+.domino-board-pan-hint__arrow--vertical { right: 1px; top: 20px; }
+
+@keyframes domino-board-pan-hint-drag {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(-18px, 9px); }
+  55% { transform: translate(17px, -10px); }
+  78% { transform: translate(7px, 7px); }
+}
+
+@keyframes domino-board-pan-hint-fade {
+  0%, 82% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
 .domino-virtual-board-world {
   position: absolute;
   left: 0;
   top: 0;
+  /* Las zonas vacías pertenecen a la mesa; fichas y extremos reactivan eventos abajo. */
+  pointer-events: none;
   transform-origin: 0 0;
   will-change: transform;
   transition: transform 180ms ease-out;
+}
+
+.domino-virtual-board-world .domino-serpentine-tile,
+.domino-virtual-board-world .domino-serpentine-end {
+  pointer-events: auto;
 }
 
 .domino-board-camera-controls {
@@ -1013,8 +1152,11 @@ code {
 @media (prefers-reduced-motion: reduce) {
   .domino-virtual-board-world,
   .domino-board-camera-control,
-  .domino-concept-tooltip {
+  .domino-concept-tooltip,
+  .domino-board-pan-hint,
+  .domino-board-pan-hint__icon {
     transition: none;
+    animation: none;
   }
 }
 
