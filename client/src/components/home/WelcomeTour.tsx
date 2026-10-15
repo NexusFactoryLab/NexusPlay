@@ -8,7 +8,7 @@ import type { WelcomeOptions, WelcomePhase } from './welcomeTourSteps'
 import { WelcomeCard } from './WelcomeCard'
 import { WelcomeStepScene } from './WelcomeStepScene'
 import { TourSpotlight } from './TourSpotlight'
-import { cardCornerClasses, pickCardCorner, tourCardBounds, useSpotlightRect } from './tourSpotlightLayout'
+import { pickCardCorner, tourCardBounds, useSpotlightRect } from './tourSpotlightLayout'
 import { isKidsMode } from '../../utils/kidsMode'
 
 const icons = { play: Gamepad2, create: Plus, explore: Compass, profile: UserRound }
@@ -42,6 +42,15 @@ export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds }: 
   const triggerRef = useRef<HTMLButtonElement>(null)
   const headingRef = useRef<HTMLHeadingElement>(null)
   // Fijar los pasos al abrir evita desplazarlos si los permisos terminan de cargar durante la guía.
+  // Alto real de la tarjeta (cambia por paso): sirve para elegir la esquina libre y deslizarla hasta ahí.
+  const [cardHeight, setCardHeight] = useState<number | null>(null)
+  const [cardNode, setCardNode] = useState<HTMLElement | null>(null)
+  useEffect(() => {
+    if (!cardNode) return
+    const observer = new ResizeObserver(() => setCardHeight(cardNode.offsetHeight))
+    observer.observe(cardNode)
+    return () => observer.disconnect()
+  }, [cardNode])
   const [steps, setSteps] = useState(() => getWelcomeSteps(user.role, isKids, { canAccessOrganization, canGoBackToWorlds }))
   const step = steps[index]
   const visible = atHome && phase !== 'closed'
@@ -131,7 +140,16 @@ export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds }: 
   const spotlightRect = useSpotlightRect(inTour ? `[data-tour="${step.target}"]` : null)
   // La tarjeta se aparta a otra esquina si taparía el elemento iluminado.
   const viewport = { width: window.innerWidth, height: window.innerHeight }
-  const cardCorner = pickCardCorner(spotlightRect, tourCardBounds(viewport), viewport, viewport.width >= 640 ? 24 : 12)
+  const margin = viewport.width >= 640 ? 24 : 12
+  const bounds = tourCardBounds(viewport)
+  const card = { width: bounds.width, height: cardHeight ?? bounds.height }
+  const cardCorner = pickCardCorner(spotlightRect, card, viewport, margin)
+  // Posición en píxeles (no clases de esquina) para que la tarjeta se deslice
+  // con transición hacia la esquina libre y no tape lo que se está mostrando.
+  const cardPosition = {
+    left: cardCorner.endsWith('right') ? viewport.width - margin - card.width : margin,
+    top: cardCorner.startsWith('bottom') ? Math.max(margin, viewport.height - margin - card.height) : margin,
+  }
   return <>
     {forcedInvite && (
       <div className="fixed inset-0 z-40 bg-black/55 backdrop-blur-sm" aria-hidden="true" />
@@ -169,7 +187,7 @@ export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds }: 
     )}
 
     {visible && phase === 'tour' && createPortal(
-      <section aria-label="Recorrido de NexusPlay" className={`welcome-tour-card fixed ${cardCornerClasses[cardCorner]} z-[45] w-[min(360px,calc(100vw-24px))] rounded-3xl border border-border bg-surface p-5 text-left text-text shadow-[var(--shadow)]`}>
+      <section ref={setCardNode} style={cardPosition} aria-label="Recorrido de NexusPlay" className={`welcome-tour-card fixed z-[45] w-[min(360px,calc(100vw-24px))] rounded-3xl border border-border bg-surface p-5 text-left text-text shadow-[var(--shadow)]`}>
         <div className="mb-3 flex items-center justify-between gap-3">
           <span key={`icon-${index}`} className="tour-step-icon flex h-10 w-10 items-center justify-center rounded-2xl text-white shadow-md" style={{ background: 'linear-gradient(135deg, var(--accent), var(--color-accent-2, var(--accent)))' }}><Icon className="h-6 w-6" aria-hidden="true" /></span>
           <span className="flex-1 text-xs font-semibold text-accent">{index + 1} de {steps.length} · A tu ritmo</span>

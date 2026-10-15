@@ -79,9 +79,3 @@ export function tourCardBounds(viewport: { width: number; height: number }) {
   }
 }
 
-export const cardCornerClasses: Record<CardCorner, string> = {
-  'bottom-right': 'right-3 bottom-3 sm:right-6 sm:bottom-6',
-  'bottom-left': 'left-3 bottom-3 sm:left-6 sm:bottom-6',
-  'top-right': 'right-3 top-3 sm:right-6 sm:top-6',
-  'top-left': 'left-3 top-3 sm:left-6 sm:top-6',
-}
