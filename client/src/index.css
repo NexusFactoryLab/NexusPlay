@@ -2354,3 +2354,131 @@ code {
 @media (prefers-reduced-motion: reduce) {
   [style*='memory-city-'] { animation: none !important; }
 }
+
+/*
+ * Recorrido de bienvenida (issue #45): cada paso entra con un rebote, su
+ * ícono salta y una mini escena (WelcomeStepScene.tsx) muestra en pequeño lo
+ * que se explica. Todas las animaciones llevan el prefijo tour-.
+ */
+.tour-step-in {
+  animation: tour-step-in 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+.tour-step-icon {
+  animation: tour-step-icon 0.6s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+@keyframes tour-step-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes tour-step-icon {
+  0% { transform: scale(0.4) rotate(-20deg); }
+  70% { transform: scale(1.15) rotate(6deg); }
+  100% { transform: none; }
+}
+.tour-scene {
+  background-image: radial-gradient(circle at 85% 0%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 60%);
+}
+.tour-scene-theme {
+  animation: tour-scene-theme 4s ease-in-out infinite;
+}
+@keyframes tour-scene-theme {
+  0%, 40% { background-color: #f8fafc; }
+  55%, 90% { background-color: #0f172a; }
+  100% { background-color: #f8fafc; }
+}
+@keyframes tour-scene-sun {
+  0%, 40% { opacity: 1; transform: rotate(0) scale(1); }
+  55%, 90% { opacity: 0; transform: rotate(90deg) scale(0.4); }
+  100% { opacity: 1; transform: rotate(0) scale(1); }
+}
+@keyframes tour-scene-moon {
+  0%, 40% { opacity: 0; transform: rotate(-90deg) scale(0.4); }
+  55%, 90% { opacity: 1; transform: rotate(0) scale(1); }
+  100% { opacity: 0; transform: rotate(-90deg) scale(0.4); }
+}
+@keyframes tour-scene-type {
+  0% { width: 0; }
+  60%, 90% { width: var(--tour-type-width); }
+  100% { width: 0; }
+}
+@keyframes tour-scene-press {
+  0%, 62% { transform: scale(1); box-shadow: none; }
+  70% { transform: scale(0.88); }
+  78%, 92% { transform: scale(1.08); box-shadow: 0 0 0 3px #22c55e; }
+  100% { transform: scale(1); box-shadow: none; }
+}
+@keyframes tour-scene-grow {
+  0% { width: 70px; }
+  20%, 90% { width: 108px; }
+  100% { width: 70px; }
+}
+@keyframes tour-scene-filter {
+  0%, 55% { opacity: 1; transform: scale(1); }
+  65%, 90% { opacity: 0.12; transform: scale(0.85); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes tour-scene-card-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.9); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes tour-scene-pop {
+  0%, 20% { transform: scale(0.6) rotate(-8deg); opacity: 0.4; }
+  40% { transform: scale(1.12) rotate(3deg); opacity: 1; }
+  55%, 85% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(0.6) rotate(-8deg); opacity: 0.4; }
+}
+@keyframes tour-scene-collapse {
+  0%, 25% { width: 64px; }
+  45%, 75% { width: 22px; }
+  95%, 100% { width: 64px; }
+}
+@keyframes tour-scene-flip {
+  0%, 25% { transform: none; }
+  45%, 75% { transform: scaleX(-1); }
+  95%, 100% { transform: none; }
+}
+@keyframes tour-scene-nav-walk {
+  0%, 18% { background: color-mix(in srgb, var(--accent) 25%, transparent); }
+  22%, 100% { background: transparent; }
+}
+@keyframes tour-scene-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+@keyframes tour-scene-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes tour-scene-bounce {
+  0%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-4px); }
+}
+@keyframes tour-scene-panel {
+  0%, 30% { opacity: 0; transform: translateY(-6px) scale(0.92); }
+  42%, 88% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateY(-6px) scale(0.92); }
+}
+@keyframes tour-scene-tap {
+  0%, 100% { transform: translate(4px, 6px); }
+  50% { transform: translate(0, 0) scale(0.9); }
+}
+@keyframes tour-scene-world {
+  0%, 60%, 100% { transform: translateY(0) scale(1); }
+  20% { transform: translateY(-8px) scale(1.08) rotate(-4deg); }
+  40% { transform: translateY(0) scale(0.98); }
+}
+@keyframes tour-scene-back {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(-5px); }
+}
+/* Miniatura con el menú contraído: solo quedan los puntitos. */
+.tour-scene .tour-scene-label {
+  min-width: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tour-step-in,
+  .tour-step-icon,
+  .tour-scene,
+  .tour-scene * {
+    animation: none !important;
+  }
+}
