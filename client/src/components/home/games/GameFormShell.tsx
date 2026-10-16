@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { PencilLine, X } from 'lucide-react'
-import { AiDraftAppliedContext } from './aiDraftContext'
+import { PencilLine, Sparkles, X } from 'lucide-react'
+import { AiDraftAppliedContext, AiPanelVariantContext } from './aiDraftContext'
 
 type GameFormShellProps = {
   /** Texto del botón de volver, sin la flecha (ej. "Cambiar modo"). */
@@ -52,7 +52,13 @@ export function GameFormShell({
   // importante que se lea); al confirmarlo queda fijo arriba de los campos.
   const [spotlightOpen, setSpotlightOpen] = useState(false)
 
+  // Issue #52: primero la pantalla grande de IA; "Llenar manualmente" (o
+  // aplicar un borrador de IA) pasa al formulario. El formulario y el chat
+  // siguen montados en ambas etapas, así que no se pierde lo escrito.
+  const [stage, setStage] = useState<'ai' | 'manual'>('ai')
+
   const markAiDraftApplied = useCallback(() => {
+    setStage('manual')
     setAiDraftCount((count) => count + 1)
     setNoticeDismissed(false)
     setSpotlightOpen(true)
@@ -76,6 +82,7 @@ export function GameFormShell({
 
   return (
     <AiDraftAppliedContext.Provider value={markAiDraftApplied}>
+    <AiPanelVariantContext.Provider value={stage === 'ai' ? 'inline' : 'compact'}>
     <div className="relative mx-auto max-w-[1180px] p-5 sm:p-8 xl:max-w-[1440px] 2xl:max-w-[1680px]">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-[32px]">
         <div className="absolute -top-24 -right-16 h-80 w-80 rounded-full bg-accent/20 blur-[110px]" />
@@ -94,7 +101,24 @@ export function GameFormShell({
         <h2 className="mb-1 text-[20px] tracking-tight text-text-h">{title}</h2>
         <p className="mb-6 max-w-[640px] text-[13px] text-text">{description}</p>
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-10 xl:grid-cols-[minmax(0,1fr)_380px]">
+        {stage === 'manual' && (
+          <button
+            type="button"
+            className="mb-4 inline-flex items-center gap-1.5 rounded-lg border border-accent/40 px-3 py-1.5 text-[12.5px] font-semibold text-accent hover:bg-accent/10"
+            onClick={() => setStage('ai')}
+          >
+            <Sparkles className="h-3.5 w-3.5" strokeWidth={2.5} />
+            Volver al chat de IA
+          </button>
+        )}
+
+        <div
+          className={
+            stage === 'ai'
+              ? 'grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:items-stretch lg:gap-8'
+              : 'grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-10 xl:grid-cols-[minmax(0,1fr)_380px]'
+          }
+        >
           {/*
             Antes esta columna entera tenía su propio max-height + scroll
             interno (independiente del scroll de la página). Con muchos
@@ -110,8 +134,14 @@ export function GameFormShell({
             formulario de abajo siempre son alcanzables con el scroll normal
             de la página.
           */}
-          <aside className="order-1 lg:order-2 lg:sticky lg:top-8">{aiPanel}</aside>
-          <div className={`order-2 w-full lg:order-1 ${formMaxWidthClassName}`}>
+          <aside
+            className={
+              stage === 'ai' ? 'order-1' : 'order-1 lg:order-2 lg:sticky lg:top-8'
+            }
+          >
+            {aiPanel}
+          </aside>
+          <div className={`order-2 w-full lg:order-1 ${formMaxWidthClassName} ${stage === 'ai' ? 'hidden' : ''}`}>
             {showAiNotice && (
               <div
                 ref={noticeRef}
@@ -137,6 +167,21 @@ export function GameFormShell({
             )}
             {children}
           </div>
+          {stage === 'ai' && (
+            <button
+              type="button"
+              className="order-2 flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-accent bg-accent/10 p-6 text-center transition-colors hover:bg-accent/20"
+              onClick={() => setStage('manual')}
+            >
+              <span className="flex h-14 w-14 items-center justify-center rounded-full bg-accent text-white">
+                <PencilLine className="h-7 w-7" strokeWidth={2.2} />
+              </span>
+              <span className="text-[18px] font-bold text-text-h">Llenar manualmente</span>
+              <span className="text-[13px] leading-snug text-text">
+                Prefieres escribirlo tú: completa el formulario a tu ritmo. Podrás volver al chat de IA cuando quieras.
+              </span>
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -179,6 +224,7 @@ export function GameFormShell({
         </div>
       </div>
     )}
+    </AiPanelVariantContext.Provider>
     </AiDraftAppliedContext.Provider>
   )
 }

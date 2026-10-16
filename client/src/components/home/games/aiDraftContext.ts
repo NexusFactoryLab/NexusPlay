@@ -10,3 +10,15 @@ export const AiDraftAppliedContext = createContext<(() => void) | null>(null)
 export function useMarkAiDraftApplied(): (() => void) | null {
   return useContext(AiDraftAppliedContext)
 }
+
+/**
+ * Cómo muestra GameFormShell el asistente de IA: `inline` = chat grande en
+ * pantalla (primer paso tras elegir el tipo, issue #52); `compact` = botón
+ * llamativo que abre el chat en un modal (modo manual). Sin shell: `compact`.
+ */
+export type AiPanelVariant = 'inline' | 'compact'
+export const AiPanelVariantContext = createContext<AiPanelVariant>('compact')
+
+export function useAiPanelVariant(): AiPanelVariant {
+  return useContext(AiPanelVariantContext)
+}

@@ -6,7 +6,7 @@ import { useToast } from '../../../hooks/useToast'
 import { generateGameDraft, type GameDraft } from '../../../services/ai-game-assistant.service'
 import { ApiError } from '../../../utils/http'
 import { Modal } from './Modal'
-import { useMarkAiDraftApplied } from './aiDraftContext'
+import { useAiPanelVariant, useMarkAiDraftApplied } from './aiDraftContext'
 
 const ACCEPTED = '.pdf,.doc,.docx,.xls,.xlsx,.csv,image/*'
 const DEFAULT_MAX_FILES = 5
@@ -114,6 +114,7 @@ export function AiGameAssistantPanel({
   const { token } = useAuth()
   const { showToast } = useToast()
   const markAiDraftApplied = useMarkAiDraftApplied()
+  const inline = useAiPanelVariant() === 'inline'
   const inputRef = useRef<HTMLInputElement>(null)
   const [open, setOpen] = useState(false)
   const [files, setFiles] = useState<File[]>([])
@@ -218,21 +219,8 @@ export function AiGameAssistantPanel({
     }
   }
 
-  return (
+  const chatBody = (
     <>
-      <button
-        type="button"
-        className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-[13.5px] font-semibold text-white shadow-[0_10px_24px_-10px_var(--accent)] transition-transform disabled:cursor-not-allowed disabled:opacity-60 hover:not-disabled:-translate-y-0.5"
-        style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
-        disabled={disabled}
-        onClick={() => setOpen(true)}
-      >
-        <Sparkles className="h-4 w-4" strokeWidth={2.5} />
-        Generar con IA
-      </button>
-
-      {open && (
-        <Modal onClose={closeModal} maxWidthClassName="max-w-[520px]" ariaLabel="Generar con IA">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div className="flex items-center gap-2.5">
               <span
@@ -246,15 +234,17 @@ export function AiGameAssistantPanel({
                 <p className="text-[12px] text-text">Sube tus archivos, o escribe directamente el tema</p>
               </div>
             </div>
-            <button
-              type="button"
-              aria-label="Cerrar"
-              className="shrink-0 rounded-lg p-1.5 text-text transition-colors hover:bg-code-bg hover:text-text-h disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={generating}
-              onClick={closeModal}
-            >
-              <X className="h-5 w-5" strokeWidth={2} />
-            </button>
+            {!inline && (
+              <button
+                type="button"
+                aria-label="Cerrar"
+                className="shrink-0 rounded-lg p-1.5 text-text transition-colors hover:bg-code-bg hover:text-text-h disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={generating}
+                onClick={closeModal}
+              >
+                <X className="h-5 w-5" strokeWidth={2} />
+              </button>
+            )}
           </div>
 
           <p className="mb-3 text-[12px] leading-relaxed text-text">
@@ -393,6 +383,33 @@ export function AiGameAssistantPanel({
               {error}
             </p>
           )}
+    </>
+  )
+
+  if (inline) {
+    return (
+      <div className="rounded-2xl border-2 border-accent/40 bg-surface p-5 shadow-[0_20px_50px_-24px_var(--accent)] sm:p-7">
+        {chatBody}
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-[13.5px] font-semibold text-white shadow-[0_10px_24px_-10px_var(--accent)] transition-transform disabled:cursor-not-allowed disabled:opacity-60 hover:not-disabled:-translate-y-0.5"
+        style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
+        disabled={disabled}
+        onClick={() => setOpen(true)}
+      >
+        <Sparkles className="h-4 w-4" strokeWidth={2.5} />
+        Generar con IA
+      </button>
+
+      {open && (
+        <Modal onClose={closeModal} maxWidthClassName="max-w-[520px]" ariaLabel="Generar con IA">
+          {chatBody}
         </Modal>
       )}
     </>
