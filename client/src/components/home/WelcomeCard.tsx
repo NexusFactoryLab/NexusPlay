@@ -116,7 +116,7 @@ export function WelcomeCard({ onClose, onQuickGuide }: WelcomeCardProps) {
           role="dialog"
           aria-modal="true"
           aria-labelledby="welcome-card-title"
-          className="relative outline-none rounded-[22px] border-[4px] border-transparent px-5 pt-[36px] pb-[8px] text-center shadow-[0_24px_70px_-18px_rgba(0,0,0,0.55),inset_0_0_0_1px_rgba(255,255,255,0.5)] animate-[modal-panel-in_0.25s_cubic-bezier(0.16,1,0.3,1)]"
+          className="welcome-card-panel relative outline-none rounded-[22px] border-[4px] border-transparent px-5 pt-[36px] pb-[8px] text-center shadow-[0_24px_70px_-18px_rgba(0,0,0,0.55),inset_0_0_0_1px_rgba(255,255,255,0.5)] animate-[modal-panel-in_0.25s_cubic-bezier(0.16,1,0.3,1)]"
           style={{
             // Dos fondos: el relleno lavanda recortado al padding y, debajo, el
             // degradado rosa → violeta (al 65 %, como en el diseño) que asoma

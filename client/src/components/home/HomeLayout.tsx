@@ -1,11 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { Menu } from 'lucide-react'
 import { Outlet } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { Sidebar } from './Sidebar'
 import { SearchBar } from './SearchBar'
-import { ProfileMenu } from './ProfileMenu'
 import { SettingsButton } from './SettingsButton'
-import { ThemeToggle } from '../ThemeToggle'
 import { SettingsPanel } from './SettingsPanel'
 import { trackEvent } from '../../services/analytics.service'
 import { HomeSearchContext } from './homeSearchContext'
@@ -14,10 +13,14 @@ import { KidsHomeShell } from './kids/KidsHomeShell'
 import { WelcomeTour } from './WelcomeTour'
 import { isKidsMode } from '../../utils/kidsMode'
 import { ScrollMoreHint } from '../ScrollMoreHint'
+import { MeadowScenery } from './FantasyDecor'
 
 export function HomeLayout() {
   const { user, token, signOut } = useAuth()
   const [settingsOpen, setSettingsOpen] = useState(false)
+  // Menú lateral desplegable en móvil (ver Sidebar).
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const closeMobileMenu = useCallback(() => setMobileMenuOpen(false), [])
   const [searchInput, setSearchInput] = useState('')
   const [submittedQuery, setSubmittedQuery] = useState('')
   // Visible en el sidebar solo si el usuario es ADMIN de al menos una
@@ -60,24 +63,38 @@ export function HomeLayout() {
 
   return (
     <div className="fixed inset-0 flex text-left">
+      <MeadowScenery />
       <Sidebar
+        user={user}
+        onSignOut={signOut}
         userRole={user.role}
         canManageUsers={canManageUsers}
         canAccessOrganization={canAccessOrganization || canManageUsers}
+        mobileOpen={mobileMenuOpen}
+        onMobileClose={closeMobileMenu}
       />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex shrink-0 flex-wrap items-center justify-between gap-4 border-b border-border px-6 py-4">
+        <header className="app-header flex shrink-0 flex-wrap items-center justify-between gap-4 border-b border-border px-6 py-4">
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(true)}
+            aria-label="Abrir menú"
+            aria-controls="app-sidebar"
+            aria-expanded={mobileMenuOpen}
+            className="mobile-menu-btn flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-surface text-text-h shadow-[var(--shadow)] md:hidden"
+          >
+            <Menu className="h-5 w-5" strokeWidth={2.25} />
+          </button>
           <SearchBar value={searchInput} onChange={setSearchInput} onSearch={handleSearch} />
           <div className="ml-auto flex shrink-0 items-center gap-2">
             <WelcomeTour key={`${user.id}:${user.role}`} user={user} canAccessOrganization={canAccessOrganization || canManageUsers} />
-            <ThemeToggle />
+            {/* El tema ya no tiene botones aquí (issue #47): se elige en la tuerca → Temas. */}
             <SettingsButton onClick={() => setSettingsOpen(true)} />
-            <ProfileMenu user={user} onSignOut={signOut} />
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-6 sm:p-8">
+        <main className="app-main flex-1 overflow-y-auto p-6 sm:p-8">
           <HomeSearchContext.Provider
             value={{ searchQuery: submittedQuery, searchNonce, onSectionViewed: trackSection }}
           >
