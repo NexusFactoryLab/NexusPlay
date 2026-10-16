@@ -35,8 +35,8 @@ export interface ListGamesInput {
   status?: GameStatusName;
   /** "solo mis juegos" desde el panel del creador. */
   onlyMine?: boolean;
-  /** Excluye los propios y los demos: para el listado de "Comunidad" (juegos de otros). */
-  excludeMine?: boolean;
+  /** "Comunidad": todos los juegos publicados (incluidos los propios) menos los demos del Inicio. */
+  excludeDemos?: boolean;
   /** Solo los juegos demo (HOME_DEMO_GAME_SLUGS): el Inicio muestra únicamente estos. */
   onlyDemos?: boolean;
   /** Resuelve y adjunta el nombre visible del creador de cada juego (para "Comunidad"). */
@@ -99,9 +99,8 @@ export class ListGamesUseCase implements UseCase<ListGamesInput, ListGamesOutput
     const result = await this.gameRepository.findAll({
       status,
       creatorUserId: input.onlyMine ? input.requestingUserId : undefined,
-      excludeCreatorUserIds: input.excludeMine ? [input.requestingUserId] : undefined,
       slugs: input.onlyDemos ? HOME_DEMO_GAME_SLUGS : undefined,
-      excludeSlugs: input.excludeMine ? HOME_DEMO_GAME_SLUGS : undefined,
+      excludeSlugs: input.excludeDemos ? HOME_DEMO_GAME_SLUGS : undefined,
       categoryId: input.categoryId,
       organizationId: input.organizationId,
       gameType: input.gameType,

@@ -57,7 +57,7 @@ export class GameController {
       requestingUserId,
       status: query.status,
       onlyMine: query.onlyMine,
-      excludeMine: query.community,
+      excludeDemos: query.community,
       onlyDemos: query.demos,
       includeCreatorNames: query.community,
       search: query.search,

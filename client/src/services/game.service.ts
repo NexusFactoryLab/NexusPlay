@@ -43,7 +43,7 @@ export type ListGamesParams = {
   search?: string
   status?: GameSummary['status']
   onlyMine?: boolean
-  /** Sección "Comunidad": juegos publicados por otros usuarios, con el nombre del creador. */
+  /** Sección "Comunidad": todos los juegos publicados salvo los demos del Inicio, con el nombre del creador. */
   community?: boolean
   /** Inicio: solo los juegos demo de prueba (primera versión de cada juego). */
   demos?: boolean
