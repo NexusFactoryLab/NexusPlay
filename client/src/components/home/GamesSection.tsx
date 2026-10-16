@@ -210,6 +210,8 @@ export function GamesSection({
       onlyMine: mode === 'my-games' || undefined,
       status: mode === 'my-games' ? 'DRAFT' : undefined,
       community: mode === 'community' || undefined,
+      // El Inicio solo muestra los demos; lo creado por usuarios va a Comunidad.
+      demos: mode === 'all' || undefined,
       gameType: mode === 'game-type' ? gameTypeFilter ?? undefined : undefined,
       pageSize: 40,
     })

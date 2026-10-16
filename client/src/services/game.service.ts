@@ -45,6 +45,8 @@ export type ListGamesParams = {
   onlyMine?: boolean
   /** Sección "Comunidad": juegos publicados por otros usuarios, con el nombre del creador. */
   community?: boolean
+  /** Inicio: solo los juegos demo de prueba (creados por el sistema). */
+  demos?: boolean
   categoryId?: string
   /** Filtra por tipo de juego exacto (vista de catálogo de tipos, issue #156). */
   gameType?: string
@@ -61,6 +63,7 @@ export function listGames(token: string, params: ListGamesParams = {}): Promise<
   if (params.status) query.set('status', params.status)
   if (params.onlyMine) query.set('onlyMine', 'true')
   if (params.community) query.set('community', 'true')
+  if (params.demos) query.set('demos', 'true')
   if (params.categoryId) query.set('categoryId', params.categoryId)
   if (params.gameType) query.set('gameType', params.gameType)
   if (params.organizationId) query.set('organizationId', params.organizationId)

@@ -6,8 +6,8 @@ export const GAME_REPOSITORY = Symbol('GAME_REPOSITORY');
 export interface FindAllGamesFilter {
   status?: GameStatusName;
   creatorUserId?: string;
-  /** Excluye los juegos del creador dado — usado para "Comunidad" (juegos de otros). */
-  excludeCreatorUserId?: string;
+  /** Excluye los juegos de estos creadores — usado para "Comunidad" (juegos de otros, sin demos). */
+  excludeCreatorUserIds?: string[];
   categoryId?: string;
   /** Filtra juegos institucionales de una organización concreta. */
   organizationId?: string;

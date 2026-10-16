@@ -16,14 +16,19 @@ import { toGameSummaryDto, type GameSummaryDto } from '../dtos/game-response.dto
 import type { UseCase } from '../ports/use-case.port.js';
 import { RequesterAdminResolver } from '../services/requester-admin-resolver.service.js';
 
+/** Creador de los juegos demo sembrados por el equipo (ver server/prisma/seed-*.ts). */
+export const SYSTEM_CREATOR_USER_ID = 'system';
+
 export interface ListGamesInput {
   requestingUserId: string;
   /** Sin filtro, el catálogo público solo muestra PUBLISHED (ver regla abajo). */
   status?: GameStatusName;
   /** "solo mis juegos" desde el panel del creador. */
   onlyMine?: boolean;
-  /** Excluye los propios: para el listado de "Comunidad" (juegos de otros). */
+  /** Excluye los propios y los demos: para el listado de "Comunidad" (juegos de otros). */
   excludeMine?: boolean;
+  /** Solo los juegos demo del sistema: el Inicio muestra únicamente estos. */
+  onlyDemos?: boolean;
   /** Resuelve y adjunta el nombre visible del creador de cada juego (para "Comunidad"). */
   includeCreatorNames?: boolean;
   search?: string;
@@ -83,8 +88,14 @@ export class ListGamesUseCase implements UseCase<ListGamesInput, ListGamesOutput
 
     const result = await this.gameRepository.findAll({
       status,
-      creatorUserId: input.onlyMine ? input.requestingUserId : undefined,
-      excludeCreatorUserId: input.excludeMine ? input.requestingUserId : undefined,
+      creatorUserId: input.onlyMine
+        ? input.requestingUserId
+        : input.onlyDemos
+          ? SYSTEM_CREATOR_USER_ID
+          : undefined,
+      excludeCreatorUserIds: input.excludeMine
+        ? [input.requestingUserId, SYSTEM_CREATOR_USER_ID]
+        : undefined,
       categoryId: input.categoryId,
       organizationId: input.organizationId,
       gameType: input.gameType,
