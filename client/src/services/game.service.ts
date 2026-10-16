@@ -45,7 +45,7 @@ export type ListGamesParams = {
   onlyMine?: boolean
   /** Sección "Comunidad": juegos publicados por otros usuarios, con el nombre del creador. */
   community?: boolean
-  /** Inicio: solo los juegos demo de prueba (creados por el sistema). */
+  /** Inicio: solo los juegos demo de prueba (primera versión de cada juego). */
   demos?: boolean
   categoryId?: string
   /** Filtra por tipo de juego exacto (vista de catálogo de tipos, issue #156). */

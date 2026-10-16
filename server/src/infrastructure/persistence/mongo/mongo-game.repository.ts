@@ -146,6 +146,11 @@ export class MongoGameRepository implements GameRepository, OnModuleInit {
     if (filter.excludeCreatorUserIds && filter.excludeCreatorUserIds.length > 0) {
       query.creatorUserId = { $nin: filter.excludeCreatorUserIds };
     }
+    if (filter.slugs) {
+      query.slug = { $in: filter.slugs };
+    } else if (filter.excludeSlugs && filter.excludeSlugs.length > 0) {
+      query.slug = { $nin: filter.excludeSlugs };
+    }
     if (filter.categoryId) query.categoryId = filter.categoryId;
     if (filter.organizationId) query.organizationId = filter.organizationId;
     // El caller (list-games.use-case.ts) ya corta antes de llegar aquí si

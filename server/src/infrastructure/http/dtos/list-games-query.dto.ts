@@ -18,7 +18,7 @@ export class ListGamesQueryDto {
   @IsBoolean()
   community?: boolean;
 
-  /** Inicio: solo los juegos demo del sistema. */
+  /** Inicio: solo los juegos demo (primera versión de cada juego). */
   @IsOptional()
   @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
