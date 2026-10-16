@@ -54,8 +54,12 @@ export interface GameRepository {
   existsBySlug(slug: string): Promise<boolean>;
   findAll(filter: FindAllGamesFilter): Promise<PaginatedGames>;
   delete(id: string): Promise<void>;
-  /** Conteo de juegos PUBLISHED agrupados por categoría, para el catálogo de materias. */
-  countPublishedByCategory(): Promise<Map<string, number>>;
+  /**
+   * Conteo de juegos PUBLISHED agrupados por categoría, para el catálogo de
+   * materias. `excludeGameTypes` deja fuera los tipos archivados (issue #156)
+   * para quien no puede verlos.
+   */
+  countPublishedByCategory(excludeGameTypes?: string[]): Promise<Map<string, number>>;
   /**
    * Publica en bloque (DRAFT -> PUBLISHED) todos los juegos de una categoría.
    * Usado por la cascada de "publicar materia": es un `updateMany` atómico a

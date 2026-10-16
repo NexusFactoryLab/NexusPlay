@@ -5,6 +5,8 @@ import { SUBJECT_REPOSITORY } from '../domain/ports/subject.repository.port.js';
 import { GAME_REPOSITORY } from '../domain/ports/game.repository.port.js';
 import { PrismaService } from './persistence/prisma/prisma.service.js';
 import { PrismaSubjectRepository } from './persistence/prisma/prisma-subject.repository.js';
+import { GAME_TYPE_SETTING_REPOSITORY } from '../domain/ports/game-type-setting.repository.port.js';
+import { PrismaGameTypeSettingRepository } from './persistence/prisma/game-type-setting.repository.js';
 import { MongoService } from './persistence/mongo/mongo.service.js';
 import { MongoGameRepository } from './persistence/mongo/mongo-game.repository.js';
 import { CreateRootSubjectUseCase } from '../application/use-cases/create-root-subject.use-case.js';
@@ -25,6 +27,7 @@ import { SubjectController } from './http/controllers/subject.controller.js';
     MongoService,
     { provide: SUBJECT_REPOSITORY, useClass: PrismaSubjectRepository },
     { provide: GAME_REPOSITORY, useClass: MongoGameRepository },
+    { provide: GAME_TYPE_SETTING_REPOSITORY, useClass: PrismaGameTypeSettingRepository },
     RequesterAdminResolver,
     RolesGuard,
     CreateRootSubjectUseCase,
