@@ -29,7 +29,7 @@ export function WizardPhaseNav({
 }: WizardPhaseNavProps) {
   if (isLastPhase) return null
   return (
-    <div className="flex gap-2">
+    <div className="nx-sticky-actions flex gap-2">
       {onBack && (
         <button
           type="button"

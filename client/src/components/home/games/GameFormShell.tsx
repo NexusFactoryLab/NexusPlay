@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { AlertTriangle, ArrowLeft, ClipboardCheck, PencilLine, Sparkles, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, ClipboardCheck, Info, PencilLine, Sparkles, X } from 'lucide-react'
 import {
   AiDraftAppliedContext,
   AiFillStepContext,
@@ -28,6 +28,8 @@ type GameFormShellProps = {
   onBack: () => void
   title: string
   description: ReactNode
+  /** Detalle largo opcional: se muestra solo en el tooltip del icono (i). */
+  descriptionDetail?: string
   /** El panel de <AiGameAssistantPanel /> ya configurado por el formulario. */
   aiPanel: ReactNode
   /**
@@ -57,6 +59,7 @@ export function GameFormShell({
   onBack,
   title,
   description,
+  descriptionDetail,
   aiPanel,
   formMaxWidthClassName = 'lg:max-w-none',
   children,
@@ -71,7 +74,8 @@ export function GameFormShell({
   const showBackButton = !subPhase || subPhase.phase <= 1
   const formColumnRef = useRef<HTMLDivElement>(null)
   const headingRef = useRef<HTMLHeadingElement>(null)
-  const isLastPhase = !!subPhase && subPhase.phase === subPhase.totalPhases
+  // Formularios de una sola página (sin fases) muestran el resumen siempre.
+  const isLastPhase = !subPhase || subPhase.phase === subPhase.totalPhases
 
   // Cambios sin guardar: cualquier edición del usuario o un borrador de IA.
   const [dirty, setDirty] = useState(false)
@@ -297,7 +301,14 @@ export function GameFormShell({
         <h2 ref={headingRef} tabIndex={-1} className="mb-1 text-[20px] tracking-tight text-text-h outline-none">
           {title}
         </h2>
-        <p className="mb-5 max-w-[640px] text-[13px] text-text">{description}</p>
+        <p className="mb-5 flex max-w-[640px] items-start gap-1.5 text-[13px] text-text">
+          <span>{description}</span>
+          {descriptionDetail && (
+            <span title={descriptionDetail} aria-label={descriptionDetail} role="img" className="mt-0.5 shrink-0">
+              <Info className="h-3.5 w-3.5" strokeWidth={2.2} />
+            </span>
+          )}
+        </p>
 
         {/* Selector de modo: deja claro que "Con IA" y "Manual" son dos formas
             de crear el mismo juego (no un "volver"), con la pestaña activa
