@@ -4,6 +4,7 @@ import { TextField } from '../../TextField'
 import { SaveVisibilityModal } from './SaveVisibilityModal'
 import { ImageUploadField } from './ImageUploadField'
 import { AiGameAssistantPanel } from './AiGameAssistantPanel'
+import { useReportCreateSummary } from './aiDraftContext'
 import { GameFormShell } from './GameFormShell'
 import type { GameDraft } from '../../../services/ai-game-assistant.service'
 import { OrganizationSelectField } from './create/OrganizationSelectField'
@@ -291,6 +292,8 @@ export function SnakesLaddersGameForm({ onClose, onCreated, onBack, onCategoryCr
     showToast('Juego creado', 'success')
   }
 
+  useReportCreateSummary({ count: ladders.length + snakes.length + cellQuestions.length, itemsLabel: 'retos y preguntas' })
+
   if (createdGameId) {
     return (
       <SaveVisibilityModal
@@ -305,7 +308,8 @@ export function SnakesLaddersGameForm({ onClose, onCreated, onBack, onCategoryCr
       backLabel="Cambiar tipo de juego"
       onBack={onBack}
       title="Escaleras y Serpientes"
-      description="El avance no depende del azar: cada escalera exige un reto de alta complejidad para subir, y cada serpiente da una oportunidad de recuperación antes de resbalar. Ciudad Sostenible es el tema por defecto, pero puedes cambiar la narrativa por completo con tus propias preguntas."
+      description="Escaleras y serpientes con retos: avanzar depende de responder."
+      descriptionDetail="Cada escalera exige un reto de alta complejidad para subir y cada serpiente da una oportunidad de recuperación. Ciudad Sostenible es el tema por defecto, pero puedes cambiar la narrativa con tus propias preguntas."
       formMaxWidthClassName="lg:max-w-[680px]"
       aiPanel={<AiGameAssistantPanel gameType="SNAKES_LADDERS" disabled={submitting} onDraftReady={applyAiDraft} />}
     >
@@ -473,7 +477,7 @@ export function SnakesLaddersGameForm({ onClose, onCreated, onBack, onCategoryCr
           </p>
         )}
 
-        <div className="flex gap-2">
+        <div className="nx-sticky-actions flex gap-2">
           <button
             type="submit"
             className="rounded-lg px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)] transition-transform hover:not-disabled:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"

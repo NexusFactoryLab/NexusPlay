@@ -4,6 +4,7 @@ import { TextField } from '../../TextField'
 import { SaveVisibilityModal } from './SaveVisibilityModal'
 import { ImageUploadField } from './ImageUploadField'
 import { AiGameAssistantPanel } from './AiGameAssistantPanel'
+import { useReportCreateSummary } from './aiDraftContext'
 import { GameFormShell } from './GameFormShell'
 import { WizardPhaseNav } from './WizardPhaseNav'
 import type { GameDraft } from '../../../services/ai-game-assistant.service'
@@ -249,6 +250,8 @@ export function OppositesGameForm({
     showToast('Juego creado', 'success')
   }
 
+  useReportCreateSummary({ count: pairs.length, itemsLabel: 'parejas', missingImages: pairs.reduce((total, pair) => total + (pair.posImageUrl ? 0 : 1) + (pair.negImageUrl ? 0 : 1), 0) })
+
   if (createdGameId) {
     return (
       <SaveVisibilityModal
@@ -419,7 +422,7 @@ export function OppositesGameForm({
         />
 
         {phase === TOTAL_PHASES - 1 && (
-          <div className="flex gap-2">
+          <div className="nx-sticky-actions flex gap-2">
             <button
               type="submit"
               className="rounded-lg px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)] transition-transform hover:not-disabled:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"

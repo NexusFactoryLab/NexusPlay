@@ -5,6 +5,7 @@ import { SaveVisibilityModal } from './SaveVisibilityModal'
 import { ImageUploadField } from './ImageUploadField'
 import { AudioUploadField } from './AudioUploadField'
 import { AiGameAssistantPanel } from './AiGameAssistantPanel'
+import { useReportCreateSummary } from './aiDraftContext'
 import { GameFormShell } from './GameFormShell'
 import { WizardPhaseNav } from './WizardPhaseNav'
 import type { GameDraft } from '../../../services/ai-game-assistant.service'
@@ -258,6 +259,8 @@ export function GuessWhoGameForm({
     showToast('Juego creado', 'success')
   }
 
+  useReportCreateSummary({ count: cards.length, itemsLabel: 'tarjetas', missingImages: cards.filter((card) => !card.imageUrl).length })
+
   if (createdGameId) {
     return (
       <SaveVisibilityModal
@@ -272,7 +275,8 @@ export function GuessWhoGameForm({
       backLabel="Cambiar tipo de juego"
       onBack={onBack}
       title="¿Quién Es?"
-      description="Cada tarjeta tiene una imagen, un nombre y un audio opcional. Se juega en una sala en vivo entre 2 personas — abre la sala desde el detalle del juego una vez creado."
+      description="Cada tarjeta tiene imagen, nombre y audio opcional."
+      descriptionDetail="Se juega en una sala en vivo entre 2 personas: abre la sala desde el detalle del juego una vez creado."
       aiPanel={
         <AiGameAssistantPanel
           gameType="GUESS_WHO"
@@ -418,7 +422,7 @@ export function GuessWhoGameForm({
                   onChange={(event) => updateCard(index, 'info', event.target.value)}
                 />
                 <p className="mt-1 text-[11.5px] text-text">
-                  Aparece como una burbuja de información en la tarjeta durante el juego.
+                  Se ve como burbuja en la tarjeta.
                 </p>
               </div>
             </div>
@@ -453,7 +457,7 @@ export function GuessWhoGameForm({
         />
 
         {phase === TOTAL_PHASES - 1 && (
-          <div className="flex gap-2">
+          <div className="nx-sticky-actions flex gap-2">
             <button
               type="submit"
               className="rounded-lg px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)] transition-transform hover:not-disabled:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"

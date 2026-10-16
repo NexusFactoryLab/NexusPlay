@@ -4,6 +4,7 @@ import { TextField } from '../../TextField'
 import { SaveVisibilityModal } from './SaveVisibilityModal'
 import { ImageUploadField } from './ImageUploadField'
 import { AiGameAssistantPanel } from './AiGameAssistantPanel'
+import { useReportCreateSummary } from './aiDraftContext'
 import { GameFormShell } from './GameFormShell'
 import type { GameDraft } from '../../../services/ai-game-assistant.service'
 import { OrganizationSelectField } from './create/OrganizationSelectField'
@@ -379,6 +380,8 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
     showToast('Juego creado', 'success')
   }
 
+  useReportCreateSummary({ count: gems.length, itemsLabel: 'gemas' })
+
   if (createdGameId) {
     return (
       <SaveVisibilityModal
@@ -393,7 +396,8 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
       backLabel="Cambiar tipo de juego"
       onBack={onBack}
       title="Dúo Lógico"
-      description="Dos roles complementarios (Fuego/Agua) recorren el mismo mapa, cada uno bloqueado por casillas del otro, y dependen entre sí para avanzar. Al final arman juntos un concepto ensamblando lo que cada uno recolectó."
+      description="Fuego y Agua recorren el mismo mapa y se necesitan para avanzar."
+      descriptionDetail="Cada rol queda bloqueado por casillas del otro. Al final arman juntos un concepto ensamblando lo que cada uno recolectó."
       formMaxWidthClassName="lg:max-w-[760px]"
       aiPanel={<AiGameAssistantPanel gameType="DUAL_QUEST" disabled={submitting} onDraftReady={applyAiDraft} />}
     >
@@ -469,8 +473,7 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
         <div className="rounded-xl border border-border p-4">
           <p className="mb-2.5 text-[13px] font-semibold text-text-h">Editor del mapa</p>
           <p className="mb-3 text-[11.5px] text-text">
-            Elige un modo y haz clic en el mapa para colocar. En modo "Casilla" cada clic cicla libre → muro
-            → solo-Fuego → solo-Agua.
+            Elige un modo y haz clic en el mapa.
           </p>
           <div className="mb-3 flex flex-wrap gap-1.5">
             <ModeButton active={placementMode.kind === 'CELL'} onClick={() => setPlacementMode({ kind: 'CELL' })}>
@@ -662,7 +665,7 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
           </p>
         )}
 
-        <div className="flex gap-2">
+        <div className="nx-sticky-actions flex gap-2">
           <button
             type="submit"
             className="rounded-lg px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)] transition-transform hover:not-disabled:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"

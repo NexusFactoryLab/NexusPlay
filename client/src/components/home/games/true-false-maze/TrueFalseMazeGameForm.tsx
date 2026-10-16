@@ -5,7 +5,9 @@ import { TextField } from '../../../TextField'
 import { SaveVisibilityModal } from '../SaveVisibilityModal'
 import { ImageUploadField } from '../ImageUploadField'
 import { AiGameAssistantPanel } from '../AiGameAssistantPanel'
+import { useReportCreateSummary } from '../aiDraftContext'
 import { GameFormShell } from '../GameFormShell'
+import { AdvancedSettings } from '../create/AdvancedSettings'
 import { OrganizationSelectField } from '../create/OrganizationSelectField'
 import { CategorySelectField } from '../create/CategorySelectField'
 import type { GameDraft } from '../../../../services/ai-game-assistant.service'
@@ -219,6 +221,8 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
     showToast('Juego creado', 'success')
   }
 
+  useReportCreateSummary({ count: questions.length, itemsLabel: 'afirmaciones' })
+
   if (createdGameId) {
     return (
       <SaveVisibilityModal
@@ -236,7 +240,8 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
       backLabel="Cambiar tipo de juego"
       onBack={onBack}
       title="Laberinto Verdadero o Falso"
-      description="Escribe afirmaciones sobre tu tema. En el juego, un robot recorre una nave espacial y responde cada una entrando a la sala VERDADERO o FALSO, mientras esquiva medusas galácticas. Después de cada respuesta se muestra tu explicación."
+      description="Escribe afirmaciones: el robot entra a la sala VERDADERO o FALSO."
+      descriptionDetail="Un robot recorre una nave espacial y responde cada afirmación entrando a la sala VERDADERO o FALSO, mientras esquiva medusas galácticas. Después de cada respuesta se muestra tu explicación."
       aiPanel={<AiGameAssistantPanel gameType="TRUE_FALSE_MAZE" disabled={submitting} onDraftReady={applyAiDraft} />}
     >
       <form className="flex flex-col gap-[16px]" onSubmit={handleSubmit} noValidate>
@@ -279,8 +284,7 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
           onChange={setCoverImageUrl}
         />
 
-        <div className="rounded-xl border border-border p-4">
-          <p className="mb-3 text-[13px] font-semibold text-text-h">Ajustes de la partida</p>
+        <AdvancedSettings summary="Ajustes de la partida">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="tf-lives">
@@ -364,7 +368,7 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
               />
               <span>
                 Barajar las afirmaciones en cada partida
-                <span className="block text-[12px] text-text">Si lo desmarcas, salen en el orden en que las escribiste.</span>
+                <span className="block text-[12px] text-text">Desmarca para mantener tu orden.</span>
               </span>
             </label>
             <label className="flex items-start gap-2.5 text-[13.5px] text-text-h">
@@ -378,12 +382,12 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
               <span>
                 Apagones sorpresa
                 <span className="block text-[12px] text-text">
-                  De vez en cuando la nave se queda a oscuras unos segundos y solo se ve cerca del robot.
+                  La nave se oscurece unos segundos.
                 </span>
               </span>
             </label>
           </div>
-        </div>
+        </AdvancedSettings>
 
         <CategorySelectField
           token={token}
@@ -404,8 +408,7 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
           <div>
             <p className="text-[14px] font-semibold text-text-h">Afirmaciones</p>
             <p className="text-[12.5px] text-text">
-              Entre {MIN_TF_QUESTIONS} y {MAX_TF_QUESTIONS}. Mezcla verdaderas y falsas; las falsas funcionan mejor si son
-              errores creíbles.
+              Entre {MIN_TF_QUESTIONS} y {MAX_TF_QUESTIONS}. Mezcla verdaderas y falsas.
             </p>
           </div>
           <p className="text-[12.5px] text-text">
@@ -508,7 +511,7 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
           </p>
         )}
 
-        <div className="flex gap-2">
+        <div className="nx-sticky-actions flex gap-2">
           <button
             type="submit"
             className="rounded-lg px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)] transition-transform hover:not-disabled:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"

@@ -5,7 +5,9 @@ import { SaveVisibilityModal } from './SaveVisibilityModal'
 import { ImageUploadField } from './ImageUploadField'
 import { IconPickerField } from './IconPickerField'
 import { AiGameAssistantPanel } from './AiGameAssistantPanel'
+import { useReportCreateSummary } from './aiDraftContext'
 import { GameFormShell } from './GameFormShell'
+import { AdvancedSettings } from './create/AdvancedSettings'
 import type { GameDraft } from '../../../services/ai-game-assistant.service'
 import { OrganizationSelectField } from './create/OrganizationSelectField'
 import { CategorySelectField } from './create/CategorySelectField'
@@ -249,6 +251,8 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
     showToast('Juego creado', 'success')
   }
 
+  useReportCreateSummary({ count: items.length, itemsLabel: 'objetos' })
+
   if (createdGameId) {
     return (
       <SaveVisibilityModal
@@ -263,7 +267,8 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
       backLabel="Cambiar tipo de juego"
       onBack={onBack}
       title="Recolector de laberinto"
-      description="Un jugador recorre un laberinto recolectando objetos temáticos mientras esquiva enemigos. Cambia la narrativa: puede ser un camión de reciclaje esquivando nubes de contaminación, o cualquier otra idea."
+      description="Recolecta objetos temáticos en un laberinto y esquiva enemigos."
+      descriptionDetail="Puedes cambiar la narrativa: por ejemplo, un camión de reciclaje esquivando nubes de contaminación, o cualquier otra idea."
       aiPanel={<AiGameAssistantPanel gameType="MAZE_COLLECTOR" disabled={submitting} onDraftReady={applyAiDraft} />}
     >
       <form className="flex flex-col gap-[16px]" onSubmit={handleSubmit} noValidate>
@@ -285,6 +290,7 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
           onChange={setCoverImageUrl}
         />
 
+        <AdvancedSettings summary="Forma, vidas y velocidad">
         <div>
           <label className="mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="maze-layout">
             Forma del laberinto
@@ -336,6 +342,7 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
             />
           </div>
         </div>
+        </AdvancedSettings>
 
         <div className="rounded-xl border border-border p-4">
           <p className="mb-2.5 text-[13px] font-semibold text-text-h">Personaje que recolecta</p>
@@ -492,7 +499,7 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
           </p>
         )}
 
-        <div className="flex gap-2">
+        <div className="nx-sticky-actions flex gap-2">
           <button
             type="submit"
             className="rounded-lg px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)] transition-transform hover:not-disabled:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
