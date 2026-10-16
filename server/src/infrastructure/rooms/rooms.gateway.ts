@@ -426,7 +426,10 @@ export function toClientView(room: RoomState, forSocketId: string) {
 @WebSocketGateway({
   namespace: '/rooms',
   cors: {
-    origin: process.env.CORS_ORIGIN?.split(',') ?? 'http://localhost:5173',
+    origin:
+      process.env.CORS_ORIGIN?.split(',').map((o) =>
+        o.trim().replace(/\/+$/, ''),
+      ) ?? 'http://localhost:5173',
     credentials: true,
   },
 })
