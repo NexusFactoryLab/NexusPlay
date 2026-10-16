@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { PencilLine, Sparkles, X } from 'lucide-react'
-import { AiDraftAppliedContext, AiPanelVariantContext } from './aiDraftContext'
+import { AiDraftAppliedContext, AiGeneratingContext, AiPanelVariantContext } from './aiDraftContext'
 
 type GameFormShellProps = {
   /** Texto del botón de volver, sin la flecha (ej. "Cambiar modo"). */
@@ -48,9 +48,10 @@ export function GameFormShell({
   const [noticeDismissed, setNoticeDismissed] = useState(false)
   const noticeRef = useRef<HTMLDivElement>(null)
 
-  // Primero el aviso se muestra al frente con el fondo desenfocado (es
-  // importante que se lea); al confirmarlo queda fijo arriba de los campos.
-  const [spotlightOpen, setSpotlightOpen] = useState(false)
+  // La IA está generando: al lado del chat se ve el formulario "armándose".
+  const [generating, setGenerating] = useState(false)
+  // Tras aplicar un borrador, los campos aparecen en cascada unos segundos.
+  const [filling, setFilling] = useState(false)
 
   // Issue #52: primero la pantalla grande de IA; "Llenar manualmente" (o
   // aplicar un borrador de IA) pasa al formulario. El formulario y el chat
@@ -61,27 +62,20 @@ export function GameFormShell({
     setStage('manual')
     setAiDraftCount((count) => count + 1)
     setNoticeDismissed(false)
-    setSpotlightOpen(true)
+    setFilling(true)
   }, [])
 
-  // Al cerrar el aviso destacado se lleva el aviso fijo a la vista (en mobile queda más abajo).
   useEffect(() => {
-    if (aiDraftCount > 0 && !spotlightOpen) noticeRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' })
-  }, [aiDraftCount, spotlightOpen])
-
-  useEffect(() => {
-    if (!spotlightOpen) return
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' || event.key === 'Enter') setSpotlightOpen(false)
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [spotlightOpen])
+    if (!filling) return
+    const timer = window.setTimeout(() => setFilling(false), 3000)
+    return () => window.clearTimeout(timer)
+  }, [filling])
 
   const showAiNotice = aiDraftCount > 0 && !noticeDismissed
 
   return (
     <AiDraftAppliedContext.Provider value={markAiDraftApplied}>
+    <AiGeneratingContext.Provider value={setGenerating}>
     <AiPanelVariantContext.Provider value={stage === 'ai' ? 'inline' : 'compact'}>
     <div className="relative mx-auto max-w-[1180px] p-5 sm:p-8 xl:max-w-[1440px] 2xl:max-w-[1680px]">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-[32px]">
@@ -115,7 +109,7 @@ export function GameFormShell({
         <div
           className={
             stage === 'ai'
-              ? 'nx-stage-in grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:items-stretch lg:gap-8'
+              ? 'nx-stage-in grid gap-6 lg:grid-cols-2 lg:items-stretch lg:gap-8'
               : 'nx-stage-in grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-10 xl:grid-cols-[minmax(0,1fr)_380px]'
           }
         >
@@ -141,7 +135,7 @@ export function GameFormShell({
           >
             {aiPanel}
           </aside>
-          <div className={`order-2 w-full lg:order-1 ${formMaxWidthClassName} ${stage === 'ai' ? 'hidden' : ''}`}>
+          <div className={`order-2 w-full lg:order-1 ${formMaxWidthClassName} ${stage === 'ai' ? 'hidden' : ''} ${filling ? 'nx-fill' : ''}`}>
             {showAiNotice && (
               <div
                 ref={noticeRef}
@@ -150,10 +144,7 @@ export function GameFormShell({
               >
                 <PencilLine className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={2.2} />
                 <p className="flex-1">
-                  La IA llenó el contenido y los ajustes del juego. <strong>Ahora te toca a ti:</strong> escribe el{' '}
-                  <strong>nombre del juego</strong> y la <strong>descripción</strong>, y elige la{' '}
-                  <strong>materia</strong> — la IA no los completa. Revisa también lo que generó antes de crear el
-                  juego.
+                  <strong>La IA ya llenó el juego.</strong> Falta tu parte: nombre, descripción y materia.
                 </p>
                 <button
                   type="button"
@@ -167,7 +158,26 @@ export function GameFormShell({
             )}
             {children}
           </div>
-          {stage === 'ai' && (
+          {stage === 'ai' && generating && (
+            <div
+              role="status"
+              aria-label="La IA está armando tu juego"
+              className="nx-stage-in order-2 flex flex-col gap-3 rounded-2xl border border-accent/40 bg-surface p-5"
+            >
+              <p className="flex items-center gap-2 text-[14px] font-semibold text-text-h">
+                <Sparkles className="h-4 w-4 animate-pulse text-accent" strokeWidth={2.5} />
+                Armando tu juego…
+              </p>
+              {[70, 100, 85, 100, 60, 90].map((width, index) => (
+                <span
+                  key={index}
+                  className="nx-skeleton block h-9 rounded-lg"
+                  style={{ width: `${width}%`, animationDelay: `${index * 120}ms` }}
+                />
+              ))}
+            </div>
+          )}
+          {stage === 'ai' && !generating && (
             <button
               type="button"
               className="nx-manual-card order-2 flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-accent bg-accent/10 p-6 text-center hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
@@ -177,54 +187,13 @@ export function GameFormShell({
                 <PencilLine className="h-7 w-7" strokeWidth={2.2} />
               </span>
               <span className="text-[18px] font-bold text-text-h">Llenar manualmente</span>
-              <span className="text-[13px] leading-snug text-text">
-                Prefieres escribirlo tú: completa el formulario a tu ritmo. Podrás volver al chat de IA cuando quieras.
-              </span>
             </button>
           )}
         </div>
       </div>
     </div>
-    {spotlightOpen && (
-      <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-5 backdrop-blur-md animate-[fade-in-up_0.25s_ease-out_backwards]"
-        onClick={() => setSpotlightOpen(false)}
-      >
-        <div
-          role="alertdialog"
-          aria-modal="true"
-          aria-labelledby="ai-draft-spotlight-title"
-          className="w-full max-w-[460px] rounded-2xl border border-accent/40 bg-surface p-6 text-center shadow-2xl"
-          onClick={(event) => event.stopPropagation()}
-        >
-          <span
-            className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full text-white"
-            style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
-          >
-            <PencilLine className="h-6 w-6" strokeWidth={2.2} />
-          </span>
-          <h3 id="ai-draft-spotlight-title" className="mb-2 text-[18px] font-semibold text-text-h">
-            ¡La IA llenó tu juego! Ahora te toca a ti
-          </h3>
-          <p className="mb-5 text-[14px] leading-relaxed text-text">
-            La IA completó el contenido y los ajustes. Para poder crear el juego, escribe tú el{' '}
-            <strong className="text-text-h">nombre del juego</strong> y la{' '}
-            <strong className="text-text-h">descripción</strong>, y elige la{' '}
-            <strong className="text-text-h">materia</strong>. Revisa también lo que generó la IA.
-          </p>
-          <button
-            type="button"
-            autoFocus
-            className="w-full rounded-xl px-4 py-3 text-[14px] font-semibold text-white"
-            style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
-            onClick={() => setSpotlightOpen(false)}
-          >
-            Entendido, completar los datos
-          </button>
-        </div>
-      </div>
-    )}
     </AiPanelVariantContext.Provider>
+    </AiGeneratingContext.Provider>
     </AiDraftAppliedContext.Provider>
   )
 }

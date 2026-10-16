@@ -2718,3 +2718,36 @@ code {
   .nx-tile:not(:disabled):hover, .nx-tile:not(:disabled):hover .nx-tile-icon,
   .nx-manual-card:hover { transform: none; }
 }
+
+/* Issue #52: formulario "armándose" mientras la IA genera, y campos que
+ * aparecen en cascada con un destello cuando llega el borrador. */
+@keyframes nx-skeleton {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.8; }
+}
+
+@keyframes nx-field-flash {
+  0% { box-shadow: 0 0 0 0 rgba(var(--accent-rgb, 59, 130, 246), 0.55); }
+  100% { box-shadow: 0 0 0 10px rgba(var(--accent-rgb, 59, 130, 246), 0); }
+}
+
+.nx-skeleton {
+  background: var(--code-bg, rgba(127, 127, 127, 0.2));
+  animation: nx-skeleton 1.3s ease-in-out infinite;
+}
+
+.nx-fill > * {
+  animation: nx-tile-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.nx-fill > *:nth-child(2) { animation-delay: 80ms; }
+.nx-fill > *:nth-child(3) { animation-delay: 160ms; }
+.nx-fill > *:nth-child(4) { animation-delay: 240ms; }
+.nx-fill > *:nth-child(5) { animation-delay: 320ms; }
+.nx-fill > *:nth-child(n + 6) { animation-delay: 400ms; }
+.nx-fill :is(input, textarea, select) {
+  animation: nx-field-flash 1.2s ease-out 0.3s 2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nx-skeleton, .nx-fill > *, .nx-fill :is(input, textarea, select) { animation: none; }
+}

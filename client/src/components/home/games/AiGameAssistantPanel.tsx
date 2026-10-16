@@ -6,7 +6,7 @@ import { useToast } from '../../../hooks/useToast'
 import { generateGameDraft, type GameDraft } from '../../../services/ai-game-assistant.service'
 import { ApiError } from '../../../utils/http'
 import { Modal } from './Modal'
-import { useAiPanelVariant, useMarkAiDraftApplied } from './aiDraftContext'
+import { useAiPanelVariant, useMarkAiDraftApplied, useSetAiGenerating } from './aiDraftContext'
 
 const ACCEPTED = '.pdf,.doc,.docx,.xls,.xlsx,.csv,image/*'
 const DEFAULT_MAX_FILES = 5
@@ -27,37 +27,35 @@ type AiGameHint = {
 const AI_GAME_HINTS: Record<string, AiGameHint> = {
   TRUE_FALSE_MAZE: {
     summary:
-      'La IA escribe de 8 a 15 afirmaciones de verdadero o falso con su explicación, y ajusta las vidas, las medusas y la velocidad según la dificultad que pidas.',
+      'La IA escribe las afirmaciones V/F y ajusta la dificultad.',
     placeholder: 'Ej.: "La fotosíntesis, nivel fácil para primaria" o "Segunda Guerra Mundial, difícil, 12 afirmaciones"…',
   },
   GUESS_WHO: {
-    summary: 'La IA arma las tarjetas con su nombre y un dato curioso de cada una.',
+    summary: 'La IA arma las tarjetas con nombre y dato curioso.',
     placeholder: 'Ej.: "Animales de la selva amazónica" o "Banderas de Sudamérica"…',
   },
   'MEMORY_MATCH:PAIRS': {
-    summary: 'La IA arma las parejas imagen-concepto con el nombre de cada concepto.',
+    summary: 'La IA arma las parejas imagen-concepto.',
     placeholder: 'Ej.: "Figuras y sólidos geométricos básicos" o "Partes de la célula"…',
   },
   'MEMORY_MATCH:OPPOSITES': {
-    summary: 'La IA arma parejas de conceptos opuestos, cada lado con su descripción.',
+    summary: 'La IA arma las parejas de conceptos opuestos.',
     placeholder: 'Ej.: "Ácidos y bases" o "Causas y consecuencias de la Revolución Francesa"…',
   },
   DOMINO: {
-    summary: 'La IA elige de 6 a 10 conceptos clave del tema y les asigna un color.',
+    summary: 'La IA elige los conceptos clave del tema.',
     placeholder: 'Ej.: "Energías renovables" o "Personajes de la Independencia"…',
   },
   MAZE_COLLECTOR: {
-    summary:
-      'La IA elige los objetos que se recolectan, con un dato educativo de cada uno, y los nombres del recolector y del enemigo.',
+    summary: 'La IA elige los objetos, sus datos y los personajes.',
     placeholder: 'Ej.: "Reciclaje: qué va en cada caneca" o "Animales en peligro de extinción"…',
   },
   SNAKES_LADDERS: {
-    summary:
-      'La IA diseña el tablero (escaleras y serpientes) y escribe una pregunta de opción múltiple para cada casilla clave.',
+    summary: 'La IA diseña el tablero y las preguntas.',
     placeholder: 'Ej.: "El sistema solar" o "Tablas de multiplicar del 6 al 9"…',
   },
   DUAL_QUEST: {
-    summary: 'La IA diseña el mapa, las compuertas, las preguntas y las gemas que arman la pregunta final.',
+    summary: 'La IA diseña el mapa, las preguntas y las gemas.',
     placeholder: 'Ej.: "El ciclo del agua" o "Estados de la materia"…',
   },
 }
@@ -115,6 +113,7 @@ export function AiGameAssistantPanel({
   const { showToast } = useToast()
   const markAiDraftApplied = useMarkAiDraftApplied()
   const inline = useAiPanelVariant() === 'inline'
+  const setShellGenerating = useSetAiGenerating()
   const inputRef = useRef<HTMLInputElement>(null)
   const [open, setOpen] = useState(false)
   const [files, setFiles] = useState<File[]>([])
@@ -187,6 +186,7 @@ export function AiGameAssistantPanel({
   async function handleGenerate() {
     if (!token || !canSend) return
     setGenerating(true)
+    setShellGenerating?.(true)
     setError(null)
     try {
       const draft = await generateGameDraft(token, gameType, files, mode, message)
@@ -194,11 +194,9 @@ export function AiGameAssistantPanel({
       // El formulario muestra un aviso fijo con lo que falta llenar a mano (nombre, descripción, materia).
       markAiDraftApplied?.()
       showToast(
-        draft.notice
-          ? `Juego configurado con IA. ${draft.notice} Ahora escribe tú el nombre y la descripción, y elige la materia.`
-          : 'Juego configurado con IA — ahora escribe tú el nombre y la descripción, y elige la materia.',
+        draft.notice ? `¡Listo! ${draft.notice}` : '¡Listo! Revisa el juego y completa nombre, descripción y materia.',
         'success',
-        8000,
+        6000,
       )
       setFiles([])
       setMessage('')
@@ -207,6 +205,7 @@ export function AiGameAssistantPanel({
       setError(err instanceof ApiError ? err.message : 'No se pudo configurar el juego con IA.')
     } finally {
       setGenerating(false)
+      setShellGenerating?.(false)
     }
   }
 
@@ -231,7 +230,7 @@ export function AiGameAssistantPanel({
               </span>
               <div>
                 <h2 className="text-[17px] font-semibold text-text-h">Generar con IA</h2>
-                <p className="text-[12px] text-text">Sube tus archivos, o escribe directamente el tema</p>
+                <p className="text-[12px] text-text">Escribe el tema o sube tus archivos</p>
               </div>
             </div>
             {!inline && (
@@ -247,35 +246,16 @@ export function AiGameAssistantPanel({
             )}
           </div>
 
-          <p className="mb-3 text-[12px] leading-relaxed text-text">
-            {hint && <span className="font-medium text-text-h">{hint.summary} </span>}
-            {imagesRequired ? (
-              enforcesMinimum ? (
-                <>
-                  Si tienes tus imágenes, arrástralas aquí o súbelas con el clip (al menos {imagesRequired.min}): se
-                  usan esas, y la IA le asigna a cada una el concepto que le corresponde. También puedes agregar
-                  PDF/Word/Excel/CSV de referencia (opcional). O escribe solo el tema, sin ninguna imagen: la IA arma
-                  el contenido completo y consigue las imágenes ella misma — busca una foto libre en Wikimedia Commons
-                  y, si no encuentra, crea una ilustración básica — para que ninguna tarjeta quede vacía.
-                </>
-              ) : (
-                <>
-                  Si tienes tus imágenes, arrástralas aquí o súbelas como prefieras: cada imagen suelta, o un solo
-                  PDF/Word con varias fotos adentro (la IA las extrae automáticamente). Se usan esas, y la IA les
-                  asigna el concepto. Recomendamos al menos {imagesRequired.min}, pero no es obligatorio. O escribe
-                  solo el tema, sin ninguna imagen: la IA arma el contenido completo y consigue las imágenes ella
-                  misma — busca una foto libre en Wikimedia Commons y, si no encuentra, crea una ilustración básica —
-                  para que ninguna tarjeta quede vacía.
-                </>
-              )
-            ) : (
+          <p className="mb-3 text-[12.5px] leading-snug text-text">
+            {hint && <span className="font-medium text-text-h">{hint.summary}</span>}
+            {imagesRequired && (
               <>
-                Adjunta PDF, Word, Excel, CSV o imágenes con tu propio material (incluso una foto de tus apuntes): la
-                IA lee la información y llena el resto del formulario con ese tema. También puedes escribir el tema
-                directamente en el cuadro de texto, sin adjuntar nada.
+                {' '}
+                {enforcesMinimum
+                  ? `Sube al menos ${imagesRequired.min} imágenes o escribe solo el tema.`
+                  : 'Tus imágenes son opcionales: escribe solo el tema si prefieres.'}
               </>
-            )}{' '}
-            No se aceptan links, solo archivos que subas tú (o el texto que escribas, sin ningún archivo).
+            )}
           </p>
 
           <input
@@ -307,7 +287,7 @@ export function AiGameAssistantPanel({
                 }`}
               >
                 <Upload className={`h-4 w-4 shrink-0 ${isDraggingFiles ? 'animate-bounce' : ''}`} strokeWidth={2} />
-                {isDraggingFiles ? 'Suelta los archivos aquí' : 'Arrastra tus archivos aquí, o usa el clip (opcional)'}
+                {isDraggingFiles ? 'Suelta los archivos aquí' : 'Arrastra archivos aquí (opcional)'}
               </p>
             )}
 

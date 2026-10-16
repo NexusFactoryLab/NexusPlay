@@ -22,3 +22,13 @@ export const AiPanelVariantContext = createContext<AiPanelVariant>('compact')
 export function useAiPanelVariant(): AiPanelVariant {
   return useContext(AiPanelVariantContext)
 }
+
+/**
+ * Lo provee GameFormShell: el panel de IA avisa cuándo está generando para
+ * que el shell muestre, al lado del chat, el formulario "armándose".
+ */
+export const AiGeneratingContext = createContext<((generating: boolean) => void) | null>(null)
+
+export function useSetAiGenerating(): ((generating: boolean) => void) | null {
+  return useContext(AiGeneratingContext)
+}
