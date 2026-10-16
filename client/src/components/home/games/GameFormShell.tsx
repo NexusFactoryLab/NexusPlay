@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { PencilLine, Sparkles, X } from 'lucide-react'
+import { ArrowLeft, PencilLine, Sparkles, X } from 'lucide-react'
 import {
   AiDraftAppliedContext,
   AiFillStepContext,
@@ -141,24 +141,48 @@ export function GameFormShell({
       <div className="relative">
         <button
           type="button"
-          className="mb-3 text-[12.5px] font-medium text-accent hover:underline"
+          title={backLabel}
+          className="nx-back inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-[13px] font-semibold text-text-h shadow-sm hover:border-accent hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent mb-4"
           onClick={onBack}
         >
-          ← {backLabel}
+          <ArrowLeft className="nx-back-icon h-4 w-4" strokeWidth={2.5} />
+          {backLabel}
         </button>
         <h2 className="mb-1 text-[20px] tracking-tight text-text-h">{title}</h2>
-        <p className="mb-6 max-w-[640px] text-[13px] text-text">{description}</p>
+        <p className="mb-5 max-w-[640px] text-[13px] text-text">{description}</p>
 
-        {stage === 'manual' && (
+        {/* Selector de modo: deja claro que "Con IA" y "Manual" son dos formas
+            de crear el mismo juego (no un "volver"), con la pestaña activa
+            siempre visible. */}
+        <div
+          role="tablist"
+          aria-label="Cómo quieres crear el juego"
+          className="nx-seg relative mb-6 inline-grid grid-cols-2 rounded-full border border-border bg-code-bg p-1"
+        >
+          <span aria-hidden="true" className="nx-seg-thumb" data-stage={stage} />
           <button
             type="button"
-            className="mb-4 inline-flex items-center gap-1.5 rounded-lg border border-accent/40 px-3 py-1.5 text-[12.5px] font-semibold text-accent hover:bg-accent/10"
-            onClick={() => goToStage('ai')}
+            role="tab"
+            aria-selected={stage === 'ai'}
+            className="nx-seg-tab"
+            data-active={stage === 'ai'}
+            onClick={() => stage !== 'ai' && goToStage('ai')}
           >
-            <Sparkles className="h-3.5 w-3.5" strokeWidth={2.5} />
-            Volver al chat de IA
+            <Sparkles className="h-4 w-4" strokeWidth={2.4} />
+            Con IA
           </button>
-        )}
+          <button
+            type="button"
+            role="tab"
+            aria-selected={stage === 'manual'}
+            className="nx-seg-tab"
+            data-active={stage === 'manual'}
+            onClick={() => stage !== 'manual' && goToStage('manual')}
+          >
+            <PencilLine className="h-4 w-4" strokeWidth={2.4} />
+            Manual
+          </button>
+        </div>
 
         <div
           className={

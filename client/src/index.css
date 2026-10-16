@@ -2786,3 +2786,50 @@ code {
 @media (prefers-reduced-motion: reduce) {
   .nx-stage-out, .nx-slide-in { animation: none; }
 }
+
+/* Botón "volver" visible (con flecha que se desliza) y selector Con IA / Manual
+ * con pastilla deslizante. Solo transform/opacity/color. */
+.nx-back {
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+.nx-back:hover { transform: translateX(-2px); box-shadow: 0 6px 16px -10px var(--accent); }
+.nx-back:active { transform: translateX(-2px) scale(0.97); }
+.nx-back-icon { transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.nx-back:hover .nx-back-icon { transform: translateX(-4px); }
+
+.nx-seg-thumb {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  border-radius: 9999px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: 0 8px 18px -8px var(--accent);
+  transition: transform 0.4s cubic-bezier(0.34, 1.3, 0.64, 1);
+}
+.nx-seg-thumb[data-stage='manual'] { transform: translateX(100%); }
+
+.nx-seg-tab {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 20px;
+  border-radius: 9999px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  transition: color 0.25s ease;
+}
+.nx-seg-tab[data-active='true'] { color: #fff; }
+.nx-seg-tab:not([data-active='true']):hover { color: var(--text-h); }
+.nx-seg-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .nx-back, .nx-back-icon, .nx-seg-thumb, .nx-seg-tab { transition: none; }
+  .nx-back:hover, .nx-back:hover .nx-back-icon { transform: none; }
+}
