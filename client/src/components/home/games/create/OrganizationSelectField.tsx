@@ -21,7 +21,7 @@ export function OrganizationSelectField({
   if (organizations.length === 0) return null
 
   return (
-    <div>
+    <div data-nx-field>
       <label className="mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="game-organization">
         Organización (opcional)
       </label>

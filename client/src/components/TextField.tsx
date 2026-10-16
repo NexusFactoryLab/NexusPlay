@@ -8,6 +8,8 @@ type TextFieldProps = {
   error?: string
   autoComplete?: string
   placeholder?: string
+  /** Ayuda corta (una frase) bajo el campo; se oculta si hay error. */
+  hint?: string
   disabled?: boolean
   autoFocus?: boolean
   /** Solo relevante para type="date": acota el selector de calendario. */
@@ -26,6 +28,7 @@ export function TextField({
   error,
   autoComplete,
   placeholder,
+  hint,
   disabled,
   autoFocus,
   min,
@@ -38,7 +41,7 @@ export function TextField({
   const errorId = `${id}-error`
 
   return (
-    <div className="flex flex-col gap-[7px]">
+    <div className="flex flex-col gap-[7px]" data-nx-field>
       <label className="text-sm font-medium text-text-h" htmlFor={id}>
         {label}
       </label>
@@ -63,10 +66,11 @@ export function TextField({
           aria-describedby={error ? errorId : undefined}
           onChange={(event) => onChange(event.target.value)}
           onBlur={(event) => onBlur(event.target.value)}
-          className="min-w-0 flex-1 bg-transparent px-[13px] py-[11px] text-[15px] leading-normal text-text-h placeholder:text-text/60 outline-none disabled:cursor-not-allowed disabled:opacity-60"
+          className="min-w-0 flex-1 bg-transparent px-[13px] py-[11px] text-[15px] leading-normal text-text-h placeholder:text-text/75 outline-none disabled:cursor-not-allowed disabled:opacity-60"
         />
         {action}
       </div>
+      {hint && !error && <p className="text-[12px] leading-snug text-text">{hint}</p>}
       {error && (
         <p className="text-[13px] leading-tight text-danger" id={errorId}>
           {error}

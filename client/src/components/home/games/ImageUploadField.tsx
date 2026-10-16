@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { ImagePlus, Loader2, X } from 'lucide-react'
+import { FormField } from './create/FormField'
 import { useAuth } from '../../../hooks/useAuth'
 import { uploadImage, type UploadFolder } from '../../../services/upload.service'
 import { ApiError } from '../../../utils/http'
@@ -24,14 +25,16 @@ export function ImageUploadField({
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [progress, setProgress] = useState(0)
   const [isDraggingOver, setIsDraggingOver] = useState(false)
 
   async function uploadFile(file: File) {
     if (!token) return
     setUploading(true)
     setError(null)
+    setProgress(0)
     try {
-      const result = await uploadImage(token, file, folder)
+      const result = await uploadImage(token, file, folder, setProgress)
       onChange(result.url)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'No se pudo subir la imagen.')
@@ -68,9 +71,12 @@ export function ImageUploadField({
     if (file) void uploadFile(file)
   }
 
+  // Sin "(opcional)" en la etiqueta, la imagen es obligatoria: se marca si falta.
+  const isRequired = !/opcional/i.test(label)
+  const isMissing = isRequired && !imageUrl && !uploading
+
   return (
-    <div>
-      <p className="mb-1.5 text-[13px] font-medium text-text-h">{label}</p>
+    <FormField label={label}>
       <input
         ref={inputRef}
         type="file"
@@ -97,8 +103,9 @@ export function ImageUploadField({
       ) : (
         <button
           type="button"
-          className={`flex h-24 w-full flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed text-text disabled:cursor-not-allowed disabled:opacity-60 ${
-            isDraggingOver ? 'border-accent bg-accent/5' : 'border-border'
+          data-nx-image-missing={isMissing ? 'true' : undefined}
+          className={`relative flex h-24 w-full flex-col items-center justify-center gap-1.5 overflow-hidden rounded-lg border border-dashed text-text disabled:cursor-not-allowed disabled:opacity-60 ${
+            isDraggingOver ? 'border-accent bg-accent/5' : isMissing ? 'border-danger/60 bg-danger/5' : 'border-border'
           }`}
           disabled={disabled || uploading}
           onClick={() => inputRef.current?.click()}
@@ -112,12 +119,39 @@ export function ImageUploadField({
             <ImagePlus className="h-5 w-5" strokeWidth={1.75} />
           )}
           <span className="text-[12px]">
-            {uploading ? 'Subiendo…' : isDraggingOver ? 'Suelta la imagen aquí' : 'Agregar imagen o arrástrala aquí'}
+            {uploading
+              ? progress > 0
+                ? `Subiendo… ${progress}%`
+                : 'Subiendo…'
+              : isDraggingOver
+                ? 'Suelta la imagen aquí'
+                : isMissing
+                  ? 'Falta imagen · agrégala o arrástrala'
+                  : 'Agregar imagen o arrástrala aquí'}
           </span>
+          {uploading && (
+            <span
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={progress}
+              aria-label="Progreso de subida"
+              className="absolute inset-x-0 bottom-0 h-1 bg-border"
+            >
+              <span
+                className="block h-full w-full origin-left bg-accent transition-transform"
+                style={{ transform: `scaleX(${progress / 100})` }}
+              />
+            </span>
+          )}
         </button>
       )}
 
-      {error && <p className="mt-1 text-[12px] text-danger">{error}</p>}
-    </div>
+      {error && (
+        <p className="text-[12px] text-danger" role="alert">
+          {error}
+        </p>
+      )}
+    </FormField>
   )
 }

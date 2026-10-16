@@ -89,7 +89,7 @@ export function CategorySelectField({
   }
 
   return (
-    <div>
+    <div data-nx-field>
       <label className="mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="game-category">
         Materia
       </label>
