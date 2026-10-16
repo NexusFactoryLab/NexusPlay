@@ -43,3 +43,14 @@ export const AiFillStepContext = createContext<((stepIndex: number) => void) | n
 export function useAiFillStep(): ((stepIndex: number) => void) | null {
   return useContext(AiFillStepContext)
 }
+
+/**
+ * Lo provee GameFormShell: en modo manual, el botón "Generar con IA" del panel
+ * vuelve a la pantalla del chat (en vez de abrir un modal) para que
+ * regenerar siga el mismo flujo y la vista nunca quede desincronizada.
+ */
+export const AiRequestChatContext = createContext<(() => void) | null>(null)
+
+export function useRequestAiChat(): (() => void) | null {
+  return useContext(AiRequestChatContext)
+}

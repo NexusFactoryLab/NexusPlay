@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { PencilLine, Sparkles, X } from 'lucide-react'
-import { AiDraftAppliedContext, AiFillStepContext, AiGeneratingContext, AiPanelVariantContext } from './aiDraftContext'
+import {
+  AiDraftAppliedContext,
+  AiFillStepContext,
+  AiGeneratingContext,
+  AiPanelVariantContext,
+  AiRequestChatContext,
+} from './aiDraftContext'
 
 type GameFormShellProps = {
   /** Texto del botón de volver, sin la flecha (ej. "Cambiar modo"). */
@@ -58,9 +64,33 @@ export function GameFormShell({
   // aplicar un borrador de IA) pasa al formulario. El formulario y el chat
   // siguen montados en ambas etapas, así que no se pierde lo escrito.
   const [stage, setStage] = useState<'ai' | 'manual'>('ai')
+  // Transición entre etapas: la actual sale (leaving) y la nueva entra
+  // (entering) con sus elementos en cascada, en vez de cambiar de golpe.
+  const [leaving, setLeaving] = useState(false)
+  const [entering, setEntering] = useState(false)
+  const transitionTimers = useRef<number[]>([])
+
+  const goToStage = useCallback((next: 'ai' | 'manual') => {
+    transitionTimers.current.forEach((timer) => window.clearTimeout(timer))
+    setLeaving(true)
+    const swap = window.setTimeout(() => {
+      setStage(next)
+      setLeaving(false)
+      setEntering(true)
+      window.scrollTo?.({ top: 0, behavior: 'smooth' })
+    }, 220)
+    const settle = window.setTimeout(() => setEntering(false), 1300)
+    transitionTimers.current = [swap, settle]
+  }, [])
+
+  useEffect(() => {
+    const timersRef = transitionTimers
+    return () => timersRef.current.forEach((timer) => window.clearTimeout(timer))
+  }, [])
 
   const markAiDraftApplied = useCallback(() => {
     setStage('manual')
+    setEntering(true)
     setAiDraftCount((count) => count + 1)
     setNoticeDismissed(false)
     setFilling(true)
@@ -91,12 +121,15 @@ export function GameFormShell({
     window.setTimeout(() => target.classList.remove('nx-just-filled'), 1000)
   }, [])
 
+  const stageMotion = leaving ? 'nx-stage-out' : entering ? 'nx-stage-in' : ''
+
   const showAiNotice = aiDraftCount > 0 && !noticeDismissed
 
   return (
     <AiDraftAppliedContext.Provider value={markAiDraftApplied}>
     <AiGeneratingContext.Provider value={setGenerating}>
     <AiFillStepContext.Provider value={onFillStep}>
+    <AiRequestChatContext.Provider value={() => goToStage('ai')}>
     <AiPanelVariantContext.Provider value={stage === 'ai' ? 'inline' : 'compact'}>
     <div className="relative mx-auto max-w-[1180px] p-5 sm:p-8 xl:max-w-[1440px] 2xl:max-w-[1680px]">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-[32px]">
@@ -120,7 +153,7 @@ export function GameFormShell({
           <button
             type="button"
             className="mb-4 inline-flex items-center gap-1.5 rounded-lg border border-accent/40 px-3 py-1.5 text-[12.5px] font-semibold text-accent hover:bg-accent/10"
-            onClick={() => setStage('ai')}
+            onClick={() => goToStage('ai')}
           >
             <Sparkles className="h-3.5 w-3.5" strokeWidth={2.5} />
             Volver al chat de IA
@@ -130,8 +163,8 @@ export function GameFormShell({
         <div
           className={
             stage === 'ai'
-              ? 'nx-stage-in grid gap-6 lg:grid-cols-2 lg:items-stretch lg:gap-8'
-              : 'nx-stage-in grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-10 xl:grid-cols-[minmax(0,1fr)_380px]'
+              ? `${stageMotion} grid gap-6 lg:grid-cols-2 lg:items-stretch lg:gap-8`
+              : `${stageMotion} grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-10 xl:grid-cols-[minmax(0,1fr)_380px]`
           }
         >
           {/*
@@ -151,12 +184,12 @@ export function GameFormShell({
           */}
           <aside
             className={
-              stage === 'ai' ? 'order-1' : 'order-1 lg:order-2 lg:sticky lg:top-8'
+              stage === 'ai' ? 'order-1' : `order-1 lg:order-2 lg:sticky lg:top-8 ${entering ? 'nx-slide-in' : ''}`
             }
           >
             {aiPanel}
           </aside>
-          <div ref={formColumnRef} className={`order-2 w-full lg:order-1 ${formMaxWidthClassName} ${stage === 'ai' ? 'hidden' : ''} ${filling ? 'nx-fill' : ''}`}>
+          <div ref={formColumnRef} className={`order-2 w-full lg:order-1 ${formMaxWidthClassName} ${stage === 'ai' ? 'hidden' : ''} ${filling || (entering && stage === 'manual') ? 'nx-fill' : ''}`}>
             {showAiNotice && (
               <div
                 ref={noticeRef}
@@ -202,7 +235,7 @@ export function GameFormShell({
             <button
               type="button"
               className="nx-manual-card order-2 flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-accent bg-accent/10 p-6 text-center hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              onClick={() => setStage('manual')}
+              onClick={() => goToStage('manual')}
             >
               <span className="flex h-14 w-14 items-center justify-center rounded-full bg-accent text-white">
                 <PencilLine className="h-7 w-7" strokeWidth={2.2} />
@@ -214,6 +247,7 @@ export function GameFormShell({
       </div>
     </div>
     </AiPanelVariantContext.Provider>
+    </AiRequestChatContext.Provider>
     </AiFillStepContext.Provider>
     </AiGeneratingContext.Provider>
     </AiDraftAppliedContext.Provider>

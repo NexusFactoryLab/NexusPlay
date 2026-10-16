@@ -6,7 +6,13 @@ import { useToast } from '../../../hooks/useToast'
 import { generateGameDraft, type GameDraft } from '../../../services/ai-game-assistant.service'
 import { ApiError } from '../../../utils/http'
 import { Modal } from './Modal'
-import { useAiFillStep, useAiPanelVariant, useMarkAiDraftApplied, useSetAiGenerating } from './aiDraftContext'
+import {
+  useAiFillStep,
+  useAiPanelVariant,
+  useMarkAiDraftApplied,
+  useRequestAiChat,
+  useSetAiGenerating,
+} from './aiDraftContext'
 
 const ACCEPTED = '.pdf,.doc,.docx,.xls,.xlsx,.csv,image/*'
 const DEFAULT_MAX_FILES = 5
@@ -117,6 +123,7 @@ export function AiGameAssistantPanel({
   const inline = useAiPanelVariant() === 'inline'
   const setShellGenerating = useSetAiGenerating()
   const fillStep = useAiFillStep()
+  const requestChat = useRequestAiChat()
   const unmountedRef = useRef(false)
   useEffect(() => {
     unmountedRef.current = false
@@ -411,7 +418,7 @@ export function AiGameAssistantPanel({
         className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-[13.5px] font-semibold text-white shadow-[0_10px_24px_-10px_var(--accent)] transition-transform disabled:cursor-not-allowed disabled:opacity-60 hover:not-disabled:-translate-y-0.5"
         style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
         disabled={disabled}
-        onClick={() => setOpen(true)}
+        onClick={() => (requestChat ? requestChat() : setOpen(true))}
       >
         <Sparkles className="h-4 w-4" strokeWidth={2.5} />
         Generar con IA
