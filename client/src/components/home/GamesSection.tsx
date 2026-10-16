@@ -65,6 +65,21 @@ type GamesSectionProps = {
   gameTypeDisplayName?: string
 }
 
+function gamesLabel(count: number): string {
+  return `${count} ${count === 1 ? 'juego' : 'juegos'}`
+}
+
+/**
+ * Etiqueta de una materia raíz: sus juegos publicados —los asignados directo
+ * a ella más los de sus sub-materias— y, si tiene, cuántas sub-materias.
+ */
+function rootCountLabel(root: CategoryWithGameCount, subCategories: CategoryWithGameCount[]): string {
+  const children = subCategories.filter((sub) => sub.parentSubjectId === root.id)
+  const total = children.reduce((sum, sub) => sum + sub.gameCount, root.gameCount)
+  if (children.length === 0) return gamesLabel(total)
+  return `${gamesLabel(total)} · ${children.length} ${children.length === 1 ? 'sub-materia' : 'sub-materias'}`
+}
+
 function sortByGameCount(categories: CategoryWithGameCount[]): CategoryWithGameCount[] {
   return [...categories].sort((a, b) => b.gameCount - a.gameCount)
 }
@@ -615,7 +630,7 @@ export function GamesSection({
                     <CategoryCard
                       key={category.id}
                       category={category}
-                      countLabel={`${subCategories.filter((s) => s.parentSubjectId === category.id).length} sub-materias`}
+                      countLabel={rootCountLabel(category, subCategories)}
                       onOpen={() => setActiveCategoryId(category.id)}
                       canDelete={canDeleteCategory(category)}
                       onDelete={() => setPendingDeleteCategory(category)}
