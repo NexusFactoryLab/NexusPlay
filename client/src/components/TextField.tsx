@@ -1,5 +1,6 @@
-import { useId } from 'react'
+import { useContext, useId, useState } from 'react'
 import type { ReactNode } from 'react'
+import { FieldAssistContext, identityFeedback, identityKind } from './home/games/create/fieldAssist'
 
 type TextFieldProps = {
   label: string
@@ -39,6 +40,14 @@ export function TextField({
 }: TextFieldProps) {
   const id = useId()
   const errorId = `${id}-error`
+  // Ayuda del flujo de creación (solo dentro de GameFormShell): ejemplo editable
+  // para título/descripción y mensaje amable al salir del campo.
+  const assist = useContext(FieldAssistContext)
+  const kind = assist ? identityKind(label) : null
+  const example = kind && assist ? assist.examples[kind] : undefined
+  const [touched, setTouched] = useState(false)
+  const feedback = kind && touched && !error ? identityFeedback(kind, value) : null
+  const shownPlaceholder = placeholder ?? (example ? `Ej. ${example}` : undefined)
 
   return (
     <div className="flex flex-col gap-[7px]" data-nx-field>
@@ -56,7 +65,7 @@ export function TextField({
           id={id}
           type={type}
           value={value}
-          placeholder={placeholder}
+          placeholder={shownPlaceholder}
           autoComplete={autoComplete}
           disabled={disabled}
           autoFocus={autoFocus}
@@ -65,12 +74,32 @@ export function TextField({
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? errorId : undefined}
           onChange={(event) => onChange(event.target.value)}
-          onBlur={(event) => onBlur(event.target.value)}
+          onBlur={(event) => {
+            setTouched(true)
+            onBlur(event.target.value)
+          }}
           className="min-w-0 flex-1 bg-transparent px-[13px] py-[11px] text-[15px] leading-normal text-text-h placeholder:text-text/75 outline-none disabled:cursor-not-allowed disabled:opacity-60"
         />
         {action}
       </div>
-      {hint && !error && <p className="text-[12px] leading-snug text-text">{hint}</p>}
+      {example && !disabled && value.trim().length === 0 && (
+        <button
+          type="button"
+          className="nx-example-btn self-start rounded-md px-1 py-0.5 text-[12px] font-medium text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          onClick={() => onChange(example)}
+        >
+          Usar ejemplo
+        </button>
+      )}
+      {feedback && (
+        <p
+          role="status"
+          className={`nx-feedback text-[12px] leading-snug ${feedback.tone === 'ok' ? 'font-medium text-accent' : 'text-text'}`}
+        >
+          {feedback.text}
+        </p>
+      )}
+      {hint && !error && !feedback && <p className="text-[12px] leading-snug text-text">{hint}</p>}
       {error && (
         <p className="text-[13px] leading-tight text-danger" id={errorId}>
           {error}
