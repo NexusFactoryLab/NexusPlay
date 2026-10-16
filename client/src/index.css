@@ -2855,7 +2855,7 @@ code {
   transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .nx-progress-seg[data-state='done']::after { transform: scaleX(1); }
-.nx-progress-seg[data-state='current']::after { transform: scaleX(0.55); }
+.nx-progress-seg[data-state='current']::after { transform: scaleX(var(--nx-fill, 0.55)); }
 
 .nx-step-label {
   animation: nx-stage-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) backwards;
@@ -2939,4 +2939,83 @@ code {
   [data-nx-field][data-nx-pending='true']::before,
   [data-nx-field][data-nx-invalid='true'] { animation: none; }
   .nx-collapse { transition: none; }
+}
+
+
+/* Ayuda al llenado manual (issue #52): check por campo, avance de fase,
+ * celebración, entrada/salida de elementos de lista. Solo transform y
+ * opacity animan; todo se apaga con prefers-reduced-motion. */
+@keyframes nx-check-pop {
+  0% { transform: scale(0); opacity: 0; }
+  60% { transform: scale(1.25); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes nx-item-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes nx-celebrate-ring {
+  0% { transform: scale(0.6); opacity: 0.7; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+[data-nx-field][data-nx-done='true'] > label::after,
+[data-nx-field][data-nx-done='true'] > div:first-child > label::after {
+  content: '¹3';
+  display: inline-block;
+  margin-left: 6px;
+  width: 15px;
+  height: 15px;
+  border-radius: 9999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 15px;
+  text-align: center;
+  vertical-align: 1px;
+  animation: nx-check-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+}
+.nx-item-in { animation: nx-item-in 0.38s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+.nx-item-out {
+  opacity: 0;
+  transform: translateX(-12px) scale(0.98);
+  transition: opacity 0.18s ease-in, transform 0.18s ease-in;
+}
+.nx-form-progress-bar {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: var(--border);
+}
+.nx-form-progress-bar > span {
+  display: block;
+  height: 100%;
+  width: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  transform: scaleX(var(--nx-fill, 0));
+  transform-origin: left;
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.nx-celebrate-badge { position: relative; animation: nx-check-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) backwards; }
+.nx-celebrate-badge::after,
+.nx-celebrate[data-celebrate='true'] .nx-celebrate-icon::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 2px solid var(--accent);
+  animation: nx-celebrate-ring 0.9s ease-out 0.15s backwards;
+  pointer-events: none;
+}
+.nx-celebrate-icon { position: relative; }
+.nx-celebrate[data-celebrate='true'] .nx-celebrate-icon { animation: nx-check-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-nx-field][data-nx-done='true'] > label::after,
+  [data-nx-field][data-nx-done='true'] > div:first-child > label::after,
+  .nx-item-in, .nx-celebrate-badge, .nx-celebrate-badge::after,
+  .nx-celebrate[data-celebrate='true'] .nx-celebrate-icon,
+  .nx-celebrate[data-celebrate='true'] .nx-celebrate-icon::after { animation: none; }
+  .nx-item-out, .nx-form-progress-bar > span { transition: none; }
 }
