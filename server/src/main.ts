@@ -19,7 +19,12 @@ async function bootstrap() {
   // El refresh token viaja en una cookie httpOnly: el navegador solo la
   // envía en peticiones cross-origin si el servidor declara credentials.
   app.enableCors({
-    origin: process.env.CORS_ORIGIN?.split(',') ?? 'http://localhost:5173',
+    // Se normaliza (espacios y "/" final) porque el header Origin del
+    // navegador nunca lleva barra final y la comparación es exacta.
+    origin:
+      process.env.CORS_ORIGIN?.split(',').map((o) =>
+        o.trim().replace(/\/+$/, ''),
+      ) ?? 'http://localhost:5173',
     credentials: true,
   });
 
