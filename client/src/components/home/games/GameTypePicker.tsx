@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { Bot, Ghost, Layers, Puzzle, UserRoundSearch, Dices, Flame, User, Users } from 'lucide-react'
 import { LIVE_ROOM_GAME_TYPES } from './resolveRoomCode'
 import { modeColorForGameType } from './gameModeVisuals'
@@ -106,7 +107,7 @@ export function GameTypePicker({ onClose, onSelect, archivedGameTypes }: GameTyp
               type="button"
               disabled={isArchived}
               title={description}
-              style={{ '--i': index, '--tile-color': modeColorForGameType(GAME_TYPE_BY_CHOICE[choice]) } as React.CSSProperties}
+              style={{ '--i': index, '--tile-color': modeColorForGameType(GAME_TYPE_BY_CHOICE[choice]) } as CSSProperties}
               className={
                 isArchived
                   ? 'nx-tile nx-tile-in flex flex-col items-center gap-2 rounded-xl border border-border p-4 text-center opacity-50 cursor-not-allowed'

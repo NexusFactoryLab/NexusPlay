@@ -1,4 +1,5 @@
-import { GitCompareArrows, ImageIcon, Layers } from 'lucide-react'
+import type { CSSProperties } from 'react'
+import { GitCompareArrows, ImageIcon } from 'lucide-react'
 import type { MemoryMatchMode } from './memoryMatchTypes'
 
 type GameModePickerProps = {
@@ -29,42 +30,35 @@ const MODE_OPTIONS: Array<{
 /** Primer paso al crear un juego de cartas: elegir la variante de la mecánica de memoria. */
 export function GameModePicker({ onClose, onSelect }: GameModePickerProps) {
   return (
-    <div className="mx-auto max-w-[520px] p-8">
-      <div className="mb-6 flex items-center gap-3">
-        <span
-          className="flex h-10 w-10 items-center justify-center rounded-xl text-white"
-          style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
-        >
-          <Layers className="h-5 w-5" strokeWidth={2} />
-        </span>
-        <div>
-          <h2 className="text-[18px] tracking-tight text-text-h">Juego de cartas</h2>
-          <p className="text-[13px] text-text">Elige cómo quieres que funcionen las parejas.</p>
-        </div>
-      </div>
+    <div className="mx-auto max-w-[900px] p-5 sm:p-8">
+      <h2 className="mb-1 text-[20px] tracking-tight text-text-h">Juego de cartas</h2>
+      <p className="mb-5 text-[13px] text-text">Elige cómo quieres que funcionen las parejas.</p>
 
-      <div className="flex flex-col gap-3">
-        {MODE_OPTIONS.map(({ mode, title, description, icon: Icon }) => (
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {MODE_OPTIONS.map(({ mode, title, description, icon: Icon }, index) => (
           <button
             key={mode}
             type="button"
-            className="flex items-start gap-3.5 rounded-xl border border-border p-4 text-left transition-colors hover:border-accent hover:bg-accent/5"
+            title={description}
+            style={{ '--i': index, '--tile-color': 'var(--accent)' } as CSSProperties}
+            className="nx-tile nx-tile-in flex flex-col items-center gap-2 rounded-xl border border-border p-5 text-center hover:border-accent hover:bg-accent/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             onClick={() => onSelect(mode)}
           >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-code-bg text-accent">
-              <Icon className="h-5 w-5" strokeWidth={2} />
+            <span
+              className="nx-tile-icon flex h-14 w-14 items-center justify-center rounded-xl text-white shadow-md"
+              style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
+            >
+              <Icon className="h-7 w-7" strokeWidth={2} />
             </span>
-            <span>
-              <span className="block text-[14.5px] font-semibold text-text-h">{title}</span>
-              <span className="mt-0.5 block text-[12.5px] leading-snug text-text">{description}</span>
-            </span>
+            <span className="text-[14px] font-semibold leading-tight text-text-h">{title}</span>
+            <span className="text-[12.5px] leading-snug text-text">{description}</span>
           </button>
         ))}
       </div>
 
       <button
         type="button"
-        className="mt-6 w-full rounded-lg border border-border px-4 py-2.5 text-[14px] font-medium text-text-h"
+        className="mt-5 w-full rounded-lg border border-border px-4 py-2.5 text-[14px] font-medium text-text-h"
         onClick={onClose}
       >
         Cancelar
