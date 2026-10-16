@@ -32,3 +32,14 @@ export const AiGeneratingContext = createContext<((generating: boolean) => void)
 export function useSetAiGenerating(): ((generating: boolean) => void) | null {
   return useContext(AiGeneratingContext)
 }
+
+/**
+ * Lo provee GameFormShell: el panel lo llama en cada paso del llenado
+ * animado del borrador (índice 0 = ajustes) para que el shell lleve la vista
+ * hasta el campo que acaba de llenarse y lo resalte.
+ */
+export const AiFillStepContext = createContext<((stepIndex: number) => void) | null>(null)
+
+export function useAiFillStep(): ((stepIndex: number) => void) | null {
+  return useContext(AiFillStepContext)
+}

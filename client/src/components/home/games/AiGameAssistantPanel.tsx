@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import { FileText, Loader2, Paperclip, Send, Sparkles, Upload, X } from 'lucide-react'
 import { useAuth } from '../../../hooks/useAuth'
@@ -6,7 +6,7 @@ import { useToast } from '../../../hooks/useToast'
 import { generateGameDraft, type GameDraft } from '../../../services/ai-game-assistant.service'
 import { ApiError } from '../../../utils/http'
 import { Modal } from './Modal'
-import { useAiPanelVariant, useMarkAiDraftApplied, useSetAiGenerating } from './aiDraftContext'
+import { useAiFillStep, useAiPanelVariant, useMarkAiDraftApplied, useSetAiGenerating } from './aiDraftContext'
 
 const ACCEPTED = '.pdf,.doc,.docx,.xls,.xlsx,.csv,image/*'
 const DEFAULT_MAX_FILES = 5
@@ -64,6 +64,8 @@ function hintFor(gameType: string, mode?: string): AiGameHint | undefined {
   return (mode ? AI_GAME_HINTS[`${gameType}:${mode}`] : undefined) ?? AI_GAME_HINTS[gameType]
 }
 
+const wait = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms))
+
 type AiGameAssistantPanelProps = {
   gameType: string
   /** Solo para MEMORY_MATCH: 'PAIRS' u 'OPPOSITES'. */
@@ -114,6 +116,14 @@ export function AiGameAssistantPanel({
   const markAiDraftApplied = useMarkAiDraftApplied()
   const inline = useAiPanelVariant() === 'inline'
   const setShellGenerating = useSetAiGenerating()
+  const fillStep = useAiFillStep()
+  const unmountedRef = useRef(false)
+  useEffect(() => {
+    unmountedRef.current = false
+    return () => {
+      unmountedRef.current = true
+    }
+  }, [])
   const inputRef = useRef<HTMLInputElement>(null)
   const [open, setOpen] = useState(false)
   const [files, setFiles] = useState<File[]>([])
@@ -190,9 +200,29 @@ export function AiGameAssistantPanel({
     setError(null)
     try {
       const draft = await generateGameDraft(token, gameType, files, mode, message)
-      onDraftReady(draft)
-      // El formulario muestra un aviso fijo con lo que falta llenar a mano (nombre, descripción, materia).
+      // El servidor manda el borrador completo de una vez: se aplica por pasos
+      // (ajustes primero, luego un elemento a la vez) y el shell lleva la vista
+      // a cada campo que se llena, para que el llenado se vea y se entienda.
+      // El último paso aplica el borrador completo, así que el resultado final
+      // es idéntico al de aplicarlo de golpe.
       markAiDraftApplied?.()
+      await wait(450)
+      const items = Array.isArray(draft.content) ? draft.content : []
+      const stepDelay = Math.min(450, Math.max(140, Math.floor(2600 / Math.max(items.length, 1))))
+      if (items.length > 0 && !unmountedRef.current) {
+        onDraftReady({ ...draft, content: [] })
+        fillStep?.(0)
+        await wait(500)
+        for (let count = 1; count < items.length && !unmountedRef.current; count++) {
+          onDraftReady({ ...draft, content: items.slice(0, count) })
+          await wait(40)
+          fillStep?.(count)
+          await wait(stepDelay)
+        }
+      }
+      onDraftReady(draft)
+      await wait(40)
+      fillStep?.(items.length)
       showToast(
         draft.notice ? `¡Listo! ${draft.notice}` : '¡Listo! Revisa el juego y completa nombre, descripción y materia.',
         'success',

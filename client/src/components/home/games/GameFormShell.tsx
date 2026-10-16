@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { PencilLine, Sparkles, X } from 'lucide-react'
-import { AiDraftAppliedContext, AiGeneratingContext, AiPanelVariantContext } from './aiDraftContext'
+import { AiDraftAppliedContext, AiFillStepContext, AiGeneratingContext, AiPanelVariantContext } from './aiDraftContext'
 
 type GameFormShellProps = {
   /** Texto del botón de volver, sin la flecha (ej. "Cambiar modo"). */
@@ -47,6 +47,7 @@ export function GameFormShell({
   const [aiDraftCount, setAiDraftCount] = useState(0)
   const [noticeDismissed, setNoticeDismissed] = useState(false)
   const noticeRef = useRef<HTMLDivElement>(null)
+  const formColumnRef = useRef<HTMLDivElement>(null)
 
   // La IA está generando: al lado del chat se ve el formulario "armándose".
   const [generating, setGenerating] = useState(false)
@@ -71,11 +72,31 @@ export function GameFormShell({
     return () => window.clearTimeout(timer)
   }, [filling])
 
+  // Llevar la vista al campo que la IA acaba de llenar (el primero para los
+  // ajustes; luego el último campo con contenido) y resaltarlo un momento.
+  const onFillStep = useCallback((stepIndex: number) => {
+    const root = formColumnRef.current
+    if (!root) return
+    const fields = Array.from(
+      root.querySelectorAll<HTMLInputElement>(
+        'input:not([type=file]):not([type=hidden]):not([type=checkbox]):not([type=radio]), textarea, select',
+      ),
+    )
+    const target =
+      stepIndex === 0 ? fields[0] : [...fields].reverse().find((field) => field.value.trim().length > 0)
+    if (!target) return
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+    target.scrollIntoView?.({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' })
+    target.classList.add('nx-just-filled')
+    window.setTimeout(() => target.classList.remove('nx-just-filled'), 1000)
+  }, [])
+
   const showAiNotice = aiDraftCount > 0 && !noticeDismissed
 
   return (
     <AiDraftAppliedContext.Provider value={markAiDraftApplied}>
     <AiGeneratingContext.Provider value={setGenerating}>
+    <AiFillStepContext.Provider value={onFillStep}>
     <AiPanelVariantContext.Provider value={stage === 'ai' ? 'inline' : 'compact'}>
     <div className="relative mx-auto max-w-[1180px] p-5 sm:p-8 xl:max-w-[1440px] 2xl:max-w-[1680px]">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-[32px]">
@@ -135,7 +156,7 @@ export function GameFormShell({
           >
             {aiPanel}
           </aside>
-          <div className={`order-2 w-full lg:order-1 ${formMaxWidthClassName} ${stage === 'ai' ? 'hidden' : ''} ${filling ? 'nx-fill' : ''}`}>
+          <div ref={formColumnRef} className={`order-2 w-full lg:order-1 ${formMaxWidthClassName} ${stage === 'ai' ? 'hidden' : ''} ${filling ? 'nx-fill' : ''}`}>
             {showAiNotice && (
               <div
                 ref={noticeRef}
@@ -193,6 +214,7 @@ export function GameFormShell({
       </div>
     </div>
     </AiPanelVariantContext.Provider>
+    </AiFillStepContext.Provider>
     </AiGeneratingContext.Provider>
     </AiDraftAppliedContext.Provider>
   )
