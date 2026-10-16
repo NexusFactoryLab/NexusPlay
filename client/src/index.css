@@ -4888,3 +4888,17 @@ code {
     animation: none;
   }
 }
+
+/* Móvil (issue #47): ☰, Guía y tuerca en la primera fila; el buscador debajo, a todo el ancho. */
+@media (max-width: 767px) {
+  .app-header {
+    gap: 12px;
+    padding: 12px 16px;
+  }
+
+  .app-header form[role='search'] {
+    order: 3;
+    flex-basis: 100%;
+    max-width: none;
+  }
+}

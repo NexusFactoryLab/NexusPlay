@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { BarChart3, BookOpen, Bot, Building2, ChevronLeft, Gamepad2, LayoutGrid, Lock, Plus, Users, Users2, Zap } from 'lucide-react'
@@ -12,6 +12,22 @@ type SidebarProps = {
   canManageUsers: boolean
   /** ADMIN de al menos una organización, o ADMIN global (ver HomeLayout). */
   canAccessOrganization: boolean
+  /** Móvil (< 768px): la barra es un menú desplegable que se abre con el botón ☰ del encabezado. */
+  mobileOpen: boolean
+  onMobileClose: () => void
+}
+
+const MOBILE_QUERY = '(max-width: 767px)'
+
+function useIsMobile(): boolean {
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia(MOBILE_QUERY).matches)
+  useEffect(() => {
+    const media = window.matchMedia(MOBILE_QUERY)
+    const update = () => setIsMobile(media.matches)
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
+  return isMobile
 }
 
 const BASE_ITEM_CLASS =
@@ -27,10 +43,28 @@ function readStoredCollapsed(): boolean {
   }
 }
 
-export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOrganization }: SidebarProps) {
-  const [collapsed, setCollapsed] = useState(readStoredCollapsed)
-  const navigate = useNavigate()
+export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOrganization, mobileOpen, onMobileClose }: SidebarProps) {
+  const [storedCollapsed, setCollapsed] = useState(readStoredCollapsed)
+  const isMobile = useIsMobile()
+  // En móvil el menú desplegable siempre se ve completo (no tiene sentido contraerlo).
+  const collapsed = storedCollapsed && !isMobile
+  const routerNavigate = useNavigate()
   const location = useLocation()
+
+  // Al elegir una sección en móvil, el menú se cierra solo.
+  function navigate(path: string) {
+    routerNavigate(path)
+    onMobileClose()
+  }
+
+  useEffect(() => {
+    if (!mobileOpen) return
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') onMobileClose()
+    }
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [mobileOpen, onMobileClose])
 
   function toggleCollapsed() {
     setCollapsed((current) => {
@@ -45,17 +79,23 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
   }
 
   return (
+    <>
+    {isMobile && mobileOpen && (
+      <div className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[2px]" onClick={onMobileClose} aria-hidden="true" />
+    )}
     <aside
-      className={`app-sidebar relative flex shrink-0 flex-col gap-1 border-r border-border bg-bg p-4 transition-[width] duration-200 ease-out ${
+      id="app-sidebar"
+      className={`app-sidebar relative flex shrink-0 flex-col gap-1 border-r border-border bg-bg p-4 transition-[width,transform] duration-200 ease-out max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-50 max-md:w-[min(300px,85vw)] max-md:overflow-y-auto ${
         collapsed ? 'is-collapsed w-[76px]' : 'w-[240px]'
-      }`}
+      } ${mobileOpen ? '' : 'max-md:-translate-x-full max-md:invisible'}`}
+      aria-label="Menú"
     >
       <button
         type="button"
-        onClick={toggleCollapsed}
+        onClick={isMobile ? onMobileClose : toggleCollapsed}
         data-tour="menu-toggle"
         style={{ position: 'absolute' }}
-        aria-label={collapsed ? 'Expandir menú' : 'Contraer menú'}
+        aria-label={isMobile ? 'Cerrar menú' : collapsed ? 'Expandir menú' : 'Contraer menú'}
         className="absolute top-6 -right-3 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-surface text-text shadow-[var(--shadow)] transition-transform hover:text-text-h"
       >
         <ChevronLeft
@@ -213,6 +253,7 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
         )}
       </nav>
     </aside>
+    </>
   )
 }
 
