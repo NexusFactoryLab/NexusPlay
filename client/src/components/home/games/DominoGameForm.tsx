@@ -471,8 +471,8 @@ export function DominoGameForm({
         )}
 
         <WizardPhaseNav
-          onBack={phase === 0 ? onBack : goToPreviousPhase}
-          backLabel={phase === 0 ? 'Cambiar tipo de juego' : 'Atrás'}
+          onBack={phase === 0 ? undefined : goToPreviousPhase}
+          backLabel="Atrás"
           onNext={goToNextPhase}
           isLastPhase={phase === TOTAL_PHASES - 1}
           submitting={submitting}

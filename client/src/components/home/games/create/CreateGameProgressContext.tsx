@@ -40,3 +40,8 @@ export function useCreateGameProgress() {
   }
   return context
 }
+
+/** Igual que `useCreateGameProgress`, pero devuelve `null` fuera del provider (p. ej. en tests). */
+export function useOptionalCreateGameProgress() {
+  return useContext(CreateGameProgressContext)
+}

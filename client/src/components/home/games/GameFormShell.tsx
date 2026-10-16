@@ -8,6 +8,7 @@ import {
   AiPanelVariantContext,
   AiRequestChatContext,
 } from './aiDraftContext'
+import { useOptionalCreateGameProgress } from './create/CreateGameProgressContext'
 
 type GameFormShellProps = {
   /** Texto del botón de volver, sin la flecha (ej. "Cambiar modo"). */
@@ -53,6 +54,9 @@ export function GameFormShell({
   const [aiDraftCount, setAiDraftCount] = useState(0)
   const [noticeDismissed, setNoticeDismissed] = useState(false)
   const noticeRef = useRef<HTMLDivElement>(null)
+  // En las fases siguientes del formulario el "Atrás" de cada fase ya cubre el volver.
+  const subPhase = useOptionalCreateGameProgress()?.subPhase ?? null
+  const showBackButton = !subPhase || subPhase.phase <= 1
   const formColumnRef = useRef<HTMLDivElement>(null)
 
   // La IA está generando: al lado del chat se ve el formulario "armándose".
@@ -139,15 +143,17 @@ export function GameFormShell({
       </div>
 
       <div className="relative">
-        <button
-          type="button"
-          title={backLabel}
-          className="nx-back inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-[13px] font-semibold text-text-h shadow-sm hover:border-accent hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent mb-4"
-          onClick={onBack}
-        >
-          <ArrowLeft className="nx-back-icon h-4 w-4" strokeWidth={2.5} />
-          {backLabel}
-        </button>
+        {showBackButton && (
+          <button
+            type="button"
+            title={backLabel}
+            className="nx-back inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-[13px] font-semibold text-text-h shadow-sm hover:border-accent hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent mb-4"
+            onClick={onBack}
+          >
+            <ArrowLeft className="nx-back-icon h-4 w-4" strokeWidth={2.5} />
+            {backLabel}
+          </button>
+        )}
         <h2 className="mb-1 text-[20px] tracking-tight text-text-h">{title}</h2>
         <p className="mb-5 max-w-[640px] text-[13px] text-text">{description}</p>
 

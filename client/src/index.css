@@ -2833,3 +2833,35 @@ code {
   .nx-back, .nx-back-icon, .nx-seg-thumb, .nx-seg-tab { transition: none; }
   .nx-back:hover, .nx-back:hover .nx-back-icon { transform: none; }
 }
+
+/* Progreso segmentado del encabezado de creación: el segmento actual se
+ * llena con una barra animada y el texto de la etapa entra con fade. */
+.nx-progress-seg {
+  position: relative;
+  flex: 1;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: var(--border);
+}
+.nx-progress-seg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.nx-progress-seg[data-state='done']::after { transform: scaleX(1); }
+.nx-progress-seg[data-state='current']::after { transform: scaleX(0.55); }
+
+.nx-step-label {
+  animation: nx-stage-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nx-progress-seg::after { transition: none; }
+  .nx-step-label { animation: none; }
+}
