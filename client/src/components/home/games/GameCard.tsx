@@ -31,8 +31,6 @@ type GameCardProps = {
   justCreated?: boolean
   /** Se dispara al interactuar con el resaltado (click en la tarjeta o en el CTA), para apagarlo ya. */
   onDismissJustCreated?: () => void
-  /** Sin botón de adaptar: para tarjetas que no son un juego guardado (p. ej. el demo del laberinto V/F). */
-  hideAdapt?: boolean
 }
 
 export function GameCard({
@@ -43,7 +41,6 @@ export function GameCard({
   edition,
   justCreated = false,
   onDismissJustCreated,
-  hideAdapt = false,
 }: GameCardProps) {
   const { user } = useAuth()
   const accentColor = color ?? game.theme.primaryColor
@@ -154,7 +151,7 @@ export function GameCard({
         )}
       </div>
     </button>
-    {canAdapt && !hideAdapt && (
+    {canAdapt && (
       <AdaptGameCornerButton game={game} topClassName={justCreated ? 'top-9' : 'top-2'} />
     )}
     </div>
