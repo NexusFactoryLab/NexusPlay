@@ -21,7 +21,7 @@ export interface GameAggregate {
   lastPlayedAt: Date;
 }
 
-/** Fila cruda agregada por materia, para el desglose "por materia" del estudiante. */
+/** Fila cruda agregada por Ã¡rea, para el desglose "por Ã¡rea" del estudiante. */
 export interface SubjectAggregate {
   subjectId: string;
   subjectName: string;
@@ -48,7 +48,7 @@ export interface GamePlayResultRepository {
   /** Desglose agregado por juego de un estudiante (todas sus clases/partidas). */
   aggregateByGameForStudent(studentUserId: string): Promise<GameAggregate[]>;
 
-  /** Desglose agregado por materia de un estudiante. */
+  /** Desglose agregado por Ã¡rea de un estudiante. */
   aggregateBySubjectForStudent(studentUserId: string): Promise<SubjectAggregate[]>;
 
   /**

@@ -1,5 +1,5 @@
 /**
- * Deriva un slug legible a partir de un nombre de materia libre (ej. "Ciencias
+ * Deriva un slug legible a partir de un nombre de Ã¡rea libre (ej. "Ciencias
  * Naturales" -> "ciencias-naturales"). No garantiza unicidad — para eso está el
  * índice único en Postgres + captura de duplicados en el repositorio.
  */

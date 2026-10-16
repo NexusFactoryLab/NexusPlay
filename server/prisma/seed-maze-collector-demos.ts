@@ -85,7 +85,7 @@ const GAMES: SeedGame[] = [
       },
       {
         itemId: 'organico',
-        label: 'Materia Orgánica',
+        label: 'Ãrea Orgánica',
         icon: 'leaf',
         color: '#84cc16',
         fact: 'Los residuos orgánicos se pueden convertir en compost para la tierra.',
@@ -205,7 +205,7 @@ async function ensureCategory(
     creatorUserId: null,
     createdAt: new Date(),
   } as never);
-  console.log(`Materia creada: ${name}`);
+  console.log(`Ãrea creada: ${name}`);
   return categoryId;
 }
 

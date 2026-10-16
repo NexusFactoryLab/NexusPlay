@@ -5,9 +5,9 @@ export interface SubjectProps {
   id: string;
   name: string;
   slug: string;
-  /** `null` = materia raíz del catálogo. Con valor = sub-materia de esa materia. */
+  /** `null` = Ã¡rea raíz del catálogo. Con valor = sub-Ã¡rea de esa Ã¡rea. */
   parentSubjectId: string | null;
-  /** `null` solo en materias raíz creadas por un admin sin registrar autoría individual. */
+  /** `null` solo en Ã¡reas raíz creadas por un admin sin registrar autoría individual. */
   creatorUserId: string | null;
   status: SubjectStatus;
   createdAt: Date;
@@ -25,9 +25,9 @@ const NAME_MIN_LENGTH = 2;
 const NAME_MAX_LENGTH = 60;
 
 /**
- * Materia raíz (`parentSubjectId: null`): solo la crea un ADMIN, nace pública
+ * Ãrea raíz (`parentSubjectId: null`): solo la crea un ADMIN, nace pública
  * de una vez (es el esqueleto fijo del catálogo, no contenido de un usuario).
- * Sub-materia (`parentSubjectId` con valor): la crea cualquier profesor o
+ * Sub-Ã¡rea (`parentSubjectId` con valor): la crea cualquier profesor o
  * admin, nace PRIVATE. Pasar a PUBLIC es irreversible — no hay `unpublish`
  * una vez pública, porque otros usuarios pueden haber publicado juegos bajo
  * ella mientras tanto y quedarían huérfanos. Sí puede eliminarse siendo
@@ -57,8 +57,8 @@ export class Subject {
       slug: props.slug,
       parentSubjectId,
       creatorUserId: props.creatorUserId,
-      // Una materia raíz (sin parent) solo la crea un admin y nace ya pública;
-      // una sub-materia nace privada hasta que su dueño decida publicarla.
+      // Un Ã¡rea raíz (sin parent) solo la crea un admin y nace ya pública;
+      // una sub-Ã¡rea nace privada hasta que su dueño decida publicarla.
       status: parentSubjectId === null ? SubjectStatus.public_() : SubjectStatus.private_(),
       createdAt: new Date(),
     });
@@ -100,7 +100,7 @@ export class Subject {
     return this.props.parentSubjectId === null;
   }
 
-  /** El creador de la sub-materia o un admin pueden publicarla; una raíz ya nace pública. */
+  /** El creador de la sub-Ã¡rea o un admin pueden publicarla; una raíz ya nace pública. */
   canBePublishedBy(requestingUserId: string, isAdmin: boolean): boolean {
     return isAdmin || this.props.creatorUserId === requestingUserId;
   }
@@ -111,13 +111,13 @@ export class Subject {
    * repositorio de Game en Mongo — la entidad de dominio no puede consultar
    * Mongo directamente.
    *
-   * - Materia raíz (`parentSubjectId === null`, siempre PUBLIC): solo un
+   * - Ãrea raíz (`parentSubjectId === null`, siempre PUBLIC): solo un
    *   admin puede borrarla, y solo si el árbol está vacío. Nunca por
    *   "creador": la mayoría de raíces no tienen `creatorUserId`.
-   * - Sub-materia PRIVATE: regla histórica sin cambios — su creador o un
+   * - Sub-Ã¡rea PRIVATE: regla histórica sin cambios — su creador o un
    *   admin, sin depender de si el árbol está vacío (una PRIVATE no puede
    *   tener descendientes con juegos publicados por otros usuarios).
-   * - Sub-materia PUBLIC: nueva excepción a la irreversibilidad de
+   * - Sub-Ã¡rea PUBLIC: nueva excepción a la irreversibilidad de
    *   `publish()` — su creador o un admin pueden borrarla, pero SOLO si el
    *   árbol está vacío. Esto no reabre PUBLIC -> PRIVATE, es exclusivamente
    *   una condición de borrado.
@@ -136,7 +136,7 @@ export class Subject {
 
   publish(): void {
     if (this.props.status.isPublic()) {
-      throw new InvalidSubjectStateError('la materia ya es pública.');
+      throw new InvalidSubjectStateError('el Ã¡rea ya es pública.');
     }
     this.props.status = SubjectStatus.public_();
   }

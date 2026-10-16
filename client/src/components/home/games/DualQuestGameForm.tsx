@@ -295,7 +295,7 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
       return
     }
     if (!categoryId) {
-      setError('Elige una materia para el juego.')
+      setError('Elige un Ã¡rea para el juego.')
       return
     }
     if (!coreQuestion.trim()) {

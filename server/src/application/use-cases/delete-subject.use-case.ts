@@ -19,7 +19,7 @@ export interface DeleteSubjectInput {
  * Soft-delete (ver `Subject.canBeDeletedBy` para la matriz completa de
  * reglas por rol/estado). Antes de invocar el guard de dominio, este
  * use-case calcula `isEmpty` recorriendo recursivamente el árbol (la propia
- * materia y todas sus sub-materias descendientes, sin importar su estado)
+ * Ã¡rea y todas sus sub-Ã¡reas descendientes, sin importar su estado)
  * contra el repositorio de Game en Mongo por `categoryId` — no hay FK real
  * entre Subject y Game, así que la verificación se hace a mano.
  */
@@ -44,14 +44,14 @@ export class DeleteSubjectUseCase implements UseCase<DeleteSubjectInput, void> {
       if (!isEmpty) {
         throw new SubjectHasGamesError();
       }
-      throw new ForbiddenActionError('eliminar esta materia');
+      throw new ForbiddenActionError('eliminar esta Ã¡rea');
     }
 
     await this.subjectRepository.softDelete(input.subjectId);
   }
 
   /**
-   * Recorrido en anchura del árbol completo (la materia + todas sus
+   * Recorrido en anchura del árbol completo (el Ã¡rea + todas sus
    * descendientes directas e indirectas, en cualquier estado). Corta apenas
    * encuentra un juego, sin seguir recorriendo el resto del árbol.
    */

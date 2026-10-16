@@ -9,7 +9,7 @@ type GameCardProps = {
   game: GameSummary
   onClick: () => void
   /**
-   * Color por psicología del color según la materia del juego (ver
+   * Color por psicología del color según el Ã¡rea del juego (ver
    * `colorForGame` en GamesSection). Si no llega, cae al color que haya
    * elegido quien creó el juego (`game.theme.primaryColor`).
    */

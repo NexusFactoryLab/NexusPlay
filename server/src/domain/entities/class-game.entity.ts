@@ -16,7 +16,7 @@ export interface CreateClassGameProps {
 /**
  * Vínculo N:M entre una Class (agrupador privado de trabajo de un profesor) y
  * un Game (que vive en MongoDB, no en Postgres). El juego puede pertenecer a
- * cualquier materia, y una misma clase puede agrupar juegos de materias
+ * cualquier Ã¡rea, y una misma clase puede agrupar juegos de Ã¡reas
  * distintas — la existencia del gameId se valida en el use-case contra el
  * repositorio de Game, no con una FK de base de datos.
  */

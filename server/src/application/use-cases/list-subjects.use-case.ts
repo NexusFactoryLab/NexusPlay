@@ -14,8 +14,8 @@ export interface ListSubjectsInput {
 }
 
 /**
- * Devuelve todas las materias PUBLIC del catálogo más las PRIVATE del propio
- * usuario (ver `SubjectRepository.findVisibleTo`) — no expone materias
+ * Devuelve todas las Ã¡reas PUBLIC del catálogo más las PRIVATE del propio
+ * usuario (ver `SubjectRepository.findVisibleTo`) — no expone Ã¡reas
  * privadas de otros usuarios.
  */
 @Injectable()

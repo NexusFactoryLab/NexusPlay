@@ -190,12 +190,12 @@ export function AiGameAssistantPanel({
     try {
       const draft = await generateGameDraft(token, gameType, files, mode, message)
       onDraftReady(draft)
-      // El formulario muestra un aviso fijo con lo que falta llenar a mano (nombre, descripción, materia).
+      // El formulario muestra un aviso fijo con lo que falta llenar a mano (nombre, descripción, Ã¡rea).
       markAiDraftApplied?.()
       showToast(
         draft.notice
-          ? `Juego configurado con IA. ${draft.notice} Ahora escribe tú el nombre y la descripción, y elige la materia.`
-          : 'Juego configurado con IA — ahora escribe tú el nombre y la descripción, y elige la materia.',
+          ? `Juego configurado con IA. ${draft.notice} Ahora escribe tú el nombre y la descripción, y elige el Ã¡rea.`
+          : 'Juego configurado con IA — ahora escribe tú el nombre y la descripción, y elige el Ã¡rea.',
         'success',
         8000,
       )

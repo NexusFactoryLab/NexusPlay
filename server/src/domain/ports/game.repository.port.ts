@@ -52,11 +52,11 @@ export interface GameRepository {
   existsBySlug(slug: string): Promise<boolean>;
   findAll(filter: FindAllGamesFilter): Promise<PaginatedGames>;
   delete(id: string): Promise<void>;
-  /** Conteo de juegos PUBLISHED agrupados por categoría, para el catálogo de materias. */
+  /** Conteo de juegos PUBLISHED agrupados por categoría, para el catálogo de Ã¡reas. */
   countPublishedByCategory(): Promise<Map<string, number>>;
   /**
    * Publica en bloque (DRAFT -> PUBLISHED) todos los juegos de una categoría.
-   * Usado por la cascada de "publicar materia": es un `updateMany` atómico a
+   * Usado por la cascada de "publicar Ã¡rea": es un `updateMany` atómico a
    * nivel de Mongo, no find+mutate+save por documento, para no competir con
    * el control de concurrencia optimista de cada juego individual. Devuelve
    * cuántos se publicaron.

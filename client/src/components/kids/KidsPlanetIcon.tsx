@@ -7,9 +7,9 @@ type KidsPlanetIconProps = {
 }
 
 /**
- * Planeta kawaii que representa cada "mundo" (materia) en `KidsWorldGrid`:
+ * Planeta kawaii que representa cada "mundo" (Ã¡rea) en `KidsWorldGrid`:
  * el planeta completo (cuerpo, continentes, anillo y plantita, como en el
- * fondo del Modo Kids) es la tarjeta de la materia, con su nombre escrito
+ * fondo del Modo Kids) es la tarjeta del Ã¡rea, con su nombre escrito
  * dentro, debajo de la carita — igual que los "planetas ecológicos" del
  * fondo. Los ids de gradiente/clip-path se generan con `useId` porque el
  * grid renderiza varias instancias a la vez y los ids de un `<defs>` de SVG
@@ -97,7 +97,7 @@ export function KidsPlanetIcon({ label, size = 230, className }: KidsPlanetIconP
           <circle cx="-35" cy="5" r="5" fill="#ff7675" opacity="0.85" />
           <circle cx="35" cy="5" r="5" fill="#ff7675" opacity="0.85" />
 
-          {/* Nombre de la materia, debajo de la carita — más grande y con
+          {/* Nombre del Ã¡rea, debajo de la carita — más grande y con
               trazo grueso además de la sombra, para que se lea bien sobre
               cualquier parte del planeta (océano o continente). */}
           <text
