@@ -317,6 +317,15 @@ export function GamesSection({
    * casillas marcadas de la misma sección se combinan, no se excluyen).
    * Ninguna casilla marcada en una sección = esa sección no filtra.
    */
+  // Demo del laberinto verdadero/falso (ruta /jugar/laberinto-vf-demo): no
+  // es un juego guardado, pero va primero en el carrusel del inicio para que
+  // haya un juego más a la vista. Respeta la búsqueda y los filtros.
+  const showMazeDemo =
+    mode === 'all' &&
+    (!searchQuery || 'laberinto verdadero falso demo'.includes(searchQuery.trim().toLowerCase())) &&
+    (activeModes.size === 0 || activeModes.has('SOLO')) &&
+    (activeTypes.size === 0 || activeTypes.has('TRUE_FALSE_MAZE'))
+
   const filteredGames = games.filter((game) => {
     if (activeModes.size > 0 && !activeModes.has(modeFilterForGameType(game.gameType))) return false
     if (activeTypes.size > 0 && !activeTypes.has(game.gameType)) return false
@@ -1179,7 +1188,7 @@ export function GamesSection({
               </div>
             )}
 
-            {filteredGames.length === 0 ? (
+            {filteredGames.length === 0 && !showMazeDemo ? (
               <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-16 text-center">
                 <p className="text-[15px] font-medium text-text-h">Ningún juego coincide con estos filtros.</p>
                 <button
@@ -1195,7 +1204,15 @@ export function GamesSection({
               </div>
             ) : (
               renderGameList(
-                filteredGames.map((game, index) => (
+                [
+                  ...(showMazeDemo
+                    ? [
+                        <div key="true-false-maze-demo" className="games-carousel-item shrink-0 snap-start animate-[fade-in-up_0.35s_ease-out_backwards]">
+                          <GameCard game={MAZE_DEMO_GAME} hideAdapt onClick={() => navigate('/jugar/laberinto-vf-demo')} />
+                        </div>,
+                      ]
+                    : []),
+                  ...filteredGames.map((game, index) => (
                   <div
                     key={game.id}
                     className={`animate-[fade-in-up_0.35s_ease-out_backwards] ${
@@ -1217,7 +1234,8 @@ export function GamesSection({
                       onDismissJustCreated={dismissJustCreatedHighlight}
                     />
                   </div>
-                )),
+                  )),
+                ],
               )
             )}
           </div>
@@ -1248,6 +1266,31 @@ export function GamesSection({
       {renderGameOverlays()}
     </section>
   )
+}
+
+/** Tarjeta del demo del laberinto V/F en el inicio (ver `showMazeDemo`). */
+const MAZE_DEMO_GAME: GameSummary = {
+  id: 'true-false-maze-demo',
+  slug: 'laberinto-vf-demo',
+  title: 'Laberinto Verdadero o Falso',
+  description: 'Demo: recorre la nave y elige la puerta correcta según si cada afirmación es verdadera o falsa.',
+  gameType: 'TRUE_FALSE_MAZE',
+  // Portada dibujada en el propio código (SVG en línea), sin archivo ni servidor.
+  theme: {
+    primaryColor: '#6366f1',
+    coverImageUrl:
+      'data:image/svg+xml,' +
+      encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#312e81"/><stop offset="1" stop-color="#06b6d4"/></linearGradient></defs><rect width="400" height="300" fill="url(#g)"/><text x="125" y="185" font-size="110" text-anchor="middle">✅</text><text x="275" y="185" font-size="110" text-anchor="middle">❌</text></svg>',
+      ),
+  },
+  categoryId: '',
+  status: 'PUBLISHED',
+  creatorUserId: '',
+  organizationId: null,
+  sourceGameId: null,
+  createdAt: '',
+  updatedAt: '',
 }
 
 function CategoryCard({
