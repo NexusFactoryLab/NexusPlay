@@ -115,8 +115,8 @@ export function GameFormShell({
         <div
           className={
             stage === 'ai'
-              ? 'grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:items-stretch lg:gap-8'
-              : 'grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-10 xl:grid-cols-[minmax(0,1fr)_380px]'
+              ? 'nx-stage-in grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:items-stretch lg:gap-8'
+              : 'nx-stage-in grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-10 xl:grid-cols-[minmax(0,1fr)_380px]'
           }
         >
           {/*
@@ -170,7 +170,7 @@ export function GameFormShell({
           {stage === 'ai' && (
             <button
               type="button"
-              className="order-2 flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-accent bg-accent/10 p-6 text-center transition-colors hover:bg-accent/20"
+              className="nx-manual-card order-2 flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-accent bg-accent/10 p-6 text-center hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               onClick={() => setStage('manual')}
             >
               <span className="flex h-14 w-14 items-center justify-center rounded-full bg-accent text-white">

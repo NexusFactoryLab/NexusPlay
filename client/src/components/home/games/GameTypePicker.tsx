@@ -96,7 +96,7 @@ export function GameTypePicker({ onClose, onSelect, archivedGameTypes }: GameTyp
       <p className="mb-5 text-[13px] text-text">Elige qué tipo de juego quieres crear.</p>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-        {TYPE_OPTIONS.map(({ choice, title, icon: Icon }) => {
+        {TYPE_OPTIONS.map(({ choice, title, description, icon: Icon }, index) => {
           const isArchived = archivedGameTypes?.has(GAME_TYPE_BY_CHOICE[choice]) ?? false
           const isMultiplayer = LIVE_ROOM_GAME_TYPES.includes(GAME_TYPE_BY_CHOICE[choice])
 
@@ -105,16 +105,17 @@ export function GameTypePicker({ onClose, onSelect, archivedGameTypes }: GameTyp
               key={choice}
               type="button"
               disabled={isArchived}
-              title={TYPE_OPTIONS.find((o) => o.choice === choice)?.description}
+              title={description}
+              style={{ '--i': index, '--tile-color': modeColorForGameType(GAME_TYPE_BY_CHOICE[choice]) } as React.CSSProperties}
               className={
                 isArchived
-                  ? 'flex flex-col items-center gap-2 rounded-xl border border-border p-4 text-center opacity-50 cursor-not-allowed'
-                  : 'flex flex-col items-center gap-2 rounded-xl border border-border p-4 text-center transition-colors hover:border-accent hover:bg-accent/5'
+                  ? 'nx-tile nx-tile-in flex flex-col items-center gap-2 rounded-xl border border-border p-4 text-center opacity-50 cursor-not-allowed'
+                  : 'nx-tile nx-tile-in flex flex-col items-center gap-2 rounded-xl border border-border p-4 text-center hover:border-accent hover:bg-accent/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent'
               }
               onClick={isArchived ? undefined : () => onSelect(choice)}
             >
               <span
-                className="flex h-14 w-14 items-center justify-center rounded-xl text-white"
+                className="nx-tile-icon flex h-14 w-14 items-center justify-center rounded-xl text-white shadow-md"
                 style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
               >
                 <Icon className="h-7 w-7" strokeWidth={2} />
