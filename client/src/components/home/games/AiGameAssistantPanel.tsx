@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
-import { FileText, Loader2, Paperclip, Send, Sparkles, Upload, X } from 'lucide-react'
+import { FileText, Loader2, Paperclip, RotateCcw, Send, Sparkles, Upload, X } from 'lucide-react'
 import { useAuth } from '../../../hooks/useAuth'
 import { useToast } from '../../../hooks/useToast'
 import { generateGameDraft, type GameDraft } from '../../../services/ai-game-assistant.service'
@@ -70,6 +70,14 @@ function hintFor(gameType: string, mode?: string): AiGameHint | undefined {
   return (mode ? AI_GAME_HINTS[`${gameType}:${mode}`] : undefined) ?? AI_GAME_HINTS[gameType]
 }
 
+/** Mensajes que rotan mientras la IA trabaja, para que se sienta el avance. */
+const PROGRESS_MESSAGES = [
+  'Leyendo tu material…',
+  'Armando el contenido…',
+  'Ajustando la dificultad…',
+  'Revisando que todo encaje…',
+]
+
 const wait = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms))
 
 type AiGameAssistantPanelProps = {
@@ -137,6 +145,24 @@ export function AiGameAssistantPanel({
   const [message, setMessage] = useState('')
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [progressIndex, setProgressIndex] = useState(0)
+  const [announce, setAnnounce] = useState('')
+  const abortRef = useRef<AbortController | null>(null)
+
+  // Mensajes de progreso rotativos mientras la IA genera.
+  useEffect(() => {
+    if (!generating) return
+    setProgressIndex(0)
+    const timer = window.setInterval(
+      () => setProgressIndex((index) => Math.min(index + 1, PROGRESS_MESSAGES.length - 1)),
+      2800,
+    )
+    return () => window.clearInterval(timer)
+  }, [generating])
+
+  function cancelGeneration() {
+    abortRef.current?.abort()
+  }
 
   const hint = hintFor(gameType, mode)
   const maxFiles = imagesRequired ? imagesRequired.max + EXTRA_REFERENCE_FILES : DEFAULT_MAX_FILES
@@ -205,8 +231,11 @@ export function AiGameAssistantPanel({
     setGenerating(true)
     setShellGenerating?.(true)
     setError(null)
+    setAnnounce('')
+    const controller = new AbortController()
+    abortRef.current = controller
     try {
-      const draft = await generateGameDraft(token, gameType, files, mode, message)
+      const draft = await generateGameDraft(token, gameType, files, mode, message, controller.signal)
       // El servidor manda el borrador completo de una vez: se aplica por pasos
       // (ajustes primero, luego un elemento a la vez) y el shell lleva la vista
       // a cada campo que se llena, para que el llenado se vea y se entienda.
@@ -238,9 +267,15 @@ export function AiGameAssistantPanel({
       setFiles([])
       setMessage('')
       setOpen(false)
+      setAnnounce('Listo: la IA terminó de armar el juego. Revisa los campos y completa lo pendiente.')
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'No se pudo configurar el juego con IA.')
+      if (controller.signal.aborted) {
+        setError('Cancelaste la generación. Puedes intentarlo de nuevo.')
+      } else {
+        setError(err instanceof ApiError ? err.message : 'No se pudo configurar el juego con IA.')
+      }
     } finally {
+      abortRef.current = null
       setGenerating(false)
       setShellGenerating?.(false)
     }
@@ -392,13 +427,43 @@ export function AiGameAssistantPanel({
             </div>
           </div>
 
-          {error && (
-            <p
-              className="mt-2.5 rounded-lg border border-danger/35 bg-danger/10 px-[13px] py-[11px] text-[12.5px] leading-snug text-danger"
+          <p className="sr-only" role="status" aria-live="polite">
+            {generating ? PROGRESS_MESSAGES[progressIndex] : announce}
+          </p>
+
+          {generating && (
+            <div className="mt-2.5 flex items-center justify-between gap-3 rounded-lg border border-accent/30 bg-accent/10 px-3 py-2">
+              <p key={progressIndex} className="nx-step-label flex items-center gap-2 text-[12.5px] font-medium text-text-h">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" strokeWidth={2.5} />
+                {PROGRESS_MESSAGES[progressIndex]}
+              </p>
+              <button
+                type="button"
+                className="shrink-0 rounded-md px-2 py-1 text-[12px] font-semibold text-text-h hover:bg-code-bg"
+                onClick={cancelGeneration}
+              >
+                Cancelar
+              </button>
+            </div>
+          )}
+
+          {error && !generating && (
+            <div
+              className="mt-2.5 flex items-start justify-between gap-3 rounded-lg border border-danger/35 bg-danger/10 px-[13px] py-[11px] text-[12.5px] leading-snug text-danger"
               role="alert"
             >
-              {error}
-            </p>
+              <p className="flex-1">{error}</p>
+              {canSend && (
+                <button
+                  type="button"
+                  className="inline-flex shrink-0 items-center gap-1 rounded-md border border-danger/40 px-2 py-1 text-[12px] font-semibold hover:bg-danger/10"
+                  onClick={handleGenerate}
+                >
+                  <RotateCcw className="h-3 w-3" strokeWidth={2.5} />
+                  Reintentar
+                </button>
+              )}
+            </div>
           )}
     </>
   )
