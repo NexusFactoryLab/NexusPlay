@@ -1,4 +1,6 @@
+import { useContext } from 'react'
 import { ArrowLeft } from 'lucide-react'
+import { PhaseProgressContext, missingHint, summarizeProgress } from './create/fieldAssist'
 
 type WizardPhaseNavProps = {
   /** Fase anterior. Sin él (primera fase) no hay botón: salir lo resuelve el botón de volver del encabezado. */
@@ -27,6 +29,8 @@ export function WizardPhaseNav({
   isLastPhase,
   submitting,
 }: WizardPhaseNavProps) {
+  const progress = useContext(PhaseProgressContext)
+  const summary = progress ? summarizeProgress(progress) : null
   if (isLastPhase) return null
   return (
     <div className="nx-sticky-actions flex gap-2">
@@ -47,9 +51,18 @@ export function WizardPhaseNav({
         style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
         onClick={onNext}
         disabled={submitting}
+        data-nx-primary
+        title="Ctrl + Enter"
       >
         {nextLabel} →
       </button>
+      {summary && progress && progress.total > 0 && (
+        <span
+          className={`self-center text-[12px] font-medium ${summary.complete ? 'text-accent' : 'text-text'}`}
+        >
+          {missingHint(summary.missing)}
+        </span>
+      )}
     </div>
   )
 }

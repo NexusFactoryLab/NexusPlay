@@ -1,12 +1,14 @@
+import type { CSSProperties } from 'react'
 import { Gamepad2 } from 'lucide-react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { stepFromPath } from './steps'
+import { headerSegmentFill } from './fieldAssist'
 import { CreateGameProgressProvider, useCreateGameProgress } from './CreateGameProgressContext'
 import { ScrollMoreHint } from '../../../ScrollMoreHint'
 
 function CreateGameLayoutContent() {
   const location = useLocation()
-  const { subPhase } = useCreateGameProgress()
+  const { subPhase, fill } = useCreateGameProgress()
   const { label, step, total } = stepFromPath(location.pathname, subPhase)
 
   return (
@@ -42,6 +44,11 @@ function CreateGameLayoutContent() {
               key={index}
               className="nx-progress-seg"
               data-state={index + 1 < step ? 'done' : index + 1 === step ? 'current' : 'todo'}
+              style={
+                index + 1 === step && subPhase
+                  ? ({ '--nx-fill': headerSegmentFill(fill) } as CSSProperties)
+                  : undefined
+              }
             />
           ))}
         </div>

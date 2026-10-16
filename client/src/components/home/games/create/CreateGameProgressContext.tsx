@@ -13,6 +13,9 @@ export type SubPhaseProgress = {
 type CreateGameProgressContextValue = {
   subPhase: SubPhaseProgress | null
   setSubPhase: (value: SubPhaseProgress | null) => void
+  /** Avance (0..1) de los campos de la fase actual; mueve el segmento activo del header. */
+  fill: number
+  setFill: (value: number) => void
 }
 
 const CreateGameProgressContext = createContext<CreateGameProgressContextValue | null>(null)
@@ -26,8 +29,9 @@ const CreateGameProgressContext = createContext<CreateGameProgressContextValue |
  */
 export function CreateGameProgressProvider({ children }: { children: ReactNode }) {
   const [subPhase, setSubPhase] = useState<SubPhaseProgress | null>(null)
+  const [fill, setFill] = useState(0)
   return (
-    <CreateGameProgressContext.Provider value={{ subPhase, setSubPhase }}>
+    <CreateGameProgressContext.Provider value={{ subPhase, setSubPhase, fill, setFill }}>
       {children}
     </CreateGameProgressContext.Provider>
   )

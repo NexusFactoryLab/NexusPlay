@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { AlertTriangle, ArrowLeft, ClipboardCheck, Info, PencilLine, Sparkles, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Check, ClipboardCheck, Gamepad2, Info, PencilLine, Sparkles, X } from 'lucide-react'
 import {
   AiDraftAppliedContext,
   AiFillStepContext,
@@ -12,9 +12,76 @@ import {
 } from './aiDraftContext'
 import { Modal } from './Modal'
 import { useOptionalCreateGameProgress } from './create/CreateGameProgressContext'
+import {
+  FieldAssistContext,
+  PhaseProgressContext,
+  examplesFor,
+  identityKind,
+  summarizeProgress,
+  type PhaseProgress,
+} from './create/fieldAssist'
 
 const CONTROL_SELECTOR =
   'input:not([type=file]):not([type=hidden]):not([type=checkbox]):not([type=radio]), textarea, select'
+
+const ADD_BUTTON = /^\+\s*Agregar/i
+
+function isReduceMotion(): boolean {
+  return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+}
+
+/** Controles de texto/select usables (visibles para el teclado), en orden de documento. */
+function usableControls(root: HTMLElement): HTMLInputElement[] {
+  return Array.from(root.querySelectorAll<HTMLInputElement>(CONTROL_SELECTOR)).filter(
+    (control) => !control.disabled && !control.closest('[inert], [aria-hidden=true]'),
+  )
+}
+
+function findAddButton(root: HTMLElement, after: HTMLElement): HTMLButtonElement | null {
+  const buttons = Array.from(root.querySelectorAll<HTMLButtonElement>('button')).filter(
+    (button) => !button.disabled && ADD_BUTTON.test(button.textContent?.trim() ?? ''),
+  )
+  // El "+ Agregar" de la lista a la que pertenece el campo es el que sigue en el documento.
+  return (
+    buttons.find((button) => after.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING) ??
+    buttons[0] ??
+    null
+  )
+}
+
+/** La tarjeta de una lista repetible: el ancestro hermano del botón "+ Agregar". */
+function findListItem(from: HTMLElement): HTMLElement | null {
+  let node: HTMLElement | null = from
+  while (node && node.parentElement) {
+    const parent: HTMLElement = node.parentElement
+    const hasAdd = Array.from(parent.children).some(
+      (child) => child.tagName === 'BUTTON' && ADD_BUTTON.test(child.textContent?.trim() ?? ''),
+    )
+    if (hasAdd && node.tagName !== 'BUTTON') return node
+    node = parent
+  }
+  return null
+}
+
+function afterRender(callback: () => void) {
+  window.requestAnimationFrame(() => window.requestAnimationFrame(callback))
+}
+
+/** Tras agregar un elemento: enfoca su primer campo, lo centra y lo anima al entrar. */
+function revealNewItem(root: HTMLElement, before: HTMLInputElement[]) {
+  const known = new Set(before)
+  afterRender(() => {
+    const created = usableControls(root).find((control) => !known.has(control))
+    if (!created) return
+    created.focus({ preventScroll: true })
+    created.scrollIntoView?.({ behavior: isReduceMotion() ? 'auto' : 'smooth', block: 'center' })
+    const card = findListItem(created)
+    if (card) {
+      card.classList.add('nx-item-in')
+      window.setTimeout(() => card.classList.remove('nx-item-in'), 450)
+    }
+  })
+}
 
 function clearInvalid(field: HTMLElement) {
   delete field.dataset.nxInvalid
@@ -81,6 +148,13 @@ export function GameFormShell({
   const [dirty, setDirty] = useState(false)
   const [confirmLeave, setConfirmLeave] = useState(false)
   const [summary, setSummary] = useState<CreateSummary | null>(null)
+  // Avance de la fase actual y vista previa del juego, medidos del propio formulario.
+  const [progress, setProgress] = useState<PhaseProgress>({ ready: 0, total: 0 })
+  const [previewTitle, setPreviewTitle] = useState('')
+  const [celebrate, setCelebrate] = useState(false)
+  const wasComplete = useRef(false)
+  const setHeaderFill = useOptionalCreateGameProgress()?.setFill
+  const progressSummary = summarizeProgress(progress)
 
   // La IA está generando: al lado del chat se ve el formulario "armándose".
   const [generating, setGenerating] = useState(false)
@@ -150,9 +224,24 @@ export function GameFormShell({
   const refreshMarks = useCallback(() => {
     const root = formColumnRef.current
     if (!root) return
+    let ready = 0
+    let total = 0
     root.querySelectorAll<HTMLElement>('[data-nx-field]').forEach((field) => {
       const label = (field.querySelector('label, p')?.textContent ?? '').trim().toLowerCase()
       const control = field.querySelector<HTMLInputElement>(CONTROL_SELECTOR)
+      // Avance: cada campo obligatorio visible cuenta como listo si tiene valor
+      // (o imagen); los numéricos ya traen valor por defecto, no se cuentan.
+      const hidden = !!field.closest('[inert], [aria-hidden=true]')
+      const hasFile = !!field.querySelector('input[type=file]')
+      const countable = !hidden && (!!control ? control.type !== 'number' : hasFile)
+      const done = control ? control.value.trim().length > 0 : hasFile && !!field.querySelector('img')
+      if (countable && !/opcional/.test(label)) {
+        total += 1
+        if (done) ready += 1
+      }
+      if (countable && done) field.dataset.nxDone = 'true'
+      else delete field.dataset.nxDone
+      if (control && identityKind(label) === 'title') setPreviewTitle(control.value.trim())
       const isIdentity = /^(t[ií]tulo|descripci[oó]n|materia|nombre del juego)/.test(label)
       const empty = !!control && control.value.trim().length === 0
       if (aiDraftCount > 0 && isIdentity && empty) field.dataset.nxPending = 'true'
@@ -160,7 +249,27 @@ export function GameFormShell({
       // El error junto al campo se quita en cuanto el usuario lo corrige.
       if (field.dataset.nxInvalid && field.dataset.nxEmpty === 'true' && control && !empty) clearInvalid(field)
     })
+    setProgress((current) => (current.ready === ready && current.total === total ? current : { ready, total }))
   }, [aiDraftCount])
+
+  // Avance sincronizado con el header y microcelebración al completar la fase.
+  useEffect(() => {
+    setHeaderFill?.(progressSummary.fraction)
+    if (progressSummary.complete && !wasComplete.current) {
+      setCelebrate(true)
+      const timer = window.setTimeout(() => setCelebrate(false), 1200)
+      wasComplete.current = true
+      return () => window.clearTimeout(timer)
+    }
+    if (!progressSummary.complete) wasComplete.current = false
+  }, [progressSummary.fraction, progressSummary.complete, setHeaderFill])
+
+  // Al cambiar de fase el avance empieza de cero (y la celebración puede repetirse).
+  useEffect(() => {
+    wasComplete.current = false
+    setCelebrate(false)
+    window.requestAnimationFrame(refreshMarks)
+  }, [phaseNumber, refreshMarks])
 
   /** Errores de validación junto al campo que falla, con scroll hasta el primero. */
   const highlightInvalid = useCallback((alertText: string) => {
@@ -227,10 +336,75 @@ export function GameFormShell({
     window.requestAnimationFrame(refreshMarks)
   }, [refreshMarks])
 
-  const handleClickCapture = useCallback((event: React.MouseEvent) => {
-    const button = (event.target as HTMLElement).closest('button')
-    if (button && /^(\+|Quitar|Agregar|Eliminar|Añadir)/i.test(button.textContent?.trim() ?? '')) {
-      setDirty(true)
+  const handleClickCapture = useCallback(
+    (event: React.MouseEvent) => {
+      const button = (event.target as HTMLElement).closest('button')
+      const text = button?.textContent?.trim() ?? ''
+      if (button && /^(\+|Quitar|Agregar|Eliminar|Añadir)/i.test(text)) {
+        setDirty(true)
+      }
+      window.requestAnimationFrame(refreshMarks)
+      const root = formColumnRef.current
+      if (!button || !root) return
+
+      // "+ Agregar": foco y animación de entrada en el elemento recién creado.
+      if (ADD_BUTTON.test(text)) {
+        revealNewItem(root, usableControls(root))
+        return
+      }
+
+      // "Quitar": la tarjeta sale con una animación breve antes de eliminarse.
+      if (/^Quitar/i.test(text) && !button.dataset.nxLeaving && !isReduceMotion()) {
+        const card = findListItem(button)
+        if (!card) return
+        event.stopPropagation()
+        event.preventDefault()
+        card.classList.add('nx-item-out')
+        window.setTimeout(() => {
+          button.dataset.nxLeaving = 'true'
+          button.click()
+          delete button.dataset.nxLeaving
+          card.classList.remove('nx-item-out')
+          card.classList.add('nx-item-in')
+          window.setTimeout(() => card.classList.remove('nx-item-in'), 450)
+        }, 180)
+      }
+    },
+    [refreshMarks],
+  )
+
+  /**
+   * Teclado: Ctrl/Cmd+Enter avanza o crea; Enter en un campo de texto pasa al
+   * siguiente y, desde el último, agrega otro elemento a la lista (en vez de
+   * enviar el formulario por accidente).
+   */
+  const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
+    if (event.key !== 'Enter' || event.nativeEvent.isComposing) return
+    const root = formColumnRef.current
+    const target = event.target as HTMLElement
+    if (!root) return
+    if (event.ctrlKey || event.metaKey) {
+      const primary = root.querySelector<HTMLButtonElement>('button[data-nx-primary], button[type=submit]')
+      if (primary && !primary.disabled) {
+        event.preventDefault()
+        primary.click()
+      }
+      return
+    }
+    if (target.tagName !== 'INPUT' || event.shiftKey) return
+    const controls = usableControls(root)
+    const index = controls.indexOf(target as HTMLInputElement)
+    if (index === -1) return
+    event.preventDefault()
+    const next = controls[index + 1]
+    if (next) {
+      next.focus()
+      next.scrollIntoView?.({ behavior: isReduceMotion() ? 'auto' : 'smooth', block: 'center' })
+      return
+    }
+    const addButton = findAddButton(root, target)
+    if (addButton) {
+      addButton.click()
     }
   }, [])
 
@@ -264,11 +438,14 @@ export function GameFormShell({
     if (!target) return
     const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
     target.scrollIntoView?.({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' })
+    window.requestAnimationFrame(refreshMarks)
     target.classList.add('nx-just-filled')
     window.setTimeout(() => target.classList.remove('nx-just-filled'), 1000)
-  }, [])
+  }, [refreshMarks])
 
   const stageMotion = leaving ? 'nx-stage-out' : entering ? 'nx-stage-in' : ''
+
+  const assistValue = useMemo(() => ({ examples: examplesFor(title) }), [title])
 
   const showAiNotice = aiDraftCount > 0 && !noticeDismissed
 
@@ -279,6 +456,8 @@ export function GameFormShell({
     <AiFillStepContext.Provider value={onFillStep}>
     <AiRequestChatContext.Provider value={() => goToStage('ai')}>
     <AiPanelVariantContext.Provider value={stage === 'ai' ? 'inline' : 'compact'}>
+    <FieldAssistContext.Provider value={assistValue}>
+    <PhaseProgressContext.Provider value={progress}>
     <div className="relative mx-auto max-w-[1180px] p-5 sm:p-8 xl:max-w-[1440px] 2xl:max-w-[1680px]">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-[32px]">
         <div className="absolute -top-24 -right-16 h-80 w-80 rounded-full bg-accent/20 blur-[110px]" />
@@ -372,7 +551,60 @@ export function GameFormShell({
           >
             {aiPanel}
           </aside>
-          <div ref={formColumnRef} onInputCapture={markDirty} onChangeCapture={markDirty} onClickCapture={handleClickCapture} className={`order-2 w-full lg:order-1 ${formMaxWidthClassName} ${stage === 'ai' ? 'hidden' : ''} ${filling || (entering && stage === 'manual') ? 'nx-fill' : ''}`}>
+          <div ref={formColumnRef} onInputCapture={markDirty} onChangeCapture={markDirty} onClickCapture={handleClickCapture} onKeyDown={handleKeyDown} className={`order-2 w-full lg:order-1 ${formMaxWidthClassName} ${stage === 'ai' ? 'hidden' : ''} ${filling || (entering && stage === 'manual') ? 'nx-fill' : ''}`}>
+            {stage === 'manual' && (
+              <div
+                className={`nx-celebrate mb-5 rounded-xl border border-border bg-surface px-4 py-3 ${progressSummary.complete ? 'border-accent/50' : ''}`}
+                data-celebrate={celebrate}
+              >
+                <div className="flex items-center gap-3">
+                  <span
+                    aria-hidden="true"
+                    className="nx-celebrate-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white"
+                    style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
+                  >
+                    {progressSummary.complete ? (
+                      <Check className="h-[18px] w-[18px]" strokeWidth={3} />
+                    ) : (
+                      <Gamepad2 className="h-[18px] w-[18px]" strokeWidth={2.2} />
+                    )}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className={`truncate text-[14px] font-semibold leading-tight ${previewTitle ? 'text-text-h' : 'text-text'}`}
+                    >
+                      {previewTitle || 'Tu juego aún no tiene nombre'}
+                    </p>
+                    <p className="truncate text-[12px] text-text">{title}</p>
+                  </div>
+                  {progressSummary.label && (
+                    <span
+                      className={`shrink-0 text-[12px] font-semibold ${progressSummary.complete ? 'text-accent' : 'text-text-h'}`}
+                    >
+                      {progressSummary.label}
+                    </span>
+                  )}
+                </div>
+                {progressSummary.label && (
+                  <div
+                    className="nx-form-progress-bar mt-2.5"
+                    role="progressbar"
+                    aria-valuemin={0}
+                    aria-valuemax={progress.total}
+                    aria-valuenow={progress.ready}
+                    aria-label="Campos listos de esta fase"
+                  >
+                    <span style={{ '--nx-fill': progressSummary.fraction } as React.CSSProperties} />
+                  </div>
+                )}
+                <p className="mt-2 hidden text-[11.5px] text-text lg:block">
+                  Tip: Enter pasa al siguiente campo o agrega otro elemento; Ctrl + Enter avanza o crea.
+                </p>
+                <span className="sr-only" role="status">
+                  {progressSummary.complete ? 'Fase completa. Puedes continuar.' : ''}
+                </span>
+              </div>
+            )}
             {showAiNotice && (
               <div
                 ref={noticeRef}
@@ -484,6 +716,8 @@ export function GameFormShell({
         </Modal>
       )}
     </div>
+    </PhaseProgressContext.Provider>
+    </FieldAssistContext.Provider>
     </AiPanelVariantContext.Provider>
     </AiRequestChatContext.Provider>
     </AiFillStepContext.Provider>
