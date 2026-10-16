@@ -2865,3 +2865,78 @@ code {
   .nx-progress-seg::after { transition: none; }
   .nx-step-label { animation: none; }
 }
+
+/* Campos del formulario de creación (issue #52): pendiente / inválido /
+ * barra fija en celular / ajustes avanzados plegables. Solo transform y
+ * opacity animan; todo se apaga con prefers-reduced-motion. */
+[data-nx-field][data-nx-pending='true'] {
+  position: relative;
+  border-radius: 12px;
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline-offset: 6px;
+}
+[data-nx-field][data-nx-pending='true']::before {
+  content: 'Pendiente';
+  position: absolute;
+  top: -8px;
+  right: 4px;
+  z-index: 1;
+  padding: 1px 8px;
+  border-radius: 9999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  animation: nx-stage-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+[data-nx-field][data-nx-invalid='true'] {
+  border-radius: 12px;
+  outline: 2px solid var(--color-danger);
+  outline-offset: 6px;
+  animation: nx-shake 0.35s ease-in-out;
+}
+[data-nx-field][data-nx-invalid='true']::after {
+  content: attr(data-nx-msg);
+  color: var(--color-danger);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+@keyframes nx-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
+/* Ajustes avanzados: despliegue con grid 0fr -> 1fr (solo layout interno). */
+.nx-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 0.3s ease, opacity 0.25s ease;
+}
+.nx-collapse[data-open='true'] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.nx-collapse > div { overflow: hidden; min-height: 0; }
+
+/* Celular: acciones (Siguiente/Crear) fijas abajo sin tapar contenido. */
+@media (max-width: 1023px) {
+  .nx-sticky-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 30;
+    margin-inline: -4px;
+    padding: 12px 4px calc(12px + env(safe-area-inset-bottom));
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-nx-field][data-nx-pending='true']::before,
+  [data-nx-field][data-nx-invalid='true'] { animation: none; }
+  .nx-collapse { transition: none; }
+}

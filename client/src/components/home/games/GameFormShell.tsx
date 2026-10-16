@@ -1,14 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { ArrowLeft, PencilLine, Sparkles, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, ClipboardCheck, PencilLine, Sparkles, X } from 'lucide-react'
 import {
   AiDraftAppliedContext,
   AiFillStepContext,
   AiGeneratingContext,
   AiPanelVariantContext,
   AiRequestChatContext,
+  CreateSummaryContext,
+  type CreateSummary,
 } from './aiDraftContext'
+import { Modal } from './Modal'
 import { useOptionalCreateGameProgress } from './create/CreateGameProgressContext'
+
+const CONTROL_SELECTOR =
+  'input:not([type=file]):not([type=hidden]):not([type=checkbox]):not([type=radio]), textarea, select'
+
+function clearInvalid(field: HTMLElement) {
+  delete field.dataset.nxInvalid
+  delete field.dataset.nxMsg
+  delete field.dataset.nxEmpty
+}
 
 type GameFormShellProps = {
   /** Texto del botón de volver, sin la flecha (ej. "Cambiar modo"). */
@@ -58,6 +70,13 @@ export function GameFormShell({
   const subPhase = useOptionalCreateGameProgress()?.subPhase ?? null
   const showBackButton = !subPhase || subPhase.phase <= 1
   const formColumnRef = useRef<HTMLDivElement>(null)
+  const headingRef = useRef<HTMLHeadingElement>(null)
+  const isLastPhase = !!subPhase && subPhase.phase === subPhase.totalPhases
+
+  // Cambios sin guardar: cualquier edición del usuario o un borrador de IA.
+  const [dirty, setDirty] = useState(false)
+  const [confirmLeave, setConfirmLeave] = useState(false)
+  const [summary, setSummary] = useState<CreateSummary | null>(null)
 
   // La IA está generando: al lado del chat se ve el formulario "armándose".
   const [generating, setGenerating] = useState(false)
@@ -82,6 +101,8 @@ export function GameFormShell({
       setLeaving(false)
       setEntering(true)
       window.scrollTo?.({ top: 0, behavior: 'smooth' })
+      // Foco al encabezado de la nueva etapa (teclado y lectores de pantalla).
+      window.setTimeout(() => headingRef.current?.focus({ preventScroll: true }), 50)
     }, 220)
     const settle = window.setTimeout(() => setEntering(false), 1300)
     transitionTimers.current = [swap, settle]
@@ -92,10 +113,128 @@ export function GameFormShell({
     return () => timersRef.current.forEach((timer) => window.clearTimeout(timer))
   }, [])
 
+  // Recarga o cierre de pestaña con datos sin guardar.
+  useEffect(() => {
+    if (!dirty) return
+    const handler = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [dirty])
+
+  const handleBack = useCallback(() => {
+    if (dirty) setConfirmLeave(true)
+    else onBack()
+  }, [dirty, onBack])
+
+  // Foco al encabezado al cambiar de fase del formulario.
+  const phaseNumber = subPhase?.phase ?? 0
+  const previousPhase = useRef(phaseNumber)
+  useEffect(() => {
+    if (previousPhase.current === phaseNumber) return
+    previousPhase.current = phaseNumber
+    headingRef.current?.focus({ preventScroll: true })
+  }, [phaseNumber])
+
+  /**
+   * Marcas visuales sobre los campos (`[data-nx-field]`), sin que cada
+   * formulario tenga que implementarlas: "pendiente" para título, descripción
+   * y materia vacíos tras llenar con IA.
+   */
+  const refreshMarks = useCallback(() => {
+    const root = formColumnRef.current
+    if (!root) return
+    root.querySelectorAll<HTMLElement>('[data-nx-field]').forEach((field) => {
+      const label = (field.querySelector('label, p')?.textContent ?? '').trim().toLowerCase()
+      const control = field.querySelector<HTMLInputElement>(CONTROL_SELECTOR)
+      const isIdentity = /^(t[ií]tulo|descripci[oó]n|materia|nombre del juego)/.test(label)
+      const empty = !!control && control.value.trim().length === 0
+      if (aiDraftCount > 0 && isIdentity && empty) field.dataset.nxPending = 'true'
+      else delete field.dataset.nxPending
+      // El error junto al campo se quita en cuanto el usuario lo corrige.
+      if (field.dataset.nxInvalid && field.dataset.nxEmpty === 'true' && control && !empty) clearInvalid(field)
+    })
+  }, [aiDraftCount])
+
+  /** Errores de validación junto al campo que falla, con scroll hasta el primero. */
+  const highlightInvalid = useCallback((alertText: string) => {
+    const root = formColumnRef.current
+    if (!root) return
+    const text = alertText.toLowerCase()
+    let firstEmpty: HTMLElement | null = null
+    let matched: HTMLElement | null = null
+    root.querySelectorAll<HTMLElement>('[data-nx-field]').forEach((field) => {
+      clearInvalid(field)
+      const rawLabel = (field.querySelector('label, p')?.textContent ?? '').trim().toLowerCase()
+      const label = rawLabel.replace(/\(opcional\)/, '').trim()
+      const control = field.querySelector<HTMLInputElement>(CONTROL_SELECTOR)
+      const imageMissing = !!field.querySelector('[data-nx-image-missing]')
+      if (!control && !imageMissing) return
+      const empty = control ? control.value.trim().length === 0 : true
+      const firstWord = label.split(' ')[0] ?? ''
+      const isMatch = firstWord.length > 3 && text.includes(firstWord)
+      if (!matched && isMatch) matched = field
+      if (!firstEmpty && empty && !/\(opcional\)/.test(rawLabel)) firstEmpty = field
+    })
+    const target = (matched ?? firstEmpty) as HTMLElement | null
+    if (!target) {
+      root.querySelector('[role=alert]')?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
+      return
+    }
+    const control = target.querySelector<HTMLInputElement>(CONTROL_SELECTOR)
+    const empty = control ? control.value.trim().length === 0 : true
+    target.dataset.nxInvalid = 'true'
+    target.dataset.nxEmpty = empty ? 'true' : 'false'
+    target.dataset.nxMsg = empty ? 'Falta completar este campo' : alertText
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+    target.scrollIntoView?.({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' })
+    target.querySelector<HTMLElement>(`${CONTROL_SELECTOR}, button`)?.focus({ preventScroll: true })
+  }, [])
+
+  // Observa el formulario: refresca marcas y reacciona a errores nuevos.
+  useEffect(() => {
+    const root = formColumnRef.current
+    if (!root) return
+    let lastAlert = ''
+    let frame = 0
+    const observer = new MutationObserver(() => {
+      window.cancelAnimationFrame(frame)
+      frame = window.requestAnimationFrame(() => {
+        refreshMarks()
+        const text = root.querySelector<HTMLElement>('[role=alert]')?.textContent?.trim() ?? ''
+        if (text && text !== lastAlert) highlightInvalid(text)
+        if (!text) root.querySelectorAll<HTMLElement>('[data-nx-invalid]').forEach(clearInvalid)
+        lastAlert = text
+      })
+    })
+    observer.observe(root, { childList: true, subtree: true, characterData: true })
+    refreshMarks()
+    return () => {
+      observer.disconnect()
+      window.cancelAnimationFrame(frame)
+    }
+  }, [refreshMarks, highlightInvalid])
+
+  // Cualquier edición del usuario cuenta como "cambios sin guardar".
+  const markDirty = useCallback(() => {
+    setDirty(true)
+    window.requestAnimationFrame(refreshMarks)
+  }, [refreshMarks])
+
+  const handleClickCapture = useCallback((event: React.MouseEvent) => {
+    const button = (event.target as HTMLElement).closest('button')
+    if (button && /^(\+|Quitar|Agregar|Eliminar|Añadir)/i.test(button.textContent?.trim() ?? '')) {
+      setDirty(true)
+    }
+  }, [])
+
   const markAiDraftApplied = useCallback(() => {
     setStage('manual')
     setEntering(true)
     setAiDraftCount((count) => count + 1)
+    setDirty(true)
     setNoticeDismissed(false)
     setFilling(true)
   }, [])
@@ -131,6 +270,7 @@ export function GameFormShell({
 
   return (
     <AiDraftAppliedContext.Provider value={markAiDraftApplied}>
+    <CreateSummaryContext.Provider value={setSummary}>
     <AiGeneratingContext.Provider value={setGenerating}>
     <AiFillStepContext.Provider value={onFillStep}>
     <AiRequestChatContext.Provider value={() => goToStage('ai')}>
@@ -148,13 +288,15 @@ export function GameFormShell({
             type="button"
             title={backLabel}
             className="nx-back inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-[13px] font-semibold text-text-h shadow-sm hover:border-accent hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent mb-4"
-            onClick={onBack}
+            onClick={handleBack}
           >
             <ArrowLeft className="nx-back-icon h-4 w-4" strokeWidth={2.5} />
             {backLabel}
           </button>
         )}
-        <h2 className="mb-1 text-[20px] tracking-tight text-text-h">{title}</h2>
+        <h2 ref={headingRef} tabIndex={-1} className="mb-1 text-[20px] tracking-tight text-text-h outline-none">
+          {title}
+        </h2>
         <p className="mb-5 max-w-[640px] text-[13px] text-text">{description}</p>
 
         {/* Selector de modo: deja claro que "Con IA" y "Manual" son dos formas
@@ -219,7 +361,7 @@ export function GameFormShell({
           >
             {aiPanel}
           </aside>
-          <div ref={formColumnRef} className={`order-2 w-full lg:order-1 ${formMaxWidthClassName} ${stage === 'ai' ? 'hidden' : ''} ${filling || (entering && stage === 'manual') ? 'nx-fill' : ''}`}>
+          <div ref={formColumnRef} onInputCapture={markDirty} onChangeCapture={markDirty} onClickCapture={handleClickCapture} className={`order-2 w-full lg:order-1 ${formMaxWidthClassName} ${stage === 'ai' ? 'hidden' : ''} ${filling || (entering && stage === 'manual') ? 'nx-fill' : ''}`}>
             {showAiNotice && (
               <div
                 ref={noticeRef}
@@ -238,6 +380,34 @@ export function GameFormShell({
                 >
                   <X className="h-4 w-4" strokeWidth={2.2} />
                 </button>
+              </div>
+            )}
+            {isLastPhase && summary && (
+              <div
+                role="group"
+                aria-label="Resumen antes de crear"
+                className="nx-stage-in mb-5 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-xl border border-border bg-code-bg px-4 py-3 text-[13px] text-text-h"
+              >
+                <span className="inline-flex items-center gap-1.5 font-semibold">
+                  <ClipboardCheck className="h-4 w-4 text-accent" strokeWidth={2.2} />
+                  Resumen
+                </span>
+                <span>Tipo: {title}</span>
+                <span>
+                  {summary.count} {summary.itemsLabel}
+                </span>
+                {typeof summary.missingImages === 'number' && (
+                  <span
+                    className={
+                      summary.missingImages > 0
+                        ? 'inline-flex items-center gap-1 font-semibold text-danger'
+                        : 'text-text'
+                    }
+                  >
+                    {summary.missingImages > 0 && <AlertTriangle className="h-3.5 w-3.5" strokeWidth={2.4} />}
+                    {summary.missingImages > 0 ? `${summary.missingImages} sin imagen` : 'Todas con imagen'}
+                  </span>
+                )}
               </div>
             )}
             {children}
@@ -275,11 +445,39 @@ export function GameFormShell({
           )}
         </div>
       </div>
+      {confirmLeave && (
+        <Modal onClose={() => setConfirmLeave(false)} maxWidthClassName="max-w-[400px]" ariaLabel="¿Salir sin guardar?">
+          <h3 className="mb-1 text-[17px] font-semibold text-text-h">¿Salir sin guardar?</h3>
+          <p className="mb-5 text-[13.5px] text-text">Perderás lo que llevas en este juego.</p>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              autoFocus
+              className="rounded-lg border border-border px-4 py-2 text-[14px] font-medium text-text-h"
+              onClick={() => setConfirmLeave(false)}
+            >
+              Seguir editando
+            </button>
+            <button
+              type="button"
+              className="rounded-lg bg-danger px-4 py-2 text-[14px] font-semibold text-white"
+              onClick={() => {
+                setConfirmLeave(false)
+                setDirty(false)
+                onBack()
+              }}
+            >
+              Salir
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
     </AiPanelVariantContext.Provider>
     </AiRequestChatContext.Provider>
     </AiFillStepContext.Provider>
     </AiGeneratingContext.Provider>
+    </CreateSummaryContext.Provider>
     </AiDraftAppliedContext.Provider>
   )
 }

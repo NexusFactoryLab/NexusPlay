@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react'
+import { createContext, useContext, useEffect } from 'react'
 
 /**
  * Lo provee GameFormShell: AiGameAssistantPanel lo llama cuando la IA ya
@@ -53,4 +53,26 @@ export const AiRequestChatContext = createContext<(() => void) | null>(null)
 
 export function useRequestAiChat(): (() => void) | null {
   return useContext(AiRequestChatContext)
+}
+
+/** Resumen que cada formulario reporta al shell para mostrarlo antes de crear. */
+export type CreateSummary = {
+  /** Cuántos elementos tiene el juego (parejas, tarjetas, preguntas...). */
+  count: number
+  /** Nombre en plural del elemento, ej. "parejas". */
+  itemsLabel: string
+  /** Elementos que aún no tienen imagen (si el tipo de juego usa imágenes). */
+  missingImages?: number
+}
+
+export const CreateSummaryContext = createContext<((summary: CreateSummary | null) => void) | null>(null)
+
+/** Reporta al shell el resumen del juego; se limpia al desmontar. */
+export function useReportCreateSummary(summary: CreateSummary): void {
+  const report = useContext(CreateSummaryContext)
+  const { count, itemsLabel, missingImages } = summary
+  useEffect(() => {
+    report?.({ count, itemsLabel, missingImages })
+  }, [report, count, itemsLabel, missingImages])
+  useEffect(() => () => report?.(null), [report])
 }
