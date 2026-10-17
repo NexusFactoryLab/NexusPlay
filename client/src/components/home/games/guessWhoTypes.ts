@@ -1,3 +1,6 @@
+/** Rasgo verificable de una tarjeta: de él sale una pregunta guiada de Sí/No (issue #58). */
+export type GuessWhoTrait = { id: string; question: string }
+
 export type GuessWhoCard = {
   cardId: string
   imageUrl: string
@@ -5,6 +8,8 @@ export type GuessWhoCard = {
   audioUrl: string | null
   /** Dato breve opcional sobre el tema de esa tarjeta (ej. dato de un país si es una bandera) — se muestra como burbuja de información en el juego. */
   info: string | null
+  /** Rasgos de la tarjeta; sin ellos el juego solo propone la pregunta del grupo. */
+  traits?: GuessWhoTrait[]
 }
 
 /**

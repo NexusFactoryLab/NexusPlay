@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 
-type Card = { cardId: string; label: string };
+type Card = { cardId: string; label: string; traits?: { id: string; question: string }[] };
 export type GuidedQuestion = { id: string; text: string; cardIds: string[] };
 export type PendingQuestion = GuidedQuestion & { requestId: string; askerId: string; deadline: number };
 export type GuidedMessage = { userId: string; displayName: string; text: string; sentAt: number };
@@ -14,22 +14,69 @@ export interface GuidedState {
   guidedChat?: GuidedMessage[];
 }
 
-const normalize = (text: string) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+/** Máximo de preguntas sugeridas a la vez: las que mejor parten las tarjetas que le quedan al jugador. */
+const MAX_SUGGESTED_QUESTIONS = 6;
 
-/** Only public, deterministic data. Never classify arbitrary pictures or infer unknown traits. */
+const questionId = (text: string, cardIds: string[]) =>
+  createHash('sha256').update(JSON.stringify({ text, cardIds })).digest('hex').slice(0, 24);
+
+/**
+ * Los rasgos solo se usan si TODAS las tarjetas del juego están clasificadas
+ * (`traits` definido, aunque vacío): una tarjeta sin clasificar respondería
+ * «No» a cualquier rasgo y la respuesta sería falsa.
+ */
+function traitsAreUsable(cards: Card[]): boolean {
+  return cards.length > 0 && cards.every((c) => Array.isArray(c.traits));
+}
+
+function traitQuestions(cards: Card[], remaining: Card[]): Omit<GuidedQuestion, 'id'>[] {
+  const byTrait = new Map<string, { text: string; cardIds: string[] }>();
+  for (const card of cards) {
+    for (const trait of card.traits ?? []) {
+      const entry = byTrait.get(trait.id) ?? { text: trait.question, cardIds: [] };
+      entry.cardIds.push(card.cardId);
+      byTrait.set(trait.id, entry);
+    }
+  }
+  const remainingIds = remaining.map((c) => c.cardId);
+  const half = remaining.length / 2;
+  const seenSplits = new Set<string>();
+  return [...byTrait.values()]
+    .map((q) => ({ ...q, yes: remainingIds.filter((id) => q.cardIds.includes(id)) }))
+    // Solo sirve una pregunta que descarte algo sea cual sea la respuesta.
+    .filter((q) => q.yes.length > 0 && q.yes.length < remaining.length)
+    // Primero las que parten las tarjetas que quedan más cerca de la mitad (sort estable: empate = orden de los rasgos).
+    .sort((x, y) => Math.abs(x.yes.length - half) - Math.abs(y.yes.length - half))
+    .filter((q) => {
+      // Un rasgo que parte el tablero igual que otro, o justo al revés, descarta las mismas tarjetas.
+      const yes = q.yes.join(',');
+      const no = remainingIds.filter((id) => !q.yes.includes(id)).join(',');
+      const split = yes < no ? yes : no;
+      if (seenSplits.has(split)) return false;
+      seenSplits.add(split);
+      return true;
+    })
+    .slice(0, MAX_SUGGESTED_QUESTIONS)
+    .map(({ text, cardIds }) => ({ text, cardIds }));
+}
+
+/**
+ * Preguntas sugeridas para el jugador. Salen de los rasgos de las tarjetas
+ * (datos del tema: documento del usuario o juego demo); si el juego no los
+ * tiene queda solo la pregunta del grupo. Datos públicos y deterministas:
+ * nunca se consulta la carta secreta de nadie.
+ */
 export function questionsFor(state: GuidedState, userId: string): GuidedQuestion[] {
   const player = state.players.find(p => p.userId === userId);
   if (!player || state.phase !== 'PLAYING') return [];
-  const cards = state.cards.filter(c => !player.discardedCardIds.includes(c.cardId));
-  const candidates = [
-    ...['a', 'e', 'i', 'o', 'u'].map(letter => ({ text: `¿El nombre de tu tarjeta contiene la letra ${letter.toUpperCase()}?`, test: (c: Card) => normalize(c.label).includes(letter) })),
-    { text: '¿El nombre de tu tarjeta empieza por una vocal?', test: (c: Card) => /^[aeiou]/.test(normalize(c.label.trim())) },
-    { text: '¿El nombre de tu tarjeta tiene más de una palabra?', test: (c: Card) => /\s/.test(c.label.trim()) },
-  ].map(q => ({ text: q.text, cardIds: cards.filter(q.test).map(c => c.cardId) }));
-  candidates.push({ text: '¿Tu tarjeta está en este grupo?', cardIds: cards.slice(0, Math.ceil(cards.length / 2)).map(c => c.cardId) });
-  return candidates.filter(q => q.cardIds.length > 0 && q.cardIds.length < cards.length).map(q => ({
-    ...q, id: createHash('sha256').update(JSON.stringify(q)).digest('hex').slice(0, 24),
-  }));
+  const remaining = state.cards.filter(c => !player.discardedCardIds.includes(c.cardId));
+  const candidates = traitsAreUsable(state.cards) ? traitQuestions(state.cards, remaining) : [];
+  if (candidates.length === 0) {
+    candidates.push({ text: '¿Tu tarjeta está en este grupo?', cardIds: remaining.slice(0, Math.ceil(remaining.length / 2)).map(c => c.cardId) });
+  }
+  return candidates
+    .filter(q => q.cardIds.length > 0 && remaining.some(c => !q.cardIds.includes(c.cardId)))
+    .map(q => ({ ...q, id: questionId(q.text, q.cardIds) }));
 }
 
 export function currentQuestion(state: GuidedState, now = Date.now()): PendingQuestion | null {
