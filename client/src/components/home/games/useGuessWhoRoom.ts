@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { io, type Socket } from 'socket.io-client'
 import type { AccusationResult, GuessWhoChatMessage, RoomStateView } from './guessWhoTypes'
+import type { BotDifficulty } from './guessWhoBot'
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:3000'
 
@@ -80,6 +81,11 @@ export function useGuessWhoRoom(token: string | null) {
     socketRef.current?.emit('room:create', { gameId })
   }, [])
 
+  /** Sala en solitario contra el bot (issue #60): arranca sola, sin lobby que esperar. */
+  const createSoloRoom = useCallback((gameId: string, difficulty: BotDifficulty) => {
+    socketRef.current?.emit('room:create-solo', { gameId, difficulty })
+  }, [])
+
   const joinRoom = useCallback((code: string) => {
     waitingCodeRef.current = code
     if (socketRef.current?.connected) socketRef.current.emit('room:join', { code })
@@ -141,6 +147,7 @@ export function useGuessWhoRoom(token: string | null) {
     clearLastFailedAccusation: () => setLastFailedAccusation(null),
     messages,
     createRoom,
+    createSoloRoom,
     joinRoom,
     setReady,
     updateTurnDuration,

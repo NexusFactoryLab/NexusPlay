@@ -1,3 +1,6 @@
+/** Rasgo verificable de una tarjeta: de él sale una pregunta guiada de Sí/No (issue #58). */
+export type GuessWhoTrait = { id: string; question: string }
+
 export type GuessWhoCard = {
   cardId: string
   imageUrl: string
@@ -5,6 +8,8 @@ export type GuessWhoCard = {
   audioUrl: string | null
   /** Dato breve opcional sobre el tema de esa tarjeta (ej. dato de un país si es una bandera) — se muestra como burbuja de información en el juego. */
   info: string | null
+  /** Rasgos de la tarjeta; sin ellos el juego solo propone la pregunta del grupo. */
+  traits?: GuessWhoTrait[]
 }
 
 /**
@@ -33,6 +38,8 @@ export type RoomPlayerView = {
   ready?: boolean
   isSelf: boolean
   hasVotedRematch: boolean
+  /** true para el bot de una partida en solitario (issue #60): no lee el chat. */
+  isBot?: boolean
   /**
    * true solo para quien creó la sala 1v1 — es el único que puede fijar los
    * segundos por turno. No aplica a matches de torneo (ahí el rol

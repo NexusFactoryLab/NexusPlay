@@ -9,6 +9,16 @@ import type { ContentValidationOptions, ContentValidator } from './content-valid
  * como una burbuja de información en la esquina de la tarjeta durante la
  * partida (ver CardInfoBubble en el cliente).
  */
+/**
+ * Rasgo verificable de una tarjeta (ej. `{ id: 'europa', question: '¿Es un país de Europa?' }`).
+ * Las preguntas guiadas de la partida se arman agrupando las tarjetas que
+ * comparten un mismo `id`; la pregunta es la del primer rasgo con ese id.
+ */
+export interface GuessWhoTrait {
+  id: string;
+  question: string;
+}
+
 export interface GuessWhoCard {
   cardId: string;
   /**
@@ -22,6 +32,14 @@ export interface GuessWhoCard {
   label: string;
   audioUrl: string | null;
   info: string | null;
+  /**
+   * Rasgos de la tarjeta. `undefined` = tarjeta sin clasificar (juegos creados
+   * a mano o anteriores a los rasgos): mientras alguna tarjeta del juego no
+   * esté clasificada, las preguntas guiadas ignoran los rasgos de todas, porque
+   * una tarjeta sin rasgos respondería «No» a todo y daría respuestas falsas.
+   * `[]` = clasificada, pero sin ninguno de los rasgos que tiene el juego.
+   */
+  traits?: GuessWhoTrait[];
 }
 
 export interface GuessWhoConfig {
@@ -38,6 +56,9 @@ const DEFAULT_CONFIG: GuessWhoConfig = {
 const MAX_LABEL_LENGTH = 120;
 const MAX_URL_LENGTH = 2048;
 const MAX_INFO_LENGTH = 500;
+const MAX_TRAITS_PER_CARD = 12;
+const MAX_TRAIT_ID_LENGTH = 40;
+const MAX_TRAIT_QUESTION_LENGTH = 140;
 const MIN_CARDS = 12;
 const MAX_CARDS = 60;
 
@@ -127,6 +148,7 @@ export class GuessWhoContentValidator implements ContentValidator {
     }
 
     const trimmedInfo = typeof card.info === 'string' ? card.info.trim() : null;
+    const traits = this.validateTraits(card.traits, index);
 
     return {
       cardId: isNonEmptyString(card.cardId, 60) ? card.cardId : `card-${index}`,
@@ -134,6 +156,34 @@ export class GuessWhoContentValidator implements ContentValidator {
       label: card.label.trim(),
       audioUrl: card.audioUrl ?? null,
       info: trimmedInfo || null,
+      ...(traits ? { traits } : {}),
     };
+  }
+
+  private validateTraits(raw: unknown, index: number): GuessWhoTrait[] | undefined {
+    if (raw === undefined || raw === null) return undefined;
+    if (!Array.isArray(raw) || raw.length > MAX_TRAITS_PER_CARD) {
+      throw new InvalidGameContentError(
+        `la tarjeta en la posición ${index} tiene rasgos inválidos (máximo ${MAX_TRAITS_PER_CARD}).`,
+      );
+    }
+    const seen = new Set<string>();
+    return raw.map((item) => {
+      const trait = (item ?? {}) as Record<string, unknown>;
+      if (
+        !isNonEmptyString(trait.id, MAX_TRAIT_ID_LENGTH) ||
+        !isNonEmptyString(trait.question, MAX_TRAIT_QUESTION_LENGTH)
+      ) {
+        throw new InvalidGameContentError(
+          `la tarjeta en la posición ${index} tiene un rasgo sin id o sin pregunta válidos.`,
+        );
+      }
+      const id = trait.id.trim();
+      if (seen.has(id)) {
+        throw new InvalidGameContentError(`la tarjeta en la posición ${index} repite el rasgo "${id}".`);
+      }
+      seen.add(id);
+      return { id, question: trait.question.trim() };
+    });
   }
 }
