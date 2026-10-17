@@ -134,18 +134,121 @@ function normalizeMemoryOpposites(config: Record<string, unknown>, content: unkn
 
 // --- ¿Quién Es? -------------------------------------------------------------
 
+/** Mismos topes que GuessWhoContentValidator: rasgos por tarjeta, largo del id y de la pregunta. */
+const GUESS_WHO_MAX_TRAITS = 12;
+const GUESS_WHO_TRAIT_ID_MAX = 40;
+const GUESS_WHO_TRAIT_QUESTION_MAX = 140;
+
+type GuessWhoTraitDraft = { id: string; question: string };
+
 function normalizeGuessWho(config: Record<string, unknown>, content: unknown, options: NormalizeDraftOptions): NormalizedDraft {
-  const next: Record<string, unknown> = { ...config };
+  // El catálogo de rasgos viaja en la config solo para ahorrar tokens: se
+  // reparte en cada tarjeta y no queda en la config del juego.
+  const { traits: rawCatalog, ...rest } = config;
+  const next: Record<string, unknown> = { ...rest };
   setClampedInt(next, 'maxAccusationCount', 2, 12);
   setClampedInt(next, 'turnDurationSeconds', 5, 120);
 
+  const catalog = guessWhoTraitCatalog(rawCatalog, content);
   const items = mapObjects(content, (raw) => {
     const label = trimmedLabel(raw.label, 120);
     if (label === null) return null;
     const info = typeof raw.info === 'string' ? truncate(raw.info.trim(), 500) : raw.info;
-    return { ...raw, label, ...(info !== undefined ? { info } : {}) };
+    const { traits: rawTraits, ...card } = raw;
+    return {
+      ...card,
+      label,
+      ...(info !== undefined ? { info } : {}),
+      // Con catálogo, TODA tarjeta queda clasificada (lista vacía = ningún rasgo):
+      // así las preguntas guiadas pueden usar los rasgos (ver guided-questions.ts).
+      ...(catalog.size > 0 ? { traits: cardTraitIds(rawTraits, catalog) } : {}),
+    };
   });
-  return { config: next, content: limit(options.dedupe ? dedupeBy(items, (item) => item.label) : items, 60) };
+  const cards = limit(options.dedupe ? dedupeBy(items, (item) => item.label) : items, 60);
+  return { config: next, content: keepUsefulTraits(cards, catalog) };
+}
+
+/** `"¿Es un País de Europa?"` -> `"es-un-pais-de-europa"`: ids comparables aunque el modelo cambie mayúsculas o tildes. */
+function traitSlug(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const slug = value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, GUESS_WHO_TRAIT_ID_MAX)
+    .replace(/-+$/g, '');
+  return slug || null;
+}
+
+function traitQuestion(value: unknown): string | null {
+  const text = nonEmptyString(value);
+  if (text === null) return null;
+  const body = text.replace(/^¿+/, '').replace(/\?+$/, '').trim();
+  return body ? truncate(`¿${body}?`, GUESS_WHO_TRAIT_QUESTION_MAX) : null;
+}
+
+/**
+ * Catálogo id -> pregunta. Sale de `config.traits` (forma pedida en el
+ * prompt) y, por si el modelo escribió los rasgos completos dentro de cada
+ * tarjeta, también de esos objetos. Ante dos preguntas para el mismo id
+ * gana la primera.
+ */
+function guessWhoTraitCatalog(rawCatalog: unknown, content: unknown): Map<string, string> {
+  const catalog = new Map<string, string>();
+  const add = (raw: unknown) => {
+    if (typeof raw !== 'object' || raw === null) return;
+    const trait = raw as Record<string, unknown>;
+    const question = traitQuestion(trait.question);
+    const id = traitSlug(trait.id) ?? traitSlug(question);
+    if (id && question && !catalog.has(id)) catalog.set(id, question);
+  };
+  if (Array.isArray(rawCatalog)) rawCatalog.forEach(add);
+  if (Array.isArray(content)) {
+    for (const item of content) {
+      const traits = (item as Record<string, unknown> | null)?.traits;
+      if (Array.isArray(traits)) traits.forEach(add);
+    }
+  }
+  return catalog;
+}
+
+/** Ids del catálogo que el modelo marcó en la tarjeta (acepta `"europa"` o `{ id: "europa" }`), sin repetir. */
+function cardTraitIds(rawTraits: unknown, catalog: Map<string, string>): string[] {
+  if (!Array.isArray(rawTraits)) return [];
+  const ids = rawTraits
+    .map((raw) => traitSlug(typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>).id : raw))
+    .filter((id): id is string => id !== null && catalog.has(id));
+  return [...new Set(ids)];
+}
+
+/**
+ * Deja solo los rasgos que sirven como pregunta: los que tienen ALGUNAS
+ * tarjetas pero no todas (uno que tienen todas o ninguna nunca descarta
+ * nada). Si quedan más de los que caben en una tarjeta, se quedan los que
+ * mejor parten el mazo (más cerca de la mitad). Las tarjetas salen con sus
+ * rasgos ya completos (`{ id, question }`), como los guarda el juego.
+ */
+function keepUsefulTraits(cards: unknown, catalog: Map<string, string>): unknown {
+  if (!Array.isArray(cards) || catalog.size === 0) return cards;
+  const items = cards as Array<Record<string, unknown> & { traits?: string[] }>;
+  const counts = new Map<string, number>();
+  for (const card of items) for (const id of card.traits ?? []) counts.set(id, (counts.get(id) ?? 0) + 1);
+  const half = items.length / 2;
+  const kept = new Set(
+    [...catalog.keys()]
+      .filter((id) => (counts.get(id) ?? 0) > 0 && (counts.get(id) ?? 0) < items.length)
+      .sort((a, b) => Math.abs((counts.get(a) ?? 0) - half) - Math.abs((counts.get(b) ?? 0) - half))
+      .slice(0, GUESS_WHO_MAX_TRAITS),
+  );
+  return items.map(({ traits, ...card }) => {
+    if (kept.size === 0) return card;
+    const own: GuessWhoTraitDraft[] = (traits ?? [])
+      .filter((id) => kept.has(id))
+      .map((id) => ({ id, question: catalog.get(id)! }));
+    return { ...card, traits: own };
+  });
 }
 
 // --- Dominó -----------------------------------------------------------------

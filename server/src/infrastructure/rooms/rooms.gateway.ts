@@ -56,6 +56,7 @@ import { AnalyticsTrackerService } from '../../application/services/analytics-tr
 import { WsExceptionFilter } from './ws-exception.filter.js';
 import { allLobbyReady, recordLobbyReady, resetLobbyReady } from './lobby-ready.js';
 import { addGuidedMessage, askGuidedQuestion, answerGuidedQuestion, guidedView } from '../../domain/services/guided-questions.js';
+import { assertCanPassTurn, judgeAccusation, toggleDiscard } from '../../domain/services/guess-who-rules.js';
 
 interface AuthenticatedSocket extends Socket {
   data: {
@@ -119,14 +120,6 @@ const MAX_CHAT_MESSAGE_LENGTH = 500;
 
 /** Cupo máximo absoluto de una sala de torneo (modo grupo de "¿Quién Es?"). */
 const TOURNAMENT_MAX_PARTICIPANTS = 10;
-
-/**
- * Tarjetas mínimas que hay que descartar antes de poder acusar al rival —
- * reemplaza al viejo umbral basado en "cuántas quedan en el tablero"
- * (maxAccusationCount) por uno fijo y fácil de comunicar en el lobby: no
- * importa cuántas tarjetas tenga el juego, siempre son 3 descartes.
- */
-const MIN_DISCARDS_BEFORE_ACCUSATION = 3;
 
 /** Vista pública del torneo que se envía a un participante dado. */
 function toTournamentClientView(tournament: TournamentState, forUserId: string) {
@@ -844,18 +837,14 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   handleQuestion(@ConnectedSocket() socket: AuthenticatedSocket, @MessageBody() body: { questionId: string }) {
     const room = this.roomStore.findBySocketId(socket.id);
     if (!room) throw new Error('No estás en ninguna sala.');
-    askGuidedQuestion(room, socket.data.userId, socket.data.displayName, body?.questionId);
-    this.roomStore.set(room);
-    this.broadcastState(room);
+    this.askInRoom(room, socket.data.userId, socket.data.displayName, body?.questionId);
   }
 
   @SubscribeMessage('room:answer')
   handleAnswer(@ConnectedSocket() socket: AuthenticatedSocket, @MessageBody() body: { requestId: string; answer: boolean }) {
     const room = this.roomStore.findBySocketId(socket.id);
     if (!room) throw new Error('No estás en ninguna sala.');
-    answerGuidedQuestion(room, socket.data.userId, socket.data.displayName, body?.requestId, body?.answer);
-    this.roomStore.set(room);
-    this.broadcastState(room);
+    this.answerInRoom(room, socket.data.userId, socket.data.displayName, body?.requestId, body?.answer);
   }
 
   @SubscribeMessage('tournament:match-chat')
@@ -1019,13 +1008,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
    */
   @SubscribeMessage('room:pass-turn')
   handlePassTurn(@ConnectedSocket() socket: AuthenticatedSocket) {
-    const room = this.roomStore.findBySocketId(socket.id);
-    if (!room || room.phase !== 'PLAYING') throw new Error('La partida no está en curso.');
-
-    const player = room.players.find((p) => p.socketId === socket.id);
-    if (!player || player.userId !== room.activePlayerUserId) throw new Error('No es tu turno.');
-
-    this.advanceTurn(room);
+    this.passTurnInRoom(this.requirePlayingRoom(socket), socket.data.userId);
   }
 
   @SubscribeMessage('room:discard')
@@ -1033,22 +1016,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     @ConnectedSocket() socket: AuthenticatedSocket,
     @MessageBody() body: { cardId: string },
   ) {
-    const room = this.roomStore.findBySocketId(socket.id);
-    if (!room || room.phase !== 'PLAYING') throw new Error('La partida no está en curso.');
-
-    const player = room.players.find((p) => p.socketId === socket.id);
-    if (!player) throw new Error('No estás en esta sala.');
-    if (player.userId !== room.activePlayerUserId) throw new Error('No es tu turno.');
-
-    const discardedIndex = player.discardedCardIds.indexOf(body.cardId);
-    if (discardedIndex === -1) {
-      player.discardedCardIds.push(body.cardId);
-    } else {
-      player.discardedCardIds.splice(discardedIndex, 1);
-    }
-
-    this.roomStore.set(room);
-    this.broadcastState(room);
+    this.discardInRoom(this.requirePlayingRoom(socket), socket.data.userId, body?.cardId);
   }
 
   @SubscribeMessage('room:accuse')
@@ -1056,18 +1024,45 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     @ConnectedSocket() socket: AuthenticatedSocket,
     @MessageBody() body: { cardId: string },
   ) {
+    this.accuseInRoom(this.requirePlayingRoom(socket), socket.data.userId, body?.cardId);
+  }
+
+  private requirePlayingRoom(socket: AuthenticatedSocket): RoomState {
     const room = this.roomStore.findBySocketId(socket.id);
     if (!room || room.phase !== 'PLAYING') throw new Error('La partida no está en curso.');
+    return room;
+  }
 
-    const accuser = room.players.find((p) => p.socketId === socket.id);
-    const opponent = room.players.find((p) => p.socketId !== socket.id);
-    if (!accuser || !opponent) throw new Error('Falta el rival para acusar.');
-    if (accuser.userId !== room.activePlayerUserId) throw new Error('No es tu turno.');
-    if (accuser.discardedCardIds.length < MIN_DISCARDS_BEFORE_ACCUSATION) {
-      throw new Error(`Debes descartar al menos ${MIN_DISCARDS_BEFORE_ACCUSATION} tarjetas antes de acusar.`);
-    }
+  // Acciones de la partida 1v1 por userId, no por socket: las usan los
+  // handlers de arriba y cualquier jugador sin conexión propia (el bot de
+  // una partida en solitario). Las reglas viven en guess-who-rules.ts y
+  // guided-questions.ts; aquí solo se guarda, se avisa y se mueven los turnos.
 
-    const correct = body.cardId === opponent.secretCardId;
+  private askInRoom(room: RoomState, userId: string, displayName: string, questionId: unknown) {
+    askGuidedQuestion(room, userId, displayName, questionId);
+    this.roomStore.set(room);
+    this.broadcastState(room);
+  }
+
+  private answerInRoom(room: RoomState, userId: string, displayName: string, requestId: unknown, answer: unknown) {
+    answerGuidedQuestion(room, userId, displayName, requestId, answer);
+    this.roomStore.set(room);
+    this.broadcastState(room);
+  }
+
+  private discardInRoom(room: RoomState, userId: string, cardId: unknown) {
+    toggleDiscard(room, userId, cardId);
+    this.roomStore.set(room);
+    this.broadcastState(room);
+  }
+
+  private passTurnInRoom(room: RoomState, userId: string) {
+    assertCanPassTurn(room, userId);
+    this.advanceTurn(room);
+  }
+
+  private accuseInRoom(room: RoomState, userId: string, cardId: unknown) {
+    const { accuser, opponent, correct, cardId: accusedCardId } = judgeAccusation(room, userId, cardId);
 
     this.server.to(room.code).emit('room:accusation-result', {
       accuserUserId: accuser.userId,
@@ -1077,7 +1072,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       // adivinar de qué lado de la sala está mirando.
       targetUserId: opponent.userId,
       targetName: opponent.displayName,
-      cardId: body.cardId,
+      cardId: accusedCardId,
       correct,
     });
 
@@ -1408,6 +1403,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
         imageUrl: card.imageUrl ?? '',
         label: card.label,
         audioUrl: card.audioUrl,
+        ...(card.traits ? { traits: card.traits } : {}),
       })),
       players: [
         { userId: playerUserIds[0], secretCardId: shuffled[0].cardId, discardedCardIds: [] },
@@ -1467,8 +1463,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   @SubscribeMessage('tournament:match-pass-turn')
   handleTournamentMatchPassTurn(@ConnectedSocket() socket: AuthenticatedSocket) {
     const { tournament, match } = this.requireActiveTournamentMatch(socket);
-    const player = match.players.find((p) => p.userId === socket.data.userId);
-    if (!player || player.userId !== match.activePlayerUserId) throw new Error('No es tu turno.');
+    assertCanPassTurn(match, socket.data.userId);
     this.advanceTournamentMatchTurn(tournament, match);
   }
 
@@ -1478,16 +1473,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     @MessageBody() body: { cardId: string },
   ) {
     const { tournament, match } = this.requireActiveTournamentMatch(socket);
-    const player = match.players.find((p) => p.userId === socket.data.userId);
-    if (!player) throw new Error('No estás en este match.');
-    if (player.userId !== match.activePlayerUserId) throw new Error('No es tu turno.');
-
-    const discardedIndex = player.discardedCardIds.indexOf(body.cardId);
-    if (discardedIndex === -1) {
-      player.discardedCardIds.push(body.cardId);
-    } else {
-      player.discardedCardIds.splice(discardedIndex, 1);
-    }
+    toggleDiscard(match, socket.data.userId, body?.cardId);
     this.tournamentStore.set(tournament);
     this.broadcastMatchState(tournament, match);
   }
@@ -1498,15 +1484,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     @MessageBody() body: { cardId: string },
   ) {
     const { tournament, match } = this.requireActiveTournamentMatch(socket);
-    const accuser = match.players.find((p) => p.userId === socket.data.userId);
-    const opponent = match.players.find((p) => p.userId !== socket.data.userId);
-    if (!accuser || !opponent) throw new Error('Falta el rival para acusar.');
-    if (accuser.userId !== match.activePlayerUserId) throw new Error('No es tu turno.');
-    if (accuser.discardedCardIds.length < MIN_DISCARDS_BEFORE_ACCUSATION) {
-      throw new Error(`Debes descartar al menos ${MIN_DISCARDS_BEFORE_ACCUSATION} tarjetas antes de acusar.`);
-    }
-
-    const correct = body.cardId === opponent.secretCardId;
+    const { accuser, opponent, correct } = judgeAccusation(match, socket.data.userId, body?.cardId);
 
     this.server.to(`tournament:${tournament.code}`).emit('tournament:match-accusation-result', {
       matchCode: match.matchCode,

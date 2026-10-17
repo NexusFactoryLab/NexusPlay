@@ -34,7 +34,7 @@ export interface TournamentMatch {
   playerUserIds: [string, string] | [string];
   isBye: boolean;
   phase: 'WAITING' | 'PLAYING' | 'FINISHED';
-  cards: { cardId: string; imageUrl: string; label: string; audioUrl: string | null }[];
+  cards: { cardId: string; imageUrl: string; label: string; audioUrl: string | null; traits?: { id: string; question: string }[] }[];
   players: {
     userId: string;
     secretCardId: string | null;

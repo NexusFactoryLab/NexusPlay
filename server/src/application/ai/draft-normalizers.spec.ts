@@ -203,6 +203,78 @@ describe('normalizeDraft — ¿Quién Es?', () => {
     const cards = Array.from({ length: 70 }, (_, i) => ({ label: `País ${i}` }));
     expect(normalizeDraft({ gameType: 'GUESS_WHO' }, {}, cards).content).toHaveLength(60);
   });
+
+  describe('rasgos de las preguntas guiadas', () => {
+    type Card = { label: string; traits?: { id: string; question: string }[] };
+    const catalog = [
+      { id: 'america', question: '¿Es un país de América?' },
+      { id: 'habla-espanol', question: '¿La mayoría de su población habla español?' },
+    ];
+
+    it('reparte el catálogo de la config en cada tarjeta y no lo deja en la config', () => {
+      const { config, content } = normalizeDraft({ gameType: 'GUESS_WHO' }, { maxAccusationCount: 6, traits: catalog }, [
+        { label: 'Perú', traits: ['america', 'habla-espanol'] },
+        { label: 'Brasil', traits: ['america'] },
+        { label: 'Japón', traits: [] },
+        { label: 'Grecia' },
+      ]);
+      expect(config).not.toHaveProperty('traits');
+      const cards = content as Card[];
+      expect(cards[0].traits).toEqual(catalog);
+      expect(cards[1].traits).toEqual([catalog[0]]);
+      // Con catálogo toda tarjeta queda clasificada: sin lista = ningún rasgo.
+      expect(cards[2].traits).toEqual([]);
+      expect(cards[3].traits).toEqual([]);
+    });
+
+    it('acepta ids con otra forma o rasgos completos dentro de la tarjeta, y completa los signos ¿?', () => {
+      const { content } = normalizeDraft({ gameType: 'GUESS_WHO' }, { traits: [{ id: 'Habla Español', question: 'La mayoría habla español' }] }, [
+        { label: 'Perú', traits: ['habla-espanol', { id: 'europa', question: '¿Es un país de Europa?' }] },
+        { label: 'Grecia', traits: [{ id: 'EUROPA' }, 'inventado'] },
+        { label: 'Japón', traits: [] },
+      ]);
+      const [peru, grecia] = content as Card[];
+      expect(peru.traits).toEqual([
+        { id: 'habla-espanol', question: '¿La mayoría habla español?' },
+        { id: 'europa', question: '¿Es un país de Europa?' },
+      ]);
+      expect(grecia.traits).toEqual([{ id: 'europa', question: '¿Es un país de Europa?' }]);
+    });
+
+    it('quita los rasgos que tienen todas las tarjetas o ninguna: nunca descartarían nada', () => {
+      const { content } = normalizeDraft({ gameType: 'GUESS_WHO' }, {
+        traits: [...catalog, { id: 'pais', question: '¿Es un país?' }, { id: 'luna', question: '¿Está en la Luna?' }],
+      }, [
+        { label: 'Perú', traits: ['pais', 'america', 'habla-espanol'] },
+        { label: 'Japón', traits: ['pais'] },
+      ]);
+      const ids = (content as Card[]).flatMap((card) => card.traits!.map((trait) => trait.id));
+      expect(new Set(ids)).toEqual(new Set(['america', 'habla-espanol']));
+    });
+
+    it('si hay más de 12 rasgos útiles, se queda con los que mejor parten el mazo', () => {
+      const traits = Array.from({ length: 14 }, (_, i) => ({ id: `r${i}`, question: `¿Rasgo ${i}?` }));
+      // r0 y r1 los tiene una sola tarjeta de 20; el resto, la mitad.
+      const cards = Array.from({ length: 20 }, (_, i) => ({
+        label: `País ${i}`,
+        traits: traits.filter((t, k) => (k < 2 ? i === 0 : i % 2 === k % 2)).map((t) => t.id),
+      }));
+      const { content } = normalizeDraft({ gameType: 'GUESS_WHO' }, { traits }, cards);
+      const ids = new Set((content as Card[]).flatMap((card) => card.traits!.map((trait) => trait.id)));
+      expect(ids.size).toBe(12);
+      expect(ids.has('r0')).toBe(false);
+      expect(ids.has('r1')).toBe(false);
+    });
+
+    it('sin catálogo ni rasgos útiles, las tarjetas quedan sin la clave (el juego usa la pregunta del grupo)', () => {
+      expect((normalizeDraft({ gameType: 'GUESS_WHO' }, {}, [{ label: 'Perú' }]).content as Card[])[0]).not.toHaveProperty('traits');
+      const allSame = normalizeDraft({ gameType: 'GUESS_WHO' }, { traits: catalog }, [
+        { label: 'Perú', traits: ['america'] },
+        { label: 'Chile', traits: ['america'] },
+      ]);
+      expect((allSame.content as Card[]).every((card) => !('traits' in card))).toBe(true);
+    });
+  });
 });
 
 describe('normalizeDraft — Dominó y Laberinto recolector', () => {
