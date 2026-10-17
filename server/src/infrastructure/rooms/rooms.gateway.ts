@@ -1,4 +1,4 @@
-import { Inject, Logger, UseFilters } from '@nestjs/common';
+import { Inject, Logger, Optional, UseFilters } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import {
   ConnectedSocket,
@@ -57,6 +57,14 @@ import { WsExceptionFilter } from './ws-exception.filter.js';
 import { allLobbyReady, recordLobbyReady, resetLobbyReady } from './lobby-ready.js';
 import { addGuidedMessage, askGuidedQuestion, answerGuidedQuestion, guidedView } from '../../domain/services/guided-questions.js';
 import { assertCanPassTurn, judgeAccusation, toggleDiscard } from '../../domain/services/guess-who-rules.js';
+import {
+  GUESS_WHO_BOT_POLICY,
+  isBotDifficulty,
+  type BotDifficulty,
+  type GuessWhoBotPolicy,
+} from '../../domain/ports/guess-who-bot-policy.port.js';
+import { HeuristicGuessWhoBotPolicy } from '../../application/bots/heuristic-guess-who-bot.policy.js';
+import { GuessWhoBotRunner } from '../bots/guess-who-bot-runner.js';
 
 interface AuthenticatedSocket extends Socket {
   data: {
@@ -120,6 +128,18 @@ const MAX_CHAT_MESSAGE_LENGTH = 500;
 
 /** Cupo máximo absoluto de una sala de torneo (modo grupo de "¿Quién Es?"). */
 const TOURNAMENT_MAX_PARTICIPANTS = 10;
+
+/** Nombre con el que el bot aparece en la sala y en el chat de una partida en solitario. */
+const BOT_DISPLAY_NAMES: Record<BotDifficulty, string> = {
+  EASY: 'Bot Nexus (fácil)',
+  MEDIUM: 'Bot Nexus (medio)',
+  HARD: 'Bot Nexus (difícil)',
+};
+
+/** El bot siempre está listo: ningún reinicio del lobby debe dejar la partida en solitario esperándolo. */
+function keepBotsReady(players: { ready?: boolean; bot?: unknown }[]) {
+  for (const player of players) if (player.bot) player.ready = true;
+}
 
 /** Vista pública del torneo que se envía a un participante dado. */
 function toTournamentClientView(tournament: TournamentState, forUserId: string) {
@@ -404,6 +424,7 @@ export function toClientView(room: RoomState, forSocketId: string) {
       isSelf: player.socketId === forSocketId,
       hasVotedRematch: room.rematchVotes[player.userId] !== undefined,
       isHost: player.userId === room.hostUserId,
+      isBot: Boolean(player.bot),
     })),
   };
 }
@@ -476,6 +497,9 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   /** Construido una vez en el constructor a partir de los stores inyectados — ver RoomRegistryEntry. */
   private readonly roomRegistry: RoomRegistryEntry[];
 
+  /** Hace jugar al bot de las salas en solitario (issue #60) con las mismas acciones que un jugador. */
+  private readonly botRunner: GuessWhoBotRunner;
+
   private cancelDealCountdown(key: string) {
     clearTimeout(this.dealTimers.get(key));
     this.dealTimers.delete(key);
@@ -491,7 +515,20 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     @Inject(SNAKES_LADDERS_ROOM_STORE) private readonly snakesLaddersRoomStore: SnakesLaddersRoomStore,
     @Inject(DUAL_QUEST_ROOM_STORE) private readonly dualQuestRoomStore: DualQuestRoomStore,
     private readonly analyticsTracker: AnalyticsTrackerService,
+    @Optional() @Inject(GUESS_WHO_BOT_POLICY) botPolicy: GuessWhoBotPolicy = new HeuristicGuessWhoBotPolicy(),
   ) {
+    this.botRunner = new GuessWhoBotRunner(
+      {
+        getRoom: (code) => this.roomStore.get(code),
+        ask: (room, userId, name, questionId) => this.askInRoom(room, userId, name, questionId),
+        answer: (room, userId, name, requestId, answer) => this.answerInRoom(room, userId, name, requestId, answer),
+        discard: (room, userId, cardId) => this.discardInRoom(room, userId, cardId),
+        accuse: (room, userId, cardId) => this.accuseInRoom(room, userId, cardId),
+        passTurn: (room, userId) => this.passTurnInRoom(room, userId),
+        voteRematch: (room, userId) => this.voteRematchInRoom(room, userId, true),
+      },
+      botPolicy,
+    );
     this.roomRegistry = [
       { kind: 'room', store: this.roomStore },
       { kind: 'tournament', store: this.tournamentStore },
@@ -567,8 +604,10 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       this.clearTurnTimer(room.code);
       room.players = room.players.filter((player) => player.socketId !== socket.id);
 
-      if (room.players.length === 0) {
+      // Partida en solitario: sin el jugador, el bot no tiene con quién jugar.
+      if (room.players.every((player) => player.bot)) {
         this.roomStore.delete(room.code);
+        this.botRunner.forget(room.code);
       } else {
         if (!wasWaiting) resetLobbyReady(room.players);
         if (!room.players.some((p) => p.userId === room.hostUserId)) room.hostUserId = room.players[0].userId;
@@ -705,6 +744,74 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   }
 
   /**
+   * Partida en solitario contra el bot (issue #60): la misma sala 1v1, con el
+   * bot como segundo jugador. Los dos entran listos, así que arranca la
+   * cuenta regresiva de inmediato; nadie más puede unirse (la sala ya está
+   * llena) y se cierra cuando el jugador sale.
+   */
+  @SubscribeMessage('room:create-solo')
+  async handleCreateSolo(
+    @ConnectedSocket() socket: AuthenticatedSocket,
+    @MessageBody() body: { gameId: string; difficulty: string },
+  ) {
+    const difficulty = body?.difficulty;
+    if (!isBotDifficulty(difficulty)) throw new Error('Elige la dificultad del bot: fácil, medio o difícil.');
+    const game = await this.gameRepository.findById(body.gameId);
+    if (!game || game.gameType.getName() !== 'GUESS_WHO') {
+      throw new Error('Juego no encontrado o no es de tipo "¿Quién Es?".');
+    }
+
+    const code = this.generateUniqueRoomCode();
+    const botId = `bot:${code}`;
+    const room: RoomState = {
+      code,
+      gameId: game.id,
+      gameTitle: game.title,
+      cards: game.content as GuessWhoCard[],
+      hostUserId: socket.data.userId,
+      maxAccusationCount: (game.config.maxAccusationCount as number | undefined) ?? 6,
+      turnDurationSeconds: (game.config.turnDurationSeconds as number | undefined) ?? 15,
+      phase: 'WAITING',
+      players: [
+        {
+          socketId: socket.id,
+          userId: socket.data.userId,
+          displayName: socket.data.displayName,
+          ready: true,
+          secretCardId: null,
+          discardedCardIds: [],
+        },
+        {
+          socketId: botId,
+          userId: botId,
+          displayName: BOT_DISPLAY_NAMES[difficulty],
+          ready: true,
+          secretCardId: null,
+          discardedCardIds: [],
+          bot: { difficulty },
+        },
+      ],
+      winnerUserId: null,
+      createdAt: Date.now(),
+      rematchVotes: {},
+      activePlayerUserId: null,
+      turnDeadline: null,
+    };
+
+    this.roomStore.create(room);
+    socket.join(code);
+    this.broadcastState(room);
+    this.tryStartRoom(room);
+
+    void this.analyticsTracker.track({
+      type: 'room_created',
+      userId: socket.data.userId,
+      gameId: game.id,
+      metadata: { mode: 'solo', botDifficulty: difficulty, turnDurationSeconds: room.turnDurationSeconds },
+    });
+  }
+
+  /**
    * Resuelve un código a ciegas (el usuario solo tiene el código, no sabe si
    * es de una sala 1v1 o de un torneo grupal) para que el cliente sepa a qué
    * pantalla enrutar antes de intentar unirse.
@@ -816,6 +923,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     if (room.turnDurationSeconds === turnDurationSeconds) return;
     this.cancelDealCountdown('room:' + room.code);
     resetLobbyReady(room.players);
+    keepBotsReady(room.players);
     room.turnDurationSeconds = turnDurationSeconds;
     this.roomStore.set(room);
     this.broadcastState(room);
@@ -932,20 +1040,25 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   ) {
     const room = this.roomStore.findBySocketId(socket.id);
     if (!room || room.phase !== 'FINISHED') throw new Error('No hay una partida terminada para votar revancha.');
+    this.voteRematchInRoom(room, socket.data.userId, body?.accept);
+  }
 
-    const voter = room.players.find((p) => p.socketId === socket.id);
+  private voteRematchInRoom(room: RoomState, userId: string, accept: unknown) {
+    if (typeof accept !== "boolean") throw new Error("Indica si quieres jugar otra ronda.");
+    const voter = room.players.find((p) => p.userId === userId);
     if (!voter) throw new Error('No estás en esta sala.');
 
-    room.rematchVotes[voter.userId] = body.accept;
+    room.rematchVotes[voter.userId] = accept;
 
-    if (body.accept === false) {
+    if (accept === false) {
       const opponent = room.players.find((p) => p.userId !== voter.userId);
-      if (opponent) {
+      if (opponent && !opponent.bot) {
         this.server.to(opponent.socketId).emit('room:rematch-rejected', {
           message: `${voter.displayName} no quiso seguir jugando.`,
         });
       }
       this.roomStore.delete(room.code);
+      this.botRunner.forget(room.code);
       return;
     }
 
@@ -1134,8 +1247,10 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
 
   private broadcastState(room: RoomState) {
     for (const player of room.players) {
+      if (player.bot) continue;
       this.server.to(player.socketId).emit('room:state', toClientView(room, player.socketId));
     }
+    this.botRunner.onRoomChanged(room);
   }
 
   // ---------------------------------------------------------------------

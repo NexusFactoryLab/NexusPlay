@@ -15,6 +15,8 @@ import { InMemoryDominoRoomStore } from './rooms/in-memory-domino-room.store.js'
 import { InMemorySnakesLaddersRoomStore } from './rooms/in-memory-snakes-ladders-room.store.js';
 import { InMemoryDualQuestRoomStore } from './rooms/in-memory-dual-quest-room.store.js';
 import { RoomsGateway } from './rooms/rooms.gateway.js';
+import { GUESS_WHO_BOT_POLICY } from '../domain/ports/guess-who-bot-policy.port.js';
+import { HeuristicGuessWhoBotPolicy } from '../application/bots/heuristic-guess-who-bot.policy.js';
 
 @Module({
   imports: [UserModule, AnalyticsModule],
@@ -26,6 +28,8 @@ import { RoomsGateway } from './rooms/rooms.gateway.js';
     { provide: DOMINO_ROOM_STORE, useClass: InMemoryDominoRoomStore },
     { provide: SNAKES_LADDERS_ROOM_STORE, useClass: InMemorySnakesLaddersRoomStore },
     { provide: DUAL_QUEST_ROOM_STORE, useClass: InMemoryDualQuestRoomStore },
+    // Bot de las partidas en solitario de Identidad Oculta (issue #60).
+    { provide: GUESS_WHO_BOT_POLICY, useClass: HeuristicGuessWhoBotPolicy },
     RoomsGateway,
   ],
 })
