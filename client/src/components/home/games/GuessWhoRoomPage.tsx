@@ -12,6 +12,7 @@ import { DealCountdownOverlay, MatchBoard, useCountdown } from './MatchBoard'
 import { ConfettiBurst } from '../../kids/ConfettiBurst'
 import { CardInfoBubble } from './CardInfoBubble'
 import { setGuessWhoSoundMuted, startGuessWhoAmbience, stopGuessWhoAmbience } from '../../../utils/gameFeedback'
+import { BOT_CHAT_NOTICE, parseBotDifficulty } from './guessWhoBot'
 
 /**
  * Sala 1v1 de "¿Quién Es?" en página propia (ruta `/quien-es/sala/:code?`,
@@ -27,6 +28,7 @@ function GuessWhoRoomSession() {
   const { code: codeFromUrl } = useParams<{ code?: string }>()
   const [searchParams] = useSearchParams()
   const gameIdToCreate = searchParams.get('gameId')
+  const botDifficulty = parseBotDifficulty(searchParams.get('bot'))
   const navigate = useNavigate()
   const { token, user } = useAuth()
   const {
@@ -39,6 +41,7 @@ function GuessWhoRoomSession() {
     clearLastFailedAccusation,
     messages,
     createRoom,
+    createSoloRoom,
     joinRoom,
     setReady,
     updateTurnDuration,
@@ -65,7 +68,8 @@ function GuessWhoRoomSession() {
       joinRoom(codeFromUrl.toUpperCase())
     } else if (gameIdToCreate) {
       startedRef.current = true
-      createRoom(gameIdToCreate)
+      if (botDifficulty) createSoloRoom(gameIdToCreate, botDifficulty)
+      else createRoom(gameIdToCreate)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connecting, codeFromUrl, gameIdToCreate])
@@ -195,6 +199,7 @@ function GuessWhoRoomSession() {
 
   const self = room.players.find((player) => player.isSelf)
   const opponent = room.players.find((player) => !player.isSelf)
+  const againstBot = Boolean(opponent?.isBot)
   const isMyTurn = room.phase === 'PLAYING' && room.activePlayerUserId === self?.userId
   const canAccuse =
     room.phase === 'PLAYING' && isMyTurn && (self?.discardedCardIds.length ?? 0) >= MIN_DISCARDS_TO_ACCUSE
@@ -215,7 +220,8 @@ function GuessWhoRoomSession() {
       <div className="guess-who-play-shell">
         <div className="mb-4 flex items-center justify-end gap-2">
           {copyFeedback && <span className="text-[11px] font-medium text-accent" role="status">{copyFeedback}</span>}
-          <button
+          {/* En solitario no hay a quién invitar: el código no sirve para nada. */}
+          {!againstBot && <button
             type="button"
             aria-label="Copiar código de sala"
             title="Copiar código de sala"
@@ -228,7 +234,7 @@ function GuessWhoRoomSession() {
             }}
           >
             <Copy className="h-4 w-4" strokeWidth={2} />
-          </button>
+          </button>}
           <button
             type="button"
             aria-label={soundEnabled ? 'Silenciar efectos de sonido' : 'Activar efectos de sonido'}
@@ -371,6 +377,7 @@ function GuessWhoRoomSession() {
           messages={room.guidedChat ?? []}
           selfUserId={self?.userId ?? null}
           onSend={sendChatMessage}
+          notice={againstBot ? BOT_CHAT_NOTICE : undefined}
           disconnected={connecting || dealing}
           guided={room.phase === 'PLAYING' ? { cards: room.cards, questions: room.suggestedQuestions ?? [], pending: room.pendingQuestion ?? null, isMyTurn, onAsk: askQuestion, onAnswer: answerQuestion } : undefined}
         />

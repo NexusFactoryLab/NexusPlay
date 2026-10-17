@@ -28,6 +28,7 @@ export function ChatPanel({
   inline = false,
   guided,
   error,
+  notice,
 }: {
   messages: GuessWhoChatMessage[]
   selfUserId: string | null
@@ -38,6 +39,8 @@ export function ChatPanel({
   inline?: boolean
   guided?: GuidedChatControls
   error?: string | null
+  /** Aviso fijo sobre el chat (ej. que el rival es el bot y no lee mensajes). */
+  notice?: string
 }) {
   const [text, setText] = useState('')
   const listRef = useRef<HTMLDivElement>(null)
@@ -76,6 +79,7 @@ export function ChatPanel({
       </div>
 
       {inline && error && <p role="alert" className="mx-3 mt-2 rounded-lg border border-danger/40 bg-surface/90 p-2 text-[12px] text-danger">{error}</p>}
+      {notice && <p className="mx-3 mt-2 rounded-lg border border-accent/30 bg-accent/5 p-2 text-[12px] text-text-h">{notice}</p>}
       <div
         role="log"
         aria-live="polite"

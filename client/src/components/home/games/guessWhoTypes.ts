@@ -38,6 +38,8 @@ export type RoomPlayerView = {
   ready?: boolean
   isSelf: boolean
   hasVotedRematch: boolean
+  /** true para el bot de una partida en solitario (issue #60): no lee el chat. */
+  isBot?: boolean
   /**
    * true solo para quien creó la sala 1v1 — es el único que puede fijar los
    * segundos por turno. No aplica a matches de torneo (ahí el rol
