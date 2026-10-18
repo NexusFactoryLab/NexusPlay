@@ -3090,7 +3090,8 @@ code {
  * Pradera), con variables CSS para que funcione en claro, oscuro y ambos
  * temas. Solo transform/opacity animan; prefers-reduced-motion lo apaga.
  * ============================================================ */
-.nx-form {
+.nx-form,
+.nx-rail {
   --nx-card-bg: var(--surface);
   --nx-solid: var(--surface);
   --nx-card-border: color-mix(in srgb, var(--border) 85%, transparent);
@@ -3106,24 +3107,29 @@ code {
   min-width: 0;
 }
 :root[data-theme='dark'] .nx-form,
-:root[data-theme='fantasy'] .nx-form {
+:root[data-theme='dark'] .nx-rail,
+:root[data-theme='fantasy'] .nx-form,
+:root[data-theme='fantasy'] .nx-rail {
   --nx-ok: #52d6a0;
   --nx-card-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 16px 34px -20px rgba(0, 0, 0, 0.85);
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light'], [data-theme='kids'], [data-theme='meadow']) .nx-form {
+  :root:not([data-theme='light'], [data-theme='kids'], [data-theme='meadow']) .nx-form,
+  :root:not([data-theme='light'], [data-theme='kids'], [data-theme='meadow']) .nx-rail {
     --nx-ok: #52d6a0;
     --nx-card-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 16px 34px -20px rgba(0, 0, 0, 0.85);
   }
 }
-[data-theme='fantasy'] .nx-form {
+[data-theme='fantasy'] .nx-form,
+[data-theme='fantasy'] .nx-rail {
   --nx-card-bg: linear-gradient(180deg, rgba(58, 51, 98, 0.94), rgba(39, 33, 72, 0.96));
   --nx-card-border: rgba(255, 214, 140, 0.34);
   --nx-solid: #2a2650;
   --nx-field-bg: #1d1a29;
   --nx-bar-bg: rgba(31, 26, 58, 0.94);
 }
-[data-theme='meadow'] .nx-form {
+[data-theme='meadow'] .nx-form,
+[data-theme='meadow'] .nx-rail {
   --nx-card-bg: #fffdf8;
   --nx-card-border: #e2cfb1;
   --nx-solid: #fffdf8;
@@ -3132,7 +3138,8 @@ code {
   --nx-bar-bg: rgba(255, 253, 248, 0.95);
   --nx-ok: #1c9a68;
 }
-[data-theme='kids'] .nx-form {
+[data-theme='kids'] .nx-form,
+[data-theme='kids'] .nx-rail {
   --nx-card-shadow: 0 3px 0 #ffe0a3, 0 14px 28px -18px rgba(255, 122, 26, 0.5);
 }
 
@@ -3221,6 +3228,11 @@ code {
 .nx-card-body > :is([data-nx-wide], p, button, ul, ol, [role='alert'], .nx-actions, .nx-subbox, .nx-collapsible, .nx-notice),
 .nx-card-body > :has(textarea) {
   grid-column: 1 / -1;
+}
+/* Materia + sub-materia es alta: ocupa dos filas y el campo siguiente sube a su lado (sin huecos). */
+.nx-card-body { grid-auto-flow: row dense; }
+@media (min-width: 720px) {
+  .nx-card-body > :has(.nx-subbox) { grid-row: span 2; }
 }
 /* Los saltos entre filas del formulario también respiran, y el contenido no tapa la barra fija. */
 .nx-form { padding-bottom: 12px; }
@@ -3763,9 +3775,13 @@ code {
   border: 1px solid var(--nx-card-border);
   border-radius: 6px;
   background: var(--nx-card-bg);
-  font: 600 11px/1.5 inherit;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
   color: var(--text-h);
 }
+.nx-rail .nx-progress-title { white-space: normal; overflow-wrap: anywhere; }
 @media (min-width: 1024px) {
   .nx-rail-tip { display: block; }
   /* La pastilla de fase de cada formulario ya la cubre el rail. */

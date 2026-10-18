@@ -148,7 +148,7 @@ export function CategorySelectField({
         <label className="nx-label mb-1.5 mt-3 block text-[13px] font-medium text-text-h" htmlFor="game-new-sub-category">
           {subCategories.length > 0 ? 'O crea una sub-materia nueva' : 'Nombre de la sub-materia'}
         </label>
-        <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex flex-col gap-2">
           <input
             id="game-new-sub-category"
             type="text"
