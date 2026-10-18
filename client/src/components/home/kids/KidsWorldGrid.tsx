@@ -7,10 +7,10 @@ type KidsWorldGridProps = {
 }
 
 /**
- * Pantalla de inicio del Modo Kids: cada Ã¡rea es un "mundo" — un planeta
+ * Pantalla de inicio del Modo Kids: cada área es un "mundo" — un planeta
  * gigante con su nombre escrito adentro (ver `KidsPlanetIcon`), como los
  * planetas del fondo del Modo Kids — en vez de la barra de filtros de texto
- * del Home de adulto. Solo se listan Ã¡reas con juegos publicados: un
+ * del Home de adulto. Solo se listan áreas con juegos publicados: un
  * mundo vacío sería un callejón sin salida para un niño que no puede
  * interpretar un estado vacío.
  */

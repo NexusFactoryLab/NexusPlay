@@ -4,6 +4,23 @@ import type { CreationDraftFileInfo } from '../../../services/game-creation-draf
 /** Query param con el que "Continuar" abre un formulario con un borrador guardado. */
 export const DRAFT_QUERY_PARAM = 'borrador'
 
+// --- Cuándo se autoguarda ----------------------------------------------------
+
+/**
+ * Un cambio del estado del formulario se guarda solo si el borrador ya está
+ * listo (no se está cargando uno que se retoma) y la persona interactuó. Un
+ * formulario que nace de "Adaptar con IA" cuenta como interactuado desde el
+ * inicio: su contenido ya adaptado es trabajo que no debe perderse.
+ */
+export function shouldAutosave(state: { persistReady: boolean; touched: boolean }): boolean {
+  return state.persistReady && state.touched
+}
+
+/** Valor inicial de "interactuó": true si el formulario se abrió con un borrador adaptado. */
+export function initialTouched(adaptation: unknown): boolean {
+  return adaptation !== undefined && adaptation !== null
+}
+
 // --- Reutilización del resultado de la IA (ahorro de tokens) -----------------
 
 type SignedFile = { name: string; size: number }

@@ -168,7 +168,7 @@ export function SimplePairsGameForm({
     setSelectedPair((current) => Math.max(0, Math.min(current, pairs.length - 2)))
   }
 
-  /** Valida solo los campos de la fase 1 (Identidad): título, descripción, Ã¡rea. */
+  /** Valida solo los campos de la fase 1 (Identidad): título, descripción, área. */
   function validateIdentityPhase(): string | null {
     if (!title.trim() || title.trim().length < 3) {
       return 'El título debe tener al menos 3 caracteres.'
@@ -177,7 +177,7 @@ export function SimplePairsGameForm({
       return 'La descripción debe tener al menos 10 caracteres.'
     }
     if (!categoryId) {
-      return 'Elige un Ã¡rea para el juego.'
+      return 'Elige un área para el juego.'
     }
     return null
   }
@@ -280,6 +280,7 @@ export function SimplePairsGameForm({
       resumingDraft={resuming}
       draftState={draftState}
       onRestoreDraft={restoreDraft}
+      adaptation={adaptation}
       title="Pares"
       description="Cada pareja tiene una imagen y el nombre del concepto que representa."
       aiPanel={

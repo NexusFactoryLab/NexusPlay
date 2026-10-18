@@ -565,6 +565,7 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
       resumingDraft={resuming}
       draftState={draftState}
       onRestoreDraft={restoreDraft}
+      adaptation={adaptation}
       title="Dúo Lógico"
       description="Fuego y Agua recorren el mismo mapa y se necesitan para avanzar."
       descriptionDetail="Cada rol queda bloqueado por casillas del otro. Al final arman juntos un concepto ensamblando lo que cada uno recolectó."

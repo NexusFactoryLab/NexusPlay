@@ -243,7 +243,7 @@ export function GuessWhoGameForm({
     )
   }
 
-  /** Valida solo los campos de la fase 1 (Identidad): título, descripción, Ã¡rea. */
+  /** Valida solo los campos de la fase 1 (Identidad): título, descripción, área. */
   function validateIdentityPhase(): string | null {
     if (!title.trim() || title.trim().length < 3) {
       return 'El título debe tener al menos 3 caracteres.'
@@ -252,7 +252,7 @@ export function GuessWhoGameForm({
       return 'La descripción debe tener al menos 10 caracteres.'
     }
     if (!categoryId) {
-      return 'Elige un Ã¡rea para el juego.'
+      return 'Elige un área para el juego.'
     }
     return null
   }
@@ -377,6 +377,7 @@ export function GuessWhoGameForm({
       resumingDraft={resuming}
       draftState={draftState}
       onRestoreDraft={restoreDraft}
+      adaptation={adaptation}
       title="¿Quién Es?"
       description="Cada tarjeta tiene imagen, nombre y audio opcional."
       descriptionDetail="Se juega en una sala en vivo entre 2 personas: abre la sala desde el detalle del juego una vez creado."

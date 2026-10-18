@@ -32,7 +32,7 @@ export interface RecordGamePlayResultProps {
 /**
  * Hecho atómico de una partida jugada por un estudiante (issue #226). Única
  * responsabilidad: garantizar que un resultado individual sea válido antes de
- * persistirlo. Toda agregación (ranking, desglose por Ã¡rea, evolución en
+ * persistirlo. Toda agregación (ranking, desglose por área, evolución en
  * el tiempo) vive en servicios de aplicación que leen muchas instancias de
  * esta entidad — no en la entidad misma (SRP).
  */

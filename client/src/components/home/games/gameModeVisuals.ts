@@ -8,7 +8,7 @@ export type GameModeFilter = 'SOLO' | 'MULTI'
  * gamesCatalogVisuals.ts): azul para 1 jugador (calma, concentración
  * individual) y magenta/rosa para multijugador (el mismo tono que usa el
  * botón "Unirme con código" en GamesSection, por asociación con jugar con
- * más personas). A diferencia del color por Ã¡rea (colorForCategory), este
+ * más personas). A diferencia del color por área (colorForCategory), este
  * NO depende de la categoría del juego — es siempre el mismo para que la
  * insignia de modo sea reconocible de un vistazo en cualquier tarjeta.
  */

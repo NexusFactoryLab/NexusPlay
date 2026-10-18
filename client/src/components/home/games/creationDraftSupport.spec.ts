@@ -7,10 +7,12 @@ import {
   draftResumePath,
   draftTypeLabel,
   findCachedAiResult,
+  initialTouched,
   isStoredFile,
   materializeFiles,
   savedList,
   savedString,
+  shouldAutosave,
 } from './creationDraftSupport'
 
 const RESULT: GameDraft = { config: {}, content: [{ label: 'a' }] }
@@ -77,6 +79,23 @@ describe('materializeFiles', () => {
     const stored = createStoredFile({ filename: 'a.pdf', mimeType: 'x', sizeBytes: 1, url: 'https://cdn/a' })
     const fetcher = vi.fn(async () => new Response('', { status: 404 })) as unknown as typeof fetch
     await expect(materializeFiles([stored], fetcher)).rejects.toThrow()
+  })
+})
+
+describe('autoguardado', () => {
+  it('un formulario abierto desde "Adaptar con IA" se autoguarda sin edición manual', () => {
+    const adaptation = { title: 'Volcanes', sourceGameId: 'g1' }
+    expect(shouldAutosave({ persistReady: true, touched: initialTouched(adaptation) })).toBe(true)
+  })
+
+  it('un formulario nuevo no se guarda hasta que la persona interactúa', () => {
+    expect(initialTouched(undefined)).toBe(false)
+    expect(shouldAutosave({ persistReady: true, touched: initialTouched(undefined) })).toBe(false)
+    expect(shouldAutosave({ persistReady: true, touched: true })).toBe(true)
+  })
+
+  it('no guarda mientras se carga un borrador que se retoma', () => {
+    expect(shouldAutosave({ persistReady: false, touched: true })).toBe(false)
   })
 })
 

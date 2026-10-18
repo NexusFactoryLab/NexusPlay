@@ -9,7 +9,13 @@ import {
   saveCreationDraftAi,
   saveCreationDraftForm,
 } from '../../../services/game-creation-draft.service'
-import { buildAiCache, findCachedAiResult, type AiResultCache } from './creationDraftSupport'
+import {
+  buildAiCache,
+  findCachedAiResult,
+  initialTouched,
+  shouldAutosave,
+  type AiResultCache,
+} from './creationDraftSupport'
 import {
   AiDraftAppliedContext,
   AiDraftPersistContext,
@@ -127,6 +133,11 @@ type GameFormShellProps = {
   resumingDraft: boolean
   draftState: Record<string, unknown>
   onRestoreDraft: (saved: Record<string, unknown>) => void
+  /**
+   * Borrador de "Adaptar con IA" con el que se abrió el formulario: su
+   * contenido ya adaptado se autoguarda sin esperar una edición manual.
+   */
+  adaptation?: unknown
   children: ReactNode
 }
 
@@ -148,6 +159,7 @@ export function GameFormShell({
   resumingDraft,
   draftState,
   onRestoreDraft,
+  adaptation,
   children,
 }: GameFormShellProps) {
   // Cuántas veces se aplicó un borrador de IA (0 = nunca): cada aplicación
@@ -180,7 +192,7 @@ export function GameFormShell({
   const persistReady = useRef(!resumingDraft)
   // La persona ya interactuó (teclado, clic, subida): antes de eso los cambios de
   // estado son del propio formulario al cargar (categorías, valores por defecto).
-  const touched = useRef(false)
+  const touched = useRef(initialTouched(adaptation))
   const aiCache = useRef<AiResultCache | null>(null)
   const saveTimer = useRef<number | null>(null)
   const dirtyRef = useRef(false)
@@ -287,7 +299,7 @@ export function GameFormShell({
   // Cualquier cambio del estado del formulario tras una interacción de la
   // persona (o de la IA) cuenta como edición y se guarda con un pequeño retraso.
   useEffect(() => {
-    if (!persistReady.current || !touched.current) return
+    if (!shouldAutosave({ persistReady: persistReady.current, touched: touched.current })) return
     setDirty(true)
     scheduleFormSave(1500)
   }, [draftStateKey, scheduleFormSave])

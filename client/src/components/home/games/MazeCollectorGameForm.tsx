@@ -373,6 +373,7 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
       resumingDraft={resuming}
       draftState={draftState}
       onRestoreDraft={restoreDraft}
+      adaptation={adaptation}
       title="Recolector de laberinto"
       description="Recolecta objetos temáticos en un laberinto y esquiva enemigos."
       descriptionDetail="Puedes cambiar la narrativa: por ejemplo, un camión de reciclaje esquivando nubes de contaminación, o cualquier otra idea."

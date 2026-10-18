@@ -154,7 +154,7 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
         <SidebarItem
           tourTarget="nav-subjects"
           emoji="📕"
-          label="Ãreas"
+          label="Áreas"
           collapsed={collapsed}
           active={location.pathname.startsWith('/areas')}
           onClick={() => navigate('/areas')}

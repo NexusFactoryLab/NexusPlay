@@ -13,7 +13,7 @@ export interface AddGameToClassInput {
 
 /**
  * Solo el profesor dueño de la clase puede agregarle juegos — de cualquier
- * Ã¡rea, no solo de las suyas: la clase es un agrupador de trabajo, no un
+ * área, no solo de las suyas: la clase es un agrupador de trabajo, no un
  * contenedor de contenido propio (ver Class vs Subject en el issue #80).
  */
 @Injectable()
