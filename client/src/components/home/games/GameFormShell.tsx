@@ -49,6 +49,8 @@ function findAddButton(root: HTMLElement, after: HTMLElement): HTMLButtonElement
 
 /** La tarjeta de una lista repetible: el ancestro hermano del botón "+ Agregar". */
 function findListItem(from: HTMLElement): HTMLElement | null {
+  const card = from.closest<HTMLElement>('.nx-item')
+  if (card) return card
   let node: HTMLElement | null = from
   while (node && node.parentElement) {
     const parent: HTMLElement = node.parentElement
@@ -443,7 +445,7 @@ export function GameFormShell({
     <AiFillStepContext.Provider value={onFillStep}>
     <FieldAssistContext.Provider value={assistValue}>
     <PhaseProgressContext.Provider value={progress}>
-    <div className="relative mx-auto max-w-[1180px] p-5 sm:p-8 xl:max-w-[1440px] 2xl:max-w-[1680px]">
+    <div className={`relative mx-auto p-5 sm:p-8 ${stage === 'ai' ? 'max-w-[1180px] xl:max-w-[1440px] 2xl:max-w-[1680px]' : 'max-w-[920px]'}`}>
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-[32px]">
         <div className="absolute -top-24 -right-16 h-80 w-80 rounded-full bg-accent/20 blur-[110px]" />
         <div className="absolute top-1/3 -right-44 h-[460px] w-[460px] rounded-full bg-accent-2/20 blur-[130px]" />
@@ -526,15 +528,11 @@ export function GameFormShell({
           <div ref={formColumnRef} onInputCapture={markDirty} onChangeCapture={markDirty} onClickCapture={handleClickCapture} onKeyDown={handleKeyDown} className={`nx-form order-2 mx-auto w-full ${formMaxWidthClassName} ${stage === 'ai' ? 'hidden' : ''} ${filling || (entering && stage === 'manual') ? 'nx-fill' : ''}`}>
             {stage === 'manual' && (
               <div
-                className={`nx-celebrate mb-5 rounded-xl border border-border bg-surface px-4 py-3 ${progressSummary.complete ? 'border-accent/50' : ''}`}
-                data-celebrate={celebrate}
-              >
-                <div className="flex items-center gap-3">
-                  <span
-                    aria-hidden="true"
-                    className="nx-celebrate-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white"
-                    style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
-                  >
+                className="nx-progress-card nx-celebrate"
+                title="Tip: Enter pasa al siguiente campo o agrega otro elemento; Ctrl + Enter avanza o crea."
+                data-complete={progressSummary.complete} data-celebrate={celebrate}>
+                <div className="nx-progress-row">
+                  <span aria-hidden="true" className="nx-celebrate-icon nx-progress-icon">
                     {progressSummary.complete ? (
                       <Check className="h-[18px] w-[18px]" strokeWidth={3} />
                     ) : (
@@ -542,24 +540,21 @@ export function GameFormShell({
                     )}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p
-                      className={`truncate text-[14px] font-semibold leading-tight ${previewTitle ? 'text-text-h' : 'text-text'}`}
-                    >
+                    <p className="nx-progress-title" data-empty={!previewTitle}>
                       {previewTitle || 'Tu juego aún no tiene nombre'}
                     </p>
-                    <p className="truncate text-[12px] text-text">{title}</p>
+                    <p className="nx-progress-sub">{title}</p>
                   </div>
                   {progressSummary.label && (
-                    <span
-                      className={`shrink-0 text-[12px] font-semibold ${progressSummary.complete ? 'text-accent' : 'text-text-h'}`}
-                    >
+                    <span className="nx-progress-chip" data-complete={progressSummary.complete}>
+                      {progressSummary.complete && <Check className="h-3 w-3" strokeWidth={3.4} />}
                       {progressSummary.label}
                     </span>
                   )}
                 </div>
                 {progressSummary.label && (
                   <div
-                    className="nx-form-progress-bar mt-2.5"
+                    className="nx-form-progress-bar"
                     role="progressbar"
                     aria-valuemin={0}
                     aria-valuemax={progress.total}
@@ -569,9 +564,6 @@ export function GameFormShell({
                     <span style={{ '--nx-fill': progressSummary.fraction } as React.CSSProperties} />
                   </div>
                 )}
-                <p className="mt-2 hidden text-[11.5px] text-text lg:block">
-                  Tip: Enter pasa al siguiente campo o agrega otro elemento; Ctrl + Enter avanza o crea.
-                </p>
                 <span className="sr-only" role="status">
                   {progressSummary.complete ? 'Fase completa. Puedes continuar.' : ''}
                 </span>
@@ -581,7 +573,7 @@ export function GameFormShell({
               <div
                 ref={noticeRef}
                 role="status"
-                className="mb-5 flex items-start gap-3 rounded-xl border border-accent/40 bg-accent/10 px-4 py-3 text-[13px] leading-relaxed text-text-h"
+                className="nx-notice"
               >
                 <PencilLine className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={2.2} />
                 <p className="flex-1">
@@ -590,7 +582,7 @@ export function GameFormShell({
                 <button
                   type="button"
                   aria-label="Cerrar aviso"
-                  className="shrink-0 rounded-md p-0.5 text-text hover:text-text-h"
+                  className="nx-notice-close"
                   onClick={() => setNoticeDismissed(true)}
                 >
                   <X className="h-4 w-4" strokeWidth={2.2} />
@@ -601,7 +593,7 @@ export function GameFormShell({
               <div
                 role="group"
                 aria-label="Resumen antes de crear"
-                className="nx-stage-in mb-5 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-xl border border-border bg-code-bg px-4 py-3 text-[13px] text-text-h"
+                className="nx-stage-in nx-summary"
               >
                 <span className="inline-flex items-center gap-1.5 font-semibold">
                   <ClipboardCheck className="h-4 w-4 text-accent" strokeWidth={2.2} />

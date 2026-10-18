@@ -87,12 +87,12 @@ export function ImageUploadField({
       />
 
       {imageUrl ? (
-        <div className="relative h-24 w-full overflow-hidden rounded-lg border border-border">
+        <div className="nx-image-preview relative h-24 w-full overflow-hidden rounded-lg border border-border">
           <img src={imageUrl} alt="" className="h-full w-full object-cover" />
           {!disabled && (
             <button
               type="button"
-              className="absolute top-1.5 right-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white"
+              className="nx-image-remove absolute top-1.5 right-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white"
               onClick={() => onChange(null)}
               aria-label="Quitar imagen"
             >
@@ -104,7 +104,7 @@ export function ImageUploadField({
         <button
           type="button"
           data-nx-image-missing={isMissing ? 'true' : undefined}
-          className={`relative flex h-24 w-full flex-col items-center justify-center gap-1.5 overflow-hidden rounded-lg border border-dashed text-text disabled:cursor-not-allowed disabled:opacity-60 ${
+          className={`nx-drop relative flex h-24 w-full flex-col items-center justify-center gap-1.5 overflow-hidden rounded-lg border border-dashed text-text disabled:cursor-not-allowed disabled:opacity-60 ${
             isDraggingOver ? 'border-accent bg-accent/5' : isMissing ? 'border-danger/60 bg-danger/5' : 'border-border'
           }`}
           disabled={disabled || uploading}

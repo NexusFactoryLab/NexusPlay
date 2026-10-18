@@ -22,7 +22,7 @@ export function OrganizationSelectField({
 
   return (
     <div data-nx-field>
-      <label className="mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="game-organization">
+      <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="game-organization">
         Organización (opcional)
       </label>
       <select
@@ -39,7 +39,7 @@ export function OrganizationSelectField({
           </option>
         ))}
       </select>
-      <p className="mt-1.5 text-[12px] text-text">
+      <p className="nx-hint mt-1.5 text-[12px] text-text">
         Si eliges una organización, el juego nace institucional: cualquier miembro puede usarlo.
       </p>
     </div>

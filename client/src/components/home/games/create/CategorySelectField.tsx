@@ -90,7 +90,7 @@ export function CategorySelectField({
 
   return (
     <div data-nx-field>
-      <label className="mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="game-category">
+      <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="game-category">
         Materia
       </label>
       <select
@@ -108,7 +108,7 @@ export function CategorySelectField({
         ))}
       </select>
 
-      <div className="mt-4 rounded-xl border-2 border-accent/40 bg-accent/5 p-4">
+      <div className="nx-subbox mt-4 rounded-xl border-2 border-accent/40 bg-accent/5 p-4">
         <p className="text-[14px] font-semibold text-text-h">Sub-materia</p>
         <p className="mt-0.5 text-[13px] leading-snug text-text">
           Una sub-materia es un tema dentro de la materia (por ejemplo, Fracciones dentro de Matemáticas).
@@ -121,7 +121,7 @@ export function CategorySelectField({
           </p>
         ) : subCategories.length > 0 ? (
           <div className="mt-3">
-            <label className="mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="game-sub-category">
+            <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="game-sub-category">
               Elige una sub-materia existente
             </label>
             <select
@@ -145,7 +145,7 @@ export function CategorySelectField({
           </p>
         )}
 
-        <label className="mb-1.5 mt-3 block text-[13px] font-medium text-text-h" htmlFor="game-new-sub-category">
+        <label className="nx-label mb-1.5 mt-3 block text-[13px] font-medium text-text-h" htmlFor="game-new-sub-category">
           {subCategories.length > 0 ? 'O crea una sub-materia nueva' : 'Nombre de la sub-materia'}
         </label>
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -160,7 +160,7 @@ export function CategorySelectField({
           />
           <button
             type="button"
-            className="min-h-[44px] shrink-0 rounded-lg px-5 py-2.5 text-[14px] font-bold text-white shadow-[0_8px_20px_-10px_var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
+            className="nx-btn nx-btn-primary shrink-0"
             style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
             onClick={handleCreateCategory}
             disabled={disabled || creatingCategory || !newCategoryName.trim() || !rootId}

@@ -33,11 +33,11 @@ export function WizardPhaseNav({
   const summary = progress ? summarizeProgress(progress) : null
   if (isLastPhase) return null
   return (
-    <div className="nx-sticky-actions flex gap-2">
+    <div className="nx-sticky-actions nx-actions">
       {onBack && (
         <button
           type="button"
-          className="nx-back inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2.5 text-[14px] font-semibold text-text-h shadow-sm hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-60"
+          className="nx-back nx-btn nx-btn-secondary inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2.5 text-[14px] font-semibold text-text-h shadow-sm hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-60"
           onClick={onBack}
           disabled={submitting}
         >
@@ -47,7 +47,7 @@ export function WizardPhaseNav({
       )}
       <button
         type="button"
-        className="rounded-lg px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)] transition-transform hover:not-disabled:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+        className="nx-btn nx-btn-primary"
         style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
         onClick={onNext}
         disabled={submitting}
@@ -58,7 +58,7 @@ export function WizardPhaseNav({
       </button>
       {summary && progress && progress.total > 0 && (
         <span
-          className={`self-center text-[12px] font-medium ${summary.complete ? 'text-accent' : 'text-text'}`}
+          className={`nx-actions-hint ${summary.complete ? 'text-accent' : 'text-text'}`}
         >
           {missingHint(summary.missing)}
         </span>

@@ -1,4 +1,4 @@
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, SlidersHorizontal } from 'lucide-react'
 import { useId, useState } from 'react'
 import type { ReactNode } from 'react'
 
@@ -17,16 +17,20 @@ export function AdvancedSettings({ summary = 'Ajustes avanzados', children }: Ad
   const [open, setOpen] = useState(false)
   const panelId = useId()
   return (
-    <div className="rounded-xl border border-border">
+    <div className="nx-card nx-collapsible" data-tone="2" data-open={open}>
       <button
         type="button"
         aria-expanded={open}
         aria-controls={panelId}
-        className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-[13.5px] font-semibold text-text-h"
+        className="nx-collapsible-btn"
         onClick={() => setOpen((value) => !value)}
       >
-        <span>
-          {summary} <span className="font-normal text-text">· opcional</span>
+        <span className="nx-card-icon" aria-hidden="true">
+          <SlidersHorizontal className="h-[19px] w-[19px]" strokeWidth={2.2} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="nx-card-title block">{summary}</span>
+          <span className="nx-card-sub block">Opcional · los valores por defecto ya funcionan bien</span>
         </span>
         <ChevronDown
           className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
@@ -35,7 +39,7 @@ export function AdvancedSettings({ summary = 'Ajustes avanzados', children }: Ad
       </button>
       <div id={panelId} className="nx-collapse" data-open={open} aria-hidden={!open} inert={!open}>
         <div>
-          <div className="flex flex-col gap-4 px-4 pb-4">{children}</div>
+          <div className="nx-card-body nx-collapsible-body">{children}</div>
         </div>
       </div>
     </div>

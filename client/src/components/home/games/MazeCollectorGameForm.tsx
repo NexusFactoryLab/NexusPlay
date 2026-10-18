@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Rocket, FolderOpen, Smile, Ghost, Gem } from 'lucide-react'
 import type { FormEvent } from 'react'
 import { TextField } from '../../TextField'
 import { SaveVisibilityModal } from './SaveVisibilityModal'
@@ -7,6 +8,7 @@ import { IconPickerField } from './IconPickerField'
 import { AiGameAssistantPanel } from './AiGameAssistantPanel'
 import { useReportCreateSummary } from './aiDraftContext'
 import { GameFormShell } from './GameFormShell'
+import { FormSection } from './create/FormSection'
 import { AdvancedSettings } from './create/AdvancedSettings'
 import type { GameDraft } from '../../../services/ai-game-assistant.service'
 import { OrganizationSelectField } from './create/OrganizationSelectField'
@@ -272,7 +274,8 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
       aiPanel={<AiGameAssistantPanel gameType="MAZE_COLLECTOR" disabled={submitting} onDraftReady={applyAiDraft} />}
     >
       <form className="flex flex-col gap-[16px]" onSubmit={handleSubmit} noValidate>
-        <TextField label="Título del juego" type="text" value={title} disabled={submitting} onChange={setTitle} onBlur={() => {}} />
+        <FormSection icon={Rocket} title="Cuéntanos de tu juego" subtitle="Nombre, portada y el lugar donde vivirá." tone={1}>
+<TextField label="Título del juego" type="text" value={title} disabled={submitting} onChange={setTitle} onBlur={() => {}} />
         <TextField
           label="Descripción"
           type="text"
@@ -289,10 +292,11 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
           disabled={submitting}
           onChange={setCoverImageUrl}
         />
+</FormSection>
 
         <AdvancedSettings summary="Forma, vidas y velocidad">
         <div>
-          <label className="mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="maze-layout">
+          <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="maze-layout">
             Forma del laberinto
           </label>
           <select
@@ -310,9 +314,9 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
           </select>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <label className="mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="maze-lives">
+            <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="maze-lives">
               Vidas
             </label>
             <input
@@ -327,7 +331,7 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="maze-enemy-speed">
+            <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="maze-enemy-speed">
               Velocidad de los enemigos
             </label>
             <input
@@ -344,9 +348,8 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
         </div>
         </AdvancedSettings>
 
-        <div className="rounded-xl border border-border p-4">
-          <p className="mb-2.5 text-[13px] font-semibold text-text-h">Personaje que recolecta</p>
-          <div className="grid grid-cols-2 gap-3">
+        <FormSection icon={Smile} title="Personaje que recolecta" subtitle="Quién recorre el laberinto juntando objetos." tone={2}>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <TextField
               label="Nombre"
               type="text"
@@ -356,7 +359,7 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
               onBlur={() => {}}
             />
             <div>
-              <label className="mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="collector-icon">
+              <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="collector-icon">
                 Ícono
               </label>
               <IconPickerField
@@ -368,11 +371,10 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
               />
             </div>
           </div>
-        </div>
+        </FormSection>
 
-        <div className="rounded-xl border border-border p-4">
-          <p className="mb-2.5 text-[13px] font-semibold text-text-h">Enemigos</p>
-          <div className="grid grid-cols-2 gap-3">
+        <FormSection icon={Ghost} title="Enemigos" subtitle="Quiénes lo persiguen por el laberinto." tone={2}>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <TextField
               label="Nombre"
               type="text"
@@ -382,7 +384,7 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
               onBlur={() => {}}
             />
             <div>
-              <label className="mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="enemy-icon">
+              <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="enemy-icon">
                 Ícono
               </label>
               <IconPickerField
@@ -394,9 +396,10 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
               />
             </div>
           </div>
-        </div>
+        </FormSection>
 
-        <CategorySelectField
+        <FormSection icon={FolderOpen} title="Dónde vivirá" subtitle="Materia y organización para encontrarlo fácil." tone={4}>
+<CategorySelectField
           token={token}
           categories={categories}
           categoryId={categoryId}
@@ -410,21 +413,24 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
         />
 
         <OrganizationSelectField organizations={organizations} value={organizationId} disabled={submitting} onChange={setOrganizationId} />
+</FormSection>
 
-        <div className="flex flex-col gap-3">
+        <FormSection icon={Gem} title="Objetos a recolectar" subtitle="Lo que el personaje junta, con un dato curioso de cada uno." tone={3} bare>
+<div className="nx-items">
           {items.map((item, index) => {
             const Icon = iconForConcept(item.icon)
             return (
-              <div key={index} className="rounded-xl border border-border p-4">
-                <div className="mb-2.5 flex items-center justify-between">
+              <div key={index} className="nx-item">
+                <div className="nx-item-head">
                   <div className="flex items-center gap-2">
                     <Icon className="h-4 w-4" style={{ color: item.color }} strokeWidth={2} />
-                    <p className="text-[13px] font-semibold text-text-h">Objeto {index + 1}</p>
+                    <span className="nx-item-num" aria-hidden="true">{index + 1}</span>
+<p className="nx-item-title">Objeto<span className="sr-only"> {index + 1}</span></p>
                   </div>
                   {items.length > MIN_MAZE_ITEMS && (
                     <button
                       type="button"
-                      className="text-[12px] font-medium text-danger"
+                      className="nx-remove"
                       onClick={() => removeItem(index)}
                       disabled={submitting}
                     >
@@ -442,7 +448,7 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
                     onBlur={() => {}}
                   />
                   <div>
-                    <label className="mb-1.5 block text-[13px] font-medium text-text-h" htmlFor={`item-icon-${index}`}>
+                    <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor={`item-icon-${index}`}>
                       Ícono
                     </label>
                     <IconPickerField
@@ -454,7 +460,7 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
                     />
                   </div>
                   <div>
-                    <label className="mb-1.5 block text-[13px] font-medium text-text-h" htmlFor={`item-color-${index}`}>
+                    <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor={`item-color-${index}`}>
                       Color
                     </label>
                     <input
@@ -485,24 +491,25 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
         {items.length < MAX_MAZE_ITEMS && (
           <button
             type="button"
-            className="self-start rounded-lg border border-dashed border-border px-3.5 py-2 text-[13px] font-medium text-text-h"
+            className="nx-add border border-dashed border-border"
             onClick={addItem}
             disabled={submitting}
           >
             + Agregar objeto
           </button>
         )}
+</FormSection>
 
         {error && (
-          <p className="rounded-lg border border-danger/35 bg-danger/10 px-[13px] py-[11px] text-sm leading-snug text-danger" role="alert">
+          <p className="nx-alert" role="alert">
             {error}
           </p>
         )}
 
-        <div className="nx-sticky-actions flex gap-2">
+        <div className="nx-sticky-actions nx-actions">
           <button
             type="submit"
-            className="rounded-lg px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)] transition-transform hover:not-disabled:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+            className="nx-btn nx-btn-primary"
             style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
             disabled={submitting}
           >
@@ -510,7 +517,7 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
           </button>
           <button
             type="button"
-            className="rounded-lg border border-border px-4 py-2.5 text-[14px] font-medium text-text-h"
+            className="nx-btn nx-btn-secondary border border-border text-text-h"
             onClick={onClose}
             disabled={submitting}
           >

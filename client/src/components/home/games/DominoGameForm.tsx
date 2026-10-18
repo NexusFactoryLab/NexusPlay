@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Rocket, SlidersHorizontal, Puzzle } from 'lucide-react'
 import type { FormEvent } from 'react'
 import { TextField } from '../../TextField'
 import { SaveVisibilityModal } from './SaveVisibilityModal'
@@ -8,6 +9,7 @@ import { AiGameAssistantPanel } from './AiGameAssistantPanel'
 import { useReportCreateSummary } from './aiDraftContext'
 import { GameFormShell } from './GameFormShell'
 import { WizardPhaseNav } from './WizardPhaseNav'
+import { FormSection, PhaseLabel } from './create/FormSection'
 import type { GameDraft } from '../../../services/ai-game-assistant.service'
 import { OrganizationSelectField } from './create/OrganizationSelectField'
 import { CategorySelectField } from './create/CategorySelectField'
@@ -308,12 +310,10 @@ export function DominoGameForm({
       aiPanel={<AiGameAssistantPanel gameType="DOMINO" disabled={submitting} onDraftReady={applyAiDraft} />}
     >
       <form className="flex flex-col gap-[16px]" onSubmit={handleSubmit} noValidate>
-        <p className="text-[11.5px] font-semibold uppercase tracking-wide text-accent">
-          Fase {phase + 1} de {TOTAL_PHASES} · {PHASES[phase].label}
-        </p>
+        <PhaseLabel phase={phase + 1} total={TOTAL_PHASES} label={PHASES[phase].label} />
 
         {phase === 0 && (
-          <div className="flex flex-col gap-[16px] animate-[fade-in-up_0.25s_ease-out_backwards]">
+          <FormSection icon={Rocket} title="Cuéntanos de tu juego" subtitle="Nombre, portada y el lugar donde vivirá." tone={1}>
             <TextField
               label="Título del juego"
               type="text"
@@ -358,13 +358,13 @@ export function DominoGameForm({
               disabled={submitting}
               onChange={setOrganizationId}
             />
-          </div>
+          </FormSection>
         )}
 
         {phase === 1 && (
-          <div className="flex flex-col gap-[16px] animate-[fade-in-up_0.25s_ease-out_backwards]">
+          <FormSection icon={SlidersHorizontal} title="Reglas del juego" subtitle="Ajusta cómo se juega; los valores por defecto funcionan bien." tone={2}>
             <div>
-              <label className="mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="domino-hand-size">
+              <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="domino-hand-size">
                 Fichas que recibe el jugador
               </label>
               <input
@@ -377,26 +377,28 @@ export function DominoGameForm({
                 disabled={submitting}
                 onChange={(event) => setHandSize(Number(event.target.value))}
               />
-              <p className="mt-1 text-[11.5px] text-text">Entre 3 y 12 fichas; el resto queda en el pozo.</p>
+              <p className="nx-hint mt-1 text-[11.5px] text-text">Entre 3 y 12 fichas; el resto queda en el pozo.</p>
             </div>
-          </div>
+          </FormSection>
         )}
 
         {phase === 2 && (
-        <div className="grid grid-cols-1 gap-3 animate-[fade-in-up_0.25s_ease-out_backwards] xl:grid-cols-2">
+        <FormSection icon={Puzzle} title="Conceptos" subtitle="Cada concepto se conecta con otro en la cadena del dominó." tone={3} bare>
+<div className="nx-items">
           {concepts.map((concept, index) => {
             const Icon = iconForConcept(concept.icon)
             return (
-              <div key={index} className="rounded-xl border border-border p-4">
-                <div className="mb-2.5 flex items-center justify-between">
+              <div key={index} className="nx-item">
+                <div className="nx-item-head">
                   <div className="flex items-center gap-2">
                     <Icon className="h-4 w-4" style={{ color: concept.color }} strokeWidth={2} />
-                    <p className="text-[13px] font-semibold text-text-h">Concepto {index + 1}</p>
+                    <span className="nx-item-num" aria-hidden="true">{index + 1}</span>
+<p className="nx-item-title">Concepto<span className="sr-only"> {index + 1}</span></p>
                   </div>
                   {concepts.length > MIN_DOMINO_CONCEPTS && (
                     <button
                       type="button"
-                      className="text-[12px] font-medium text-danger"
+                      className="nx-remove"
                       onClick={() => removeConcept(index)}
                       disabled={submitting}
                     >
@@ -417,7 +419,7 @@ export function DominoGameForm({
                   </div>
                   <div>
                     <label
-                      className="mb-1.5 block text-[13px] font-medium text-text-h"
+                      className="nx-label mb-1.5 block text-[13px] font-medium text-text-h"
                       htmlFor={`concept-icon-${index}`}
                     >
                       Ícono
@@ -432,7 +434,7 @@ export function DominoGameForm({
                   </div>
                   <div>
                     <label
-                      className="mb-1.5 block text-[13px] font-medium text-text-h"
+                      className="nx-label mb-1.5 block text-[13px] font-medium text-text-h"
                       htmlFor={`concept-color-${index}`}
                     >
                       Color
@@ -454,7 +456,7 @@ export function DominoGameForm({
           {concepts.length < MAX_DOMINO_CONCEPTS && (
             <button
               type="button"
-              className="self-start rounded-lg border border-dashed border-border px-3.5 py-2 text-[13px] font-medium text-text-h xl:col-span-2"
+              className="nx-add border border-dashed border-border"
               onClick={addConcept}
               disabled={submitting}
             >
@@ -462,11 +464,12 @@ export function DominoGameForm({
             </button>
           )}
         </div>
+</FormSection>
         )}
 
         {error && (
           <p
-            className="rounded-lg border border-danger/35 bg-danger/10 px-[13px] py-[11px] text-sm leading-snug text-danger"
+            className="nx-alert"
             role="alert"
           >
             {error}
@@ -482,10 +485,10 @@ export function DominoGameForm({
         />
 
         {phase === TOTAL_PHASES - 1 && (
-          <div className="nx-sticky-actions flex gap-2">
+          <div className="nx-sticky-actions nx-actions">
             <button
               type="submit"
-              className="rounded-lg px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)] transition-transform hover:not-disabled:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+              className="nx-btn nx-btn-primary"
               style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
               disabled={submitting}
             >
@@ -493,7 +496,7 @@ export function DominoGameForm({
             </button>
             <button
               type="button"
-              className="rounded-lg border border-border px-4 py-2.5 text-[14px] font-medium text-text-h"
+              className="nx-btn nx-btn-secondary border border-border text-text-h"
               onClick={goToPreviousPhase}
               disabled={submitting}
             >
@@ -501,7 +504,7 @@ export function DominoGameForm({
             </button>
             <button
               type="button"
-              className="rounded-lg border border-border px-4 py-2.5 text-[14px] font-medium text-text-h"
+              className="nx-btn nx-btn-secondary border border-border text-text-h"
               onClick={onClose}
               disabled={submitting}
             >

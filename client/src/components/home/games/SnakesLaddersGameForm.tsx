@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Rocket, FolderOpen, Dices, ArrowUpRight, ArrowDownRight, HelpCircle } from 'lucide-react'
 import type { FormEvent } from 'react'
 import { TextField } from '../../TextField'
 import { SaveVisibilityModal } from './SaveVisibilityModal'
@@ -6,6 +7,7 @@ import { ImageUploadField } from './ImageUploadField'
 import { AiGameAssistantPanel } from './AiGameAssistantPanel'
 import { useReportCreateSummary } from './aiDraftContext'
 import { GameFormShell } from './GameFormShell'
+import { FormSection } from './create/FormSection'
 import type { GameDraft } from '../../../services/ai-game-assistant.service'
 import { OrganizationSelectField } from './create/OrganizationSelectField'
 import { CategorySelectField } from './create/CategorySelectField'
@@ -313,7 +315,8 @@ export function SnakesLaddersGameForm({ onClose, onCreated, onBack, onCategoryCr
       aiPanel={<AiGameAssistantPanel gameType="SNAKES_LADDERS" disabled={submitting} onDraftReady={applyAiDraft} />}
     >
       <form className="flex flex-col gap-[16px]" onSubmit={handleSubmit} noValidate>
-        <TextField label="Título del juego" type="text" value={title} disabled={submitting} onChange={setTitle} onBlur={() => {}} />
+        <FormSection icon={Rocket} title="Cuéntanos de tu juego" subtitle="Nombre, portada y el lugar donde vivirá." tone={1}>
+<TextField label="Título del juego" type="text" value={title} disabled={submitting} onChange={setTitle} onBlur={() => {}} />
         <TextField
           label="Descripción"
           type="text"
@@ -330,10 +333,12 @@ export function SnakesLaddersGameForm({ onClose, onCreated, onBack, onCategoryCr
           disabled={submitting}
           onChange={setCoverImageUrl}
         />
+</FormSection>
 
-        <div className="grid grid-cols-2 gap-3">
+        <FormSection icon={Dices} title="Tablero y turnos" subtitle="Tamaño del tablero y tiempo por turno." tone={2}>
+<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <label className="mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="sl-board-size">
+            <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="sl-board-size">
               Casillas del tablero
             </label>
             <input
@@ -348,7 +353,7 @@ export function SnakesLaddersGameForm({ onClose, onCreated, onBack, onCategoryCr
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="sl-turn-duration">
+            <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="sl-turn-duration">
               Segundos por turno
             </label>
             <input
@@ -362,9 +367,10 @@ export function SnakesLaddersGameForm({ onClose, onCreated, onBack, onCategoryCr
               onChange={(event) => setTurnDurationSeconds(Number(event.target.value))}
             />
           </div>
-        </div>
+        </div></FormSection>
 
-        <CategorySelectField
+        <FormSection icon={FolderOpen} title="Dónde vivirá" subtitle="Materia y organización para encontrarlo fácil." tone={4}>
+<CategorySelectField
           token={token}
           categories={categories}
           categoryId={categoryId}
@@ -378,6 +384,7 @@ export function SnakesLaddersGameForm({ onClose, onCreated, onBack, onCategoryCr
         />
 
         <OrganizationSelectField organizations={organizations} value={organizationId} disabled={submitting} onChange={setOrganizationId} />
+</FormSection>
 
         <LinksSection
           title="Escaleras (innovaciones sostenibles)"
@@ -403,18 +410,17 @@ export function SnakesLaddersGameForm({ onClose, onCreated, onBack, onCategoryCr
           onOptionChange={(i, oi, v) => updateLinkOption(snakes, setSnakes, i, oi, v)}
         />
 
-        <div className="flex flex-col gap-3">
-          <p className="text-[13px] font-semibold text-text-h">
-            Retos de casillas normales (mínimo {MIN_CELL_QUESTIONS})
-          </p>
+        <FormSection icon={HelpCircle} title="Retos de casillas normales" subtitle={`Preguntas para el resto del tablero (mínimo ${MIN_CELL_QUESTIONS}).`} tone={1} bare>
+          <div className="nx-items">
           {cellQuestions.map((question, index) => (
-            <div key={index} className="rounded-xl border border-border p-4">
-              <div className="mb-2.5 flex items-center justify-between">
-                <p className="text-[13px] font-semibold text-text-h">Reto {index + 1}</p>
+            <div key={index} className="nx-item">
+              <div className="nx-item-head">
+                <span className="nx-item-num" aria-hidden="true">{index + 1}</span>
+<p className="nx-item-title">Reto<span className="sr-only"> {index + 1}</span></p>
                 {cellQuestions.length > MIN_CELL_QUESTIONS && (
                   <button
                     type="button"
-                    className="text-[12px] font-medium text-danger"
+                    className="nx-remove"
                     onClick={() => setCellQuestions(cellQuestions.filter((_, i) => i !== index))}
                     disabled={submitting}
                   >
@@ -462,24 +468,25 @@ export function SnakesLaddersGameForm({ onClose, onCreated, onBack, onCategoryCr
           ))}
           <button
             type="button"
-            className="self-start rounded-lg border border-dashed border-border px-3.5 py-2 text-[13px] font-medium text-text-h"
+            className="nx-add border border-dashed border-border"
             onClick={() => setCellQuestions([...cellQuestions, emptyCellQuestion(2)])}
             disabled={submitting}
           >
             + Agregar reto de casilla
           </button>
-        </div>
+          </div>
+        </FormSection>
 
         {error && (
-          <p className="rounded-lg border border-danger/35 bg-danger/10 px-[13px] py-[11px] text-sm leading-snug text-danger" role="alert">
+          <p className="nx-alert" role="alert">
             {error}
           </p>
         )}
 
-        <div className="nx-sticky-actions flex gap-2">
+        <div className="nx-sticky-actions nx-actions">
           <button
             type="submit"
-            className="rounded-lg px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)] transition-transform hover:not-disabled:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+            className="nx-btn nx-btn-primary"
             style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
             disabled={submitting}
           >
@@ -487,7 +494,7 @@ export function SnakesLaddersGameForm({ onClose, onCreated, onBack, onCategoryCr
           </button>
           <button
             type="button"
-            className="rounded-lg border border-border px-4 py-2.5 text-[14px] font-medium text-text-h"
+            className="nx-btn nx-btn-secondary border border-border text-text-h"
             onClick={onClose}
             disabled={submitting}
           >
@@ -520,20 +527,27 @@ function LinksSection({
   onChange: (index: number, patch: Partial<LinkDraft>) => void
   onOptionChange: (index: number, optionIndex: number, value: string) => void
 }) {
-  const borderColor = accent === 'emerald' ? 'border-emerald-400/40' : 'border-rose-400/40'
+  const isLadder = accent === 'emerald'
   return (
-    <div className="flex flex-col gap-3">
-      <p className="text-[13px] font-semibold text-text-h">{title}</p>
+    <FormSection
+      icon={isLadder ? ArrowUpRight : ArrowDownRight}
+      title={title}
+      subtitle={isLadder ? 'Cada escalera exige un reto para subir.' : 'Cada serpiente da una oportunidad de recuperación.'}
+      tone={isLadder ? 3 : 4}
+      bare
+    >
+      <div className="nx-items">
       {links.map((link, index) => (
-        <div key={index} className={`rounded-xl border ${borderColor} p-4`}>
-          <div className="mb-2.5 flex items-center justify-between">
-            <p className="text-[13px] font-semibold text-text-h">
-              {index + 1}. de casilla {link.from} a {link.to}
+        <div key={index} className="nx-item" data-kind={accent}>
+          <div className="nx-item-head">
+            <span className="nx-item-num" aria-hidden="true">{index + 1}</span>
+            <p className="nx-item-title">
+              De casilla {link.from} a {link.to}
             </p>
             {links.length > 0 && (
               <button
                 type="button"
-                className="text-[12px] font-medium text-danger"
+                className="nx-remove"
                 onClick={() => onRemove(index)}
                 disabled={submitting}
               >
@@ -591,13 +605,14 @@ function LinksSection({
       ))}
       <button
         type="button"
-        className="self-start rounded-lg border border-dashed border-border px-3.5 py-2 text-[13px] font-medium text-text-h"
+        className="nx-add border border-dashed border-border"
         onClick={onAdd}
         disabled={submitting}
       >
         + Agregar
       </button>
-    </div>
+      </div>
+    </FormSection>
   )
 }
 
@@ -622,9 +637,9 @@ function OptionsEditor({
 }) {
   return (
     <div className="mt-3 flex flex-col gap-2">
-      <p className="text-[12px] font-medium text-text-h">Opciones (marca la correcta)</p>
+      <p className="nx-label text-[12px] font-medium text-text-h">Opciones (marca la correcta)</p>
       {options.map((option, optionIndex) => (
-        <div key={optionIndex} className="flex items-center gap-2">
+        <div key={optionIndex} className="nx-option">
           <input
             type="radio"
             name={groupName}
@@ -642,7 +657,7 @@ function OptionsEditor({
           {options.length > 2 && (
             <button
               type="button"
-              className="text-[11px] font-medium text-danger"
+              className="nx-remove nx-remove-sm"
               onClick={() => onRemoveOption(optionIndex)}
               disabled={disabled}
             >
@@ -654,7 +669,7 @@ function OptionsEditor({
       {options.length < 6 && (
         <button
           type="button"
-          className="self-start text-[11.5px] font-medium text-accent"
+          className="nx-add-inline"
           onClick={onAddOption}
           disabled={disabled}
         >

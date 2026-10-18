@@ -2839,27 +2839,17 @@ code {
   .nx-just-filled { animation: none; }
 }
 
-/* Salida de la etapa actual y entrada lateral del botón de IA al pasar a
- * llenado manual: el chat "se encoge" hacia la columna lateral. */
+/* Salida de la etapa actual al cambiar entre Con IA y Manual. */
 @keyframes nx-stage-out {
   to { opacity: 0; transform: translateY(-8px) scale(0.98); }
-}
-
-@keyframes nx-slide-in {
-  from { opacity: 0; transform: translateX(28px) scale(0.9); }
-  to { opacity: 1; transform: translateX(0) scale(1); }
 }
 
 .nx-stage-out {
   animation: nx-stage-out 0.22s ease-in forwards;
 }
 
-.nx-slide-in {
-  animation: nx-slide-in 0.55s cubic-bezier(0.34, 1.3, 0.64, 1) 0.15s backwards;
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .nx-stage-out, .nx-slide-in { animation: none; }
+  .nx-stage-out { animation: none; }
 }
 
 /* Botón "volver" visible (con flecha que se desliza) y selector Con IA / Manual
@@ -3093,6 +3083,732 @@ code {
   .nx-celebrate[data-celebrate='true'] .nx-celebrate-icon,
   .nx-celebrate[data-celebrate='true'] .nx-celebrate-icon::after { animation: none; }
   .nx-item-out, .nx-form-progress-bar > span { transition: none; }
+}
+
+/* ============================================================
+ * Formulario manual de creación (issue #52): tarjetas por sección, campos
+ * amables, elementos numerados con color, barra de avance fija y botones
+ * con degradado. Todo cuelga de `.nx-form` y de clases `nx-*` propias (no
+ * de las combinaciones `rounded-* border-border` que reescriben Fantasía y
+ * Pradera), con variables CSS para que funcione en claro, oscuro y ambos
+ * temas. Solo transform/opacity animan; prefers-reduced-motion lo apaga.
+ * ============================================================ */
+.nx-form {
+  --nx-card-bg: var(--surface);
+  --nx-solid: var(--surface);
+  --nx-card-border: color-mix(in srgb, var(--border) 85%, transparent);
+  --nx-card-shadow: 0 1px 0 color-mix(in srgb, #fff 55%, transparent) inset,
+    0 14px 34px -20px color-mix(in srgb, var(--accent) 45%, transparent),
+    0 2px 6px -3px rgba(20, 18, 28, 0.12);
+  --nx-field-bg: var(--bg);
+  --nx-bar-bg: color-mix(in srgb, var(--surface) 92%, transparent);
+  --nx-ring: color-mix(in srgb, var(--accent) 24%, transparent);
+  --nx-soft: color-mix(in srgb, var(--accent) 9%, transparent);
+  --nx-ok: #1c9a68;
+  --nx-title-font: var(--fx-display, var(--mw-display, var(--heading)));
+  min-width: 0;
+}
+:root[data-theme='dark'] .nx-form,
+:root[data-theme='fantasy'] .nx-form {
+  --nx-ok: #52d6a0;
+  --nx-card-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 16px 34px -20px rgba(0, 0, 0, 0.85);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light'], [data-theme='kids'], [data-theme='meadow']) .nx-form {
+    --nx-ok: #52d6a0;
+    --nx-card-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 16px 34px -20px rgba(0, 0, 0, 0.85);
+  }
+}
+[data-theme='fantasy'] .nx-form {
+  --nx-card-bg: linear-gradient(180deg, rgba(58, 51, 98, 0.94), rgba(39, 33, 72, 0.96));
+  --nx-card-border: rgba(255, 214, 140, 0.34);
+  --nx-solid: #2a2650;
+  --nx-field-bg: #1d1a29;
+  --nx-bar-bg: rgba(31, 26, 58, 0.94);
+}
+[data-theme='meadow'] .nx-form {
+  --nx-card-bg: #fffdf8;
+  --nx-card-border: #e2cfb1;
+  --nx-solid: #fffdf8;
+  --nx-card-shadow: 0 3px 0 #ecd9b9, 0 16px 30px -18px rgba(99, 128, 155, 0.6);
+  --nx-field-bg: #ffffff;
+  --nx-bar-bg: rgba(255, 253, 248, 0.95);
+  --nx-ok: #1c9a68;
+}
+[data-theme='kids'] .nx-form {
+  --nx-card-shadow: 0 3px 0 #ffe0a3, 0 14px 28px -18px rgba(255, 122, 26, 0.5);
+}
+
+/* Formulario: más aire entre secciones. */
+.nx-form > form {
+  gap: 22px;
+}
+.nx-form > * + * {
+  margin-top: 0;
+}
+
+/* ---- Tarjeta de sección ---- */
+@keyframes nx-card-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+.nx-card {
+  --nx-tone: var(--accent);
+  position: relative;
+  min-width: 0;
+  padding: 24px 24px 26px;
+  border: 1px solid var(--nx-card-border);
+  border-radius: 24px;
+  background: var(--nx-card-bg);
+  box-shadow: var(--nx-card-shadow);
+  animation: nx-card-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.nx-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  border-radius: 24px 24px 0 0;
+  background: linear-gradient(90deg, var(--nx-tone), color-mix(in srgb, var(--nx-tone) 20%, transparent) 75%);
+  pointer-events: none;
+}
+.nx-card[data-tone='2'] { --nx-tone: var(--accent-2); }
+.nx-card[data-tone='3'] { --nx-tone: #14b8a6; }
+.nx-card[data-tone='4'] { --nx-tone: #f59e0b; }
+.nx-card:nth-child(2) { animation-delay: 70ms; }
+.nx-card:nth-child(3) { animation-delay: 140ms; }
+.nx-card:nth-child(n + 4) { animation-delay: 200ms; }
+.nx-card-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.nx-card-icon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 15px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--nx-tone), color-mix(in srgb, var(--nx-tone) 55%, var(--accent-2)));
+  box-shadow: 0 10px 20px -10px var(--nx-tone), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+.nx-card-title {
+  margin: 0;
+  font-family: var(--nx-title-font);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--text-h);
+  overflow-wrap: anywhere;
+}
+.nx-card-sub {
+  margin: 3px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text);
+}
+.nx-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+  counter-reset: nx-item;
+}
+.nx-card-bare {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.nx-card-bare::before { display: none; }
+.nx-card-bare > .nx-card-head { margin-bottom: 14px; padding-inline: 2px; }
+
+/* Ajustes avanzados como tarjeta plegable. */
+.nx-collapsible { padding: 18px 24px; }
+.nx-collapsible-btn {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  color: var(--text-h);
+  cursor: pointer;
+  border-radius: 14px;
+}
+.nx-collapsible-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.nx-collapsible-btn:hover .nx-card-icon { transform: scale(1.06); }
+.nx-collapsible .nx-card-icon { transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.nx-collapsible-body { padding: 20px 6px 6px; }
+
+/* ---- Campos ---- */
+.nx-form .nx-field { gap: 8px; }
+.nx-form .nx-label {
+  line-height: 1.3;
+  font-size: 13.5px;
+  font-weight: 650;
+  letter-spacing: 0.005em;
+  color: var(--text-h);
+}
+.nx-form .nx-hint { font-size: 12.5px; line-height: 1.4; color: var(--text); }
+.nx-form .nx-error { font-size: 12.5px; font-weight: 600; }
+.nx-form .nx-feedback { animation: nx-card-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+.nx-form .nx-example-btn {
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: var(--nx-soft);
+  text-decoration: none;
+  transition: background-color 0.2s, transform 0.2s;
+}
+.nx-form .nx-example-btn:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); transform: translateY(-1px); }
+
+.nx-form .nx-input {
+  min-height: 50px;
+  border-width: 1.5px;
+  border-radius: 15px;
+  background: var(--nx-field-bg);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.nx-form .nx-input:hover:not(:focus-within) {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+.nx-form .nx-input:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--nx-ring);
+}
+.nx-form .nx-input:has(input[aria-invalid='true']) { border-color: var(--color-danger); }
+.nx-form .nx-input:has(input[aria-invalid='true']):focus-within {
+  border-color: var(--color-danger);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-danger) 22%, transparent);
+}
+.nx-form .nx-input input {
+  background: transparent;
+  box-shadow: none;
+  padding: 12px 15px;
+  font-size: 15.5px;
+}
+.nx-form [data-nx-field][data-nx-done='true'] .nx-input:not(:focus-within) {
+  border-color: color-mix(in srgb, var(--nx-ok) 55%, var(--border));
+}
+.nx-form [data-nx-field][data-nx-invalid='true'] .nx-input { border-color: var(--color-danger); }
+
+/* Campos nativos de los formularios (number, select, textarea, text). */
+.nx-form :is(input, textarea, select).border {
+  min-height: 48px;
+  padding: 12px 15px;
+  border-width: 1.5px;
+  border-radius: 15px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.nx-form :is(input, textarea, select).border:hover:not(:focus, :disabled) {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+.nx-form :is(input, textarea, select).border:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--nx-ring);
+}
+.nx-form :is(input, textarea, select).border:disabled { opacity: 0.6; }
+.nx-form input[type='radio'],
+.nx-form input[type='checkbox'] {
+  width: 19px;
+  height: 19px;
+  flex-shrink: 0;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
+/* Check de "campo listo" junto a la etiqueta (reemplaza al anterior). */
+.nx-form [data-nx-field][data-nx-done='true'] > label::after,
+.nx-form [data-nx-field][data-nx-done='true'] > div:first-child > label::after {
+  content: '\2713';
+  width: 17px;
+  height: 17px;
+  margin-left: 8px;
+  background: var(--nx-ok);
+  font-size: 11px;
+  line-height: 17px;
+  vertical-align: 1px;
+}
+
+/* Zona de imagen. */
+.nx-form .nx-drop {
+  height: auto;
+  min-height: 118px;
+  gap: 8px;
+  border: 2px dashed color-mix(in srgb, var(--accent) 38%, var(--border));
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--accent) 5%, var(--nx-solid));
+  box-shadow: none;
+  color: var(--text);
+  transition: border-color 0.2s, background-color 0.2s, transform 0.2s;
+}
+.nx-form .nx-drop svg { width: 28px; height: 28px; color: var(--accent); }
+.nx-form .nx-drop:hover:not(:disabled) {
+  border-style: solid;
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 11%, var(--nx-solid));
+  transform: translateY(-1px);
+}
+.nx-form .nx-drop:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.nx-form [data-nx-invalid='true'] .nx-drop[data-nx-image-missing='true'] {
+  border-color: color-mix(in srgb, var(--color-danger) 65%, transparent);
+  background: color-mix(in srgb, var(--color-danger) 7%, transparent);
+}
+.nx-form [data-nx-invalid='true'] .nx-drop[data-nx-image-missing='true'] svg { color: var(--color-danger); }
+.nx-form .nx-drop[class*='border-accent'] {
+  border-style: solid;
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.nx-form .nx-image-preview {
+  height: 150px;
+  border-radius: 18px;
+  border: 1px solid var(--nx-card-border);
+  box-shadow: 0 10px 22px -14px rgba(20, 18, 28, 0.5);
+}
+.nx-form .nx-image-remove {
+  width: 30px;
+  height: 30px;
+  transition: transform 0.2s, background-color 0.2s;
+}
+.nx-form .nx-image-remove:hover { transform: scale(1.1); background: var(--color-danger); }
+
+/* ---- Elementos repetidos: tarjetas numeradas con color ---- */
+.nx-items {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+  counter-reset: nx-item;
+}
+.nx-item {
+  --nx-hue: var(--accent);
+  counter-increment: nx-item;
+  position: relative;
+  min-width: 0;
+  padding: 20px 20px 22px 24px;
+  border: 1px solid var(--nx-card-border);
+  border-radius: 22px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--nx-hue) 10%, transparent), transparent 46%), var(--nx-card-bg);
+  box-shadow: var(--nx-card-shadow);
+  animation: nx-card-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.nx-item::before {
+  content: '';
+  position: absolute;
+  inset: 14px auto 14px 0;
+  width: 5px;
+  border-radius: 0 6px 6px 0;
+  background: var(--nx-hue);
+}
+.nx-item:nth-child(6n + 2) { --nx-hue: var(--accent-2); }
+.nx-item:nth-child(6n + 3) { --nx-hue: #14b8a6; }
+.nx-item:nth-child(6n + 4) { --nx-hue: #f59e0b; }
+.nx-item:nth-child(6n + 5) { --nx-hue: #3b82f6; }
+.nx-item:nth-child(6n + 6) { --nx-hue: #22c55e; }
+.nx-item[data-kind='emerald'] { --nx-hue: #10b981; }
+.nx-item[data-kind='rose'] { --nx-hue: #f43f5e; }
+.nx-item:nth-child(2) { animation-delay: 60ms; }
+.nx-item:nth-child(3) { animation-delay: 120ms; }
+.nx-item:nth-child(4) { animation-delay: 180ms; }
+.nx-item:nth-child(n + 5) { animation-delay: 220ms; }
+.nx-item-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.nx-item-head > div:not(.nx-remove) {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.nx-item-num,
+.nx-item-head:not(:has(.nx-item-num))::before {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  font-family: var(--nx-title-font);
+  font-size: 16px;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(135deg, var(--nx-hue), color-mix(in srgb, var(--nx-hue) 60%, #000));
+  box-shadow: 0 8px 16px -8px var(--nx-hue);
+}
+.nx-item-head:not(:has(.nx-item-num))::before { content: counter(nx-item); }
+.nx-item-num { order: -1; }
+.nx-item-title {
+  flex: 1;
+  margin: 0;
+  min-width: 0;
+  font-size: 15.5px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text-h);
+  overflow-wrap: anywhere;
+}
+.nx-remove {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  margin-left: auto;
+  padding: 7px 14px;
+  border: 1px solid color-mix(in srgb, var(--color-danger) 32%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-danger) 9%, transparent);
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--color-danger);
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s;
+}
+.nx-remove:hover:not(:disabled) { background: color-mix(in srgb, var(--color-danger) 18%, transparent); transform: translateY(-1px); }
+.nx-remove:focus-visible { outline: 2px solid var(--color-danger); outline-offset: 2px; }
+.nx-remove:disabled { opacity: 0.5; cursor: not-allowed; }
+.nx-remove-sm { padding: 4px 10px; font-size: 11.5px; }
+
+/* "+ Agregar": invitación grande en lugar de un botón perdido. */
+.nx-form .nx-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 56px;
+  padding: 14px 18px;
+  border: 2px dashed color-mix(in srgb, var(--accent) 45%, var(--border));
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--accent) 7%, var(--nx-solid));
+  box-shadow: none;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--accent) 72%, var(--text-h));
+  cursor: pointer;
+  transition: border-color 0.2s, background-color 0.2s, transform 0.2s;
+}
+.nx-form .nx-add:hover:not(:disabled) {
+  border-style: solid;
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--nx-solid));
+  transform: translateY(-2px);
+  filter: none;
+}
+.nx-form .nx-add:active:not(:disabled) { transform: scale(0.99); }
+.nx-form .nx-add:focus-visible,
+.nx-form .nx-add-inline:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.nx-form .nx-add:disabled { opacity: 0.55; cursor: not-allowed; }
+.nx-add-row { display: flex; flex-wrap: wrap; gap: 12px; }
+.nx-add-row > .nx-add { flex: 1 1 180px; width: auto; }
+.nx-add-inline {
+  align-self: flex-start;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--nx-soft);
+  font-size: 12.5px;
+  font-weight: 650;
+  color: color-mix(in srgb, var(--accent) 72%, var(--text-h));
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s;
+}
+.nx-add-inline:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 18%, transparent); transform: translateY(-1px); }
+
+/* Opciones de respuesta (radio + texto + quitar). */
+.nx-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 16px;
+  transition: background-color 0.2s;
+}
+.nx-option:has(input[type='radio']:checked) { background: color-mix(in srgb, var(--nx-ok) 12%, transparent); }
+.nx-option input[type='text'] { flex: 1; min-width: 0; }
+
+/* Verdadera / Falsa */
+.nx-form .nx-answer { padding: 4px; border-radius: 16px; background: var(--nx-field-bg); }
+.nx-form .nx-answer button { min-height: 40px; padding-inline: 16px; border-radius: 12px; }
+.nx-counts { margin: -4px 2px 0; font-size: 13px; }
+
+/* Escenario del laberinto V/F: siempre oscuro, como el juego. */
+.nx-scenario {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 22px;
+  border: 1px solid rgba(120, 200, 255, 0.28);
+  border-radius: 24px;
+  color: #e8f3ff;
+  background: radial-gradient(120% 150% at 0% 0%, #1d2d78 0%, #0b1033 55%, #070914 100%);
+  box-shadow: 0 18px 38px -22px rgba(8, 16, 60, 0.95);
+  animation: nx-card-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.nx-form .nx-subbox {
+  padding: 18px 20px;
+  border-width: 1.5px;
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+.nx-form .nx-subbox input.border { background: var(--nx-field-bg); }
+
+/* ---- Cabecera de fase ---- */
+.nx-phase {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 9px;
+  margin: 0;
+  padding: 7px 15px 7px 11px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  border-radius: 999px;
+  background: var(--nx-soft);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--accent) 70%, var(--text-h));
+}
+.nx-phase-name { font-weight: 600; color: var(--text); }
+.nx-phase-dots { display: inline-flex; gap: 4px; }
+.nx-phase-dots i {
+  width: 18px;
+  height: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 25%, transparent);
+  transition: background-color 0.3s;
+}
+.nx-phase-dots i[data-on='true'] { background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+
+/* ---- Avance, aviso y resumen ---- */
+.nx-progress-card {
+  position: relative;
+  z-index: 25;
+  margin-bottom: 22px;
+  padding: 14px 18px 16px;
+  border: 1px solid var(--nx-card-border);
+  border-radius: 22px;
+  background: var(--nx-bar-bg);
+  box-shadow: var(--nx-card-shadow);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.nx-progress-card[data-complete='true'] { border-color: color-mix(in srgb, var(--nx-ok) 55%, transparent); }
+.nx-progress-card::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border: 2px solid var(--nx-ok);
+  border-radius: 24px;
+  opacity: 0;
+  pointer-events: none;
+}
+.nx-progress-card[data-celebrate='true']::after { animation: nx-celebrate-glow 1s ease-out; }
+@keyframes nx-celebrate-glow {
+  0% { opacity: 0.9; transform: scale(0.99); }
+  100% { opacity: 0; transform: scale(1.04); }
+}
+@media (min-width: 640px) {
+  .nx-progress-card { position: sticky; top: 8px; }
+}
+.nx-progress-row { display: flex; align-items: center; gap: 14px; }
+.nx-progress-icon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: 0 10px 20px -10px var(--accent), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+.nx-progress-card[data-complete='true'] .nx-progress-icon {
+  background: linear-gradient(135deg, var(--nx-ok), color-mix(in srgb, var(--nx-ok) 55%, var(--accent)));
+}
+.nx-progress-title {
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--nx-title-font);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--text-h);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nx-progress-title[data-empty='true'] { font-weight: 600; color: var(--text); }
+.nx-progress-sub {
+  margin: 2px 0 0;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nx-progress-chip {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 13px;
+  border-radius: 999px;
+  background: var(--nx-soft);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+.nx-progress-chip[data-complete='true'] {
+  background: color-mix(in srgb, var(--nx-ok) 16%, transparent);
+  color: var(--nx-ok);
+}
+.nx-progress-card .nx-form-progress-bar {
+  height: 7px;
+  margin-top: 13px;
+  background: color-mix(in srgb, var(--text) 18%, transparent);
+}
+.nx-progress-card[data-complete='true'] .nx-form-progress-bar > span {
+  background: linear-gradient(90deg, var(--nx-ok), color-mix(in srgb, var(--nx-ok) 60%, var(--accent)));
+}
+/* La barra de acciones flotante ocupa el borde inferior: el aviso "Desliza" sobra. */
+.create-game-layout:has(.nx-form:not(.hidden) .nx-actions) [data-scroll-hint] { display: none; }
+.nx-notice,
+.nx-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 22px;
+  padding: 14px 18px;
+  border-radius: 20px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-h);
+}
+.nx-notice {
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 14%, transparent), color-mix(in srgb, var(--accent-2) 10%, transparent));
+}
+.nx-notice-close {
+  flex-shrink: 0;
+  padding: 3px;
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.nx-notice-close:hover { background: var(--nx-soft); color: var(--text-h); }
+.nx-summary {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  border: 1px solid var(--nx-card-border);
+  background: var(--nx-soft);
+  font-size: 13px;
+}
+
+/* ---- Botones ---- */
+.nx-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 50px;
+  padding: 0 24px;
+  border-radius: 16px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s, filter 0.2s;
+}
+.nx-btn:disabled { cursor: not-allowed; opacity: 0.6; }
+.nx-btn:focus-visible { outline: 3px solid var(--nx-ring); outline-offset: 2px; }
+.nx-btn-primary {
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: 0 14px 26px -12px var(--accent), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+.nx-btn-primary:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.06); }
+.nx-btn-primary:active:not(:disabled) { transform: translateY(0) scale(0.98); }
+.nx-btn-secondary:hover:not(:disabled) { transform: translateY(-1px); }
+.nx-btn-secondary { background: var(--nx-card-bg); }
+
+/* Barra de acciones: siempre a la vista, como una píldora flotante. */
+.nx-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.nx-actions.nx-sticky-actions {
+  position: sticky;
+  bottom: 10px;
+  z-index: 30;
+  margin-inline: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--nx-card-border);
+  border-radius: 22px;
+  background: var(--nx-bar-bg);
+  box-shadow: var(--nx-card-shadow), 0 -8px 24px -16px rgba(20, 18, 28, 0.35);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.nx-actions > .nx-back,
+.nx-actions > .nx-btn-secondary { order: 1; }
+.nx-actions > .nx-actions-hint {
+  order: 2;
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: right;
+}
+.nx-actions > .nx-btn-primary { order: 3; margin-left: auto; min-width: 150px; }
+.nx-actions > .nx-actions-hint + .nx-btn-primary { margin-left: 0; }
+@media (max-width: 520px) {
+  .nx-actions > .nx-btn-primary { flex: 1 1 100%; order: 0; }
+  .nx-actions > .nx-actions-hint { display: none; }
+}
+
+/* Alerta de error del formulario. */
+.nx-alert {
+  padding: 13px 16px;
+  border: 1px solid color-mix(in srgb, var(--color-danger) 38%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--color-danger);
+  animation: nx-card-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+/* Celular primero: menos relleno y sin desbordes. */
+@media (max-width: 639px) {
+  .nx-card { padding: 18px 16px 20px; border-radius: 20px; }
+  .nx-collapsible { padding: 14px 16px; }
+  .nx-item { padding: 16px 14px 18px 18px; border-radius: 18px; }
+  .nx-card-head { margin-bottom: 16px; }
+  .nx-card-icon { width: 40px; height: 40px; border-radius: 13px; }
+  .nx-progress-card { padding: 12px 14px 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nx-card, .nx-item, .nx-scenario, .nx-alert, .nx-form .nx-feedback,
+  .nx-progress-card[data-celebrate='true']::after { animation: none; }
+  .nx-btn, .nx-form .nx-add, .nx-form .nx-drop, .nx-remove, .nx-add-inline, .nx-form .nx-input,
+  .nx-form :is(input, textarea, select).border, .nx-collapsible .nx-card-icon,
+  .nx-form .nx-example-btn, .nx-phase-dots i, .nx-option { transition: none; }
+  .nx-btn:hover, .nx-form .nx-add:hover, .nx-form .nx-drop:hover, .nx-remove:hover,
+  .nx-add-inline:hover, .nx-form .nx-example-btn:hover, .nx-collapsible-btn:hover .nx-card-icon { transform: none; }
 }
 
 /* ============================================================

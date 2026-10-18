@@ -50,12 +50,12 @@ export function TextField({
   const shownPlaceholder = placeholder ?? (example ? `Ej. ${example}` : undefined)
 
   return (
-    <div className="flex flex-col gap-[7px]" data-nx-field>
-      <label className="text-sm font-medium text-text-h" htmlFor={id}>
+    <div className="nx-field flex flex-col gap-[7px]" data-nx-field>
+      <label className="nx-label text-sm font-medium text-text-h" htmlFor={id}>
         {label}
       </label>
       <div
-        className={`flex items-center rounded-lg border bg-bg transition-[border-color,box-shadow] ${
+        className={`nx-input flex items-center rounded-lg border bg-bg transition-[border-color,box-shadow] ${
           error
             ? 'border-danger focus-within:ring-3 focus-within:ring-danger/15'
             : 'border-border focus-within:border-accent focus-within:ring-3 focus-within:ring-accent/10'
@@ -99,9 +99,9 @@ export function TextField({
           {feedback.text}
         </p>
       )}
-      {hint && !error && !feedback && <p className="text-[12px] leading-snug text-text">{hint}</p>}
+      {hint && !error && !feedback && <p className="nx-hint text-[12px] leading-snug text-text">{hint}</p>}
       {error && (
-        <p className="text-[13px] leading-tight text-danger" id={errorId}>
+        <p className="nx-error text-[13px] leading-tight text-danger" id={errorId}>
           {error}
         </p>
       )}

@@ -21,10 +21,10 @@ type FormFieldProps = {
 export function FormField({ label, htmlFor, hint, tooltip, error, children }: FormFieldProps) {
   const LabelTag = htmlFor ? 'label' : 'p'
   return (
-    <div className="flex flex-col gap-1.5" data-nx-field>
+    <div className="nx-field flex flex-col gap-1.5" data-nx-field>
       <div className="flex items-center gap-1.5">
         <LabelTag
-          className="text-[13px] font-medium text-text-h"
+          className="nx-label text-[13px] font-medium text-text-h"
           {...(htmlFor ? { htmlFor } : {})}
         >
           {label}
@@ -36,9 +36,9 @@ export function FormField({ label, htmlFor, hint, tooltip, error, children }: Fo
         )}
       </div>
       {children}
-      {hint && !error && <p className="text-[12px] leading-snug text-text">{hint}</p>}
+      {hint && !error && <p className="nx-hint text-[12px] leading-snug text-text">{hint}</p>}
       {error && (
-        <p className="text-[12.5px] leading-tight text-danger" role="alert">
+        <p className="nx-error text-[12.5px] leading-tight text-danger" role="alert">
           {error}
         </p>
       )}

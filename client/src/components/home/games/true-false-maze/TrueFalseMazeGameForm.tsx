@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Check, ExternalLink, X } from 'lucide-react'
+import { Check, ExternalLink, X, Rocket, FolderOpen, ListChecks } from 'lucide-react'
 import { TextField } from '../../../TextField'
 import { SaveVisibilityModal } from '../SaveVisibilityModal'
 import { ImageUploadField } from '../ImageUploadField'
 import { AiGameAssistantPanel } from '../AiGameAssistantPanel'
 import { useReportCreateSummary } from '../aiDraftContext'
 import { GameFormShell } from '../GameFormShell'
+import { FormSection } from '../create/FormSection'
 import { AdvancedSettings } from '../create/AdvancedSettings'
 import { OrganizationSelectField } from '../create/OrganizationSelectField'
 import { CategorySelectField } from '../create/CategorySelectField'
@@ -245,7 +246,7 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
       aiPanel={<AiGameAssistantPanel gameType="TRUE_FALSE_MAZE" disabled={submitting} onDraftReady={applyAiDraft} />}
     >
       <form className="flex flex-col gap-[16px]" onSubmit={handleSubmit} noValidate>
-        <div className="flex flex-wrap items-center gap-4 rounded-xl border border-border bg-[#070914] p-4 text-slate-100">
+        <div className="nx-scenario">
           <div className="flex items-end gap-2">
             <img src={robotSprite} alt="" className="h-12 w-auto" />
             <img src={zoneTrueSprite} alt="" className="h-11 w-auto" />
@@ -266,7 +267,8 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
           </div>
         </div>
 
-        <TextField label="Título del juego" type="text" value={title} disabled={submitting} onChange={setTitle} onBlur={() => {}} />
+        <FormSection icon={Rocket} title="Cuéntanos de tu juego" subtitle="Nombre, portada y el lugar donde vivirá." tone={1}>
+<TextField label="Título del juego" type="text" value={title} disabled={submitting} onChange={setTitle} onBlur={() => {}} />
         <TextField
           label="Descripción"
           type="text"
@@ -283,11 +285,12 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
           disabled={submitting}
           onChange={setCoverImageUrl}
         />
+</FormSection>
 
         <AdvancedSettings summary="Ajustes de la partida">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="tf-lives">
+              <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="tf-lives">
                 Baterías (vidas)
               </label>
               <select
@@ -305,7 +308,7 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
               </select>
             </div>
             <div>
-              <label className="mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="tf-enemies">
+              <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="tf-enemies">
                 Medusas galácticas
               </label>
               <select
@@ -323,7 +326,7 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
               </select>
             </div>
             <div>
-              <label className="mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="tf-speed">
+              <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="tf-speed">
                 Velocidad de las medusas
               </label>
               <select
@@ -339,7 +342,7 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
               </select>
             </div>
             <div>
-              <label className="mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="tf-relocate">
+              <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="tf-relocate">
                 Las salas cambian de lugar
               </label>
               <select
@@ -389,7 +392,8 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
           </div>
         </AdvancedSettings>
 
-        <CategorySelectField
+        <FormSection icon={FolderOpen} title="Dónde vivirá" subtitle="Materia y organización para encontrarlo fácil." tone={4}>
+<CategorySelectField
           token={token}
           categories={categories}
           categoryId={categoryId}
@@ -403,29 +407,22 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
         />
 
         <OrganizationSelectField organizations={organizations} value={organizationId} disabled={submitting} onChange={setOrganizationId} />
+</FormSection>
 
-        <div className="flex flex-wrap items-end justify-between gap-2">
-          <div>
-            <p className="text-[14px] font-semibold text-text-h">Afirmaciones</p>
-            <p className="text-[12.5px] text-text">
-              Entre {MIN_TF_QUESTIONS} y {MAX_TF_QUESTIONS}. Mezcla verdaderas y falsas.
-            </p>
-          </div>
-          <p className="text-[12.5px] text-text">
-            <span className="font-semibold text-emerald-600 dark:text-emerald-400">{trueCount} verdaderas</span> ·{' '}
+        <FormSection icon={ListChecks} title="Afirmaciones" subtitle={`Entre ${MIN_TF_QUESTIONS} y ${MAX_TF_QUESTIONS}. Mezcla verdaderas y falsas.`} tone={3} bare>
+<p className="nx-counts"><span className="font-semibold text-emerald-600 dark:text-emerald-400">{trueCount} verdaderas</span> ·{' '}
             <span className="font-semibold text-rose-600 dark:text-rose-400">{falseCount} falsas</span>
           </p>
-        </div>
-
-        <div className="flex flex-col gap-3">
+<div className="nx-items">
           {questions.map((question, index) => (
-            <div key={question.key} className="rounded-xl border border-border p-4">
-              <div className="mb-2.5 flex items-center justify-between">
-                <p className="text-[13px] font-semibold text-text-h">Afirmación {index + 1}</p>
+            <div key={question.key} className="nx-item">
+              <div className="nx-item-head">
+                <span className="nx-item-num" aria-hidden="true">{index + 1}</span>
+<p className="nx-item-title">Afirmación<span className="sr-only"> {index + 1}</span></p>
                 {questions.length > MIN_TF_QUESTIONS && (
                   <button
                     type="button"
-                    className="text-[12px] font-medium text-danger"
+                    className="nx-remove"
                     onClick={() => removeQuestion(index)}
                     disabled={submitting}
                   >
@@ -447,7 +444,7 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
                 onChange={(event) => updateQuestion(index, 'statement', event.target.value)}
               />
               <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2">
-                <div className="inline-flex rounded-lg border border-border p-0.5" role="radiogroup" aria-label={`Respuesta de la afirmación ${index + 1}`}>
+                <div className="nx-answer inline-flex rounded-lg border border-border p-0.5" role="radiogroup" aria-label={`Respuesta de la afirmación ${index + 1}`}>
                   <button
                     type="button"
                     role="radio"
@@ -497,24 +494,25 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
         {questions.length < MAX_TF_QUESTIONS && (
           <button
             type="button"
-            className="self-start rounded-lg border border-dashed border-border px-3.5 py-2 text-[13px] font-medium text-text-h"
+            className="nx-add border border-dashed border-border"
             onClick={addQuestion}
             disabled={submitting}
           >
             + Agregar afirmación
           </button>
         )}
+</FormSection>
 
         {error && (
-          <p className="rounded-lg border border-danger/35 bg-danger/10 px-[13px] py-[11px] text-sm leading-snug text-danger" role="alert">
+          <p className="nx-alert" role="alert">
             {error}
           </p>
         )}
 
-        <div className="nx-sticky-actions flex gap-2">
+        <div className="nx-sticky-actions nx-actions">
           <button
             type="submit"
-            className="rounded-lg px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)] transition-transform hover:not-disabled:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+            className="nx-btn nx-btn-primary"
             style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
             disabled={submitting}
           >
@@ -522,7 +520,7 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
           </button>
           <button
             type="button"
-            className="rounded-lg border border-border px-4 py-2.5 text-[14px] font-medium text-text-h"
+            className="nx-btn nx-btn-secondary border border-border text-text-h"
             onClick={onClose}
             disabled={submitting}
           >

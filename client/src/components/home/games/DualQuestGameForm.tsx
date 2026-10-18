@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Rocket, FolderOpen, Gem, Map, DoorOpen, Sparkles, LayoutGrid } from 'lucide-react'
 import type { FormEvent, ReactNode } from 'react'
 import { TextField } from '../../TextField'
 import { SaveVisibilityModal } from './SaveVisibilityModal'
@@ -6,6 +7,7 @@ import { ImageUploadField } from './ImageUploadField'
 import { AiGameAssistantPanel } from './AiGameAssistantPanel'
 import { useReportCreateSummary } from './aiDraftContext'
 import { GameFormShell } from './GameFormShell'
+import { FormSection } from './create/FormSection'
 import type { GameDraft } from '../../../services/ai-game-assistant.service'
 import { OrganizationSelectField } from './create/OrganizationSelectField'
 import { CategorySelectField } from './create/CategorySelectField'
@@ -401,7 +403,8 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
       aiPanel={<AiGameAssistantPanel gameType="DUAL_QUEST" disabled={submitting} onDraftReady={applyAiDraft} />}
     >
       <form className="flex flex-col gap-[16px]" onSubmit={handleSubmit} noValidate>
-        <TextField label="Título del juego" type="text" value={title} disabled={submitting} onChange={setTitle} onBlur={() => {}} />
+        <FormSection icon={Rocket} title="Cuéntanos de tu juego" subtitle="Nombre, portada y el lugar donde vivirá." tone={1}>
+<TextField label="Título del juego" type="text" value={title} disabled={submitting} onChange={setTitle} onBlur={() => {}} />
         <TextField
           label="Descripción"
           type="text"
@@ -418,7 +421,9 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
           disabled={submitting}
           onChange={setCoverImageUrl}
         />
-        <TextField
+</FormSection>
+        <FormSection icon={Gem} title="La gema núcleo" subtitle="La pregunta que los dos jugadores resuelven al final." tone={2}>
+<TextField
           label="Pregunta/hipótesis de la Gema Núcleo"
           type="text"
           value={coreQuestion}
@@ -426,8 +431,10 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
           onChange={setCoreQuestion}
           onBlur={() => {}}
         />
+</FormSection>
 
-        <CategorySelectField
+        <FormSection icon={FolderOpen} title="Dónde vivirá" subtitle="Materia y organización para encontrarlo fácil." tone={4}>
+<CategorySelectField
           token={token}
           categories={categories}
           categoryId={categoryId}
@@ -441,10 +448,12 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
         />
 
         <OrganizationSelectField organizations={organizations} value={organizationId} disabled={submitting} onChange={setOrganizationId} />
+</FormSection>
 
-        <div className="grid grid-cols-2 gap-3">
+        <FormSection icon={LayoutGrid} title="Tamaño del mapa" subtitle="Cuántas columnas y filas tendrá el tablero." tone={2}>
+<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <label className="mb-1.5 block text-[13px] font-medium text-text-h">Columnas del mapa</label>
+            <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h">Columnas del mapa</label>
             <input
               type="number"
               min={MIN_GRID_COLS}
@@ -456,7 +465,7 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-[13px] font-medium text-text-h">Filas del mapa</label>
+            <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h">Filas del mapa</label>
             <input
               type="number"
               min={MIN_GRID_ROWS}
@@ -467,13 +476,9 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
               onChange={(e) => handleGridSizeChange(Number(e.target.value), gridCols)}
             />
           </div>
-        </div>
+        </div></FormSection>
 
-        <div className="rounded-xl border border-border p-4">
-          <p className="mb-2.5 text-[13px] font-semibold text-text-h">Editor del mapa</p>
-          <p className="mb-3 text-[11.5px] text-text">
-            Elige un modo y haz clic en el mapa.
-          </p>
+        <FormSection icon={Map} title="Editor del mapa" subtitle="Elige un modo y haz clic en el mapa para colocar cada pieza." tone={2}>
           <div className="mb-3 flex flex-wrap gap-1.5">
             <ModeButton active={placementMode.kind === 'CELL'} onClick={() => setPlacementMode({ kind: 'CELL' })}>
               Casilla
@@ -499,20 +504,20 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
             gems={gems.map((g) => ({ ...g, collected: false }))}
             onCellClick={handleCellClick}
           />
-        </div>
+        </FormSection>
 
-        <div className="flex flex-col gap-3">
-          <p className="text-[13px] font-semibold text-text-h">Compuertas e interruptores (la dependencia obligatoria)</p>
+        <FormSection icon={DoorOpen} title="Compuertas e interruptores" subtitle="La dependencia obligatoria entre los dos jugadores." tone={3} bare>
+<div className="nx-items">
           {gates.map((gate) => {
             const trigger = triggers.find((t) => t.gateId === gate.gateId)
             return (
-              <div key={gate.gateId} className="rounded-xl border border-border p-4">
-                <div className="mb-2.5 flex items-center justify-between">
-                  <p className="text-[13px] font-semibold text-text-h">
+              <div key={gate.gateId} className="nx-item">
+                <div className="nx-item-head">
+                  <p className="nx-item-title">
                     Compuerta en ({gate.position.row},{gate.position.col})
                   </p>
                   {gates.length > 1 && (
-                    <button type="button" className="text-[12px] font-medium text-danger" onClick={() => removeGate(gate.gateId)} disabled={submitting}>
+                    <button type="button" className="nx-remove" onClick={() => removeGate(gate.gateId)} disabled={submitting}>
                       Quitar
                     </button>
                   )}
@@ -528,7 +533,7 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
 
                 {trigger && (
                   <div className="flex flex-col gap-3">
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div>
                         <label className="mb-1.5 block text-[12px] font-medium text-text-h">Tipo</label>
                         <select
@@ -604,26 +609,25 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
           })}
           <button
             type="button"
-            className="self-start rounded-lg border border-dashed border-border px-3.5 py-2 text-[13px] font-medium text-text-h"
+            className="nx-add border border-dashed border-border"
             onClick={addGate}
             disabled={submitting}
           >
             + Agregar compuerta
           </button>
         </div>
+</FormSection>
 
-        <div className="flex flex-col gap-3">
-          <p className="text-[13px] font-semibold text-text-h">
-            Gemas fragmento — el orden de esta lista es el orden correcto del ensamblaje final
-          </p>
+        <FormSection icon={Sparkles} title="Gemas fragmento" subtitle="El orden de esta lista es el orden correcto del ensamblaje final." tone={4} bare>
+<div className="nx-items">
           {gems.map((gem, index) => (
-            <div key={gem.gemId} className="rounded-xl border border-border p-4">
-              <div className="mb-2.5 flex items-center justify-between">
-                <p className="text-[13px] font-semibold text-text-h">
+            <div key={gem.gemId} className="nx-item">
+              <div className="nx-item-head">
+                <p className="nx-item-title">
                   #{index + 1} · {gem.role === 'FIRE' ? '🔥 Fuego' : '💧 Agua'}
                 </p>
                 {gems.length > MIN_GEMS_PER_ROLE * 2 && (
-                  <button type="button" className="text-[12px] font-medium text-danger" onClick={() => removeGem(gem.gemId)} disabled={submitting}>
+                  <button type="button" className="nx-remove" onClick={() => removeGem(gem.gemId)} disabled={submitting}>
                     Quitar
                   </button>
                 )}
@@ -648,26 +652,27 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
               </div>
             </div>
           ))}
-          <div className="flex gap-2">
-            <button type="button" className="rounded-lg border border-dashed border-border px-3.5 py-2 text-[13px] font-medium text-text-h" onClick={() => addGem('FIRE')} disabled={submitting}>
+          <div className="nx-add-row">
+            <button type="button" className="nx-add border border-dashed border-border" onClick={() => addGem('FIRE')} disabled={submitting}>
               + Gema de Fuego
             </button>
-            <button type="button" className="rounded-lg border border-dashed border-border px-3.5 py-2 text-[13px] font-medium text-text-h" onClick={() => addGem('WATER')} disabled={submitting}>
+            <button type="button" className="nx-add border border-dashed border-border" onClick={() => addGem('WATER')} disabled={submitting}>
               + Gema de Agua
             </button>
           </div>
         </div>
+</FormSection>
 
         {error && (
-          <p className="rounded-lg border border-danger/35 bg-danger/10 px-[13px] py-[11px] text-sm leading-snug text-danger" role="alert">
+          <p className="nx-alert" role="alert">
             {error}
           </p>
         )}
 
-        <div className="nx-sticky-actions flex gap-2">
+        <div className="nx-sticky-actions nx-actions">
           <button
             type="submit"
-            className="rounded-lg px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)] transition-transform hover:not-disabled:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+            className="nx-btn nx-btn-primary"
             style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
             disabled={submitting}
           >
@@ -675,7 +680,7 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
           </button>
           <button
             type="button"
-            className="rounded-lg border border-border px-4 py-2.5 text-[14px] font-medium text-text-h"
+            className="nx-btn nx-btn-secondary border border-border text-text-h"
             onClick={onClose}
             disabled={submitting}
           >
