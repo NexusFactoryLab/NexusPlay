@@ -1,0 +1,112 @@
+{
+  "timesteps": 1000000,
+  "envs": 8,
+  "seed": 62,
+  "netArch": [
+    64,
+    64
+  ],
+  "hyperparameters": {
+    "n_steps": 1024,
+    "batch_size": 2048,
+    "n_epochs": 10,
+    "learning_rate": 0.0003,
+    "gamma": 0.99,
+    "gae_lambda": 0.95,
+    "ent_coef": 0.01,
+    "clip_range": 0.2
+  },
+  "trainingSeconds": 431,
+  "evaluation": {
+    "modelo": {
+      "games": 2000,
+      "wins": 1339,
+      "losses": 661,
+      "draws": 0,
+      "winRate": 0.6695
+    },
+    "reglas": {
+      "games": 2000,
+      "wins": 1058,
+      "losses": 942,
+      "draws": 0,
+      "winRate": 0.529
+    }
+  },
+  "evaluationByOpponent": {
+    "modelo": {
+      "cuidadoso": {
+        "games": 400,
+        "wins": 335,
+        "losses": 65,
+        "draws": 0,
+        "winRate": 0.8375
+      },
+      "casual": {
+        "games": 400,
+        "wins": 356,
+        "losses": 44,
+        "draws": 0,
+        "winRate": 0.89
+      },
+      "rapido": {
+        "games": 400,
+        "wins": 172,
+        "losses": 228,
+        "draws": 0,
+        "winRate": 0.43
+      },
+      "arriesgado": {
+        "games": 400,
+        "wins": 216,
+        "losses": 184,
+        "draws": 0,
+        "winRate": 0.54
+      },
+      "bot-dificil": {
+        "games": 400,
+        "wins": 260,
+        "losses": 140,
+        "draws": 0,
+        "winRate": 0.65
+      }
+    },
+    "reglas": {
+      "cuidadoso": {
+        "games": 400,
+        "wins": 278,
+        "losses": 122,
+        "draws": 0,
+        "winRate": 0.695
+      },
+      "casual": {
+        "games": 400,
+        "wins": 327,
+        "losses": 73,
+        "draws": 0,
+        "winRate": 0.8175
+      },
+      "rapido": {
+        "games": 400,
+        "wins": 116,
+        "losses": 284,
+        "draws": 0,
+        "winRate": 0.29
+      },
+      "arriesgado": {
+        "games": 400,
+        "wins": 139,
+        "losses": 261,
+        "draws": 0,
+        "winRate": 0.3475
+      },
+      "bot-dificil": {
+        "games": 400,
+        "wins": 198,
+        "losses": 202,
+        "draws": 0,
+        "winRate": 0.495
+      }
+    }
+  }
+}

@@ -15,6 +15,9 @@ import { useAuth } from '../../../hooks/useAuth'
 import { useToast } from '../../../hooks/useToast'
 import type { AdaptedGameDraft } from '../../../services/game-adaptation.service'
 import { useApplyAdaptation } from './useApplyAdaptation'
+import { GuessWhoTraitsEditor } from './GuessWhoTraitsEditor'
+import { newTraitId, traitCatalogFromCards, traitIdsOf, traitsForCard, validateTraits } from './guessWhoTraits'
+import type { GuessWhoTrait } from './guessWhoTypes'
 import { createGame, publishGame } from '../../../services/game.service'
 import {
   listSubjects as listCategories,
@@ -29,9 +32,11 @@ type CardDraft = {
   audioUrl: string | null
   /** Dato breve opcional sobre el tema de la tarjeta (ej. dato de un país si es una bandera). */
   info: string
+  /** Ids de las preguntas guiadas para las que esta tarjeta responde «Sí» (ver guessWhoTraits.ts). */
+  traitIds: string[]
 }
 
-const EMPTY_CARD: CardDraft = { imageUrl: null, label: '', audioUrl: null, info: '' }
+const EMPTY_CARD: CardDraft = { imageUrl: null, label: '', audioUrl: null, info: '', traitIds: [] }
 const MIN_CARDS = 12
 const MAX_INFO_LENGTH = 500
 const DEFAULT_MAX_ACCUSATION_COUNT = 6
@@ -45,6 +50,7 @@ const PHASES = [
   { label: 'Identidad del juego' },
   { label: 'Configuración del juego' },
   { label: 'Contenido: tarjetas' },
+  { label: 'Preguntas guiadas' },
 ] as const
 const TOTAL_PHASES = PHASES.length
 
@@ -83,6 +89,7 @@ export function GuessWhoGameForm({
     Array.from({ length: MIN_CARDS }, () => ({ ...EMPTY_CARD })),
   )
   const [maxAccusationCount, setMaxAccusationCount] = useState(DEFAULT_MAX_ACCUSATION_COUNT)
+  const [traits, setTraits] = useState<GuessWhoTrait[]>([])
   const [categories, setCategories] = useState<CategoryWithGameCount[]>([])
   const [categoryId, setCategoryId] = useState('')
   const [organizations, setOrganizations] = useState<OrganizationWithMyRole[]>([])
@@ -127,17 +134,19 @@ export function GuessWhoGameForm({
   })
 
   function applyAiDraft(draft: GameDraft) {
-    const items = Array.isArray(draft.content) ? draft.content : []
+    const items = (Array.isArray(draft.content) ? draft.content : []).map((item) => (item ?? {}) as Record<string, unknown>)
+    // Las preguntas guiadas que propuso la IA (o las del juego adaptado) quedan
+    // para revisar en la última fase; sin ellas, el catálogo queda vacío.
+    const catalog = traitCatalogFromCards(items)
+    setTraits(catalog)
     setCards(
-      items.map((item) => {
-        const raw = (item ?? {}) as Record<string, unknown>
-        return {
-          imageUrl: typeof raw.imageUrl === 'string' ? raw.imageUrl : null,
-          label: typeof raw.label === 'string' ? raw.label : '',
-          audioUrl: typeof raw.audioUrl === 'string' ? raw.audioUrl : null,
-          info: typeof raw.info === 'string' ? raw.info : '',
-        }
-      }),
+      items.map((raw) => ({
+        imageUrl: typeof raw.imageUrl === 'string' ? raw.imageUrl : null,
+        label: typeof raw.label === 'string' ? raw.label : '',
+        audioUrl: typeof raw.audioUrl === 'string' ? raw.audioUrl : null,
+        info: typeof raw.info === 'string' ? raw.info : '',
+        traitIds: traitIdsOf(raw, catalog),
+      })),
     )
     const config = (draft.config ?? {}) as Record<string, unknown>
     if (typeof config.maxAccusationCount === 'number') setMaxAccusationCount(config.maxAccusationCount)
@@ -153,6 +162,34 @@ export function GuessWhoGameForm({
 
   function removeCard(index: number) {
     setCards((current) => (current.length > MIN_CARDS ? current.filter((_, i) => i !== index) : current))
+  }
+
+  function addTrait() {
+    setTraits((current) => [...current, { id: newTraitId(current), question: '' }])
+  }
+
+  function removeTrait(traitId: string) {
+    setTraits((current) => current.filter((trait) => trait.id !== traitId))
+    setCards((current) => current.map((card) => ({ ...card, traitIds: card.traitIds.filter((id) => id !== traitId) })))
+  }
+
+  function changeTraitQuestion(traitId: string, question: string) {
+    setTraits((current) => current.map((trait) => (trait.id === traitId ? { ...trait, question } : trait)))
+  }
+
+  function toggleCardTrait(cardIndex: number, traitId: string) {
+    setCards((current) =>
+      current.map((card, i) =>
+        i !== cardIndex
+          ? card
+          : {
+              ...card,
+              traitIds: card.traitIds.includes(traitId)
+                ? card.traitIds.filter((id) => id !== traitId)
+                : [...card.traitIds, traitId],
+            },
+      ),
+    )
   }
 
   /** Valida solo los campos de la fase 1 (Identidad): título, descripción, materia. */
@@ -189,7 +226,12 @@ export function GuessWhoGameForm({
     return null
   }
 
-  const VALIDATORS = [validateIdentityPhase, validateConfigPhase, validateContentPhase]
+  /** Valida la fase 4 (Preguntas guiadas): opcional, pero cada pregunta escrita debe separar tarjetas. */
+  function validateTraitsPhase(): string | null {
+    return validateTraits(traits, cards.map((card) => card.traitIds))
+  }
+
+  const VALIDATORS = [validateIdentityPhase, validateConfigPhase, validateContentPhase, validateTraitsPhase]
 
   function goToNextPhase() {
     const validationError = VALIDATORS[phase]()
@@ -232,12 +274,16 @@ export function GuessWhoGameForm({
         categoryId,
         organizationId: organizationId || undefined,
         theme: coverImageUrl ? { coverImageUrl } : undefined,
-        content: cards.map((card) => ({
-          imageUrl: card.imageUrl as string,
-          label: card.label.trim(),
-          audioUrl: card.audioUrl,
-          info: card.info.trim() || null,
-        })),
+        content: cards.map((card) => {
+          const cardTraits = traitsForCard(card.traitIds, traits)
+          return {
+            imageUrl: card.imageUrl as string,
+            label: card.label.trim(),
+            audioUrl: card.audioUrl,
+            info: card.info.trim() || null,
+            ...(cardTraits ? { traits: cardTraits } : {}),
+          }
+        }),
         config: { maxAccusationCount },
       })
       // El juego queda en DRAFT; la elección de dónde guardarlo (privado o
@@ -433,6 +479,18 @@ export function GuessWhoGameForm({
             + Agregar tarjeta
           </button>
         </div>
+        )}
+
+        {phase === 3 && (
+          <GuessWhoTraitsEditor
+            catalog={traits}
+            cards={cards}
+            disabled={submitting}
+            onAdd={addTrait}
+            onRemove={removeTrait}
+            onChangeQuestion={changeTraitQuestion}
+            onToggleCard={toggleCardTrait}
+          />
         )}
 
         {error && (
