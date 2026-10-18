@@ -21,7 +21,7 @@ function Probe(){const location=useLocation();window.navigated=location.pathname
 createRoot(document.getElementById('root')).render(React.createElement(MemoryRouter,{initialEntries:['/']},React.createElement(Routes,null,
   React.createElement(Route,{path:'/',element:React.createElement(GuessWhoRoom,{gameId:'juego-1',onExit:()=>{window.exited++}})}),
   React.createElement(Route,{path:'/quien-es/sala',element:React.createElement(Probe)}))));
-window.showChat=()=>createRoot(document.getElementById('chat')).render(React.createElement(ChatPanel,{inline:true,messages:[{userId:'bot:X',displayName:'Bot Nexus (difícil)',text:'¿Es un país de Europa?',sentAt:1},{userId:'bot:X',displayName:'Bot Nexus (difícil)',text:'Sí. (respondido con IA, puede equivocarse) Pregunta propia: descarta tú según la respuesta.',sentAt:2}],selfUserId:'ana',onSend:()=>{},notice:BOT_CHAT_NOTICE,
+window.showChat=()=>createRoot(document.getElementById('chat')).render(React.createElement(ChatPanel,{inline:true,messages:[{userId:'bot:X',displayName:'Bot Nexus (difícil)',text:'¿Es un país de Europa?',sentAt:1},{userId:'bot:X',displayName:'Bot Nexus (difícil)',text:'Sí. (respondido con IA, puede equivocarse) Pregunta propia: descarta tú según la respuesta.',sentAt:Date.now()}],selfUserId:'ana',onSend:()=>{},notice:BOT_CHAT_NOTICE,
   guided:{cards:[],questions:[{id:'q',text:'¿Es un país de América?',cardIds:['0']}],pending:null,isMyTurn:true,opponentIsBot:true,onAsk:()=>{},onAskFree:t=>{window.free=t},onAnswer:()=>{}}}));
 </script></body></html>`
 
@@ -50,12 +50,14 @@ async function main(){
       await page.getByText('Sala: /quien-es/sala?gameId=juego-1&bot=HARD').waitFor()
 
       await page.evaluate(()=>window.showChat())
-      await page.getByText('El bot no lee el chat: usa las preguntas sugeridas para jugar.').waitFor()
+      await page.getByText('El bot no lee mensajes sueltos: hazle preguntas de Sí/No (sugeridas o tuyas, con «?»).').waitFor()
+      await page.getByRole('status').filter({hasText:'respondió'}).getByText('Sí',{exact:true}).waitFor()
+      await page.locator('#chat').screenshot({path:'.scratch/guess-who-answer-'+width+'.png'})
+      await page.getByRole('button',{name:'Seguir preguntando'}).click()
       await page.getByText(/el bot la responde con IA/).waitFor()
       await page.locator('#chat').getByRole('textbox',{name:'Mensaje'}).fill('su capital es muy grande')
       await page.getByRole('button',{name:/Hacer esta pregunta/}).click()
       assert.equal(await page.evaluate(()=>window.free),'su capital es muy grande')
-      await page.getByRole('status').filter({hasText:'respondió'}).getByText('Sí',{exact:true}).waitFor()
       const box=page.locator('#chat').getByRole('textbox',{name:'Mensaje'})
       await box.fill('¿Tiene costa?')
       await box.press('Enter')

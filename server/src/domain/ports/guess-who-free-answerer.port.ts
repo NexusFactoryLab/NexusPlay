@@ -1,19 +1,18 @@
 /**
- * Responde, de parte del bot, una pregunta propia que escribió el jugador
- * (issue #64). El bot no entiende texto libre, así que se apoya en la IA:
- * recibe solo la pregunta y los datos de SU PROPIA tarjeta, nunca los del
- * jugador.
+ * Clasifica con IA una pregunta propia que el jugador le hace al bot
+ * (issue #64): qué tarjetas del juego responden «Sí». Con eso la pregunta
+ * funciona como una sugerida: el bot responde según su tarjeta y, con
+ * descarte automático, se descartan solas las que no coinciden.
  */
 export const GUESS_WHO_FREE_ANSWERER = Symbol('GUESS_WHO_FREE_ANSWERER');
 
 export interface FreeAnswerCard {
+  cardId: string;
   label: string;
   info: string | null;
-  /** Preguntas guiadas que esta tarjeta responde con «Sí»: contexto extra para la IA. */
-  facts: string[];
 }
 
 export interface GuessWhoFreeAnswerer {
-  /** `true`/`false` si pudo responder; `null` si no sabe o la IA no está disponible. */
-  answer(question: string, card: FreeAnswerCard): Promise<boolean | null>;
+  /** Ids de las tarjetas que responden «Sí»; `null` si la pregunta no se puede responder o la IA no está disponible. */
+  classify(question: string, cards: FreeAnswerCard[]): Promise<string[] | null>;
 }

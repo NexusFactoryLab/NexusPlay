@@ -21,4 +21,4 @@ export function soloRoomPath(gameId: string, difficulty: BotDifficulty, autoDisc
 }
 
 /** Aviso del chat cuando el rival es el bot: no lee mensajes libres. */
-export const BOT_CHAT_NOTICE = 'El bot no lee el chat: usa las preguntas sugeridas para jugar.'
+export const BOT_CHAT_NOTICE = 'El bot no lee mensajes sueltos: hazle preguntas de Sí/No (sugeridas o tuyas, con «?»).'

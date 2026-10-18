@@ -178,6 +178,17 @@ export function askFreeQuestion(state: GuidedState, userId: string, name: string
   addGuidedMessage(state, userId, name, question);
 }
 
+/**
+ * Una pregunta propia ya clasificada (qué tarjetas responden «Sí», p. ej. por
+ * la IA del bot) pasa a funcionar como una sugerida: la respuesta se valida
+ * y, con descarte automático, descarta sola.
+ */
+export function resolveFreeQuestion(state: GuidedState, requestId: string, cardIds: string[]) {
+  const q = currentQuestion(state);
+  if (!q?.free || q.requestId !== requestId) return;
+  state.pendingQuestion = { ...q, free: false, cardIds };
+}
+
 /** El rival no puede (o no sabe) responder una pregunta propia: se retira y quien preguntó puede hacer otra. */
 export function declineFreeQuestion(state: GuidedState, userId: string, name: string, reason: string) {
   const q = currentQuestion(state);
@@ -204,13 +215,13 @@ export function answerGuidedQuestion(state: GuidedState, userId: string, name: s
   state.pendingQuestion = null;
   if (state.autoDiscard === false) {
     // Descarte manual (issue #64): quien preguntó decide qué descartar con lo que sabe.
-    addGuidedMessage(state, userId, name, `${answer ? 'Sí' : 'No'}. Descarta tú las tarjetas que no coinciden.`);
+    addGuidedMessage(state, userId, name, `${answer ? 'Sí' : 'No'}.${note} Descarta tú las tarjetas que no coinciden.`);
     return;
   }
   const discarded = state.cards.filter(c => !asker.discardedCardIds.includes(c.cardId) && q.cardIds.includes(c.cardId) !== answer);
   // Atomic update; repeats and late answers cannot discard again.
   asker.discardedCardIds.push(...discarded.map(c => c.cardId));
-  addGuidedMessage(state, userId, name, `${answer ? 'Sí' : 'No'}. ${discarded.length} tarjeta${discarded.length === 1 ? '' : 's'} descartada${discarded.length === 1 ? '' : 's'} automáticamente.`);
+  addGuidedMessage(state, userId, name, `${answer ? 'Sí' : 'No'}.${note} ${discarded.length} tarjeta${discarded.length === 1 ? '' : 's'} descartada${discarded.length === 1 ? '' : 's'} automáticamente.`);
 }
 
 /**

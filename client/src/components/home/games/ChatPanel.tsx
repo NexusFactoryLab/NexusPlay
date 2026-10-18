@@ -70,6 +70,16 @@ export function ChatPanel({
 
   // La última respuesta del rival a una pregunta, destacada para que no se pierda en el chat.
   const lastAnswer = [...messages].reverse().find((m) => m.userId !== selfUserId && /^(Sí|No)\./.test(m.text))
+  // Recién llegada, la respuesta ocupa el panel sola unos segundos; luego vuelven las sugerencias.
+  const [dismissedAnswerAt, setDismissedAnswerAt] = useState<number | null>(null)
+  const [now, setNow] = useState(() => Date.now())
+  const answerIsFresh = Boolean(lastAnswer && lastAnswer.sentAt !== dismissedAnswerAt && now - lastAnswer.sentAt < ANSWER_SPOTLIGHT_MS)
+  const lastAnswerAt = lastAnswer?.sentAt
+  useEffect(() => {
+    if (lastAnswerAt === undefined) return
+    const timer = setTimeout(() => setNow(Date.now()), Math.max(0, lastAnswerAt + ANSWER_SPOTLIGHT_MS - Date.now()))
+    return () => clearTimeout(timer)
+  }, [lastAnswerAt])
 
   return (
     <div
@@ -150,10 +160,15 @@ export function ChatPanel({
           </div>}
           <p className="mt-2 text-[11px] text-text">{guided.pending.free ? 'Es una pregunta propia: responde con la verdad sobre tu tarjeta. Quien pregunta descarta según la respuesta.' : guided.autoDiscard === false ? 'Con la respuesta, descarta tú las tarjetas que no coinciden.' : 'La respuesta descarta automáticamente las opciones que no coinciden.'} La pregunta vence al cambiar el turno.</p>
         </> : <>
-          {lastAnswer && <p role="status" className="mb-2 rounded-lg border border-accent/40 bg-surface px-2.5 py-1.5 text-[12.5px] text-text-h">
+          {lastAnswer && answerIsFresh ? <div role="status" className="rounded-xl border-2 border-accent bg-surface px-3 py-3 text-center text-text-h">
+            <p className="text-[12px] font-semibold">{lastAnswer.displayName} respondió</p>
+            <p className="my-1 text-[28px] font-extrabold leading-none text-accent">{lastAnswer.text.startsWith('Sí') ? 'Sí' : 'No'}</p>
+            <p className="text-[11px] text-text">{lastAnswer.text.replace(/^(Sí|No)\.\s*/, '')}</p>
+            <button type="button" onClick={() => setDismissedAnswerAt(lastAnswer.sentAt)} className="mt-2 rounded-lg border border-accent/40 px-3 py-1.5 text-[12px] font-semibold text-accent focus-visible:outline-2 focus-visible:outline-accent">Seguir preguntando</button>
+          </div> : <>
+          {lastAnswer && <p className="mb-2 rounded-lg border border-accent/40 bg-surface px-2.5 py-1.5 text-[12.5px] text-text-h">
             <span className="font-semibold">{lastAnswer.displayName} respondió: </span>
             <strong className="text-accent">{lastAnswer.text.startsWith('Sí') ? 'Sí' : 'No'}</strong>
-            <span className="block text-[11px] text-text">{lastAnswer.text.replace(/^(Sí|No)\.\s*/, '')}</span>
           </p>}
           <p className="text-[12px] font-bold text-accent">Preguntas Sí/No · {guided.autoDiscard === false ? 'descartas tú' : 'descarte automático'}</p>
           {!guided.isMyTurn ? <p className="mt-1 text-[12px] text-text">Podrás preguntar en tu turno. Puedes escribir mensajes mientras esperas.</p> : <div className="mt-2 space-y-2">
@@ -165,6 +180,7 @@ export function ChatPanel({
               ? <button type="button" disabled={disconnected} onClick={() => { guided.onAskFree!(text.trim()); setText('') }} className="w-full rounded-xl bg-accent px-3 py-2 text-left text-[12px] font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50">Hacer esta pregunta (Sí/No): «{text.trim()}»</button>
               : <p className="text-[11.5px] text-text">¿Quieres preguntar otra cosa? Escríbela abajo con «?» y pulsa Enter{guided.opponentIsBot ? ' (el bot la responde con IA)' : ''}.</p>)}
           </div>}
+          </>}
         </>}
       </div>}
 
@@ -200,5 +216,8 @@ export function ChatPanel({
     </div>
   )
 }
+
+/** Cuánto tiempo ocupa el panel la respuesta recién llegada antes de volver a las sugerencias. */
+const ANSWER_SPOTLIGHT_MS = 6000
 
 const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()

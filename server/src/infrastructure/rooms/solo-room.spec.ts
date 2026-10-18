@@ -170,12 +170,13 @@ describe('partida en solitario contra el bot (issue #60)', () => {
     expect(rooms.findBySocketId('ana')!.autoDiscard).toBe(false);
   });
 
-  it('responde con IA una pregunta propia, solo con los datos de SU tarjeta (issue #64)', async () => {
-    const seen: { question: string; card: FreeAnswerCard }[] = [];
-    const ai: GuessWhoFreeAnswerer = { answer: async (question, card) => { seen.push({ question, card }); return true; } };
+  it.each([true, false])('pregunta propia: la IA clasifica las tarjetas, el bot responde según la suya y el descarte automático (%s) funciona (issue #64)', async (autoDiscard) => {
+    const seen: { question: string; cards: FreeAnswerCard[] }[] = [];
+    // La "IA" dice que la respuesta es Sí para las 6 primeras tarjetas.
+    const ai: GuessWhoFreeAnswerer = { classify: async (question, cards) => { seen.push({ question, cards }); return cards.slice(0, 6).map((c) => c.cardId); } };
     const { gateway, rooms } = setup(undefined, ai);
     const human = client('ana');
-    await gateway.handleCreateSolo(human, { gameId: game.id, difficulty: 'HARD' });
+    await gateway.handleCreateSolo(human, { gameId: game.id, difficulty: 'HARD', autoDiscard });
     const room = rooms.findBySocketId('ana')!;
     gateway.handleReady(human, { ready: true });
     vi.advanceTimersByTime(3000);
@@ -183,13 +184,17 @@ describe('partida en solitario contra el bot (issue #60)', () => {
     gateway.handleFreeQuestion(human, { text: '¿Su capital es muy grande?' });
     await vi.advanceTimersByTimeAsync(700);
     expect(room.pendingQuestion).toBeNull();
-    expect(room.guidedChat!.at(-1)!.text).toBe(`Sí.${AI_ANSWER_NOTE} Pregunta propia: descarta tú según la respuesta.`);
-    const botCard = room.cards.find((c) => c.cardId === room.players[1].secretCardId)!;
-    expect(seen).toEqual([{ question: '¿Su capital es muy grande?', card: { label: botCard.label, info: null, facts: botCard.traits!.map((t) => t.question) } }]);
+    const yes = room.cards.slice(0, 6).map((c) => c.cardId);
+    const botSaysYes = yes.includes(room.players[1].secretCardId!);
+    expect(room.guidedChat!.at(-1)!.text.startsWith(`${botSaysYes ? 'Sí' : 'No'}.${AI_ANSWER_NOTE}`)).toBe(true);
+    const expectedDiscards = room.cards.map((c) => c.cardId).filter((id) => yes.includes(id) !== botSaysYes);
+    expect(room.players[0].discardedCardIds).toEqual(autoDiscard ? expectedDiscards : []);
+    expect(seen[0].question).toBe('¿Su capital es muy grande?');
+    expect(seen[0].cards).toHaveLength(room.cards.length);
   });
 
   it('si la IA no sabe o no está, el bot retira la pregunta propia y el turno sigue', async () => {
-    const { gateway, rooms } = setup(undefined, { answer: async () => null });
+    const { gateway, rooms } = setup(undefined, { classify: async () => null });
     const human = client('ana');
     await gateway.handleCreateSolo(human, { gameId: game.id, difficulty: 'HARD' });
     const room = rooms.findBySocketId('ana')!;

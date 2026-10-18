@@ -6,7 +6,7 @@ import type {
   GuessWhoBotObservation,
   GuessWhoBotPolicy,
 } from '../../domain/ports/guess-who-bot-policy.port.js';
-import { contradictedCardIds, currentQuestion, questionsFor } from '../../domain/services/guided-questions.js';
+import { contradictedCardIds, currentQuestion, questionsFor, resolveFreeQuestion } from '../../domain/services/guided-questions.js';
 import { MIN_DISCARDS_BEFORE_ACCUSATION } from '../../domain/services/guess-who-rules.js';
 import type { GuessWhoFreeAnswerer } from '../../domain/ports/guess-who-free-answerer.port.js';
 
@@ -156,22 +156,25 @@ export class GuessWhoBotRunner {
 
     const pending = currentQuestion(room);
     if (pending?.free && pending.askerId !== bot.userId) {
-      // Pregunta propia del jugador: la IA responde con los datos de la tarjeta del bot.
+      // Pregunta propia del jugador: la IA clasifica todas las tarjetas; con eso
+      // el bot responde según la suya y, con descarte automático, se descarta solo.
       return {
         key: `free:${pending.requestId}`,
         delayMs: this.withinTurn(room, [300, 600]),
         run: async () => {
-          const card = room.cards.find((c) => c.cardId === bot.secretCardId);
-          const answer = card && this.freeAnswerer
-            ? await this.freeAnswerer.answer(pending.text, {
-                label: card.label,
-                info: card.info ?? null,
-                facts: (card.traits ?? []).map((trait) => trait.question),
-              })
+          const yes = this.freeAnswerer
+            ? await this.freeAnswerer.classify(
+                pending.text,
+                room.cards.map((card) => ({ cardId: card.cardId, label: card.label, info: card.info ?? null })),
+              )
             : null;
           if (currentQuestion(room)?.requestId !== pending.requestId) return;
-          if (answer === null) this.actions.declineFree(room, bot.userId, bot.displayName, BOT_CANNOT_ANSWER);
-          else this.actions.answer(room, bot.userId, bot.displayName, pending.requestId, answer, AI_ANSWER_NOTE);
+          if (yes === null || bot.secretCardId === null) {
+            this.actions.declineFree(room, bot.userId, bot.displayName, BOT_CANNOT_ANSWER);
+            return;
+          }
+          resolveFreeQuestion(room, pending.requestId, yes);
+          this.actions.answer(room, bot.userId, bot.displayName, pending.requestId, yes.includes(bot.secretCardId), AI_ANSWER_NOTE);
         },
       };
     }
