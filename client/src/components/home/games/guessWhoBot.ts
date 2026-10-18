@@ -9,7 +9,7 @@ export type BotDifficulty = 'EASY' | 'MEDIUM' | 'HARD'
 export const BOT_DIFFICULTY_OPTIONS: { id: BotDifficulty; label: string; description: string }[] = [
   { id: 'EASY', label: 'Fácil', description: 'Pregunta al azar y tarda en adivinar. Ideal para aprender a jugar.' },
   { id: 'MEDIUM', label: 'Medio', description: 'Casi siempre elige buenas preguntas.' },
-  { id: 'HARD', label: 'Difícil', description: 'Usa todo lo que sabe y se arriesga si vas ganando.' },
+  { id: 'HARD', label: 'Difícil', description: 'Entrenado jugando miles de partidas: usa todo lo que sabe y se arriesga a adivinar en cuanto puede.' },
 ]
 
 export function parseBotDifficulty(value: string | null | undefined): BotDifficulty | null {

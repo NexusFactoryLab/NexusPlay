@@ -34,6 +34,9 @@ RUN npm ci --omit=dev --workspace=server
 # dist junto con el resto del código — no vive en node_modules/.prisma.
 COPY --from=builder /app/server/dist ./server/dist
 COPY --from=builder /app/server/prisma ./server/prisma
+# Pesos del bot de Identidad Oculta entrenado en ml/ (issue #62); el
+# servidor los lee en tiempo de ejecución desde server/assets.
+COPY --from=builder /app/server/assets ./server/assets
 
 EXPOSE 3000
 CMD ["node", "server/dist/main"]

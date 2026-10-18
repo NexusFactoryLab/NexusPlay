@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { existsSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { JwtService } from '@nestjs/jwt';
 import type { Server } from 'socket.io';
@@ -13,6 +14,8 @@ import { InMemoryTournamentStore } from './in-memory-tournament.store.js';
 import { InMemoryDominoRoomStore } from './in-memory-domino-room.store.js';
 import { InMemorySnakesLaddersRoomStore } from './in-memory-snakes-ladders-room.store.js';
 import { InMemoryDualQuestRoomStore } from './in-memory-dual-quest-room.store.js';
+import { MlpGuessWhoBotPolicy } from '../../application/bots/mlp-guess-who-bot.policy.js';
+import { DEFAULT_GUESS_WHO_MODEL_PATH, loadGuessWhoBotPolicy } from '../bots/load-guess-who-bot-policy.js';
 
 type Client = Parameters<RoomsGateway['handleCreateSolo']>[0];
 const client = (id: string) => ({ id, data: { userId: id, displayName: id }, join: vi.fn(), leave: vi.fn(), emit: vi.fn(), disconnect: vi.fn() }) as unknown as Client;
@@ -48,6 +51,34 @@ async function startSolo(difficulty = 'HARD', botPolicy?: GuessWhoBotPolicy) {
   const room = ctx.rooms.findBySocketId('ana')!;
   vi.advanceTimersByTime(3000);
   return { ...ctx, human, room, bot: room.players[1] };
+}
+
+/**
+ * Juega como alguien que pregunta una vez por turno y nunca acusa, y
+ * responde con la verdad lo que pregunta el bot. Devuelve cuántas preguntas
+ * hizo el bot.
+ */
+function playAgainstPassiveHuman({ gateway, human, room, bot }: Awaited<ReturnType<typeof startSolo>>): number {
+  let humanAskedOn: number | null = null;
+  let botQuestions = 0;
+  for (let step = 0; step < 400 && room.phase === 'PLAYING'; step++) {
+    const pending = currentQuestion(room);
+    if (room.activePlayerUserId === 'ana' && !pending) {
+      const question = questionsFor(room, 'ana')[0];
+      if (question && humanAskedOn !== room.turnDeadline) {
+        humanAskedOn = room.turnDeadline;
+        gateway.handleQuestion(human, { questionId: question.id });
+      } else {
+        gateway.handlePassTurn(human);
+      }
+    } else if (pending?.askerId === bot.userId) {
+      botQuestions++;
+      const truth = pending.cardIds.includes(room.players[0].secretCardId!);
+      gateway.handleAnswer(human, { requestId: pending.requestId, answer: truth });
+    }
+    vi.advanceTimersByTime(500);
+  }
+  return botQuestions;
 }
 
 describe('partida en solitario contra el bot (issue #60)', () => {
@@ -90,29 +121,23 @@ describe('partida en solitario contra el bot (issue #60)', () => {
   });
 
   it('juega su turno (pregunta, espera la respuesta, decide) hasta ganar a quien nunca acusa', async () => {
-    const { gateway, human, room, bot } = await startSolo('HARD');
-    let humanAskedOn: number | null = null;
-    let botQuestions = 0;
-    for (let step = 0; step < 400 && room.phase === 'PLAYING'; step++) {
-      const pending = currentQuestion(room);
-      if (room.activePlayerUserId === 'ana' && !pending) {
-        const question = questionsFor(room, 'ana')[0];
-        if (question && humanAskedOn !== room.turnDeadline) {
-          humanAskedOn = room.turnDeadline;
-          gateway.handleQuestion(human, { questionId: question.id });
-        } else {
-          gateway.handlePassTurn(human);
-        }
-      } else if (pending?.askerId === bot.userId) {
-        botQuestions++;
-        const truth = pending.cardIds.includes(room.players[0].secretCardId!);
-        gateway.handleAnswer(human, { requestId: pending.requestId, answer: truth });
-      }
-      vi.advanceTimersByTime(500);
-    }
-    expect(room.phase).toBe('FINISHED');
-    expect(room.winnerUserId).toBe(bot.userId);
+    const solo = await startSolo('HARD');
+    const botQuestions = playAgainstPassiveHuman(solo);
+    expect(solo.room.phase).toBe('FINISHED');
+    expect(solo.room.winnerUserId).toBe(solo.bot.userId);
     expect(botQuestions).toBeGreaterThan(0);
+  });
+
+  it.runIf(existsSync(DEFAULT_GUESS_WHO_MODEL_PATH))('con el modelo entrenado de server/assets, el Difícil también juega partidas completas', async () => {
+    const policy = loadGuessWhoBotPolicy(DEFAULT_GUESS_WHO_MODEL_PATH, { log: () => {}, warn: () => {} });
+    expect(policy).toBeInstanceOf(MlpGuessWhoBotPolicy);
+    for (let game = 0; game < 5; game++) {
+      const solo = await startSolo('HARD', policy);
+      const botQuestions = playAgainstPassiveHuman(solo);
+      expect(solo.room.phase).toBe('FINISHED');
+      expect(solo.room.winnerUserId).toBe(solo.bot.userId);
+      expect(botQuestions).toBeGreaterThan(0);
+    }
   });
 
   it('no reprograma su jugada por cada mensaje de chat', async () => {
