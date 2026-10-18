@@ -9,6 +9,8 @@ import { GameNotFoundError } from '../errors/application.errors.js';
 import { buildGameSourceText } from '../ai/game-content-source-text.js';
 import type { GameAuthorizationService } from '../services/game-authorization.service.js';
 import type { RequesterAdminResolver } from '../services/requester-admin-resolver.service.js';
+import type { DeterministicGameAdapter } from '../adaptation/deterministic-game-adapter.js';
+import type { AiUsagePolicy } from '../services/ai-usage-policy.service.js';
 import { AdaptGameUseCase } from './adapt-game.use-case.js';
 import type { GenerateGameDraftUseCase } from './generate-game-draft.use-case.js';
 
@@ -36,9 +38,24 @@ function buildGame(overrides: { status?: 'draft' | 'published'; gameType?: strin
   });
 }
 
-function build(options: { game?: Game | null; canManage?: boolean; isAdmin?: boolean; archivedTypes?: string[] } = {}) {
+function build(
+  options: {
+    game?: Game | null;
+    canManage?: boolean;
+    isAdmin?: boolean;
+    archivedTypes?: string[];
+    canUseAi?: boolean;
+    algorithmSupported?: boolean;
+  } = {},
+) {
   const game = options.game === undefined ? buildGame() : options.game;
   const generate = vi.fn().mockResolvedValue({ config: { boardSize: 30 }, content: [{ cellNumber: 4 }] });
+  const adapt = vi.fn().mockReturnValue({
+    config: { handSize: 7 },
+    content: [{ label: 'Marte' }],
+    notices: ['Faltan imágenes.'],
+  });
+  const canUseAi = vi.fn().mockResolvedValue(options.canUseAi ?? true);
   const useCase = new AdaptGameUseCase(
     { findById: vi.fn().mockResolvedValue(game) } as never,
     {
@@ -49,8 +66,14 @@ function build(options: { game?: Game | null; canManage?: boolean; isAdmin?: boo
     { canManage: vi.fn().mockResolvedValue(options.canManage ?? false) } as unknown as GameAuthorizationService,
     { resolve: vi.fn().mockResolvedValue(options.isAdmin ?? false) } as unknown as RequesterAdminResolver,
     { execute: generate } as unknown as GenerateGameDraftUseCase,
+    {
+      supports: vi.fn().mockReturnValue(options.algorithmSupported ?? true),
+      supportedTargetKeys: vi.fn().mockReturnValue(['DOMINO', 'MEMORY_MATCH:PAIRS']),
+      adapt,
+    } as unknown as DeterministicGameAdapter,
+    { canUseAi } as unknown as AiUsagePolicy,
   );
-  return { useCase, generate };
+  return { useCase, generate, adapt, canUseAi };
 }
 
 describe('AdaptGameUseCase', () => {
@@ -60,6 +83,7 @@ describe('AdaptGameUseCase', () => {
     const result = await useCase.execute({
       gameId: 'game-1',
       requestingUserId: 'someone-else',
+      engine: 'AI',
       targetType: 'SNAKES_LADDERS',
     });
 
@@ -84,7 +108,7 @@ describe('AdaptGameUseCase', () => {
     const { useCase } = build({ game: buildGame({ status: 'draft' }), canManage: false });
 
     await expect(
-      useCase.execute({ gameId: 'game-1', requestingUserId: 'someone-else', targetType: 'MAZE_COLLECTOR' }),
+      useCase.execute({ gameId: 'game-1', requestingUserId: 'someone-else', engine: 'AI', targetType: 'MAZE_COLLECTOR' }),
     ).rejects.toBeInstanceOf(ForbiddenActionError);
   });
 
@@ -92,7 +116,7 @@ describe('AdaptGameUseCase', () => {
     const { useCase } = build({ game: buildGame({ status: 'draft' }), canManage: true });
 
     await expect(
-      useCase.execute({ gameId: 'game-1', requestingUserId: 'author-1', targetType: 'MAZE_COLLECTOR' }),
+      useCase.execute({ gameId: 'game-1', requestingUserId: 'author-1', engine: 'AI', targetType: 'MAZE_COLLECTOR' }),
     ).resolves.toMatchObject({ sourceGameId: 'game-1' });
   });
 
@@ -100,7 +124,7 @@ describe('AdaptGameUseCase', () => {
     const { useCase } = build({ game: null });
 
     await expect(
-      useCase.execute({ gameId: 'nope', requestingUserId: 'u', targetType: 'DOMINO' }),
+      useCase.execute({ gameId: 'nope', requestingUserId: 'u', engine: 'AI', targetType: 'DOMINO' }),
     ).rejects.toBeInstanceOf(GameNotFoundError);
   });
 
@@ -108,7 +132,7 @@ describe('AdaptGameUseCase', () => {
     const { useCase } = build({ archivedTypes: ['DOMINO'] });
 
     await expect(
-      useCase.execute({ gameId: 'game-1', requestingUserId: 'u', targetType: 'MAZE_COLLECTOR' }),
+      useCase.execute({ gameId: 'game-1', requestingUserId: 'u', engine: 'AI', targetType: 'MAZE_COLLECTOR' }),
     ).rejects.toBeInstanceOf(GameNotFoundError);
   });
 
@@ -116,7 +140,7 @@ describe('AdaptGameUseCase', () => {
     const { useCase } = build();
 
     await expect(
-      useCase.execute({ gameId: 'game-1', requestingUserId: 'u', targetType: 'DOMINO' }),
+      useCase.execute({ gameId: 'game-1', requestingUserId: 'u', engine: 'AI', targetType: 'DOMINO' }),
     ).rejects.toBeInstanceOf(InvalidGameContentError);
   });
 
@@ -129,10 +153,10 @@ describe('AdaptGameUseCase', () => {
     const { useCase } = build({ game: pairs });
 
     await expect(
-      useCase.execute({ gameId: 'game-1', requestingUserId: 'u', targetType: 'MEMORY_MATCH', mode: 'OPPOSITES' }),
+      useCase.execute({ gameId: 'game-1', requestingUserId: 'u', engine: 'AI', targetType: 'MEMORY_MATCH', mode: 'OPPOSITES' }),
     ).resolves.toMatchObject({ sourceGameId: 'game-1' });
     await expect(
-      useCase.execute({ gameId: 'game-1', requestingUserId: 'u', targetType: 'MEMORY_MATCH', mode: 'PAIRS' }),
+      useCase.execute({ gameId: 'game-1', requestingUserId: 'u', engine: 'AI', targetType: 'MEMORY_MATCH', mode: 'PAIRS' }),
     ).rejects.toBeInstanceOf(InvalidGameContentError);
   });
 
@@ -140,7 +164,7 @@ describe('AdaptGameUseCase', () => {
     const { useCase } = build({ archivedTypes: ['MAZE_COLLECTOR'] });
 
     await expect(
-      useCase.execute({ gameId: 'game-1', requestingUserId: 'u', targetType: 'MAZE_COLLECTOR' }),
+      useCase.execute({ gameId: 'game-1', requestingUserId: 'u', engine: 'AI', targetType: 'MAZE_COLLECTOR' }),
     ).rejects.toBeInstanceOf(InvalidGameContentError);
   });
 
@@ -148,8 +172,65 @@ describe('AdaptGameUseCase', () => {
     const { useCase } = build();
 
     await expect(
-      useCase.execute({ gameId: 'game-1', requestingUserId: 'u', targetType: 'DUAL_QUEST_PIXI' }),
+      useCase.execute({ gameId: 'game-1', requestingUserId: 'u', engine: 'AI', targetType: 'DUAL_QUEST_PIXI' }),
     ).rejects.toBeInstanceOf(InvalidGameContentError);
+  });
+});
+
+describe('AdaptGameUseCase — motor de adaptación (issue #50)', () => {
+  it('ALGORITHM adapta sin llamar a la IA ni consultar canUseAi, y junta los avisos', async () => {
+    const { useCase, generate, adapt, canUseAi } = build();
+
+    const result = await useCase.execute({
+      gameId: 'game-1',
+      requestingUserId: 'u',
+      engine: 'ALGORITHM',
+      targetType: 'MAZE_COLLECTOR',
+    });
+
+    expect(generate).not.toHaveBeenCalled();
+    expect(canUseAi).not.toHaveBeenCalled();
+    expect(adapt).toHaveBeenCalledOnce();
+    expect(result).toMatchObject({ sourceGameId: 'game-1', title: 'Sistema solar', content: [{ label: 'Marte' }] });
+    expect(result.notice).toContain('Adaptado de');
+    expect(result.notice).toContain('Faltan imágenes.');
+  });
+
+  it('ALGORITHM sobre un par sin adaptador se rechaza y NUNCA cae a la IA', async () => {
+    const { useCase, generate } = build({ algorithmSupported: false });
+
+    await expect(
+      useCase.execute({ gameId: 'game-1', requestingUserId: 'u', engine: 'ALGORITHM', targetType: 'SNAKES_LADDERS' }),
+    ).rejects.toBeInstanceOf(InvalidGameContentError);
+    expect(generate).not.toHaveBeenCalled();
+  });
+
+  it('AI pasa por canUseAi y se rechaza antes de gastar IA si no tiene permiso', async () => {
+    const { useCase, generate, canUseAi } = build({ canUseAi: false });
+
+    await expect(
+      useCase.execute({ gameId: 'game-1', requestingUserId: 'u', engine: 'AI', targetType: 'MAZE_COLLECTOR' }),
+    ).rejects.toBeInstanceOf(ForbiddenActionError);
+    expect(canUseAi).toHaveBeenCalledWith('u');
+    expect(generate).not.toHaveBeenCalled();
+  });
+
+  it('ALGORITHM respeta el permiso de acceso al origen (borrador ajeno)', async () => {
+    const { useCase, adapt } = build({ game: buildGame({ status: 'draft' }), canManage: false });
+
+    await expect(
+      useCase.execute({ gameId: 'game-1', requestingUserId: 'u', engine: 'ALGORITHM', targetType: 'MAZE_COLLECTOR' }),
+    ).rejects.toBeInstanceOf(ForbiddenActionError);
+    expect(adapt).not.toHaveBeenCalled();
+  });
+
+  it('listOptions informa los destinos sin IA y si hay IA disponible', async () => {
+    const { useCase } = build({ canUseAi: false });
+
+    await expect(useCase.listOptions({ gameId: 'game-1', requestingUserId: 'u' })).resolves.toEqual({
+      aiAvailable: false,
+      algorithmTargets: ['DOMINO', 'MEMORY_MATCH:PAIRS'],
+    });
   });
 });
 

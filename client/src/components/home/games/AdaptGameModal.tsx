@@ -9,10 +9,16 @@ import {
   Loader2,
   Puzzle,
   UserRoundSearch,
+  Zap,
   type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '../../../hooks/useAuth'
-import { adaptGame } from '../../../services/game-adaptation.service'
+import {
+  adaptGame,
+  getAdaptationOptions,
+  type AdaptationEngine,
+  type AdaptationOptions,
+} from '../../../services/game-adaptation.service'
 import { listAllGameTypeSettings, type GameDetail } from '../../../services/game.service'
 import { ApiError } from '../../../utils/http'
 import { AiSparklesIcon } from './AiSparklesIcon'
@@ -118,6 +124,9 @@ export function AdaptGameModal({ game, onClose }: AdaptGameModalProps) {
   const navigate = useNavigate()
   const [candidate, setCandidate] = useState<AdaptTarget | null>(null)
   const [pendingKey, setPendingKey] = useState<string | null>(null)
+  const [pendingEngine, setPendingEngine] = useState<AdaptationEngine | null>(null)
+  // `null` mientras carga. Si falla, se asume solo IA (el servidor valida igual).
+  const [options, setOptions] = useState<AdaptationOptions | null>(null)
   const [error, setError] = useState<string | null>(null)
   // `null` mientras carga o si la consulta falla: en ese caso no se bloquea
   // nada en pantalla y la validación definitiva la hace el servidor.
@@ -132,22 +141,31 @@ export function AdaptGameModal({ game, onClose }: AdaptGameModalProps) {
         setActiveTypes(new Set(settings.filter((s) => !s.isArchived).map((s) => s.gameType)))
       })
       .catch(() => {})
+    getAdaptationOptions(token, game.id)
+      .then((result) => {
+        if (!cancelled) setOptions(result)
+      })
+      .catch(() => {
+        if (!cancelled) setOptions({ aiAvailable: true, algorithmTargets: [] })
+      })
     return () => {
       cancelled = true
     }
-  }, [token])
+  }, [token, game.id])
 
   function isUnavailable(target: AdaptTarget): boolean {
     return activeTypes !== null && !activeTypes.has(target.targetType)
   }
 
-  async function handleConfirm() {
+  async function handleAdapt(engine: AdaptationEngine) {
     if (!token || !candidate || pendingKey) return
     const target = candidate
     setPendingKey(target.key)
+    setPendingEngine(engine)
     setError(null)
     try {
       const adaptation = await adaptGame(token, game.id, {
+        engine,
         targetType: target.targetType,
         mode: target.mode,
       })
@@ -155,11 +173,12 @@ export function AdaptGameModal({ game, onClose }: AdaptGameModalProps) {
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'No se pudo adaptar el juego.')
       setPendingKey(null)
+      setPendingEngine(null)
     }
   }
 
   const busy = pendingKey !== null
-  const options = TARGETS.filter((target) => !isSameTarget(game, target))
+  const targetOptions = TARGETS.filter((target) => !isSameTarget(game, target))
   const CandidateIcon = candidate?.icon
 
   return (
@@ -192,7 +211,7 @@ export function AdaptGameModal({ game, onClose }: AdaptGameModalProps) {
             Elige el tipo de juego
           </p>
           <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {options.map((target) => {
+            {targetOptions.map((target) => {
               const Icon = target.icon
               const unavailable = isUnavailable(target)
               return (
@@ -240,29 +259,64 @@ export function AdaptGameModal({ game, onClose }: AdaptGameModalProps) {
               <p className="mt-1 text-[12.5px] leading-snug text-text">{candidate.description}</p>
             </div>
           </div>
-          <p className="mt-3 text-[12.5px] leading-snug text-text">
-            Al confirmar, la IA generará el borrador y consumirá cuota. Si no es el tipo que
-            buscabas, vuelve atrás y elige otro.
-          </p>
-          <div className="mt-4 flex flex-wrap justify-end gap-2">
+          {(() => {
+            const key = candidate.mode ? `${candidate.targetType}:${candidate.mode}` : candidate.targetType
+            const algorithmAvailable = options?.algorithmTargets.includes(key) ?? false
+            const loading = options === null
+            return (
+              <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  disabled={busy || loading || !algorithmAvailable}
+                  className="flex flex-col items-start gap-1 rounded-xl border border-border p-3 text-left transition-colors hover:border-accent hover:bg-accent/5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border disabled:hover:bg-transparent"
+                  onClick={() => void handleAdapt('ALGORITHM')}
+                >
+                  <span className="flex items-center gap-1.5 text-[13.5px] font-semibold text-text-h">
+                    {pendingEngine === 'ALGORITHM' ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Zap className="h-4 w-4 text-accent" />
+                    )}
+                    Rápida · sin IA
+                  </span>
+                  <span className="text-[12px] leading-snug text-text">
+                    {!loading && !algorithmAvailable
+                      ? 'Este tipo solo se puede con IA.'
+                      : 'Gratis e instantánea. Menos precisa.'}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  disabled={busy || loading || options?.aiAvailable === false}
+                  className="flex flex-col items-start gap-1 rounded-xl border border-accent/50 p-3 text-left transition-colors hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={() => void handleAdapt('AI')}
+                >
+                  <span className="flex items-center gap-1.5 text-[13.5px] font-semibold text-text-h">
+                    {pendingEngine === 'AI' ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <AiSparklesIcon className="h-4 w-4 text-accent" />
+                    )}
+                    Con IA
+                  </span>
+                  <span className="text-[12px] leading-snug text-text">
+                    {options?.aiAvailable === false
+                      ? 'No disponible en tu plan.'
+                      : 'Más precisa. Consume cuota de IA.'}
+                  </span>
+                </button>
+              </div>
+            )
+          })()}
+          <div className="mt-3 flex justify-end">
             <button
               type="button"
-              className="flex items-center gap-1.5 rounded-lg border border-border px-3.5 py-2 text-[13px] font-medium text-text-h disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-[12.5px] font-medium text-text-h disabled:opacity-50"
               disabled={busy}
               onClick={() => setCandidate(null)}
             >
               <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2.5} />
               Elegir otro tipo
-            </button>
-            <button
-              type="button"
-              className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-[13px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70"
-              style={{ background: ACCENT_GRADIENT }}
-              disabled={busy}
-              onClick={() => void handleConfirm()}
-            >
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <AiSparklesIcon className="h-4 w-4" />}
-              {busy ? 'Generando…' : 'Sí, adaptar con IA'}
             </button>
           </div>
         </div>
@@ -270,7 +324,9 @@ export function AdaptGameModal({ game, onClose }: AdaptGameModalProps) {
 
       {busy && (
         <p className="mt-3 text-[12.5px] text-text" role="status">
-          Armando el borrador con IA… puede tardar unos segundos.
+          {pendingEngine === 'AI'
+            ? 'Armando el borrador con IA… puede tardar unos segundos.'
+            : 'Adaptando los conceptos…'}
         </p>
       )}
       {error && (

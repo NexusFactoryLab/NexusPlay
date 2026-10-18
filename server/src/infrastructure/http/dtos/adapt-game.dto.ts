@@ -2,6 +2,10 @@ import { IsIn, IsOptional, IsString } from 'class-validator';
 import { VALID_GAME_TYPES } from '../../../domain/value-objects/game-type.vo.js';
 
 export class AdaptGameDto {
+  /** `ALGORITHM` = sin IA (gratis, menos preciso); `AI` = con IA (más preciso, consume cuota). */
+  @IsIn(['ALGORITHM', 'AI'])
+  engine!: 'ALGORITHM' | 'AI';
+
   @IsIn(VALID_GAME_TYPES)
   targetType!: string;
 
