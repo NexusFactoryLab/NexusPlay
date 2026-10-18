@@ -91,19 +91,19 @@ export class ClassNotFoundError extends ApplicationError {
 
 export class SubjectNotFoundError extends ApplicationError {
   constructor(identifier: string) {
-    super(`No se encontró una materia con identificador "${identifier}".`);
+    super(`No se encontró un Ã¡rea con identificador "${identifier}".`);
   }
 }
 
 export class SubjectSlugAlreadyTakenError extends ApplicationError {
   constructor(slug: string) {
-    super(`Ya existe una materia con el identificador "${slug}".`);
+    super(`Ya existe un Ã¡rea con el identificador "${slug}".`);
   }
 }
 
 export class ParentSubjectNotFoundError extends ApplicationError {
   constructor(parentSubjectId: string) {
-    super(`No se encontró la materia raíz "${parentSubjectId}" para crear la sub-materia.`);
+    super(`No se encontró el Ã¡rea raíz "${parentSubjectId}" para crear la sub-Ã¡rea.`);
   }
 }
 

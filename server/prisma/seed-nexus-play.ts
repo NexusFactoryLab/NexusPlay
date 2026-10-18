@@ -40,7 +40,7 @@ async function main(): Promise<void> {
     await client.connect();
     const db = client.db();
 
-    // El juego necesita una materia: se reutiliza la de sostenibilidad/medio
+    // El juego necesita un Ã¡rea: se reutiliza la de sostenibilidad/medio
     // ambiente si ya existe, y si no se crea (misma forma que usa la app).
     const categories = db.collection('categories');
     const categoryName = 'Medio Ambiente';
@@ -56,7 +56,7 @@ async function main(): Promise<void> {
         createdAt: new Date(),
       } as never);
       category = await categories.findOne({ _id: categoryId } as never);
-      console.log(`Materia creada: ${categoryName}`);
+      console.log(`Ãrea creada: ${categoryName}`);
     }
 
     const games = db.collection('games');

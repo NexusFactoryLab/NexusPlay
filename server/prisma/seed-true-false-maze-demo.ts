@@ -110,7 +110,7 @@ async function ensureCategory(
   slug: string,
 ): Promise<string> {
   // Mismo criterio que los otros seeds: busca por nombre O por slug para
-  // reusar la materia aunque el nombre no calce exacto.
+  // reusar el Ã¡rea aunque el nombre no calce exacto.
   const existing = await categories.findOne({ $or: [{ name }, { slug }] });
   if (existing) return String(existing._id);
 
@@ -122,7 +122,7 @@ async function ensureCategory(
     creatorUserId: null,
     createdAt: new Date(),
   } as never);
-  console.log(`Materia creada: ${name}`);
+  console.log(`Ãrea creada: ${name}`);
   return categoryId;
 }
 

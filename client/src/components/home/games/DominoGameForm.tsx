@@ -1,15 +1,19 @@
 import { useEffect, useState } from 'react'
+import { Rocket, SlidersHorizontal, Puzzle } from 'lucide-react'
 import type { FormEvent } from 'react'
 import { TextField } from '../../TextField'
 import { SaveVisibilityModal } from './SaveVisibilityModal'
 import { ImageUploadField } from './ImageUploadField'
 import { IconPickerField } from './IconPickerField'
 import { AiGameAssistantPanel } from './AiGameAssistantPanel'
+import { useReportCreateSummary } from './aiDraftContext'
 import { GameFormShell } from './GameFormShell'
 import { WizardPhaseNav } from './WizardPhaseNav'
+import { FormSection, PhaseLabel } from './create/FormSection'
 import type { GameDraft } from '../../../services/ai-game-assistant.service'
 import { OrganizationSelectField } from './create/OrganizationSelectField'
 import { CategorySelectField } from './create/CategorySelectField'
+import { ItemGridEditor } from './create/ItemGridEditor'
 import { useCreateGameProgress } from './create/CreateGameProgressContext'
 import { useAuth } from '../../../hooks/useAuth'
 import { useToast } from '../../../hooks/useToast'
@@ -102,6 +106,7 @@ export function DominoGameForm({
   const [submitting, setSubmitting] = useState(false)
   const [createdGameId, setCreatedGameId] = useState<string | null>(null)
   const [phase, setPhase] = useState(0)
+  const [selectedConcept, setSelectedConcept] = useState(0)
   const { setSubPhase } = useCreateGameProgress()
 
   // Informa al header del wizard (CreateGameLayout) en qué fase va este
@@ -139,6 +144,8 @@ export function DominoGameForm({
 
   function applyAiDraft(draft: GameDraft) {
     const items = Array.isArray(draft.content) ? draft.content : []
+    // El panel sigue al concepto más reciente mientras la IA llena la lista.
+    setSelectedConcept(Math.max(items.length - 1, 0))
     setConcepts(
       items.map((item, index) => {
         const raw = (item ?? {}) as Record<string, unknown>
@@ -171,9 +178,10 @@ export function DominoGameForm({
     setConcepts((current) =>
       current.length > MIN_DOMINO_CONCEPTS ? current.filter((_, i) => i !== index) : current,
     )
+    setSelectedConcept((current) => Math.max(0, Math.min(current, concepts.length - 2)))
   }
 
-  /** Valida solo los campos de la fase 1 (Identidad): título, descripción, materia. */
+  /** Valida solo los campos de la fase 1 (Identidad): título, descripción, Ã¡rea. */
   function validateIdentityPhase(): string | null {
     if (!title.trim() || title.trim().length < 3) {
       return 'El título debe tener al menos 3 caracteres.'
@@ -182,7 +190,7 @@ export function DominoGameForm({
       return 'La descripción debe tener al menos 10 caracteres.'
     }
     if (!categoryId) {
-      return 'Elige una materia para el juego.'
+      return 'Elige un Ã¡rea para el juego.'
     }
     return null
   }
@@ -203,10 +211,16 @@ export function DominoGameForm({
     if (concepts.length > MAX_DOMINO_CONCEPTS) {
       return `El dominó admite como máximo ${MAX_DOMINO_CONCEPTS} conceptos.`
     }
-    if (concepts.some((concept) => !concept.label.trim())) {
+    const emptyAt = concepts.findIndex((concept) => !concept.label.trim())
+    if (emptyAt !== -1) {
+      setSelectedConcept(emptyAt)
       return 'Cada concepto necesita un nombre antes de crear el juego.'
     }
     const labels = concepts.map((concept) => concept.label.trim().toLowerCase())
+    const duplicateAt = labels.findIndex((label, index) => labels.indexOf(label) !== index)
+    if (duplicateAt !== -1) {
+      setSelectedConcept(duplicateAt)
+    }
     if (new Set(labels).size !== labels.length) {
       return 'No puede haber dos conceptos con el mismo nombre.'
     }
@@ -279,6 +293,8 @@ export function DominoGameForm({
     showToast('Juego creado', 'success')
   }
 
+  useReportCreateSummary({ count: concepts.length, itemsLabel: 'conceptos' })
+
   if (createdGameId) {
     return (
       <SaveVisibilityModal
@@ -305,12 +321,10 @@ export function DominoGameForm({
       aiPanel={<AiGameAssistantPanel gameType="DOMINO" disabled={submitting} onDraftReady={applyAiDraft} />}
     >
       <form className="flex flex-col gap-[16px]" onSubmit={handleSubmit} noValidate>
-        <p className="text-[11.5px] font-semibold uppercase tracking-wide text-accent">
-          Fase {phase + 1} de {TOTAL_PHASES} · {PHASES[phase].label}
-        </p>
+        <PhaseLabel phase={phase + 1} total={TOTAL_PHASES} label={PHASES[phase].label} />
 
         {phase === 0 && (
-          <div className="flex flex-col gap-[16px] animate-[fade-in-up_0.25s_ease-out_backwards]">
+          <FormSection icon={Rocket} title="Cuéntanos de tu juego" subtitle="Nombre, portada y el lugar donde vivirá." tone={1}>
             <TextField
               label="Título del juego"
               type="text"
@@ -355,13 +369,13 @@ export function DominoGameForm({
               disabled={submitting}
               onChange={setOrganizationId}
             />
-          </div>
+          </FormSection>
         )}
 
         {phase === 1 && (
-          <div className="flex flex-col gap-[16px] animate-[fade-in-up_0.25s_ease-out_backwards]">
+          <FormSection icon={SlidersHorizontal} title="Reglas del juego" subtitle="Ajusta cómo se juega; los valores por defecto funcionan bien." tone={2}>
             <div>
-              <label className="mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="domino-hand-size">
+              <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="domino-hand-size">
                 Fichas que recibe el jugador
               </label>
               <input
@@ -374,96 +388,86 @@ export function DominoGameForm({
                 disabled={submitting}
                 onChange={(event) => setHandSize(Number(event.target.value))}
               />
-              <p className="mt-1 text-[11.5px] text-text">Entre 3 y 12 fichas; el resto queda en el pozo.</p>
+              <p className="nx-hint mt-1 text-[11.5px] text-text">Entre 3 y 12 fichas; el resto queda en el pozo.</p>
             </div>
-          </div>
+          </FormSection>
         )}
 
         {phase === 2 && (
-        <div className="grid grid-cols-1 gap-3 animate-[fade-in-up_0.25s_ease-out_backwards] xl:grid-cols-2">
-          {concepts.map((concept, index) => {
+        <FormSection icon={Puzzle} title="Conceptos" subtitle="Cada concepto se conecta con otro en la cadena del dominó." tone={3} bare>
+<ItemGridEditor
+          itemLabel="Concepto"
+          addLabel="+ Agregar concepto"
+          count={concepts.length}
+          minItems={MIN_DOMINO_CONCEPTS}
+          maxItems={MAX_DOMINO_CONCEPTS}
+          selected={selectedConcept}
+          onSelect={setSelectedConcept}
+          onAdd={addConcept}
+          onRemove={removeConcept}
+          disabled={submitting}
+          isComplete={(index) => !!concepts[index]?.label.trim()}
+          tileText={(index) => concepts[index]?.label ?? ''}
+          tileVisual={(index) => {
+            const concept = concepts[index]
+            if (!concept) return null
             const Icon = iconForConcept(concept.icon)
             return (
-              <div key={index} className="rounded-xl border border-border p-4">
-                <div className="mb-2.5 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Icon className="h-4 w-4" style={{ color: concept.color }} strokeWidth={2} />
-                    <p className="text-[13px] font-semibold text-text-h">Concepto {index + 1}</p>
-                  </div>
-                  {concepts.length > MIN_DOMINO_CONCEPTS && (
-                    <button
-                      type="button"
-                      className="text-[12px] font-medium text-danger"
-                      onClick={() => removeConcept(index)}
-                      disabled={submitting}
-                    >
-                      Quitar
-                    </button>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <div className="sm:col-span-1">
-                    <TextField
-                      label="Nombre"
-                      type="text"
-                      value={concept.label}
-                      disabled={submitting}
-                      onChange={(value) => updateConcept(index, 'label', value)}
-                      onBlur={() => {}}
-                    />
-                  </div>
-                  <div>
-                    <label
-                      className="mb-1.5 block text-[13px] font-medium text-text-h"
-                      htmlFor={`concept-icon-${index}`}
-                    >
-                      Ícono
-                    </label>
-                    <IconPickerField
-                      id={`concept-icon-${index}`}
-                      value={concept.icon}
-                      labels={DOMINO_ICON_LABELS}
-                      disabled={submitting}
-                      onChange={(key) => updateConcept(index, 'icon', key)}
-                    />
-                  </div>
-                  <div>
-                    <label
-                      className="mb-1.5 block text-[13px] font-medium text-text-h"
-                      htmlFor={`concept-color-${index}`}
-                    >
-                      Color
-                    </label>
-                    <input
-                      id={`concept-color-${index}`}
-                      type="color"
-                      className="h-[45px] w-full cursor-pointer rounded-lg border border-border bg-bg px-2 py-1.5 outline-none focus:border-accent"
-                      value={concept.color}
-                      disabled={submitting}
-                      onChange={(event) => updateConcept(index, 'color', event.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
+              <span className="nx-gi-swatch" style={{ background: concept.color }}>
+                <Icon className="h-6 w-6" strokeWidth={2.2} />
+              </span>
             )
-          })}
-
-          {concepts.length < MAX_DOMINO_CONCEPTS && (
-            <button
-              type="button"
-              className="self-start rounded-lg border border-dashed border-border px-3.5 py-2 text-[13px] font-medium text-text-h xl:col-span-2"
-              onClick={addConcept}
-              disabled={submitting}
-            >
-              + Agregar concepto
-            </button>
+          }}
+          renderEditor={(index) => (
+            <div className="flex flex-col gap-3">
+              <TextField
+                label="Nombre"
+                type="text"
+                value={concepts[index]?.label ?? ''}
+                disabled={submitting}
+                onChange={(value) => updateConcept(index, 'label', value)}
+                onBlur={() => {}}
+              />
+              <div>
+                <label
+                  className="nx-label mb-1.5 block text-[13px] font-medium text-text-h"
+                  htmlFor={`concept-icon-${index}`}
+                >
+                  Ícono
+                </label>
+                <IconPickerField
+                  id={`concept-icon-${index}`}
+                  value={concepts[index]?.icon ?? ''}
+                  labels={DOMINO_ICON_LABELS}
+                  disabled={submitting}
+                  onChange={(key) => updateConcept(index, 'icon', key)}
+                />
+              </div>
+              <div>
+                <label
+                  className="nx-label mb-1.5 block text-[13px] font-medium text-text-h"
+                  htmlFor={`concept-color-${index}`}
+                >
+                  Color
+                </label>
+                <input
+                  id={`concept-color-${index}`}
+                  type="color"
+                  className="h-[45px] w-full cursor-pointer rounded-lg border border-border bg-bg px-2 py-1.5 outline-none focus:border-accent"
+                  value={concepts[index]?.color ?? '#888888'}
+                  disabled={submitting}
+                  onChange={(event) => updateConcept(index, 'color', event.target.value)}
+                />
+              </div>
+            </div>
           )}
-        </div>
+        />
+</FormSection>
         )}
 
         {error && (
           <p
-            className="rounded-lg border border-danger/35 bg-danger/10 px-[13px] py-[11px] text-sm leading-snug text-danger"
+            className="nx-alert"
             role="alert"
           >
             {error}
@@ -471,18 +475,18 @@ export function DominoGameForm({
         )}
 
         <WizardPhaseNav
-          onBack={phase === 0 ? onBack : goToPreviousPhase}
-          backLabel={phase === 0 ? 'Cambiar tipo de juego' : 'Atrás'}
+          onBack={phase === 0 ? undefined : goToPreviousPhase}
+          backLabel="Atrás"
           onNext={goToNextPhase}
           isLastPhase={phase === TOTAL_PHASES - 1}
           submitting={submitting}
         />
 
         {phase === TOTAL_PHASES - 1 && (
-          <div className="flex gap-2">
+          <div className="nx-sticky-actions nx-actions">
             <button
               type="submit"
-              className="rounded-lg px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)] transition-transform hover:not-disabled:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+              className="nx-btn nx-btn-primary"
               style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
               disabled={submitting}
             >
@@ -490,7 +494,7 @@ export function DominoGameForm({
             </button>
             <button
               type="button"
-              className="rounded-lg border border-border px-4 py-2.5 text-[14px] font-medium text-text-h"
+              className="nx-btn nx-btn-secondary border border-border text-text-h"
               onClick={goToPreviousPhase}
               disabled={submitting}
             >
@@ -498,7 +502,7 @@ export function DominoGameForm({
             </button>
             <button
               type="button"
-              className="rounded-lg border border-border px-4 py-2.5 text-[14px] font-medium text-text-h"
+              className="nx-btn nx-btn-secondary border border-border text-text-h"
               onClick={onClose}
               disabled={submitting}
             >

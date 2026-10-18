@@ -1,11 +1,18 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Check, ExternalLink, X } from 'lucide-react'
+import { Check, ExternalLink, X, Rocket, ListChecks, SlidersHorizontal } from 'lucide-react'
 import { TextField } from '../../../TextField'
 import { SaveVisibilityModal } from '../SaveVisibilityModal'
 import { ImageUploadField } from '../ImageUploadField'
 import { AiGameAssistantPanel } from '../AiGameAssistantPanel'
+import { useReportCreateSummary } from '../aiDraftContext'
 import { GameFormShell } from '../GameFormShell'
+import { WizardPhaseNav } from '../WizardPhaseNav'
+import { FormSection, PhaseLabel } from '../create/FormSection'
+import { FormSelect } from '../create/FormSelect'
+import { InfoBubble } from '../create/InfoBubble'
+import { ItemGridEditor } from '../create/ItemGridEditor'
+import { useCreateGameProgress } from '../create/CreateGameProgressContext'
 import { OrganizationSelectField } from '../create/OrganizationSelectField'
 import { CategorySelectField } from '../create/CategorySelectField'
 import type { GameDraft } from '../../../../services/ai-game-assistant.service'
@@ -53,6 +60,14 @@ const SELECT_CLASS =
 const TEXTAREA_CLASS =
   'w-full resize-y rounded-lg border border-border bg-bg px-[13px] py-[10px] text-[14.5px] leading-snug text-text-h outline-none focus:border-accent'
 
+/** Fases del formulario (issue #218): Identidad, Ajustes de la partida y Contenido (afirmaciones). */
+const PHASES = [
+  { label: 'Identidad del juego' },
+  { label: 'Ajustes de la partida' },
+  { label: 'Contenido: afirmaciones' },
+] as const
+const TOTAL_PHASES = PHASES.length
+
 type TrueFalseMazeGameFormProps = {
   onClose: () => void
   onCreated: (gameId: string, visibility: 'private' | 'community') => void
@@ -88,6 +103,16 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [createdGameId, setCreatedGameId] = useState<string | null>(null)
+  const [phase, setPhase] = useState(0)
+  const [selectedQuestion, setSelectedQuestion] = useState(0)
+  const { setSubPhase } = useCreateGameProgress()
+
+  // Informa al header del wizard en qué fase va este formulario; se limpia al desmontar.
+  useEffect(() => {
+    setSubPhase({ phase: phase + 1, totalPhases: TOTAL_PHASES, phaseLabel: PHASES[phase].label })
+    return () => setSubPhase(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase])
 
   useEffect(() => {
     if (!token) return
@@ -115,7 +140,11 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
         explanation: typeof raw.explanation === 'string' ? raw.explanation : '',
       })
     })
-    if (drafted.length > 0) setQuestions(drafted)
+    // El panel sigue a la afirmación más reciente mientras la IA llena la lista.
+    if (drafted.length > 0) {
+      setSelectedQuestion(drafted.length - 1)
+      setQuestions(drafted)
+    }
 
     const config = (draft.config ?? {}) as Record<string, unknown>
     const inRange = (value: unknown, min: number, max: number): value is number =>
@@ -140,27 +169,43 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
 
   function removeQuestion(index: number) {
     setQuestions((current) => (current.length > MIN_TF_QUESTIONS ? current.filter((_, i) => i !== index) : current))
+    setSelectedQuestion((current) => Math.max(0, Math.min(current, questions.length - 2)))
+  }
+
+  /** Fase 1 (Identidad): título, descripción y área. */
+  function validateIdentityPhase(): string | null {
+    if (title.trim().length < 3) return 'El título debe tener al menos 3 caracteres.'
+    if (description.trim().length < 10) return 'La descripción debe tener al menos 10 caracteres.'
+    if (!categoryId) return 'Elige un área para el juego.'
+    return null
+  }
+
+  /** Fase 2 (Ajustes): todos tienen valor por defecto, no hay nada que bloquear. */
+  function validateSettingsPhase(): string | null {
+    return null
   }
 
   /** Mismas reglas que TrueFalseMazeContentValidator en el servidor, para avisar antes del viaje de red. */
-  function validate(): string | null {
-    if (title.trim().length < 3) return 'El título debe tener al menos 3 caracteres.'
-    if (description.trim().length < 10) return 'La descripción debe tener al menos 10 caracteres.'
-    if (!categoryId) return 'Elige una materia para el juego.'
+  function validateContentPhase(): string | null {
     if (questions.length < MIN_TF_QUESTIONS) return `Necesitas al menos ${MIN_TF_QUESTIONS} afirmaciones.`
     if (questions.length > MAX_TF_QUESTIONS) return `El laberinto admite como máximo ${MAX_TF_QUESTIONS} afirmaciones.`
     const seen = new Set<string>()
     for (const [index, question] of questions.entries()) {
       const statement = question.statement.trim()
-      if (statement.length < MIN_TF_STATEMENT_LENGTH || statement.length > MAX_TF_STATEMENT_LENGTH) {
-        return `La afirmación ${index + 1} debe tener entre ${MIN_TF_STATEMENT_LENGTH} y ${MAX_TF_STATEMENT_LENGTH} caracteres.`
+      // El panel edita una afirmación a la vez: se abre la que falla.
+      const fail = (message: string) => {
+        setSelectedQuestion(index)
+        return message
       }
-      if (question.answer === null) return `Marca si la afirmación ${index + 1} es verdadera o falsa.`
+      if (statement.length < MIN_TF_STATEMENT_LENGTH || statement.length > MAX_TF_STATEMENT_LENGTH) {
+        return fail(`La afirmación ${index + 1} debe tener entre ${MIN_TF_STATEMENT_LENGTH} y ${MAX_TF_STATEMENT_LENGTH} caracteres.`)
+      }
+      if (question.answer === null) return fail(`Marca si la afirmación ${index + 1} es verdadera o falsa.`)
       if (question.explanation.trim().length > MAX_TF_EXPLANATION_LENGTH) {
-        return `La explicación de la afirmación ${index + 1} admite como máximo ${MAX_TF_EXPLANATION_LENGTH} caracteres.`
+        return fail(`La explicación de la afirmación ${index + 1} admite como máximo ${MAX_TF_EXPLANATION_LENGTH} caracteres.`)
       }
       const normalized = statement.toLocaleLowerCase('es')
-      if (seen.has(normalized)) return `La afirmación ${index + 1} está repetida.`
+      if (seen.has(normalized)) return fail(`La afirmación ${index + 1} está repetida.`)
       seen.add(normalized)
     }
     if (!questions.some((q) => q.answer === true) || !questions.some((q) => q.answer === false)) {
@@ -169,13 +214,33 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
     return null
   }
 
+  const VALIDATORS = [validateIdentityPhase, validateSettingsPhase, validateContentPhase]
+
+  function goToNextPhase() {
+    const validationError = VALIDATORS[phase]()
+    if (validationError) {
+      setError(validationError)
+      return
+    }
+    setError(null)
+    setPhase((current) => Math.min(current + 1, TOTAL_PHASES - 1))
+  }
+
+  function goToPreviousPhase() {
+    setError(null)
+    setPhase((current) => Math.max(current - 1, 0))
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!token) return
-    const problem = validate()
-    if (problem) {
-      setError(problem)
-      return
+    // Se revalida todo por si el usuario retrocedió y cambió algo.
+    for (const validate of VALIDATORS) {
+      const problem = validate()
+      if (problem) {
+        setError(problem)
+        return
+      }
     }
 
     setSubmitting(true)
@@ -219,6 +284,8 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
     showToast('Juego creado', 'success')
   }
 
+  useReportCreateSummary({ count: questions.length, itemsLabel: 'afirmaciones' })
+
   if (createdGameId) {
     return (
       <SaveVisibilityModal
@@ -236,11 +303,16 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
       backLabel="Cambiar tipo de juego"
       onBack={onBack}
       title="Laberinto Verdadero o Falso"
-      description="Escribe afirmaciones sobre tu tema. En el juego, un robot recorre una nave espacial y responde cada una entrando a la sala VERDADERO o FALSO, mientras esquiva medusas galácticas. Después de cada respuesta se muestra tu explicación."
+      description="Escribe afirmaciones: el robot entra a la sala VERDADERO o FALSO."
+      descriptionDetail="Un robot recorre una nave espacial y responde cada afirmación entrando a la sala VERDADERO o FALSO, mientras esquiva medusas galácticas. Después de cada respuesta se muestra tu explicación."
       aiPanel={<AiGameAssistantPanel gameType="TRUE_FALSE_MAZE" disabled={submitting} onDraftReady={applyAiDraft} />}
     >
       <form className="flex flex-col gap-[16px]" onSubmit={handleSubmit} noValidate>
-        <div className="flex flex-wrap items-center gap-4 rounded-xl border border-border bg-[#070914] p-4 text-slate-100">
+        <PhaseLabel phase={phase + 1} total={TOTAL_PHASES} label={PHASES[phase].label} />
+
+        {phase === 0 && (
+        <>
+        <div className="nx-scenario">
           <div className="flex items-end gap-2">
             <img src={robotSprite} alt="" className="h-12 w-auto" />
             <img src={zoneTrueSprite} alt="" className="h-11 w-auto" />
@@ -261,7 +333,8 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
           </div>
         </div>
 
-        <TextField label="Título del juego" type="text" value={title} disabled={submitting} onChange={setTitle} onBlur={() => {}} />
+        <FormSection icon={Rocket} title="Cuéntanos de tu juego" subtitle="Nombre, portada y el lugar donde vivirá." tone={1}>
+<TextField label="Título del juego" type="text" value={title} disabled={submitting} onChange={setTitle} onBlur={() => {}} />
         <TextField
           label="Descripción"
           type="text"
@@ -279,14 +352,38 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
           onChange={setCoverImageUrl}
         />
 
-        <div className="rounded-xl border border-border p-4">
-          <p className="mb-3 text-[13px] font-semibold text-text-h">Ajustes de la partida</p>
+          <CategorySelectField
+            token={token}
+            categories={categories}
+            categoryId={categoryId}
+            onCategoryIdChange={setCategoryId}
+            onCategoryCreated={(category) => {
+              setCategories((current) => [...current, category])
+              onCategoryCreated()
+            }}
+            disabled={submitting}
+            showToast={showToast}
+          />
+
+          <OrganizationSelectField organizations={organizations} value={organizationId} disabled={submitting} onChange={setOrganizationId} />
+        </FormSection>
+        </>
+        )}
+
+        {phase === 1 && (
+        <FormSection icon={SlidersHorizontal} title="Ajustes de la partida" subtitle="Dificultad y reglas de la nave." tone={2}>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="tf-lives">
-                Baterías (vidas)
-              </label>
-              <select
+              <div className="mb-1.5 flex items-center gap-1.5">
+                <label className="nx-label text-[13px] font-medium text-text-h" htmlFor="tf-lives">
+                  Baterías (vidas)
+                </label>
+                <InfoBubble
+                  label="Ayuda: baterías"
+                  text="Las vidas del robot. Cada vez que una medusa lo toca o se equivoca de sala, pierde una batería; sin baterías, termina la partida."
+                />
+              </div>
+              <FormSelect
                 id="tf-lives"
                 className={SELECT_CLASS}
                 value={lives}
@@ -298,13 +395,19 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
                     {value}
                   </option>
                 ))}
-              </select>
+              </FormSelect>
             </div>
             <div>
-              <label className="mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="tf-enemies">
-                Medusas galácticas
-              </label>
-              <select
+              <div className="mb-1.5 flex items-center gap-1.5">
+                <label className="nx-label text-[13px] font-medium text-text-h" htmlFor="tf-enemies">
+                  Medusas galácticas
+                </label>
+                <InfoBubble
+                  label="Ayuda: medusas galácticas"
+                  text="Los enemigos que persiguen al robot por la nave. Más medusas hacen el juego más difícil."
+                />
+              </div>
+              <FormSelect
                 id="tf-enemies"
                 className={SELECT_CLASS}
                 value={enemyCount}
@@ -316,13 +419,19 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
                     {value}
                   </option>
                 ))}
-              </select>
+              </FormSelect>
             </div>
             <div>
-              <label className="mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="tf-speed">
-                Velocidad de las medusas
-              </label>
-              <select
+              <div className="mb-1.5 flex items-center gap-1.5">
+                <label className="nx-label text-[13px] font-medium text-text-h" htmlFor="tf-speed">
+                  Velocidad de las medusas
+                </label>
+                <InfoBubble
+                  label="Ayuda: velocidad de las medusas"
+                  text="Qué tan rápido persiguen al robot. Lenta es ideal para empezar; Rápida exige reflejos además de conocimiento."
+                />
+              </div>
+              <FormSelect
                 id="tf-speed"
                 className={SELECT_CLASS}
                 value={enemySpeed}
@@ -332,13 +441,19 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
                 <option value={1}>Lenta</option>
                 <option value={2}>Normal</option>
                 <option value={3}>Rápida</option>
-              </select>
+              </FormSelect>
             </div>
             <div>
-              <label className="mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="tf-relocate">
-                Las salas cambian de lugar
-              </label>
-              <select
+              <div className="mb-1.5 flex items-center gap-1.5">
+                <label className="nx-label text-[13px] font-medium text-text-h" htmlFor="tf-relocate">
+                  Las salas cambian de lugar
+                </label>
+                <InfoBubble
+                  label="Ayuda: las salas cambian de lugar"
+                  text="Las salas VERDADERO y FALSO se intercambian de posición cada cierto tiempo, para que el jugador lea la afirmación en vez de memorizar dónde está cada sala."
+                />
+              </div>
+              <FormSelect
                 id="tf-relocate"
                 className={SELECT_CLASS}
                 value={relocateSeconds}
@@ -350,7 +465,7 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
                     {option.label}
                   </option>
                 ))}
-              </select>
+              </FormSelect>
             </div>
           </div>
           <div className="mt-3 flex flex-col gap-2">
@@ -362,9 +477,12 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
                 disabled={submitting}
                 onChange={(event) => setShuffleQuestions(event.target.checked)}
               />
-              <span>
+              <span className="inline-flex items-center gap-1.5">
                 Barajar las afirmaciones en cada partida
-                <span className="block text-[12px] text-text">Si lo desmarcas, salen en el orden en que las escribiste.</span>
+                <InfoBubble
+                  label="Ayuda: barajar las afirmaciones"
+                  text="Las afirmaciones salen en orden distinto en cada partida. Desmárcalo si quieres que se muestren siempre en el orden que escribiste."
+                />
               </span>
             </label>
             <label className="flex items-start gap-2.5 text-[13.5px] text-text-h">
@@ -375,76 +493,80 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
                 disabled={submitting}
                 onChange={(event) => setLightsOut(event.target.checked)}
               />
-              <span>
+              <span className="inline-flex items-center gap-1.5">
                 Apagones sorpresa
-                <span className="block text-[12px] text-text">
-                  De vez en cuando la nave se queda a oscuras unos segundos y solo se ve cerca del robot.
-                </span>
+                <InfoBubble
+                  label="Ayuda: apagones sorpresa"
+                  text="De vez en cuando la nave se oscurece unos segundos y se ve menos del mapa. Añade tensión; déjalo apagado para una partida más tranquila."
+                />
               </span>
             </label>
           </div>
-        </div>
+        </FormSection>
+        )}
 
-        <CategorySelectField
-          token={token}
-          categories={categories}
-          categoryId={categoryId}
-          onCategoryIdChange={setCategoryId}
-          onCategoryCreated={(category) => {
-            setCategories((current) => [...current, category])
-            onCategoryCreated()
-          }}
-          disabled={submitting}
-          showToast={showToast}
-        />
-
-        <OrganizationSelectField organizations={organizations} value={organizationId} disabled={submitting} onChange={setOrganizationId} />
-
-        <div className="flex flex-wrap items-end justify-between gap-2">
-          <div>
-            <p className="text-[14px] font-semibold text-text-h">Afirmaciones</p>
-            <p className="text-[12.5px] text-text">
-              Entre {MIN_TF_QUESTIONS} y {MAX_TF_QUESTIONS}. Mezcla verdaderas y falsas; las falsas funcionan mejor si son
-              errores creíbles.
-            </p>
-          </div>
-          <p className="text-[12.5px] text-text">
-            <span className="font-semibold text-emerald-600 dark:text-emerald-400">{trueCount} verdaderas</span> ·{' '}
+        {phase === 2 && (
+        <FormSection icon={ListChecks} title="Afirmaciones" subtitle={`Entre ${MIN_TF_QUESTIONS} y ${MAX_TF_QUESTIONS}. Mezcla verdaderas y falsas.`} tone={3} bare>
+<p className="nx-counts"><span className="font-semibold text-emerald-600 dark:text-emerald-400">{trueCount} verdaderas</span> ·{' '}
             <span className="font-semibold text-rose-600 dark:text-rose-400">{falseCount} falsas</span>
           </p>
-        </div>
-
-        <div className="flex flex-col gap-3">
-          {questions.map((question, index) => (
-            <div key={question.key} className="rounded-xl border border-border p-4">
-              <div className="mb-2.5 flex items-center justify-between">
-                <p className="text-[13px] font-semibold text-text-h">Afirmación {index + 1}</p>
-                {questions.length > MIN_TF_QUESTIONS && (
-                  <button
-                    type="button"
-                    className="text-[12px] font-medium text-danger"
-                    onClick={() => removeQuestion(index)}
-                    disabled={submitting}
-                  >
-                    Quitar
-                  </button>
+<ItemGridEditor
+          itemLabel="Afirmación"
+          addLabel="+ Agregar afirmación"
+          count={questions.length}
+          minItems={MIN_TF_QUESTIONS}
+          maxItems={MAX_TF_QUESTIONS}
+          selected={selectedQuestion}
+          onSelect={setSelectedQuestion}
+          onAdd={addQuestion}
+          onRemove={removeQuestion}
+          disabled={submitting}
+          isComplete={(index) => {
+            const question = questions[index]
+            return !!question && question.statement.trim().length >= MIN_TF_STATEMENT_LENGTH && question.answer !== null
+          }}
+          tileText={(index) => questions[index]?.statement ?? ''}
+          tileVisual={(index) => {
+            const answer = questions[index]?.answer
+            return (
+              <span
+                className="nx-gi-swatch"
+                style={{ background: answer === true ? '#10b981' : answer === false ? '#f43f5e' : 'transparent', color: answer === null || answer === undefined ? 'var(--text)' : '#fff' }}
+              >
+                {answer === true ? (
+                  <Check className="h-6 w-6" strokeWidth={3} />
+                ) : answer === false ? (
+                  <X className="h-6 w-6" strokeWidth={3} />
+                ) : (
+                  <span className="text-[18px] font-bold">?</span>
                 )}
-              </div>
-              <label className="sr-only" htmlFor={`tf-statement-${question.key}`}>
-                Afirmación {index + 1}
-              </label>
-              <textarea
-                id={`tf-statement-${question.key}`}
-                rows={2}
-                maxLength={MAX_TF_STATEMENT_LENGTH}
-                className={TEXTAREA_CLASS}
-                placeholder="Ej. Las plantas producen oxígeno durante la fotosíntesis."
-                value={question.statement}
-                disabled={submitting}
-                onChange={(event) => updateQuestion(index, 'statement', event.target.value)}
-              />
-              <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2">
-                <div className="inline-flex rounded-lg border border-border p-0.5" role="radiogroup" aria-label={`Respuesta de la afirmación ${index + 1}`}>
+              </span>
+            )
+          }}
+          renderEditor={(index) => {
+            const question = questions[index]
+            if (!question) return null
+            return (
+              <div className="flex flex-col gap-3">
+                <div>
+                  <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor={`tf-statement-${question.key}`}>
+                    Afirmación
+                  </label>
+                  <textarea
+                    id={`tf-statement-${question.key}`}
+                    rows={3}
+                    maxLength={MAX_TF_STATEMENT_LENGTH}
+                    className={TEXTAREA_CLASS}
+                    placeholder="Ej. Las plantas producen oxígeno durante la fotosíntesis."
+                    value={question.statement}
+                    disabled={submitting}
+                    onChange={(event) => updateQuestion(index, 'statement', event.target.value)}
+                  />
+                  <p className="mt-1 text-right text-[11.5px] text-text">
+                    {question.statement.trim().length} / {MAX_TF_STATEMENT_LENGTH}
+                  </p>
+                </div>
+                <div className="nx-answer inline-flex self-start rounded-lg border border-border p-0.5" role="radiogroup" aria-label={`Respuesta de la afirmación ${index + 1}`}>
                   <button
                     type="button"
                     role="radio"
@@ -470,62 +592,70 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
                     <X className="h-3.5 w-3.5" strokeWidth={3} /> Falsa
                   </button>
                 </div>
-                <span className="text-[11.5px] text-text">
-                  {question.statement.trim().length} / {MAX_TF_STATEMENT_LENGTH}
-                </span>
+                <div>
+                  <label className="mb-1.5 block text-[13px] font-medium text-text-h" htmlFor={`tf-explanation-${question.key}`}>
+                    Explicación (opcional)
+                  </label>
+                  <textarea
+                    id={`tf-explanation-${question.key}`}
+                    rows={3}
+                    maxLength={MAX_TF_EXPLANATION_LENGTH}
+                    className={TEXTAREA_CLASS}
+                    placeholder="Se muestra después de responder."
+                    value={question.explanation}
+                    disabled={submitting}
+                    onChange={(event) => updateQuestion(index, 'explanation', event.target.value)}
+                  />
+                </div>
               </div>
-              <label className="mb-1.5 mt-3 block text-[13px] font-medium text-text-h" htmlFor={`tf-explanation-${question.key}`}>
-                Explicación (opcional)
-              </label>
-              <textarea
-                id={`tf-explanation-${question.key}`}
-                rows={2}
-                maxLength={MAX_TF_EXPLANATION_LENGTH}
-                className={TEXTAREA_CLASS}
-                placeholder="Se muestra después de responder: por qué es verdadera, o cuál es el dato correcto."
-                value={question.explanation}
-                disabled={submitting}
-                onChange={(event) => updateQuestion(index, 'explanation', event.target.value)}
-              />
-            </div>
-          ))}
-        </div>
-
-        {questions.length < MAX_TF_QUESTIONS && (
-          <button
-            type="button"
-            className="self-start rounded-lg border border-dashed border-border px-3.5 py-2 text-[13px] font-medium text-text-h"
-            onClick={addQuestion}
-            disabled={submitting}
-          >
-            + Agregar afirmación
-          </button>
+            )
+          }}
+        />
+</FormSection>
         )}
 
         {error && (
-          <p className="rounded-lg border border-danger/35 bg-danger/10 px-[13px] py-[11px] text-sm leading-snug text-danger" role="alert">
+          <p className="nx-alert" role="alert">
             {error}
           </p>
         )}
 
-        <div className="flex gap-2">
-          <button
-            type="submit"
-            className="rounded-lg px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)] transition-transform hover:not-disabled:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
-            style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
-            disabled={submitting}
-          >
-            {submitting ? 'Creando…' : 'Crear juego'}
-          </button>
-          <button
-            type="button"
-            className="rounded-lg border border-border px-4 py-2.5 text-[14px] font-medium text-text-h"
-            onClick={onClose}
-            disabled={submitting}
-          >
-            Cancelar
-          </button>
-        </div>
+        <WizardPhaseNav
+          onBack={phase === 0 ? undefined : goToPreviousPhase}
+          backLabel="Atrás"
+          onNext={goToNextPhase}
+          isLastPhase={phase === TOTAL_PHASES - 1}
+          submitting={submitting}
+        />
+
+        {phase === TOTAL_PHASES - 1 && (
+          <div className="nx-sticky-actions nx-actions">
+            <button
+              type="submit"
+              className="nx-btn nx-btn-primary"
+              style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
+              disabled={submitting}
+            >
+              {submitting ? 'Creando…' : 'Crear juego'}
+            </button>
+            <button
+              type="button"
+              className="nx-btn nx-btn-secondary border border-border text-text-h"
+              onClick={goToPreviousPhase}
+              disabled={submitting}
+            >
+              ← Atrás
+            </button>
+            <button
+              type="button"
+              className="nx-btn nx-btn-secondary border border-border text-text-h"
+              onClick={onClose}
+              disabled={submitting}
+            >
+              Cancelar
+            </button>
+          </div>
+        )}
       </form>
     </GameFormShell>
   )

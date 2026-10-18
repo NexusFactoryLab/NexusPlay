@@ -22,7 +22,7 @@ function createSub(creatorUserId = 'owner-1'): Subject {
 }
 
 describe('Subject.canBeDeletedBy', () => {
-  describe('sub-materia PRIVATE (regla histórica, sin cambios)', () => {
+  describe('sub-Ã¡rea PRIVATE (regla histórica, sin cambios)', () => {
     it('la borra su creador, sin importar isEmpty', () => {
       const sub = createSub('owner-1');
       expect(sub.canBeDeletedBy('owner-1', false, false)).toBe(true);
@@ -39,7 +39,7 @@ describe('Subject.canBeDeletedBy', () => {
     });
   });
 
-  describe('sub-materia PUBLIC (nueva excepción a la irreversibilidad)', () => {
+  describe('sub-Ã¡rea PUBLIC (nueva excepción a la irreversibilidad)', () => {
     it('la borra su creador si el árbol está vacío', () => {
       const sub = createSub('owner-1');
       sub.publish();
@@ -65,7 +65,7 @@ describe('Subject.canBeDeletedBy', () => {
     });
   });
 
-  describe('materia raíz (siempre PUBLIC, nueva regla admin-only)', () => {
+  describe('Ã¡rea raíz (siempre PUBLIC, nueva regla admin-only)', () => {
     it('la borra un admin si el árbol está vacío', () => {
       const root = createRoot();
       expect(root.canBeDeletedBy('admin-1', true, true)).toBe(true);

@@ -12,6 +12,7 @@ export function GameModePickerPage() {
   return (
     <GameModePicker
       onClose={() => navigate('/')}
+      onBack={() => navigate('/juegos/crear')}
       onSelect={(mode) => navigate(ROUTE_BY_MODE[mode])}
     />
   )

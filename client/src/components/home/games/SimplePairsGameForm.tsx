@@ -1,14 +1,18 @@
 import { useEffect, useState } from 'react'
+import { Rocket, Layers } from 'lucide-react'
 import type { FormEvent } from 'react'
 import { TextField } from '../../TextField'
 import { SaveVisibilityModal } from './SaveVisibilityModal'
 import { ImageUploadField } from './ImageUploadField'
 import { AiGameAssistantPanel } from './AiGameAssistantPanel'
+import { useReportCreateSummary } from './aiDraftContext'
 import { GameFormShell } from './GameFormShell'
 import { WizardPhaseNav } from './WizardPhaseNav'
+import { FormSection, PhaseLabel } from './create/FormSection'
 import type { GameDraft } from '../../../services/ai-game-assistant.service'
 import { OrganizationSelectField } from './create/OrganizationSelectField'
 import { CategorySelectField } from './create/CategorySelectField'
+import { ItemGridEditor } from './create/ItemGridEditor'
 import { useCreateGameProgress } from './create/CreateGameProgressContext'
 import { useAuth } from '../../../hooks/useAuth'
 import { useToast } from '../../../hooks/useToast'
@@ -72,6 +76,7 @@ export function SimplePairsGameForm({
   const [submitting, setSubmitting] = useState(false)
   const [createdGameId, setCreatedGameId] = useState<string | null>(null)
   const [phase, setPhase] = useState(0)
+  const [selectedPair, setSelectedPair] = useState(0)
   const { setSubPhase } = useCreateGameProgress()
 
   // Informa al header del wizard (CreateGameLayout) en qué fase va este
@@ -109,6 +114,8 @@ export function SimplePairsGameForm({
 
   function applyAiDraft(draft: GameDraft) {
     const items = Array.isArray(draft.content) ? draft.content : []
+    // El panel sigue a la pareja más reciente mientras la IA llena la lista.
+    setSelectedPair(Math.max(items.length - 1, 0))
     setPairs(
       items.map((item) => {
         const raw = (item ?? {}) as Record<string, unknown>
@@ -132,9 +139,10 @@ export function SimplePairsGameForm({
 
   function removePair(index: number) {
     setPairs((current) => (current.length > 2 ? current.filter((_, i) => i !== index) : current))
+    setSelectedPair((current) => Math.max(0, Math.min(current, pairs.length - 2)))
   }
 
-  /** Valida solo los campos de la fase 1 (Identidad): título, descripción, materia. */
+  /** Valida solo los campos de la fase 1 (Identidad): título, descripción, Ã¡rea. */
   function validateIdentityPhase(): string | null {
     if (!title.trim() || title.trim().length < 3) {
       return 'El título debe tener al menos 3 caracteres.'
@@ -143,15 +151,17 @@ export function SimplePairsGameForm({
       return 'La descripción debe tener al menos 10 caracteres.'
     }
     if (!categoryId) {
-      return 'Elige una materia para el juego.'
+      return 'Elige un Ã¡rea para el juego.'
     }
     return null
   }
 
   /** Valida solo los campos de la fase 2 (Contenido): el bloque repetible de parejas. */
   function validateContentPhase(): string | null {
-    const incompletePair = pairs.some((pair) => !pair.label.trim() || !pair.imageUrl)
-    if (incompletePair) {
+    const firstIncomplete = pairs.findIndex((pair) => !pair.label.trim() || !pair.imageUrl)
+    if (firstIncomplete !== -1) {
+      // El panel edita una pareja a la vez: se abre la primera que falta.
+      setSelectedPair(firstIncomplete)
       return 'Cada pareja necesita una imagen y un nombre antes de crear el juego.'
     }
     return null
@@ -224,6 +234,8 @@ export function SimplePairsGameForm({
     showToast('Juego creado', 'success')
   }
 
+  useReportCreateSummary({ count: pairs.length, itemsLabel: 'parejas', missingImages: pairs.filter((pair) => !pair.imageUrl).length })
+
   if (createdGameId) {
     return (
       <SaveVisibilityModal
@@ -250,12 +262,10 @@ export function SimplePairsGameForm({
       }
     >
       <form className="flex flex-col gap-[16px]" onSubmit={handleSubmit} noValidate>
-        <p className="text-[11.5px] font-semibold uppercase tracking-wide text-accent">
-          Fase {phase + 1} de {TOTAL_PHASES} · {PHASES[phase].label}
-        </p>
+        <PhaseLabel phase={phase + 1} total={TOTAL_PHASES} label={PHASES[phase].label} />
 
         {phase === 0 && (
-          <div className="flex flex-col gap-[16px] animate-[fade-in-up_0.25s_ease-out_backwards]">
+          <FormSection icon={Rocket} title="Cuéntanos de tu juego" subtitle="Nombre, portada y el lugar donde vivirá." tone={1}>
             <TextField
               label="Título del juego"
               type="text"
@@ -300,60 +310,50 @@ export function SimplePairsGameForm({
               disabled={submitting}
               onChange={setOrganizationId}
             />
-          </div>
+          </FormSection>
         )}
 
         {phase === 1 && (
-        <div className="grid grid-cols-1 gap-3 animate-[fade-in-up_0.25s_ease-out_backwards] xl:grid-cols-2">
-          {pairs.map((pair, index) => (
-            <div key={index} className="rounded-xl border border-border p-4">
-              <div className="mb-2.5 flex items-center justify-between">
-                <p className="text-[13px] font-semibold text-text-h">Pareja {index + 1}</p>
-                {pairs.length > 2 && (
-                  <button
-                    type="button"
-                    className="text-[12px] font-medium text-danger"
-                    onClick={() => removePair(index)}
-                    disabled={submitting}
-                  >
-                    Quitar
-                  </button>
-                )}
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <TextField
-                  label="Nombre del concepto"
-                  type="text"
-                  value={pair.label}
-                  disabled={submitting}
-                  onChange={(value) => updatePair(index, 'label', value)}
-                  onBlur={() => {}}
-                />
-                <ImageUploadField
-                  label="Imagen"
-                  imageUrl={pair.imageUrl}
-                  folder="memory-cards"
-                  disabled={submitting}
-                  onChange={(url) => updatePair(index, 'imageUrl', url)}
-                />
-              </div>
+        <FormSection icon={Layers} title="Parejas" subtitle="Cada pareja une una imagen con el nombre de su concepto." tone={3} bare>
+<ItemGridEditor
+          itemLabel="Pareja"
+          addLabel="+ Agregar pareja"
+          count={pairs.length}
+          minItems={2}
+          selected={selectedPair}
+          onSelect={setSelectedPair}
+          onAdd={addPair}
+          onRemove={removePair}
+          disabled={submitting}
+          isComplete={(index) => !!pairs[index]?.label.trim() && !!pairs[index]?.imageUrl}
+          tileText={(index) => pairs[index]?.label ?? ''}
+          tileImage={(index) => pairs[index]?.imageUrl}
+          renderEditor={(index) => (
+            <div className="grid grid-cols-1 gap-3">
+              <TextField
+                label="Nombre del concepto"
+                type="text"
+                value={pairs[index]?.label ?? ''}
+                disabled={submitting}
+                onChange={(value) => updatePair(index, 'label', value)}
+                onBlur={() => {}}
+              />
+              <ImageUploadField
+                label="Imagen"
+                imageUrl={pairs[index]?.imageUrl ?? null}
+                folder="memory-cards"
+                disabled={submitting}
+                onChange={(url) => updatePair(index, 'imageUrl', url)}
+              />
             </div>
-          ))}
-
-          <button
-            type="button"
-            className="self-start rounded-lg border border-dashed border-border px-3.5 py-2 text-[13px] font-medium text-text-h xl:col-span-2"
-            onClick={addPair}
-            disabled={submitting}
-          >
-            + Agregar pareja
-          </button>
-        </div>
+          )}
+        />
+</FormSection>
         )}
 
         {error && (
           <p
-            className="rounded-lg border border-danger/35 bg-danger/10 px-[13px] py-[11px] text-sm leading-snug text-danger"
+            className="nx-alert"
             role="alert"
           >
             {error}
@@ -361,18 +361,18 @@ export function SimplePairsGameForm({
         )}
 
         <WizardPhaseNav
-          onBack={phase === 0 ? onBack : goToPreviousPhase}
-          backLabel={phase === 0 ? 'Cambiar modo' : 'Atrás'}
+          onBack={phase === 0 ? undefined : goToPreviousPhase}
+          backLabel="Atrás"
           onNext={goToNextPhase}
           isLastPhase={phase === TOTAL_PHASES - 1}
           submitting={submitting}
         />
 
         {phase === TOTAL_PHASES - 1 && (
-          <div className="flex gap-2">
+          <div className="nx-sticky-actions nx-actions">
             <button
               type="submit"
-              className="rounded-lg px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)] transition-transform hover:not-disabled:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+              className="nx-btn nx-btn-primary"
               style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
               disabled={submitting}
             >
@@ -380,7 +380,7 @@ export function SimplePairsGameForm({
             </button>
             <button
               type="button"
-              className="rounded-lg border border-border px-4 py-2.5 text-[14px] font-medium text-text-h"
+              className="nx-btn nx-btn-secondary border border-border text-text-h"
               onClick={goToPreviousPhase}
               disabled={submitting}
             >
@@ -388,7 +388,7 @@ export function SimplePairsGameForm({
             </button>
             <button
               type="button"
-              className="rounded-lg border border-border px-4 py-2.5 text-[14px] font-medium text-text-h"
+              className="nx-btn nx-btn-secondary border border-border text-text-h"
               onClick={onClose}
               disabled={submitting}
             >

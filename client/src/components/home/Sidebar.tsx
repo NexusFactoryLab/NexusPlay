@@ -154,10 +154,10 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
         <SidebarItem
           tourTarget="nav-subjects"
           emoji="📕"
-          label="Materias"
+          label="Ãreas"
           collapsed={collapsed}
-          active={location.pathname.startsWith('/materias')}
-          onClick={() => navigate('/materias')}
+          active={location.pathname.startsWith('/areas')}
+          onClick={() => navigate('/areas')}
           icon={<BookOpen className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />}
         />
         <SidebarItem

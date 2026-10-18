@@ -170,8 +170,8 @@ function App() {
       <Route path="/" element={<HomeLayout />}>
         <Route index element={<HomePage />} />
         <Route path=":slug" element={<HomePage />} />
-        <Route path="materias" element={<CategoriesPage />} />
-        <Route path="materias/:slug" element={<CategoriesPage />} />
+        <Route path="areas" element={<CategoriesPage />} />
+        <Route path="areas/:slug" element={<CategoriesPage />} />
         <Route path="tipos-de-juego" element={<GameTypesCatalogPage />} />
         <Route path="tipos-de-juego/:gameType" element={<GameTypeGamesPage />} />
         <Route path="tipos-de-juego/:gameType/:slug" element={<GameTypeGamesPage />} />

@@ -102,7 +102,7 @@ async function ensureCategory(
     creatorUserId: null,
     createdAt: new Date(),
   } as never);
-  console.log(`Materia creada: ${name}`);
+  console.log(`Ãrea creada: ${name}`);
   return categoryId;
 }
 

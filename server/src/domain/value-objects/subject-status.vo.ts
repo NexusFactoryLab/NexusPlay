@@ -5,7 +5,7 @@ import { InvalidSubjectStatusError } from '../errors/subject.errors.js';
  *          (soft-delete) mientras esté en este estado.
  * PUBLIC: visible para todos en el catálogo. Transición unidireccional desde
  *         PRIVATE — no existe camino de vuelta, porque otros usuarios pueden
- *         haber publicado juegos bajo esta materia mientras tanto y
+ *         haber publicado juegos bajo esta Ã¡rea mientras tanto y
  *         quedarían huérfanos. Sí puede eliminarse estando PUBLIC, pero solo
  *         si su árbol (ella y sus descendientes) no tiene juegos asociados —
  *         ver `Subject.canBeDeletedBy`.

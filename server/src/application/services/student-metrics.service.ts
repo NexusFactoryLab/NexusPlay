@@ -14,7 +14,7 @@ const SCORE_OVER_TIME_WINDOW_DAYS = 90;
 
 /**
  * Única responsabilidad: construir el dashboard de métricas propias de un
- * estudiante (issue #226) — desglose por juego, por materia y evolución en el
+ * estudiante (issue #226) — desglose por juego, por Ã¡rea y evolución en el
  * tiempo. Separado de `ClassRankingService` porque agrega sobre una dimensión
  * distinta (todo el historial del estudiante, no una clase puntual) y tiene
  * su propio consumidor (la vista de métricas del estudiante, no el Home de

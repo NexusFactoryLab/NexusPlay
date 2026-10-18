@@ -21,6 +21,8 @@ export async function generateGameDraft(
   mode?: string,
   /** Instrucción libre del usuario (chat del asistente) para guiar a la IA — nunca reemplaza a `files`. */
   message?: string,
+  /** Permite cancelar la generación desde la interfaz (AbortController). */
+  signal?: AbortSignal,
 ): Promise<GameDraft> {
   const formData = new FormData()
   formData.append('gameType', gameType)
@@ -33,6 +35,7 @@ export async function generateGameDraft(
     headers: { Authorization: `Bearer ${token}` },
     credentials: 'include',
     body: formData,
+    signal,
   })
 
   const payload: unknown = await response.json().catch(() => null)

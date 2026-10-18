@@ -15,7 +15,7 @@ type CategoriesManagerModalProps = {
   onClose: () => void
 }
 
-/** Panel con todas las materias creadas, con el mismo estilo del home, desde donde también se eliminan. */
+/** Panel con todas las Ã¡reas creadas, con el mismo estilo del home, desde donde también se eliminan. */
 export function CategoriesManagerModal({
   categories,
   colorFor,
@@ -41,14 +41,14 @@ export function CategoriesManagerModal({
     if (ok) {
       setPendingDelete(null)
     } else {
-      setError('No se pudo eliminar la materia.')
+      setError('No se pudo eliminar el Ã¡rea.')
     }
   }
 
   if (pendingDelete) {
     return (
       <Modal onClose={() => (deleting ? null : setPendingDelete(null))} maxWidthClassName="max-w-[420px]">
-        <h2 className="mb-2 text-[18px] tracking-tight text-text-h">Eliminar materia</h2>
+        <h2 className="mb-2 text-[18px] tracking-tight text-text-h">Eliminar Ã¡rea</h2>
         <p className="mb-6 text-[14px] leading-relaxed text-text">
           ¿Eliminar "{pendingDelete.name}"? Esta acción no se puede deshacer.
         </p>
@@ -86,7 +86,7 @@ export function CategoriesManagerModal({
 
   return (
     <Modal onClose={onClose} maxWidthClassName="max-w-[560px]">
-      <h2 className="mb-1 text-[18px] tracking-tight text-text-h">Todas las materias</h2>
+      <h2 className="mb-1 text-[18px] tracking-tight text-text-h">Todas las Ã¡reas</h2>
       <p className="mb-4 text-[13px] text-text">
         Elige una para filtrar los juegos, o elimina las que ya no necesites.
       </p>
@@ -95,12 +95,12 @@ export function CategoriesManagerModal({
         type="text"
         value={query}
         onChange={(event) => setQuery(event.target.value)}
-        placeholder="Buscar materia…"
+        placeholder="Buscar Ã¡rea…"
         className="mb-4 w-full rounded-lg border border-border bg-bg px-[13px] py-2.5 text-[13px] text-text-h outline-none focus:border-accent"
       />
 
       {filtered.length === 0 ? (
-        <p className="py-6 text-center text-[13px] text-text">No hay materias que coincidan.</p>
+        <p className="py-6 text-center text-[13px] text-text">No hay Ã¡reas que coincidan.</p>
       ) : (
         <ul className="scroll-fade flex max-h-[50vh] flex-col gap-2 overflow-y-auto">
           {filtered.map((category) => {
@@ -137,8 +137,8 @@ export function CategoriesManagerModal({
                 {canDelete(category) && (
                   <button
                     type="button"
-                    aria-label={`Eliminar materia ${category.name}`}
-                    title="Eliminar materia"
+                    aria-label={`Eliminar Ã¡rea ${category.name}`}
+                    title="Eliminar Ã¡rea"
                     className="shrink-0 rounded-lg border border-border p-2 text-text/70 transition-colors hover:border-danger hover:bg-danger/10 hover:text-danger"
                     onClick={() => setPendingDelete(category)}
                   >

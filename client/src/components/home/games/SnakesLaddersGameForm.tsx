@@ -1,10 +1,17 @@
 import { useEffect, useState } from 'react'
+import { Rocket, Dices, ArrowUpRight, ArrowDownRight, HelpCircle } from 'lucide-react'
 import type { FormEvent } from 'react'
 import { TextField } from '../../TextField'
 import { SaveVisibilityModal } from './SaveVisibilityModal'
 import { ImageUploadField } from './ImageUploadField'
 import { AiGameAssistantPanel } from './AiGameAssistantPanel'
+import { useReportCreateSummary } from './aiDraftContext'
 import { GameFormShell } from './GameFormShell'
+import { WizardPhaseNav } from './WizardPhaseNav'
+import { FormSection, PhaseLabel } from './create/FormSection'
+import { ItemGridEditor } from './create/ItemGridEditor'
+import { InfoBubble } from './create/InfoBubble'
+import { useCreateGameProgress } from './create/CreateGameProgressContext'
 import type { GameDraft } from '../../../services/ai-game-assistant.service'
 import { OrganizationSelectField } from './create/OrganizationSelectField'
 import { CategorySelectField } from './create/CategorySelectField'
@@ -50,6 +57,13 @@ function emptyCellQuestion(cellNumber: number): CellQuestionDraft {
   return { cellNumber, prompt: '', options: ['', ''], correctOptionIndex: 0 }
 }
 
+const PHASES = [
+  { label: 'Identidad del juego' },
+  { label: 'Configuración: tablero, escaleras y serpientes' },
+  { label: 'Contenido: retos de casillas' },
+] as const
+const TOTAL_PHASES = PHASES.length
+
 type SnakesLaddersGameFormProps = {
   /** Borrador de adaptación desde otro juego (issue #8); pre-llena el formulario al montar. */
   adaptation?: AdaptedGameDraft
@@ -86,6 +100,17 @@ export function SnakesLaddersGameForm({ onClose, onCreated, onBack, onCategoryCr
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [createdGameId, setCreatedGameId] = useState<string | null>(null)
+  const [phase, setPhase] = useState(0)
+  const [selectedLadder, setSelectedLadder] = useState(0)
+  const [selectedSnake, setSelectedSnake] = useState(0)
+  const [selectedCell, setSelectedCell] = useState(0)
+  const { setSubPhase } = useCreateGameProgress()
+
+  useEffect(() => {
+    setSubPhase({ phase: phase + 1, totalPhases: TOTAL_PHASES, phaseLabel: PHASES[phase].label })
+    return () => setSubPhase(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase])
 
   useEffect(() => {
     if (!token) return
@@ -137,6 +162,10 @@ export function SnakesLaddersGameForm({ onClose, onCreated, onBack, onCategoryCr
 
     const rawLadders = Array.isArray(config.ladders) ? config.ladders : []
     const rawSnakes = Array.isArray(config.snakes) ? config.snakes : []
+
+    setSelectedLadder(Math.max(rawLadders.length - 1, 0))
+    setSelectedSnake(Math.max(rawSnakes.length - 1, 0))
+    setSelectedCell(Math.max(content.filter((item) => ((item ?? {}) as Record<string, unknown>).triggerType === 'CELL').length - 1, 0))
 
     setLadders(
       rawLadders.map((item) => {
@@ -191,44 +220,67 @@ export function SnakesLaddersGameForm({ onClose, onCreated, onBack, onCategoryCr
     updateCellQuestion(index, { options })
   }
 
+  function validateIdentityPhase(): string | null {
+    if (!title.trim() || title.trim().length < 3) return 'El título debe tener al menos 3 caracteres.'
+    if (!description.trim() || description.trim().length < 10) return 'La descripción debe tener al menos 10 caracteres.'
+    if (!categoryId) return 'Elige un área para el juego.'
+    return null
+  }
+
+  function validateConfigPhase(): string | null {
+    if (!Number.isInteger(boardSize) || boardSize < MIN_BOARD_SIZE || boardSize > MAX_BOARD_SIZE) {
+      return `El tablero debe tener entre ${MIN_BOARD_SIZE} y ${MAX_BOARD_SIZE} casillas.`
+    }
+    if (ladders.length === 0 && snakes.length === 0) return 'Agrega al menos una escalera o una serpiente.'
+    const incomplete = (link: LinkDraft) => !link.prompt.trim() || link.options.some((o) => !o.trim())
+    const ladderAt = ladders.findIndex(incomplete)
+    if (ladderAt !== -1) {
+      setSelectedLadder(ladderAt)
+      return 'Cada escalera y serpiente necesita su reto completo (pregunta y opciones).'
+    }
+    const snakeAt = snakes.findIndex(incomplete)
+    if (snakeAt !== -1) {
+      setSelectedSnake(snakeAt)
+      return 'Cada escalera y serpiente necesita su reto completo (pregunta y opciones).'
+    }
+    return null
+  }
+
+  function validateContentPhase(): string | null {
+    if (cellQuestions.length < MIN_CELL_QUESTIONS) return `Necesitas al menos ${MIN_CELL_QUESTIONS} retos de casilla normal.`
+    const questionAt = cellQuestions.findIndex((q) => !q.prompt.trim() || q.options.some((o) => !o.trim()))
+    if (questionAt !== -1) {
+      setSelectedCell(questionAt)
+      return 'Cada reto de casilla necesita pregunta y opciones completas.'
+    }
+    return null
+  }
+
+  const VALIDATORS = [validateIdentityPhase, validateConfigPhase, validateContentPhase]
+
+  function goToNextPhase() {
+    const validationError = VALIDATORS[phase]()
+    if (validationError) {
+      setError(validationError)
+      return
+    }
+    setError(null)
+    setPhase((current) => Math.min(current + 1, TOTAL_PHASES - 1))
+  }
+
+  function goToPreviousPhase() {
+    setError(null)
+    setPhase((current) => Math.max(current - 1, 0))
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!token) return
 
-    if (!title.trim() || title.trim().length < 3) {
-      setError('El título debe tener al menos 3 caracteres.')
-      return
-    }
-    if (!description.trim() || description.trim().length < 10) {
-      setError('La descripción debe tener al menos 10 caracteres.')
-      return
-    }
-    if (!categoryId) {
-      setError('Elige una materia para el juego.')
-      return
-    }
-    if (!Number.isInteger(boardSize) || boardSize < MIN_BOARD_SIZE || boardSize > MAX_BOARD_SIZE) {
-      setError(`El tablero debe tener entre ${MIN_BOARD_SIZE} y ${MAX_BOARD_SIZE} casillas.`)
-      return
-    }
-    if (ladders.length === 0 && snakes.length === 0) {
-      setError('Agrega al menos una escalera o una serpiente.')
-      return
-    }
-    if (cellQuestions.length < MIN_CELL_QUESTIONS) {
-      setError(`Necesitas al menos ${MIN_CELL_QUESTIONS} retos de casilla normal.`)
-      return
-    }
-    const allLinks = [...ladders, ...snakes]
-    for (const link of allLinks) {
-      if (!link.prompt.trim() || link.options.some((o) => !o.trim())) {
-        setError('Cada escalera y serpiente necesita su reto completo (pregunta y opciones).')
-        return
-      }
-    }
-    for (const question of cellQuestions) {
-      if (!question.prompt.trim() || question.options.some((o) => !o.trim())) {
-        setError('Cada reto de casilla necesita pregunta y opciones completas.')
+    for (const validate of VALIDATORS) {
+      const validationError = validate()
+      if (validationError) {
+        setError(validationError)
         return
       }
     }
@@ -291,6 +343,8 @@ export function SnakesLaddersGameForm({ onClose, onCreated, onBack, onCategoryCr
     showToast('Juego creado', 'success')
   }
 
+  useReportCreateSummary({ count: ladders.length + snakes.length + cellQuestions.length, itemsLabel: 'retos y preguntas' })
+
   if (createdGameId) {
     return (
       <SaveVisibilityModal
@@ -305,12 +359,16 @@ export function SnakesLaddersGameForm({ onClose, onCreated, onBack, onCategoryCr
       backLabel="Cambiar tipo de juego"
       onBack={onBack}
       title="Escaleras y Serpientes"
-      description="El avance no depende del azar: cada escalera exige un reto de alta complejidad para subir, y cada serpiente da una oportunidad de recuperación antes de resbalar. Ciudad Sostenible es el tema por defecto, pero puedes cambiar la narrativa por completo con tus propias preguntas."
-      formMaxWidthClassName="lg:max-w-[680px]"
+      description="Escaleras y serpientes con retos: avanzar depende de responder."
+      descriptionDetail="Cada escalera exige un reto de alta complejidad para subir y cada serpiente da una oportunidad de recuperación. Ciudad Sostenible es el tema por defecto, pero puedes cambiar la narrativa con tus propias preguntas."
       aiPanel={<AiGameAssistantPanel gameType="SNAKES_LADDERS" disabled={submitting} onDraftReady={applyAiDraft} />}
     >
       <form className="flex flex-col gap-[16px]" onSubmit={handleSubmit} noValidate>
-        <TextField label="Título del juego" type="text" value={title} disabled={submitting} onChange={setTitle} onBlur={() => {}} />
+        <PhaseLabel phase={phase + 1} total={TOTAL_PHASES} label={PHASES[phase].label} />
+
+        {phase === 0 && (
+        <FormSection icon={Rocket} title="Cuéntanos de tu juego" subtitle="Nombre, portada y el lugar donde vivirá." tone={1}>
+<TextField label="Título del juego" type="text" value={title} disabled={submitting} onChange={setTitle} onBlur={() => {}} />
         <TextField
           label="Descripción"
           type="text"
@@ -328,39 +386,6 @@ export function SnakesLaddersGameForm({ onClose, onCreated, onBack, onCategoryCr
           onChange={setCoverImageUrl}
         />
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="sl-board-size">
-              Casillas del tablero
-            </label>
-            <input
-              id="sl-board-size"
-              type="number"
-              min={MIN_BOARD_SIZE}
-              max={MAX_BOARD_SIZE}
-              className="w-full rounded-lg border border-border bg-bg px-[13px] py-[11px] text-[15px] text-text-h outline-none focus:border-accent"
-              value={boardSize}
-              disabled={submitting}
-              onChange={(event) => setBoardSize(Number(event.target.value))}
-            />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="sl-turn-duration">
-              Segundos por turno
-            </label>
-            <input
-              id="sl-turn-duration"
-              type="number"
-              min={15}
-              max={180}
-              className="w-full rounded-lg border border-border bg-bg px-[13px] py-[11px] text-[15px] text-text-h outline-none focus:border-accent"
-              value={turnDurationSeconds}
-              disabled={submitting}
-              onChange={(event) => setTurnDurationSeconds(Number(event.target.value))}
-            />
-          </div>
-        </div>
-
         <CategorySelectField
           token={token}
           categories={categories}
@@ -375,6 +400,46 @@ export function SnakesLaddersGameForm({ onClose, onCreated, onBack, onCategoryCr
         />
 
         <OrganizationSelectField organizations={organizations} value={organizationId} disabled={submitting} onChange={setOrganizationId} />
+</FormSection>
+        )}
+
+        {phase === 1 && (
+        <>
+        <FormSection icon={Dices} title="Tablero y turnos" subtitle="Tamaño del tablero y tiempo por turno." tone={2}>
+<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label className="nx-label mb-1.5 flex items-center gap-1.5 text-[13px] font-medium text-text-h" htmlFor="sl-board-size">
+              Casillas del tablero
+              <InfoBubble label="Ayuda: casillas del tablero" text={`Cuántas casillas tiene el recorrido, entre ${MIN_BOARD_SIZE} y ${MAX_BOARD_SIZE}. Más casillas hacen la partida más larga.`} />
+            </label>
+            <input
+              id="sl-board-size"
+              type="number"
+              min={MIN_BOARD_SIZE}
+              max={MAX_BOARD_SIZE}
+              className="w-full rounded-lg border border-border bg-bg px-[13px] py-[11px] text-[15px] text-text-h outline-none focus:border-accent"
+              value={boardSize}
+              disabled={submitting}
+              onChange={(event) => setBoardSize(Number(event.target.value))}
+            />
+          </div>
+          <div>
+            <label className="nx-label mb-1.5 flex items-center gap-1.5 text-[13px] font-medium text-text-h" htmlFor="sl-turn-duration">
+              Segundos por turno
+              <InfoBubble label="Ayuda: segundos por turno" text="Tiempo que tiene cada jugador para responder el reto de su casilla (entre 15 y 180 segundos)." />
+            </label>
+            <input
+              id="sl-turn-duration"
+              type="number"
+              min={15}
+              max={180}
+              className="w-full rounded-lg border border-border bg-bg px-[13px] py-[11px] text-[15px] text-text-h outline-none focus:border-accent"
+              value={turnDurationSeconds}
+              disabled={submitting}
+              onChange={(event) => setTurnDurationSeconds(Number(event.target.value))}
+            />
+          </div>
+        </div></FormSection>
 
         <LinksSection
           title="Escaleras (innovaciones sostenibles)"
@@ -382,8 +447,13 @@ export function SnakesLaddersGameForm({ onClose, onCreated, onBack, onCategoryCr
           links={ladders}
           boardSize={boardSize}
           submitting={submitting}
+          selected={selectedLadder}
+          onSelect={setSelectedLadder}
           onAdd={() => setLadders([...ladders, emptyLink(2, 3)])}
-          onRemove={(i) => setLadders(ladders.filter((_, idx) => idx !== i))}
+          onRemove={(i) => {
+            setLadders(ladders.filter((_, idx) => idx !== i))
+            setSelectedLadder((current) => Math.max(0, Math.min(current, ladders.length - 2)))
+          }}
           onChange={(i, patch) => updateLink(ladders, setLadders, i, patch)}
           onOptionChange={(i, oi, v) => updateLinkOption(ladders, setLadders, i, oi, v)}
         />
@@ -394,45 +464,65 @@ export function SnakesLaddersGameForm({ onClose, onCreated, onBack, onCategoryCr
           links={snakes}
           boardSize={boardSize}
           submitting={submitting}
+          selected={selectedSnake}
+          onSelect={setSelectedSnake}
           onAdd={() => setSnakes([...snakes, emptyLink(3, 2)])}
-          onRemove={(i) => setSnakes(snakes.filter((_, idx) => idx !== i))}
+          onRemove={(i) => {
+            setSnakes(snakes.filter((_, idx) => idx !== i))
+            setSelectedSnake((current) => Math.max(0, Math.min(current, snakes.length - 2)))
+          }}
           onChange={(i, patch) => updateLink(snakes, setSnakes, i, patch)}
           onOptionChange={(i, oi, v) => updateLinkOption(snakes, setSnakes, i, oi, v)}
         />
+        </>
+        )}
 
-        <div className="flex flex-col gap-3">
-          <p className="text-[13px] font-semibold text-text-h">
-            Retos de casillas normales (mínimo {MIN_CELL_QUESTIONS})
-          </p>
-          {cellQuestions.map((question, index) => (
-            <div key={index} className="rounded-xl border border-border p-4">
-              <div className="mb-2.5 flex items-center justify-between">
-                <p className="text-[13px] font-semibold text-text-h">Reto {index + 1}</p>
-                {cellQuestions.length > MIN_CELL_QUESTIONS && (
-                  <button
-                    type="button"
-                    className="text-[12px] font-medium text-danger"
-                    onClick={() => setCellQuestions(cellQuestions.filter((_, i) => i !== index))}
-                    disabled={submitting}
-                  >
-                    Quitar
-                  </button>
-                )}
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div>
-                  <label className="mb-1.5 block text-[12px] font-medium text-text-h">Casilla</label>
-                  <input
-                    type="number"
-                    min={2}
-                    max={boardSize - 1}
-                    className="w-full rounded-lg border border-border bg-bg px-[13px] py-[9px] text-[14px] text-text-h outline-none focus:border-accent"
-                    value={question.cellNumber}
-                    disabled={submitting}
-                    onChange={(e) => updateCellQuestion(index, { cellNumber: Number(e.target.value) })}
-                  />
-                </div>
-                <div className="sm:col-span-2">
+        {phase === 2 && (
+
+        <FormSection
+          icon={HelpCircle}
+          title="Retos de casillas normales"
+          subtitle={`Mínimo ${MIN_CELL_QUESTIONS} retos.`}
+          info="Son las preguntas que aparecen al caer en una casilla que no tiene escalera ni serpiente."
+          tone={1}
+          bare
+        >
+          <ItemGridEditor
+            itemLabel="Reto"
+            addLabel="+ Agregar reto"
+            count={cellQuestions.length}
+            minItems={MIN_CELL_QUESTIONS}
+            selected={selectedCell}
+            onSelect={setSelectedCell}
+            onAdd={() => setCellQuestions([...cellQuestions, emptyCellQuestion(2)])}
+            onRemove={(index) => {
+              setCellQuestions(cellQuestions.filter((_, i) => i !== index))
+              setSelectedCell((current) => Math.max(0, Math.min(current, cellQuestions.length - 2)))
+            }}
+            disabled={submitting}
+            isComplete={(index) => {
+              const q = cellQuestions[index]
+              return !!q && !!q.prompt.trim() && q.options.every((o) => o.trim())
+            }}
+            tileText={(index) => cellQuestions[index]?.prompt ?? ''}
+            tileVisual={(index) => <span className="font-semibold">{cellQuestions[index]?.cellNumber}</span>}
+            renderEditor={(index) => {
+              const question = cellQuestions[index]
+              if (!question) return null
+              return (
+                <div className="flex flex-col gap-3">
+                  <div>
+                    <label className="mb-1.5 block text-[12px] font-medium text-text-h">Casilla</label>
+                    <input
+                      type="number"
+                      min={2}
+                      max={boardSize - 1}
+                      className="w-full rounded-lg border border-border bg-bg px-[13px] py-[9px] text-[14px] text-text-h outline-none focus:border-accent"
+                      value={question.cellNumber}
+                      disabled={submitting}
+                      onChange={(e) => updateCellQuestion(index, { cellNumber: Number(e.target.value) })}
+                    />
+                  </div>
                   <TextField
                     label="Pregunta"
                     type="text"
@@ -441,56 +531,67 @@ export function SnakesLaddersGameForm({ onClose, onCreated, onBack, onCategoryCr
                     onChange={(v) => updateCellQuestion(index, { prompt: v })}
                     onBlur={() => {}}
                   />
+                  <OptionsEditor
+                    groupName={`cell-question-correct-${index}`}
+                    options={question.options}
+                    correctOptionIndex={question.correctOptionIndex}
+                    disabled={submitting}
+                    onOptionChange={(oi, v) => updateCellOption(index, oi, v)}
+                    onAddOption={() => updateCellQuestion(index, { options: [...question.options, ''] })}
+                    onRemoveOption={(oi) =>
+                      updateCellQuestion(index, { options: question.options.filter((_, i) => i !== oi) })
+                    }
+                    onCorrectChange={(oi) => updateCellQuestion(index, { correctOptionIndex: oi })}
+                  />
                 </div>
-              </div>
-              <OptionsEditor
-                groupName={`cell-question-correct-${index}`}
-                options={question.options}
-                correctOptionIndex={question.correctOptionIndex}
-                disabled={submitting}
-                onOptionChange={(oi, v) => updateCellOption(index, oi, v)}
-                onAddOption={() => updateCellQuestion(index, { options: [...question.options, ''] })}
-                onRemoveOption={(oi) =>
-                  updateCellQuestion(index, { options: question.options.filter((_, i) => i !== oi) })
-                }
-                onCorrectChange={(oi) => updateCellQuestion(index, { correctOptionIndex: oi })}
-              />
-            </div>
-          ))}
-          <button
-            type="button"
-            className="self-start rounded-lg border border-dashed border-border px-3.5 py-2 text-[13px] font-medium text-text-h"
-            onClick={() => setCellQuestions([...cellQuestions, emptyCellQuestion(2)])}
-            disabled={submitting}
-          >
-            + Agregar reto de casilla
-          </button>
-        </div>
+              )
+            }}
+          />
+        </FormSection>
+        )}
 
         {error && (
-          <p className="rounded-lg border border-danger/35 bg-danger/10 px-[13px] py-[11px] text-sm leading-snug text-danger" role="alert">
+          <p className="nx-alert" role="alert">
             {error}
           </p>
         )}
 
-        <div className="flex gap-2">
-          <button
-            type="submit"
-            className="rounded-lg px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)] transition-transform hover:not-disabled:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
-            style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
-            disabled={submitting}
-          >
-            {submitting ? 'Creando…' : 'Crear juego'}
-          </button>
-          <button
-            type="button"
-            className="rounded-lg border border-border px-4 py-2.5 text-[14px] font-medium text-text-h"
-            onClick={onClose}
-            disabled={submitting}
-          >
-            Cancelar
-          </button>
-        </div>
+        <WizardPhaseNav
+          onBack={phase === 0 ? undefined : goToPreviousPhase}
+          backLabel="Atrás"
+          onNext={goToNextPhase}
+          isLastPhase={phase === TOTAL_PHASES - 1}
+          submitting={submitting}
+        />
+
+        {phase === TOTAL_PHASES - 1 && (
+          <div className="nx-sticky-actions nx-actions">
+            <button
+              type="submit"
+              className="nx-btn nx-btn-primary"
+              style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
+              disabled={submitting}
+            >
+              {submitting ? 'Creando…' : 'Crear juego'}
+            </button>
+            <button
+              type="button"
+              className="nx-btn nx-btn-secondary border border-border text-text-h"
+              onClick={goToPreviousPhase}
+              disabled={submitting}
+            >
+              ← Atrás
+            </button>
+            <button
+              type="button"
+              className="nx-btn nx-btn-secondary border border-border text-text-h"
+              onClick={onClose}
+              disabled={submitting}
+            >
+              Cancelar
+            </button>
+          </div>
+        )}
       </form>
     </GameFormShell>
   )
@@ -502,6 +603,8 @@ function LinksSection({
   links,
   boardSize,
   submitting,
+  selected,
+  onSelect,
   onAdd,
   onRemove,
   onChange,
@@ -512,32 +615,48 @@ function LinksSection({
   links: LinkDraft[]
   boardSize: number
   submitting: boolean
+  selected: number
+  onSelect: (index: number) => void
   onAdd: () => void
   onRemove: (index: number) => void
   onChange: (index: number, patch: Partial<LinkDraft>) => void
   onOptionChange: (index: number, optionIndex: number, value: string) => void
 }) {
-  const borderColor = accent === 'emerald' ? 'border-emerald-400/40' : 'border-rose-400/40'
+  const isLadder = accent === 'emerald'
   return (
-    <div className="flex flex-col gap-3">
-      <p className="text-[13px] font-semibold text-text-h">{title}</p>
-      {links.map((link, index) => (
-        <div key={index} className={`rounded-xl border ${borderColor} p-4`}>
-          <div className="mb-2.5 flex items-center justify-between">
-            <p className="text-[13px] font-semibold text-text-h">
-              {index + 1}. de casilla {link.from} a {link.to}
-            </p>
-            {links.length > 0 && (
-              <button
-                type="button"
-                className="text-[12px] font-medium text-danger"
-                onClick={() => onRemove(index)}
-                disabled={submitting}
-              >
-                Quitar
-              </button>
-            )}
-          </div>
+    <FormSection
+      icon={isLadder ? ArrowUpRight : ArrowDownRight}
+      title={title}
+      subtitle={isLadder ? 'Cada escalera exige un reto para subir.' : 'Cada serpiente da una oportunidad de recuperación.'}
+      info={
+        isLadder
+          ? 'Una escalera lleva al jugador de una casilla a otra más adelante, pero solo si responde bien un reto de alta complejidad.'
+          : 'Una serpiente baja al jugador a una casilla anterior; el reto le da una oportunidad de recuperarse y quedarse donde está.'
+      }
+      tone={isLadder ? 3 : 4}
+      bare
+    >
+      <ItemGridEditor
+        itemLabel={isLadder ? 'Escalera' : 'Serpiente'}
+        addLabel={isLadder ? '+ Agregar escalera' : '+ Agregar serpiente'}
+        count={links.length}
+        minItems={1}
+        selected={selected}
+        onSelect={onSelect}
+        onAdd={onAdd}
+        onRemove={onRemove}
+        disabled={submitting}
+        isComplete={(index) => {
+          const link = links[index]
+          return !!link && !!link.prompt.trim() && link.options.every((o) => o.trim())
+        }}
+        tileText={(index) => (links[index] ? `${links[index].from} → ${links[index].to}` : '')}
+        tileVisual={() => (isLadder ? <ArrowUpRight className="h-6 w-6" strokeWidth={2.2} /> : <ArrowDownRight className="h-6 w-6" strokeWidth={2.2} />)}
+        renderEditor={(index) => {
+          const link = links[index]
+          if (!link) return null
+          return (
+        <div data-kind={accent}>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1.5 block text-[12px] font-medium text-text-h">Casilla origen</label>
@@ -585,16 +704,10 @@ function LinksSection({
             onCorrectChange={(oi) => onChange(index, { correctOptionIndex: oi })}
           />
         </div>
-      ))}
-      <button
-        type="button"
-        className="self-start rounded-lg border border-dashed border-border px-3.5 py-2 text-[13px] font-medium text-text-h"
-        onClick={onAdd}
-        disabled={submitting}
-      >
-        + Agregar
-      </button>
-    </div>
+          )
+        }}
+      />
+    </FormSection>
   )
 }
 
@@ -619,9 +732,9 @@ function OptionsEditor({
 }) {
   return (
     <div className="mt-3 flex flex-col gap-2">
-      <p className="text-[12px] font-medium text-text-h">Opciones (marca la correcta)</p>
+      <p className="nx-label text-[12px] font-medium text-text-h">Opciones (marca la correcta)</p>
       {options.map((option, optionIndex) => (
-        <div key={optionIndex} className="flex items-center gap-2">
+        <div key={optionIndex} className="nx-option">
           <input
             type="radio"
             name={groupName}
@@ -639,7 +752,7 @@ function OptionsEditor({
           {options.length > 2 && (
             <button
               type="button"
-              className="text-[11px] font-medium text-danger"
+              className="nx-remove nx-remove-sm"
               onClick={() => onRemoveOption(optionIndex)}
               disabled={disabled}
             >
@@ -651,7 +764,7 @@ function OptionsEditor({
       {options.length < 6 && (
         <button
           type="button"
-          className="self-start text-[11.5px] font-medium text-accent"
+          className="nx-add-inline"
           onClick={onAddOption}
           disabled={disabled}
         >

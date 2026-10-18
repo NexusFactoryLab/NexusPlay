@@ -11,9 +11,42 @@ async function uploadFile(
   file: File,
   folder: string,
   errorMessage: string,
+  onProgress?: (percent: number) => void,
 ): Promise<{ url: string }> {
   const formData = new FormData()
   formData.append('file', file)
+
+  // Con onProgress se usa XHR (fetch no expone el avance de la subida).
+  if (onProgress) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', `${API_URL}/uploads/${endpoint}?folder=${folder}`)
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+      xhr.withCredentials = true
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100))
+      }
+      xhr.onerror = () => reject(new ApiError(errorMessage, 0))
+      xhr.onload = () => {
+        let payload: unknown = null
+        try {
+          payload = JSON.parse(xhr.responseText)
+        } catch {
+          payload = null
+        }
+        if (xhr.status < 200 || xhr.status >= 300) {
+          const message =
+            payload && typeof payload === 'object' && 'message' in payload
+              ? String((payload as { message: unknown }).message)
+              : errorMessage
+          reject(new ApiError(message, xhr.status))
+          return
+        }
+        resolve(payload as { url: string })
+      }
+      xhr.send(formData)
+    })
+  }
 
   const response = await fetch(`${API_URL}/uploads/${endpoint}?folder=${folder}`, {
     method: 'POST',
@@ -35,8 +68,13 @@ async function uploadFile(
 }
 
 /** POST /uploads/image — sube una imagen a Cloudinary y devuelve su URL pública. */
-export function uploadImage(token: string, file: File, folder: UploadFolder): Promise<{ url: string }> {
-  return uploadFile('image', token, file, folder, 'No se pudo subir la imagen.')
+export function uploadImage(
+  token: string,
+  file: File,
+  folder: UploadFolder,
+  onProgress?: (percent: number) => void,
+): Promise<{ url: string }> {
+  return uploadFile('image', token, file, folder, 'No se pudo subir la imagen.', onProgress)
 }
 
 /** POST /uploads/audio — sube un audio a Cloudinary y devuelve su URL pública. */

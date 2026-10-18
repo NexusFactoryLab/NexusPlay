@@ -77,7 +77,7 @@ function setup(options: {
 }
 
 describe('DeleteSubjectUseCase', () => {
-  it('lanza SubjectNotFoundError si la materia no existe', async () => {
+  it('lanza SubjectNotFoundError si el Ã¡rea no existe', async () => {
     const { useCase } = setup({
       subjects: new Map(),
       childrenByParentId: new Map(),
@@ -90,7 +90,7 @@ describe('DeleteSubjectUseCase', () => {
     );
   });
 
-  it('sub-materia PRIVATE sin juegos, borrada por su creador: soft-delete exitoso', async () => {
+  it('sub-Ã¡rea PRIVATE sin juegos, borrada por su creador: soft-delete exitoso', async () => {
     const sub = createSub('sub-1', 'root-1', 'owner-1');
     const { useCase, subjectRepository } = setup({
       subjects: new Map([['sub-1', sub]]),
@@ -104,7 +104,7 @@ describe('DeleteSubjectUseCase', () => {
     expect(subjectRepository.softDelete).toHaveBeenCalledWith('sub-1');
   });
 
-  it('sub-materia PRIVATE sin juegos, borrada por un admin que no es el creador: soft-delete exitoso', async () => {
+  it('sub-Ã¡rea PRIVATE sin juegos, borrada por un admin que no es el creador: soft-delete exitoso', async () => {
     const sub = createSub('sub-1', 'root-1', 'owner-1');
     const { useCase, subjectRepository } = setup({
       subjects: new Map([['sub-1', sub]]),
@@ -118,7 +118,7 @@ describe('DeleteSubjectUseCase', () => {
     expect(subjectRepository.softDelete).toHaveBeenCalledWith('sub-1');
   });
 
-  it('sub-materia PUBLIC sin juegos en su árbol, borrada por su creador: soft-delete exitoso', async () => {
+  it('sub-Ã¡rea PUBLIC sin juegos en su árbol, borrada por su creador: soft-delete exitoso', async () => {
     const sub = createSub('sub-1', 'root-1', 'owner-1');
     sub.publish();
     const { useCase, subjectRepository } = setup({
@@ -133,7 +133,7 @@ describe('DeleteSubjectUseCase', () => {
     expect(subjectRepository.softDelete).toHaveBeenCalledWith('sub-1');
   });
 
-  it('sub-materia PUBLIC con un juego asociado directamente: falla con SubjectHasGamesError', async () => {
+  it('sub-Ã¡rea PUBLIC con un juego asociado directamente: falla con SubjectHasGamesError', async () => {
     const sub = createSub('sub-1', 'root-1', 'owner-1');
     sub.publish();
     const { useCase, subjectRepository } = setup({
@@ -149,7 +149,7 @@ describe('DeleteSubjectUseCase', () => {
     expect(subjectRepository.softDelete).not.toHaveBeenCalled();
   });
 
-  it('sub-materia PUBLIC sin juegos propios pero con una descendiente con juegos: falla con SubjectHasGamesError (recursividad)', async () => {
+  it('sub-Ã¡rea PUBLIC sin juegos propios pero con una descendiente con juegos: falla con SubjectHasGamesError (recursividad)', async () => {
     const sub = createSub('sub-1', 'root-1', 'owner-1');
     sub.publish();
     const grandchild = createSub('sub-2', 'sub-1', 'owner-1');
@@ -167,7 +167,7 @@ describe('DeleteSubjectUseCase', () => {
     expect(subjectRepository.softDelete).not.toHaveBeenCalled();
   });
 
-  it('materia raíz sin juegos en todo su árbol, borrada por un ADMIN: soft-delete exitoso (bug resuelto)', async () => {
+  it('Ã¡rea raíz sin juegos en todo su árbol, borrada por un ADMIN: soft-delete exitoso (bug resuelto)', async () => {
     const root = createRoot('root-1');
     const { useCase, subjectRepository } = setup({
       subjects: new Map([['root-1', root]]),
@@ -181,7 +181,7 @@ describe('DeleteSubjectUseCase', () => {
     expect(subjectRepository.softDelete).toHaveBeenCalledWith('root-1');
   });
 
-  it('materia raíz sin juegos, borrada por un usuario NO admin: falla con ForbiddenActionError', async () => {
+  it('Ã¡rea raíz sin juegos, borrada por un usuario NO admin: falla con ForbiddenActionError', async () => {
     const root = createRoot('root-1');
     const { useCase, subjectRepository } = setup({
       subjects: new Map([['root-1', root]]),
@@ -196,7 +196,7 @@ describe('DeleteSubjectUseCase', () => {
     expect(subjectRepository.softDelete).not.toHaveBeenCalled();
   });
 
-  it('materia raíz con una descendiente con juegos, borrada por ADMIN: falla con SubjectHasGamesError', async () => {
+  it('Ã¡rea raíz con una descendiente con juegos, borrada por ADMIN: falla con SubjectHasGamesError', async () => {
     const root = createRoot('root-1');
     const child = createSub('sub-1', 'root-1', 'owner-1');
 
