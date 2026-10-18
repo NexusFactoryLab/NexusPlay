@@ -1,6 +1,6 @@
 import { Check } from 'lucide-react'
 import type { GuessWhoTrait } from './guessWhoTypes'
-import { FALLBACK_QUESTION, MAX_TRAITS, MAX_TRAIT_CATEGORY_LENGTH, MAX_TRAIT_QUESTION_LENGTH, SUGGESTED_CATEGORIES } from './guessWhoTraits'
+import { MIN_TRAITS, MAX_TRAITS, MAX_TRAIT_CATEGORY_LENGTH, MAX_TRAIT_QUESTION_LENGTH, SUGGESTED_CATEGORIES } from './guessWhoTraits'
 
 type EditorCard = { imageUrl: string | null; label: string; traitIds: string[] }
 
@@ -42,7 +42,7 @@ export function GuessWhoTraitsEditor({
           Para aprender más, pregunta lo que hay que saber (historia, cultura, deporte…), no lo que se ve en la
           imagen. La categoría ayuda a que el juego mezcle temas en cada turno.
         </p>
-        <p className="mt-1 text-text">Es opcional: sin preguntas, el juego propone «{FALLBACK_QUESTION}».</p>
+        <p className="mt-1 text-text">Escribe al menos {MIN_TRAITS}; lo ideal son 15 o más, de varias categorías.</p>
       </div>
 
       {catalog.map((trait, index) => {

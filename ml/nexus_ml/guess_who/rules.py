@@ -14,7 +14,6 @@ from dataclasses import dataclass
 
 MAX_SUGGESTED_QUESTIONS = 6
 MIN_DISCARDS_BEFORE_ACCUSATION = 3
-GROUP_QUESTION = "¿Tu tarjeta está en este grupo?"
 
 
 @dataclass(frozen=True)
@@ -86,9 +85,7 @@ def questions_for(cards: Sequence[Card], discarded: Iterable[str], seed: str = "
     # Los rasgos solo valen si TODAS las tarjetas están clasificadas.
     if cards and all(card.traits is not None for card in cards):
         candidates = _trait_questions(cards, remaining, seed)
-    if not candidates:
-        half = -(-len(remaining) // 2)  # Math.ceil(n / 2)
-        candidates = [Question(GROUP_QUESTION, tuple(card.card_id for card in remaining[:half]))]
+    # Sin rasgos no hay sugerencias (ya no existe la pregunta del grupo, issue #64).
     remaining_ids = [card.card_id for card in remaining]
     result = []
     for question in candidates:

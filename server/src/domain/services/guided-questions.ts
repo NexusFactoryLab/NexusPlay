@@ -123,7 +123,8 @@ function traitQuestions(cards: Card[], remaining: Card[], seed: string): Omit<Gu
 /**
  * Preguntas sugeridas para el jugador. Salen de los rasgos de las tarjetas
  * (datos del tema: documento del usuario o juego demo); si el juego no los
- * tiene queda solo la pregunta del grupo. Datos públicos y deterministas:
+ * tiene no se sugiere nada: ya no existe la pregunta del grupo, que dejaba
+ * descartar mirando las imágenes sin pensar (issue #64). Datos públicos y deterministas:
  * nunca se consulta la carta secreta de nadie.
  */
 export function questionsFor(state: GuidedState, userId: string): GuidedQuestion[] {
@@ -133,9 +134,6 @@ export function questionsFor(state: GuidedState, userId: string): GuidedQuestion
   // Semilla del jugador y del turno: las sugerencias cambian de un turno a otro.
   const seed = userId + '|' + (state.turnDeadline ?? 0);
   const candidates = traitsAreUsable(state.cards) ? traitQuestions(state.cards, remaining, seed) : [];
-  if (candidates.length === 0) {
-    candidates.push({ text: '¿Tu tarjeta está en este grupo?', cardIds: remaining.slice(0, Math.ceil(remaining.length / 2)).map(c => c.cardId) });
-  }
   return candidates
     .filter(q => q.cardIds.length > 0 && remaining.some(c => !q.cardIds.includes(c.cardId)))
     .map(q => ({ ...q, id: questionId(q.text, q.cardIds) }));

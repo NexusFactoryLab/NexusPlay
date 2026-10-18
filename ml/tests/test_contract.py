@@ -55,7 +55,7 @@ def test_los_casos_cubren_lo_importante():
     cases = QUESTIONS["cases"]
     texts = [question["text"] for case in cases for question in case["expected"]]
     assert any(text.startswith("¿Rasgo") for text in texts), "preguntas por rasgo"
-    assert any("grupo" in text for text in texts), "pregunta del grupo (sin rasgos o sin clasificar)"
+    assert any(not case["expected"] for case in cases), "juegos sin rasgos: ninguna sugerencia"
     assert any(len(case["expected"]) == MAX_QUESTIONS for case in cases), "tope de 6 sugerencias"
     assert any(traits and "copia" in traits for case in cases for _, traits in case["cards"]), "particiones repetidas"
     assert any(len({q.get("category") for q in case["expected"]}) >= 3 for case in cases), "varias categorías"

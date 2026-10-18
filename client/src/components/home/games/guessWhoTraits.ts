@@ -16,8 +16,8 @@ export const MAX_TRAIT_CATEGORY_LENGTH = 30
 /** Categorías sugeridas en el formulario (se puede escribir cualquier otra). */
 export const SUGGESTED_CATEGORIES = ['Historia', 'Cultura', 'Geografía', 'Deporte', 'Ciencia', 'Arte', 'Naturaleza']
 
-/** Texto de la pregunta que el juego usa cuando no hay rasgos (ver guided-questions.ts del servidor). */
-export const FALLBACK_QUESTION = '¿Tu tarjeta está en este grupo?'
+/** Preguntas mínimas para crear un juego: sin preguntas no hay partida de pensar (issue #64). */
+export const MIN_TRAITS = 4
 
 type WithTraits = { traits?: unknown }
 
@@ -70,6 +70,9 @@ export function newTraitId(catalog: GuessWhoTrait[]): string {
 
 /** Error de la fase de preguntas, o null si todas sirven. `cardTraitIds[i]` son los ids marcados en la tarjeta i. */
 export function validateTraits(catalog: GuessWhoTrait[], cardTraitIds: string[][]): string | null {
+  if (catalog.length < MIN_TRAITS) {
+    return `Escribe al menos ${MIN_TRAITS} preguntas de Sí/No sobre el tema (o genéralas con la IA).`
+  }
   for (const [index, trait] of catalog.entries()) {
     const question = formatQuestion(trait.question)
     const name = question || `la pregunta ${index + 1}`

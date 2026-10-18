@@ -132,7 +132,6 @@ export function ChatPanel({
         {guided.pending ? <>
           <p className="text-[12px] font-bold text-accent">{guided.pending.askerId === selfUserId ? 'Esperando a tu rival…' : 'Tu rival pregunta'}</p>
           <p className="mt-1 text-[13px] font-semibold text-text-h">{guided.pending.text}</p>
-          <QuestionGroup question={guided.pending} cards={guided.cards} />
           {guided.pending.askerId !== selfUserId && <div className="mt-2 flex gap-2">
             {[true, false].map(answer => <button key={String(answer)} type="button" disabled={disconnected} onClick={() => guided.onAnswer(guided.pending!.requestId, answer)} className="min-h-11 flex-1 rounded-xl border border-accent bg-accent/10 px-3 py-2 font-bold text-accent focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50">{answer ? 'Sí' : 'No'}</button>)}
           </div>}
@@ -142,9 +141,8 @@ export function ChatPanel({
           {!guided.isMyTurn ? <p className="mt-1 text-[12px] text-text">Podrás preguntar en tu turno. Puedes escribir mensajes mientras esperas.</p> : <div className="mt-2 space-y-2">
             {guided.questions.filter(q => normalize(q.text).includes(normalize(text.trim()))).map(q => <div key={q.id}>
               <button type="button" disabled={disconnected} onClick={() => { guided.onAsk(q.id); setText('') }} className="w-full rounded-xl border border-accent/30 bg-surface/70 px-3 py-2 text-left text-[12px] font-medium text-text-h hover:border-accent focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50" aria-label={`Preguntar: ${q.text}`}>{q.category && <span className="mr-1.5 inline-block rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold text-accent">{q.category}</span>}{q.text}</button>
-              <QuestionGroup question={q} cards={guided.cards} />
             </div>)}
-            {guided.questions.filter(q => normalize(q.text).includes(normalize(text.trim()))).length === 0 && <p className="text-[12px] text-text">{guided.questions.length ? 'Sin sugerencias para ese texto. Puedes enviar un mensaje libre.' : 'No quedan preguntas que separen las opciones. Puedes adivinar o conversar.'}</p>}
+            {guided.questions.filter(q => normalize(q.text).includes(normalize(text.trim()))).length === 0 && <p className="text-[12px] text-text">{guided.questions.length ? 'Sin sugerencias para ese texto. Puedes enviar un mensaje libre.' : 'No quedan preguntas que separen las tarjetas: piensa cuál puede ser y adivina.'}</p>}
           </div>}
         </>}
       </div>}
@@ -183,11 +181,3 @@ export function ChatPanel({
 }
 
 const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
-
-function QuestionGroup({ question, cards }: { question: GuidedQuestion; cards: GuessWhoCard[] }) {
-  if (question.text !== '¿Tu tarjeta está en este grupo?') return null
-  return <details className="mt-1 text-[12px] text-text-h" open>
-    <summary className="cursor-pointer text-accent">Ver tarjetas del grupo</summary>
-    <ul className="mt-2 grid grid-cols-3 gap-1.5">{cards.filter(c => question.cardIds.includes(c.cardId)).map(c => <li key={c.cardId} className="rounded-lg border border-border bg-surface/80 p-1"><img src={c.imageUrl} alt="" className="h-10 w-full object-contain" /><p className="break-words text-center text-[10px]">{c.label}</p></li>)}</ul>
-  </details>
-}

@@ -127,18 +127,13 @@ describe('preguntas guiadas autoritativas', () => {
     s.cards = Array.from({ length: 12 }, (_, i) => ({ cardId: String(i), label: `Tarjeta ${i}`, traits: i < 10 ? [{ id: `r${i}`, question: `¿Rasgo ${i}?` }] : [] }));
     expect(questionsFor(s, 'a')).toHaveLength(6);
   });
-  it('respeta descartes manuales previos y ofrece grupos cuando el juego no tiene rasgos', () => {
+  it('sin rasgos no sugiere nada: ya no existe la pregunta del grupo que mostraba las tarjetas (issue #64)', () => {
     const s = state(); s.cards.forEach(c => delete c.traits);
-    s.players[0].discardedCardIds = ['5'];
-    const qs = questionsFor(s, 'a'); expect(qs).toHaveLength(1);
-    askGuidedQuestion(s, 'a', 'Ana', qs[0].id);
-    answerGuidedQuestion(s, 'b', 'Luis', s.pendingQuestion!.requestId, true);
-    expect(s.players[0].discardedCardIds).toEqual(['5', '3', '4']);
-    expect(new Set(s.players[0].discardedCardIds).size).toBe(3);
+    expect(questionsFor(s, 'a')).toEqual([]);
   });
   it('ignora los rasgos si alguna tarjeta no está clasificada: respondería «No» a todo', () => {
     const s = state(); delete s.cards[1].traits;
-    expect(texts(s)).toEqual(['¿Tu tarjeta está en este grupo?']);
+    expect(texts(s)).toEqual([]);
   });
   it('el chat libre no descarta y limita el historial y longitud', () => {
     const s = state();

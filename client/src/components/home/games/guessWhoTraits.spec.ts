@@ -42,12 +42,14 @@ describe('preguntas guiadas en el formulario de ¿Quién Es? (issue #58)', () =>
     expect(newTraitId([{ id: 'pregunta-2', question: '¿A?' }, { id: 'pregunta-3', question: '¿B?' }])).toBe('pregunta-4')
   })
 
-  it('exige texto y que cada pregunta separe: algunas tarjetas responden Sí, pero no todas', () => {
-    expect(validateTraits([], [[], []])).toBeNull()
-    expect(validateTraits([EUROPA], [['europa'], []])).toBeNull()
-    expect(validateTraits([{ id: 'p', question: '  ' }], [['p'], []])).toMatch(/Escribe el texto/)
-    expect(validateTraits([EUROPA], [[], []])).toMatch(/no separa/)
-    expect(validateTraits([EUROPA], [['europa'], ['europa']])).toMatch(/no separa/)
-    expect(validateTraits([{ id: 'p', question: 'x'.repeat(141) }], [['p'], []])).toMatch(/muy larga/)
+  it('exige al menos 4 preguntas, con texto, y que cada una separe: algunas tarjetas responden Sí, pero no todas', () => {
+    const more = [1, 2, 3].map((n) => ({ id: `r${n}`, question: `¿Rasgo ${n}?` }))
+    const marks = (ids: string[]) => [[...ids, 'r1', 'r2', 'r3'], []]
+    expect(validateTraits([], [[], []])).toMatch(/al menos 4/)
+    expect(validateTraits([EUROPA], [['europa'], []])).toMatch(/al menos 4/)
+    expect(validateTraits([EUROPA, ...more], marks(['europa']))).toBeNull()
+    expect(validateTraits([{ id: 'p', question: '  ' }, ...more], marks(['p']))).toMatch(/Escribe el texto/)
+    expect(validateTraits([EUROPA, ...more], marks([]))).toMatch(/no separa/)
+    expect(validateTraits([{ id: 'p', question: 'x'.repeat(141) }, ...more], marks(['p']))).toMatch(/muy larga/)
   })
 })
