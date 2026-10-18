@@ -220,7 +220,9 @@ export function GameFormShell({
       const control = field.querySelector<HTMLInputElement>(CONTROL_SELECTOR)
       // Avance: cada campo obligatorio visible cuenta como listo si tiene valor
       // (o imagen); los numéricos ya traen valor por defecto, no se cuentan.
-      const hidden = !!field.closest('[inert], [aria-hidden=true]')
+      // Los campos del panel de una lista (`data-nx-nocount`) editan un solo
+      // elemento a la vez: no representan el avance de la fase.
+      const hidden = !!field.closest('[inert], [aria-hidden=true], [data-nx-nocount]')
       const hasFile = !!field.querySelector('input[type=file]')
       const countable = !hidden && (!!control ? control.type !== 'number' : hasFile)
       const done = control ? control.value.trim().length > 0 : hasFile && !!field.querySelector('img')
