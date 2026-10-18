@@ -3809,9 +3809,22 @@ code {
 }
 .nx-gi-layout { display: grid; gap: 16px; min-width: 0; }
 @media (min-width: 1024px) {
-  .nx-gi-layout { grid-template-columns: minmax(0, 1fr) 340px; align-items: start; }
-  .nx-gi-panel { position: sticky; top: 14px; }
+  .nx-gi-layout[data-layout='side'] { grid-template-columns: minmax(0, 1fr) 340px; align-items: start; }
+  .nx-gi-layout[data-layout='side'] .nx-gi-panel { position: sticky; top: 14px; }
 }
+.nx-gi-layout[data-layout='stacked'] .nx-gi-tiles { max-height: 300px; }
+/* Pareja de opuestos: mitad positiva / mitad negativa, en la tarjeta y en el panel. */
+.nx-gi-split { display: grid; grid-template-columns: 1fr 1fr; width: 100%; height: 100%; }
+.nx-gi-split > span { display: grid; place-items: center; overflow: hidden; font-size: 22px; font-weight: 800; color: #fff; }
+.nx-gi-split img { width: 100%; height: 100%; object-fit: cover; }
+.nx-gi-split-pos { background: #10b981; }
+.nx-gi-split-neg { background: #f43f5e; }
+.nx-gi-side { display: flex; flex-direction: column; gap: 12px; min-width: 0; padding: 14px; border: 1px solid var(--nx-card-border); border-radius: 18px; background: color-mix(in srgb, var(--accent) 4%, transparent); }
+.nx-gi-side[data-side='pos'] { border-top: 3px solid #10b981; }
+.nx-gi-side[data-side='neg'] { border-top: 3px solid #f43f5e; }
+.nx-gi-side-title { margin: 0; font-size: 12.5px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-h); }
+.nx-gi-side[data-side='pos'] .nx-gi-side-title { color: #10b981; }
+.nx-gi-side[data-side='neg'] .nx-gi-side-title { color: #f43f5e; }
 .nx-gi-tiles {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(124px, 1fr));

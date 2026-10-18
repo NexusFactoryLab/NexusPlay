@@ -23,6 +23,8 @@ type ItemGridEditorProps = {
   tileVisual?: (index: number) => ReactNode
   /** Tope de elementos: al alcanzarlo se oculta "Agregar". */
   maxItems?: number
+  /** `side`: panel a la derecha (campos pocos); `stacked`: panel ancho debajo de la cuadrícula (muchos campos). */
+  layout?: 'side' | 'stacked'
   /** Campos del elemento seleccionado. */
   renderEditor: (index: number) => ReactNode
 }
@@ -49,6 +51,7 @@ export function ItemGridEditor({
   tileImage,
   tileVisual,
   maxItems,
+  layout = 'side',
   renderEditor,
 }: ItemGridEditorProps) {
   const [touched, setTouched] = useState(false)
@@ -94,7 +97,7 @@ export function ItemGridEditor({
         )}
       </div>
 
-      <div className="nx-gi-layout">
+      <div className="nx-gi-layout" data-layout={layout}>
         <div className="nx-gi-tiles" ref={tilesRef} role="list" aria-label={`${itemLabel}s`}>
           {Array.from({ length: count }, (_, index) => {
             const complete = isComplete(index)
