@@ -52,12 +52,16 @@ function requireCardOfGame(state: GuessWhoRulesState, cardId: unknown): string {
 }
 
 /**
- * Marca o desmarca una tarjeta en el tablero propio del jugador activo. Solo
- * acepta tarjetas del juego: antes cualquier texto contaba como descarte y
- * bastaban tres ids inventados para habilitar la acusación.
+ * Marca o desmarca una tarjeta en el tablero propio. Se puede en cualquier
+ * momento de la partida, también en el turno del rival: con una pregunta por
+ * turno, el turno pasa apenas llega la respuesta, y el descarte manual se
+ * hace después (issue #64). Solo acepta tarjetas del juego: antes cualquier
+ * texto contaba como descarte y bastaban tres ids inventados para acusar.
  */
 export function toggleDiscard(state: GuessWhoRulesState, userId: string, cardId: unknown): void {
-  const player = requireActivePlayer(state, userId);
+  if (state.phase !== 'PLAYING') throw new Error('La partida no está en curso.');
+  const player = state.players.find((p) => p.userId === userId);
+  if (!player) throw new Error('No estás en esta partida.');
   const id = requireCardOfGame(state, cardId);
   const index = player.discardedCardIds.indexOf(id);
   if (index === -1) {

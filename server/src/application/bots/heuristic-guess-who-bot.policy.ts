@@ -47,14 +47,14 @@ export class HeuristicGuessWhoBotPolicy implements GuessWhoBotPolicy {
       return { type: 'DISCARD', cardId: deducible[0] };
     }
 
+    // Una sola acción por turno (issue #64): acusar o preguntar.
     const candidates = candidatesOf(observation);
+    if (observation.canAccuse && candidates.length > 0 && shouldAccuse(observation, candidates.length, random)) {
+      return { type: 'ACCUSE', cardId: candidates[Math.floor(random() * candidates.length)] };
+    }
     if (!observation.askedThisTurn && candidates.length > 1) {
       const question = pickQuestion(observation, candidates, random);
       if (question) return { type: 'ASK', questionId: question.id };
-    }
-
-    if (observation.canAccuse && candidates.length > 0 && shouldAccuse(observation, candidates.length, random)) {
-      return { type: 'ACCUSE', cardId: candidates[Math.floor(random() * candidates.length)] };
     }
     return { type: 'PASS' };
   }

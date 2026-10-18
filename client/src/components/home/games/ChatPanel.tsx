@@ -35,6 +35,7 @@ export function ChatPanel({
   guided,
   error,
   notice,
+  answerHint,
 }: {
   messages: GuessWhoChatMessage[]
   selfUserId: string | null
@@ -47,6 +48,8 @@ export function ChatPanel({
   error?: string | null
   /** Aviso fijo sobre el chat (ej. que el rival es el bot y no lee mensajes). */
   notice?: string
+  /** Aviso al responder algo que no coincide con tu tarjeta: se muestra junto a Sí/No, no como error. */
+  answerHint?: string | null
 }) {
   const [text, setText] = useState('')
   const listRef = useRef<HTMLDivElement>(null)
@@ -155,6 +158,7 @@ export function ChatPanel({
         {guided.pending ? <>
           <p className="text-[12px] font-bold text-accent">{guided.pending.askerId === selfUserId ? (guided.pending.free && guided.opponentIsBot ? 'El bot está pensando la respuesta con IA…' : 'Esperando a tu rival…') : guided.pending.free ? 'Tu rival hace su propia pregunta' : 'Tu rival pregunta'}</p>
           <p className="mt-1 text-[13px] font-semibold text-text-h">{guided.pending.text}</p>
+          {guided.pending.askerId !== selfUserId && answerHint && <p role="status" className="mt-2 rounded-lg border border-amber-400/60 bg-amber-50 px-2.5 py-1.5 text-[12px] text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">{answerHint}</p>}
           {guided.pending.askerId !== selfUserId && <div className="mt-2 flex gap-2">
             {[true, false].map(answer => <button key={String(answer)} type="button" disabled={disconnected} onClick={() => guided.onAnswer(guided.pending!.requestId, answer)} className="min-h-11 flex-1 rounded-xl border border-accent bg-accent/10 px-3 py-2 font-bold text-accent focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50">{answer ? 'Sí' : 'No'}</button>)}
           </div>}
@@ -164,7 +168,7 @@ export function ChatPanel({
             <p className="text-[12px] font-semibold">{lastAnswer.displayName} respondió</p>
             <p className="my-1 text-[28px] font-extrabold leading-none text-accent">{lastAnswer.text.startsWith('Sí') ? 'Sí' : 'No'}</p>
             <p className="text-[11px] text-text">{lastAnswer.text.replace(/^(Sí|No)\.\s*/, '')}</p>
-            <button type="button" onClick={() => setDismissedAnswerAt(lastAnswer.sentAt)} className="mt-2 rounded-lg border border-accent/40 px-3 py-1.5 text-[12px] font-semibold text-accent focus-visible:outline-2 focus-visible:outline-accent">Seguir preguntando</button>
+            <button type="button" onClick={() => setDismissedAnswerAt(lastAnswer.sentAt)} className="mt-2 rounded-lg border border-accent/40 px-3 py-1.5 text-[12px] font-semibold text-accent focus-visible:outline-2 focus-visible:outline-accent">Entendido</button>
           </div> : <>
           {lastAnswer && <p className="mb-2 rounded-lg border border-accent/40 bg-surface px-2.5 py-1.5 text-[12.5px] text-text-h">
             <span className="font-semibold">{lastAnswer.displayName} respondió: </span>

@@ -20,15 +20,16 @@ function state(): GuessWhoRulesState<{ userId: string; displayName: string; secr
 }
 
 describe('reglas de turno de Identidad Oculta', () => {
-  it('descartar marca y desmarca solo en el tablero de quien tiene el turno', () => {
+  it('descartar marca y desmarca en el tablero propio, también en el turno del rival (issue #64)', () => {
     const s = state();
     toggleDiscard(s, 'ana', 'card-3');
     expect(s.players[0].discardedCardIds).toEqual(['card-3']);
     toggleDiscard(s, 'ana', 'card-3');
     expect(s.players[0].discardedCardIds).toEqual([]);
-    expect(() => toggleDiscard(s, 'luis', 'card-3')).toThrow('No es tu turno.');
+    toggleDiscard(s, 'luis', 'card-4');
+    expect(s.players[1].discardedCardIds).toEqual(['card-4']);
+    expect(s.players[0].discardedCardIds).toEqual([]);
     expect(() => toggleDiscard(s, 'intruso', 'card-3')).toThrow('No estás en esta partida.');
-    expect(s.players[1].discardedCardIds).toEqual([]);
   });
 
   it('no acepta descartes de tarjetas que no son del juego (antes bastaban 3 ids inventados para acusar)', () => {

@@ -39,7 +39,7 @@ class OpponentStyle:
 STYLES: tuple[OpponentStyle, ...] = (
     OpponentStyle("cuidadoso", "best", (1, 1), 2, True, True),
     OpponentStyle("casual", "random", (1, 1), 1, False, False),
-    OpponentStyle("rapido", "best", (1, 2), 3, True, True),
+    OpponentStyle("rapido", "best", (1, 1), 3, True, True),
     OpponentStyle("arriesgado", "best", (1, 1), 60, True, True),
     OpponentStyle("bot-dificil", "best", (1, 1), 4, True, True),
 )
@@ -68,26 +68,22 @@ def play_opponent_turn(
     if style.remembers_wrong_guesses:
         opponent.discarded |= opponent.wrong_guesses
 
-    low, high = style.questions_per_turn
-    for _ in range(int(rng.integers(low, high + 1))):
-        pool = candidates_of(cards, opponent, style)
-        questions = questions_for(cards, opponent.discarded, f"rival|{len(opponent.discarded)}")
-        if len(pool) <= 1 or not questions:
-            break
-        index = best_question(questions, pool) if style.question == "best" else None
-        if index is None:
-            index = int(rng.integers(len(questions)))
-        question = questions[index]
-        # El bot responde siempre con la verdad (el servidor no acepta otra cosa).
-        apply_answer(cards, opponent.discarded, question, truthful_answer(question, rival_secret))
-
+    # Una sola acción por turno (issue #64): acusar si se anima; si no, una pregunta.
     pool = candidates_of(cards, opponent, style)
-    if len(opponent.discarded) < MIN_DISCARDS_BEFORE_ACCUSATION or not pool:
+    can_accuse = len(opponent.discarded) >= MIN_DISCARDS_BEFORE_ACCUSATION and pool
+    if can_accuse and (len(pool) <= style.accuse_up_to or len(pool) == 1):
+        guess = pool[int(rng.integers(len(pool)))]
+        if guess == rival_secret:
+            return True
+        opponent.wrong_guesses.add(guess)
         return False
-    if len(pool) > style.accuse_up_to and len(pool) > 1:
+    questions = questions_for(cards, opponent.discarded, f"rival|{len(opponent.discarded)}")
+    if len(pool) <= 1 or not questions:
         return False
-    guess = pool[int(rng.integers(len(pool)))]
-    if guess == rival_secret:
-        return True
-    opponent.wrong_guesses.add(guess)
+    index = best_question(questions, pool) if style.question == "best" else None
+    if index is None:
+        index = int(rng.integers(len(questions)))
+    question = questions[index]
+    # El bot responde siempre con la verdad (el servidor no acepta otra cosa).
+    apply_answer(cards, opponent.discarded, question, truthful_answer(question, rival_secret))
     return False

@@ -26,14 +26,15 @@ HARD_OPPONENT_URGENCY = 3
 
 
 def baseline(env: GuessWhoEnv) -> int:
+    """Una acción por turno, como el servidor: acusar si se anima; si no, la mejor pregunta."""
     state = env.policy_input
     mask = env.action_masks()
-    if not state.asked_this_turn and state.remaining > 1 and env.questions:
+    if mask[ACCUSE] and (state.remaining <= HARD_MAX_CANDIDATES or state.opponent_remaining <= HARD_OPPONENT_URGENCY):
+        return ACCUSE
+    if state.remaining > 1 and env.questions:
         index = best_question(env.questions, env.candidates)
         if index is not None and mask[index]:
             return index
-    if mask[ACCUSE] and (state.remaining <= HARD_MAX_CANDIDATES or state.opponent_remaining <= HARD_OPPONENT_URGENCY):
-        return ACCUSE
     return PASS
 
 

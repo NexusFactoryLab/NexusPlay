@@ -121,14 +121,12 @@ describe('partida en solitario contra el bot (issue #60)', () => {
     const { gateway, human, room } = await startSolo();
     if (room.activePlayerUserId !== 'ana') vi.advanceTimersByTime(30_000);
     expect(room.activePlayerUserId).toBe('ana');
-    for (let i = 0; i < 3; i++) {
-      const question = questionsFor(room, 'ana')[0];
-      if (!question) break;
-      gateway.handleQuestion(human, { questionId: question.id });
-      vi.advanceTimersByTime(2_300);
-      // Si el bot hubiera mentido, el servidor rechazaría la respuesta y la pregunta seguiría pendiente.
-      expect(currentQuestion(room)).toBeNull();
-    }
+    gateway.handleQuestion(human, { questionId: questionsFor(room, 'ana')[0].id });
+    vi.advanceTimersByTime(2_300);
+    // Si el bot hubiera mentido, el servidor rechazaría la respuesta y la pregunta seguiría pendiente.
+    expect(currentQuestion(room)).toBeNull();
+    // Una pregunta por turno, intercalada: con la respuesta, el turno pasa al bot.
+    expect(room.activePlayerUserId).toBe(room.players[1].userId);
     expect(room.players[0].discardedCardIds.length).toBeGreaterThan(0);
     expect(room.players[0].discardedCardIds).not.toContain(room.players[1].secretCardId);
   });

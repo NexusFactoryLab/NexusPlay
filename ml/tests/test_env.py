@@ -51,16 +51,18 @@ def test_el_bot_nunca_descarta_la_carta_del_rival_ni_cuenta_la_suya(seed):
     play(GuessWhoEnv(), seed, check)
 
 
-def test_una_pregunta_por_turno():
+def test_una_accion_por_turno_y_el_turno_pasa_con_la_respuesta():
     env = GuessWhoEnv()
     env.reset(seed=3)
     while not env.action_masks()[:MAX_QUESTIONS].any():
         env.reset(seed=int(env.np_random.integers(1_000_000)))
-    before = len(env.candidates)
-    env.step(int(np.flatnonzero(env.action_masks()[:MAX_QUESTIONS])[0]))
+    before, rounds = len(env.candidates), env.rounds
+    _, _, done, _, _ = env.step(int(np.flatnonzero(env.action_masks()[:MAX_QUESTIONS])[0]))
     assert len(env.candidates) < before
-    assert not env.action_masks()[:MAX_QUESTIONS].any()
-    assert env.policy_input.asked_this_turn
+    if not done:
+        # Ya jugó el rival y es un turno nuevo del bot: puede volver a preguntar.
+        assert env.rounds == rounds + 1
+        assert not env.policy_input.asked_this_turn
 
 
 def test_rechaza_acciones_no_permitidas():

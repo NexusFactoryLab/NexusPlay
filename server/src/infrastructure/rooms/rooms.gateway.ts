@@ -1018,8 +1018,8 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   handleMatchAnswer(@ConnectedSocket() socket: AuthenticatedSocket, @MessageBody() body: { requestId: string; answer: boolean }) {
     const { tournament, match } = this.requireActiveTournamentMatch(socket);
     answerGuidedQuestion(match, socket.data.userId, socket.data.displayName, body?.requestId, body?.answer);
-    this.tournamentStore.set(tournament);
-    this.broadcastMatchState(tournament, match);
+    // Una pregunta por turno, intercalada (issue #64).
+    this.advanceTournamentMatchTurn(tournament, match);
   }
 
   @SubscribeMessage('domino:chat')
@@ -1201,10 +1201,10 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     this.broadcastState(room);
   }
 
+  /** Una pregunta por turno, intercalada (issue #64): con la respuesta, el turno pasa al rival. */
   private answerInRoom(room: RoomState, userId: string, displayName: string, requestId: unknown, answer: unknown, note?: string) {
     answerGuidedQuestion(room, userId, displayName, requestId, answer, note);
-    this.roomStore.set(room);
-    this.broadcastState(room);
+    this.advanceTurn(room);
   }
 
   private discardInRoom(room: RoomState, userId: string, cardId: unknown) {

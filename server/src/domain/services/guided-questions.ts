@@ -11,6 +11,9 @@ export type GuidedAnswer = { askerId: string; cardIds: string[]; answer: boolean
 export type PendingQuestion = GuidedQuestion & { requestId: string; askerId: string; deadline: number; free?: boolean };
 
 const MAX_FREE_QUESTION_LENGTH = 140;
+
+/** Cuando alguien responde algo que no coincide con los datos de su tarjeta: un aviso para aprender, no un error. */
+export const WRONG_ANSWER_MESSAGE = 'Ojo: según los datos del juego, esa respuesta no corresponde a tu tarjeta. Piénsalo de nuevo y responde otra vez.';
 export type GuidedMessage = { userId: string; displayName: string; text: string; sentAt: number };
 export interface GuidedState {
   phase: string;
@@ -210,7 +213,7 @@ export function answerGuidedQuestion(state: GuidedState, userId: string, name: s
     addGuidedMessage(state, userId, name, `${answer ? 'Sí' : 'No'}.${note} Pregunta propia: descarta tú según la respuesta.`);
     return;
   }
-  if (q.cardIds.includes(responder.secretCardId) !== answer) throw new Error('Revisa tu tarjeta secreta: esa respuesta no coincide.');
+  if (q.cardIds.includes(responder.secretCardId) !== answer) throw new Error(WRONG_ANSWER_MESSAGE);
   state.answerLog = [...(state.answerLog ?? []), { askerId: q.askerId, cardIds: q.cardIds, answer }];
   state.pendingQuestion = null;
   if (state.autoDiscard === false) {

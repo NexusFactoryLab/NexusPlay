@@ -201,6 +201,9 @@ function GuessWhoRoomSession() {
     )
   }
 
+  // Responder algo que no coincide con tu tarjeta no es un error de partida: es un aviso para aprender (issue #64).
+  const answerHint = error?.startsWith('Ojo:') ? error : null
+  const pageError = answerHint ? null : error
   const self = room.players.find((player) => player.isSelf)
   const opponent = room.players.find((player) => !player.isSelf)
   const againstBot = Boolean(opponent?.isBot)
@@ -270,12 +273,12 @@ function GuessWhoRoomSession() {
           </button>
         </div>
 
-        {error && (
+        {pageError && (
           <p
             className="mb-4 rounded-lg border border-danger/35 bg-danger/10 px-[13px] py-[11px] text-sm leading-snug text-danger"
             role="alert"
           >
-            {error}
+            {pageError}
           </p>
         )}
 
@@ -384,7 +387,8 @@ function GuessWhoRoomSession() {
         </div>
         <ChatPanel
           inline
-          error={error}
+          error={pageError}
+          answerHint={answerHint}
           messages={room.guidedChat ?? []}
           selfUserId={self?.userId ?? null}
           onSend={sendChatMessage}

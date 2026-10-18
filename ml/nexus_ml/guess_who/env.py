@@ -1,8 +1,8 @@
 """Entorno Gymnasium de Identidad Oculta para el bot (issue #62).
 
-Cada paso es una decisión del bot en su turno, con las mismas opciones que
-tiene en el servidor: hacer una de las preguntas sugeridas (una por turno),
-acusar o pasar. El rival juega entre paso y paso. Recompensa: +1 si el bot
+Cada paso es el turno del bot, con una sola acción como en el servidor
+(issue #64): hacer una de las preguntas sugeridas, acusar o pasar. Con la
+respuesta el turno pasa al rival, que juega entre paso y paso. Recompensa: +1 si el bot
 adivina, -1 si adivina el rival, 0 en lo demás (y empate si nadie gana en
 ``max_rounds`` rondas).
 
@@ -60,17 +60,13 @@ class GuessWhoEnv(gym.Env):
         if action < MAX_QUESTIONS:
             question = self.questions[action]
             apply_answer(self.cards, self.bot.discarded, question, truthful_answer(question, self.rival.secret))
-            self.asked = True
-            self._refresh()
-            return self._observation(), 0.0, False, False, {}
-
-        if action == ACCUSE:
+        elif action == ACCUSE:
             guess = self.candidates[int(self.np_random.integers(len(self.candidates)))]
             if guess == self.rival.secret:
                 return self._observation(), 1.0, True, False, {"winner": "bot", "rounds": self.rounds}
             self.bot.wrong_guesses.add(guess)
 
-        # Pasar o acusar mal termina el turno.
+        # Una acción por turno: preguntar, acusar mal o pasar termina el turno.
         if self._opponent_turn():
             return self._observation(), -1.0, True, False, {"winner": "rival", "rounds": self.rounds}
         self.rounds += 1

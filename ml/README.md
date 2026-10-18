@@ -74,24 +74,20 @@ Las pruebas de contrato fallan a propósito: el bot estaría aprendiendo un jueg
 
 ## Modelo actual y lo que aprendió
 
-Entrenado con 1.000.000 de pasos (unos 25 minutos en CPU), con sugerencias variadas por categoría (issue #64). Resultados con 5.000 partidas por política, en semillas distintas de las del entrenamiento y contra la misma mezcla de rivales simulados:
+Reglas actuales (issue #64): **una acción por turno**, preguntar o acusar, y con la respuesta el turno pasa al rival. Las sugerencias son variadas por categoría. Acusar mal no cuesta nada, pero gasta el turno.
+
+Entrenado con 1.000.000 de pasos (unos 25 minutos en CPU). Resultados con 5.000 partidas por política, en semillas distintas de las del entrenamiento y contra la misma mezcla de rivales simulados:
 
 | Rival | Bot por reglas (Difícil) | Modelo |
 |---|---|---|
-| cuidadoso | 67,7 % | 82,2 % |
-| casual | 82,7 % | 88,4 % |
-| rápido (2 preguntas por turno) | 28,2 % | 42,1 % |
-| arriesgado | 37,1 % | 54,0 % |
-| bot Difícil por reglas | 50,9 % | 65,1 % |
-| **Total** | **53,3 %** | **66,4 %** |
+| cuidadoso | 47,7 % | 49,2 % |
+| casual | 60,9 % | 64,8 % |
+| rápido | 43,1 % | 44,4 % |
+| arriesgado | 52,8 % | 52,7 % |
+| bot Difícil por reglas | 41,2 % | 42,1 % |
+| **Total** | **49,1 %** | **50,6 %** |
 
-**Qué aprendió:**
-- Siempre hace la pregunta que mejor parte a sus candidatas, igual que el bot por reglas.
-- **Acusa en cuanto puede, con cualquier cantidad de candidatas.**
-
-Con las reglas actuales es lo óptimo: acusar mal solo hace perder un turno que de todos modos terminaba. Una regla de una línea ("acusar siempre que se pueda") da exactamente el mismo resultado. El costo para quien juega contra él es ver unas 1,6 acusaciones fallidas del bot por partida, contra 0,6 del bot por reglas.
-
-El entrenamiento descubrió un hueco de las reglas. Si acusar mal tuviera un costo (por ejemplo, perder el turno siguiente o un límite de acusaciones), habría una decisión de verdad entre arriesgar y esperar. Ahí el modelo aprendería algo que una regla simple no da: basta con cambiar la regla en el servidor y en `rules.py`, y volver a entrenar.
+**Lectura honesta:** con una sola acción por turno, la decisión entre acusar y preguntar es real (acusar gasta tu pregunta), y el modelo apenas mejora a las reglas: 1,5 puntos, cerca del margen de error. Con las reglas anteriores (preguntar y además acusar en el mismo turno), el modelo había descubierto que acusar siempre era gratis y ganaba por más (67 % contra 54 %); esa ventaja desapareció con la regla nueva. Para que el aprendizaje por refuerzo aporte más habría que darle más información (por ejemplo, cuántas preguntas útiles quedan o el historial) o rivales más variados.
 
 El resumen completo del entrenamiento está en `models/guess-who-training.json`.
 
