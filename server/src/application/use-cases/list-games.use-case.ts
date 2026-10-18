@@ -16,14 +16,29 @@ import { toGameSummaryDto, type GameSummaryDto } from '../dtos/game-response.dto
 import type { UseCase } from '../ports/use-case.port.js';
 import { RequesterAdminResolver } from '../services/requester-admin-resolver.service.js';
 
+/**
+ * Juegos demo del Inicio: la primera versión de cada juego (Dominexo,
+ * MatchMente, Identidad Oculta y el laberinto V/F). Se identifican por slug
+ * porque no todos los creó el sistema. Todo lo demás —creado a mano o con
+ * IA— se lista en Comunidad.
+ */
+export const HOME_DEMO_GAME_SLUGS = [
+  'nexus-play-ecosistemas-sostenibles',
+  'herbario-urbano',
+  'quien-es-de-banderas',
+  'mision-galactica-verdadero-o-falso',
+];
+
 export interface ListGamesInput {
   requestingUserId: string;
   /** Sin filtro, el catálogo público solo muestra PUBLISHED (ver regla abajo). */
   status?: GameStatusName;
   /** "solo mis juegos" desde el panel del creador. */
   onlyMine?: boolean;
-  /** Excluye los propios: para el listado de "Comunidad" (juegos de otros). */
-  excludeMine?: boolean;
+  /** "Comunidad": todos los juegos publicados (incluidos los propios) menos los demos del Inicio. */
+  excludeDemos?: boolean;
+  /** Solo los juegos demo (HOME_DEMO_GAME_SLUGS): el Inicio muestra únicamente estos. */
+  onlyDemos?: boolean;
   /** Resuelve y adjunta el nombre visible del creador de cada juego (para "Comunidad"). */
   includeCreatorNames?: boolean;
   search?: string;
@@ -84,7 +99,8 @@ export class ListGamesUseCase implements UseCase<ListGamesInput, ListGamesOutput
     const result = await this.gameRepository.findAll({
       status,
       creatorUserId: input.onlyMine ? input.requestingUserId : undefined,
-      excludeCreatorUserId: input.excludeMine ? input.requestingUserId : undefined,
+      slugs: input.onlyDemos ? HOME_DEMO_GAME_SLUGS : undefined,
+      excludeSlugs: input.excludeDemos ? HOME_DEMO_GAME_SLUGS : undefined,
       categoryId: input.categoryId,
       organizationId: input.organizationId,
       gameType: input.gameType,

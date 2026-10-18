@@ -65,6 +65,21 @@ type GamesSectionProps = {
   gameTypeDisplayName?: string
 }
 
+function gamesLabel(count: number): string {
+  return `${count} ${count === 1 ? 'juego' : 'juegos'}`
+}
+
+/**
+ * Etiqueta de un Ã¡rea raíz: sus juegos publicados —los asignados directo
+ * a ella más los de sus sub-Ã¡reas— y, si tiene, cuántas sub-Ã¡reas.
+ */
+function rootCountLabel(root: CategoryWithGameCount, subCategories: CategoryWithGameCount[]): string {
+  const children = subCategories.filter((sub) => sub.parentSubjectId === root.id)
+  const total = children.reduce((sum, sub) => sum + sub.gameCount, root.gameCount)
+  if (children.length === 0) return gamesLabel(total)
+  return `${gamesLabel(total)} · ${children.length} ${children.length === 1 ? 'sub-Ã¡rea' : 'sub-Ã¡reas'}`
+}
+
 function sortByGameCount(categories: CategoryWithGameCount[]): CategoryWithGameCount[] {
   return [...categories].sort((a, b) => b.gameCount - a.gameCount)
 }
@@ -210,6 +225,8 @@ export function GamesSection({
       onlyMine: mode === 'my-games' || undefined,
       status: mode === 'my-games' ? 'DRAFT' : undefined,
       community: mode === 'community' || undefined,
+      // El Inicio solo muestra los demos; lo creado por usuarios va a Comunidad.
+      demos: mode === 'all' || undefined,
       gameType: mode === 'game-type' ? gameTypeFilter ?? undefined : undefined,
       pageSize: 40,
     })
@@ -613,7 +630,7 @@ export function GamesSection({
                     <CategoryCard
                       key={category.id}
                       category={category}
-                      countLabel={`${subCategories.filter((s) => s.parentSubjectId === category.id).length} sub-Ã¡reas`}
+                      countLabel={rootCountLabel(category, subCategories)}
                       onOpen={() => setActiveCategoryId(category.id)}
                       canDelete={canDeleteCategory(category)}
                       onDelete={() => setPendingDeleteCategory(category)}
