@@ -19,8 +19,8 @@ export interface ListSubjectsInput {
 }
 
 /**
- * Devuelve todas las materias PUBLIC del catálogo más las PRIVATE del propio
- * usuario (ver `SubjectRepository.findVisibleTo`) — no expone materias
+ * Devuelve todas las Ã¡reas PUBLIC del catálogo más las PRIVATE del propio
+ * usuario (ver `SubjectRepository.findVisibleTo`) — no expone Ã¡reas
  * privadas de otros usuarios.
  */
 @Injectable()
@@ -35,7 +35,7 @@ export class ListSubjectsUseCase {
 
   async execute(input: ListSubjectsInput): Promise<SubjectWithGameCountDto[]> {
     // Mismo criterio que list-games.use-case.ts: un no-ADMIN no ve los juegos
-    // de tipos archivados, así que tampoco cuentan en el contador de la materia.
+    // de tipos archivados, así que tampoco cuentan en el contador del Ã¡rea.
     const isAdmin = await this.requesterAdminResolver.resolve(input.requestingUserId);
     const archivedGameTypes = isAdmin
       ? []

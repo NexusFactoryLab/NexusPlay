@@ -212,10 +212,10 @@ enum SubjectStatusEnum {
   @@map("subject_status")
 }
 
-/// Materia raíz (parentSubjectId null, PUBLIC desde su creación por un admin) o
-/// sub-materia (parentSubjectId con valor, nace PRIVATE). PRIVATE -> PUBLIC es
+/// Ãrea raíz (parentSubjectId null, PUBLIC desde su creación por un admin) o
+/// sub-Ã¡rea (parentSubjectId con valor, nace PRIVATE). PRIVATE -> PUBLIC es
 /// irreversible; el soft-delete (deletedAt) solo aplica en PRIVATE, porque una
-/// materia pública puede tener juegos de otros usuarios colgados debajo.
+/// Ã¡rea pública puede tener juegos de otros usuarios colgados debajo.
 model SubjectModel {
   id              String            @id @default(uuid())
   name            String
@@ -223,7 +223,7 @@ model SubjectModel {
   parentSubjectId String?           @map("parent_subject_id")
   parent          SubjectModel?     @relation("SubjectHierarchy", fields: [parentSubjectId], references: [id], onDelete: Restrict)
   children        SubjectModel[]    @relation("SubjectHierarchy")
-  /// null = materia raíz creada por un admin sin registrar autoría individual.
+  /// null = Ã¡rea raíz creada por un admin sin registrar autoría individual.
   creatorUserId   String?           @map("creator_user_id")
   creator         UserModel?        @relation(fields: [creatorUserId], references: [id], onDelete: SetNull)
   status          SubjectStatusEnum @default(PRIVATE)
@@ -282,11 +282,11 @@ model GameTypeSettingModel {
 
 /// Registro de un intento/partida jugada por un estudiante (issue #226).
 /// Es el hecho atómico sobre el que se agregan todas las métricas: ranking de
-/// clase, desglose por juego, desglose por materia y evolución en el tiempo.
+/// clase, desglose por juego, desglose por Ã¡rea y evolución en el tiempo.
 /// `gameId`/`subjectId` son strings sueltos sin FK real por el mismo motivo
 /// que `ClassGameModel.gameId`: `Game` vive en MongoDB y `Subject` sí vive en
 /// Postgres pero se referencia por id de todas formas para no acoplar esta
-/// tabla de hechos a reglas de integridad de otro agregado (una materia
+/// tabla de hechos a reglas de integridad de otro agregado (un Ã¡rea
 /// eliminada no debe impedir conservar el historial de resultados).
 model GamePlayResultModel {
   id             String     @id @default(uuid())
@@ -299,7 +299,7 @@ model GamePlayResultModel {
   /// Mongo a resolver `gameType`/`title` para listar el desglose por juego.
   gameTitle      String     @map("game_title")
   subjectId      String?    @map("subject_id")
-  /// Denormalizado por el mismo motivo que `gameTitle`, y porque una materia
+  /// Denormalizado por el mismo motivo que `gameTitle`, y porque un Ã¡rea
   /// puede eliminarse (soft-delete) sin que eso rompa el historial agregado.
   subjectName    String?    @map("subject_name")
   score          Int

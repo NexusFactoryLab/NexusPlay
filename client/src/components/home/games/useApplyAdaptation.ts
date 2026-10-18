@@ -15,7 +15,7 @@ export function useAdaptationFromLocation(): AdaptedGameDraft | undefined {
 
 /**
  * Aplica UNA sola vez el borrador de adaptación al formulario: `apply`
- * rellena título/descripción/materia/portada y el contenido con las mismas
+ * rellena título/descripción/Ã¡rea/portada y el contenido con las mismas
  * funciones que ya usa el asistente de IA. El aviso de la IA (qué falta
  * completar) se muestra como toast.
  */

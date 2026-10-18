@@ -21,7 +21,7 @@ type GameDetailModalProps = {
   onJoinByCode: (resolved: ResolvedRoom, code: string) => void
   onDelete: () => void
   onUpdated: (game: GameDetail) => void
-  /** Color por psicología del color según la materia (ver `colorForGame` en GamesSection); si no llega, usa el del creador. */
+  /** Color por psicología del color según el Ã¡rea (ver `colorForGame` en GamesSection); si no llega, usa el del creador. */
   color?: string
   /**
    * Solo lo pasa GamesSection cuando el requester es ADMIN (issue #156): un

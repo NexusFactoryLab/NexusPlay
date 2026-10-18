@@ -16,25 +16,25 @@ export interface PublishSubjectInput {
 }
 
 export interface PublishSubjectOutput extends SubjectDto {
-  /** Cuántos juegos DRAFT de esta materia pasaron a PUBLISHED como efecto de la cascada. */
+  /** Cuántos juegos DRAFT de esta Ã¡rea pasaron a PUBLISHED como efecto de la cascada. */
   gamesPublished: number;
 }
 
 /**
  * Publicar es irreversible (ver `Subject.publish()`): una vez pública, otros
- * usuarios pueden colgar juegos bajo esta materia, así que no hay `unpublish`
- * ni `delete` posterior. Solo el creador de la sub-materia o un admin pueden
+ * usuarios pueden colgar juegos bajo esta Ã¡rea, así que no hay `unpublish`
+ * ni `delete` posterior. Solo el creador de la sub-Ã¡rea o un admin pueden
  * publicarla.
  *
- * Cascada: todo juego DRAFT de esta materia pasa a PUBLISHED (ver
+ * Cascada: todo juego DRAFT de esta Ã¡rea pasa a PUBLISHED (ver
  * `GameRepository.publishAllDraftsByCategory`) — es lo que hace que un juego
  * termine visible en Comunidad, que ya es solo un filtro por status. Subject
  * vive en Postgres y Game en MongoDB, sin transacción distribuida real entre
  * ambas, así que el orden importa: se publican primero los juegos y solo si
- * eso tiene éxito se marca la materia como pública. Al revés, un fallo a
- * mitad de camino dejaría la materia pública con juegos todavía en borrador
+ * eso tiene éxito se marca el Ã¡rea como pública. Al revés, un fallo a
+ * mitad de camino dejaría el Ã¡rea pública con juegos todavía en borrador
  * — una inconsistencia visible que el usuario no podría corregir reintentando
- * (publicar ya no es idempotente una vez la materia cambió de estado). En
+ * (publicar ya no es idempotente una vez el Ã¡rea cambió de estado). En
  * este orden, un fallo en Mongo simplemente no publica nada y el profesor
  * puede reintentar sin efectos secundarios a medias.
  */
@@ -54,7 +54,7 @@ export class PublishSubjectUseCase implements UseCase<PublishSubjectInput, Publi
 
     const isAdmin = await this.requesterAdminResolver.resolve(input.requestingUserId);
     if (!subject.canBePublishedBy(input.requestingUserId, isAdmin)) {
-      throw new ForbiddenActionError('publicar esta materia');
+      throw new ForbiddenActionError('publicar esta Ã¡rea');
     }
 
     subject.publish();

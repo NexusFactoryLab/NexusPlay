@@ -146,7 +146,7 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
   function validate(): string | null {
     if (title.trim().length < 3) return 'El título debe tener al menos 3 caracteres.'
     if (description.trim().length < 10) return 'La descripción debe tener al menos 10 caracteres.'
-    if (!categoryId) return 'Elige una materia para el juego.'
+    if (!categoryId) return 'Elige un Ã¡rea para el juego.'
     if (questions.length < MIN_TF_QUESTIONS) return `Necesitas al menos ${MIN_TF_QUESTIONS} afirmaciones.`
     if (questions.length > MAX_TF_QUESTIONS) return `El laberinto admite como máximo ${MAX_TF_QUESTIONS} afirmaciones.`
     const seen = new Set<string>()

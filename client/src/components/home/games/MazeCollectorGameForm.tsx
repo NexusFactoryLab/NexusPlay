@@ -186,7 +186,7 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
       return
     }
     if (!categoryId) {
-      setError('Elige una materia para el juego.')
+      setError('Elige un Ã¡rea para el juego.')
       return
     }
     if (!collectorLabel.trim() || !enemyLabel.trim()) {

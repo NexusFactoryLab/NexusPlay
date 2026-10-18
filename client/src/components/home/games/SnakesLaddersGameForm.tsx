@@ -204,7 +204,7 @@ export function SnakesLaddersGameForm({ onClose, onCreated, onBack, onCategoryCr
       return
     }
     if (!categoryId) {
-      setError('Elige una materia para el juego.')
+      setError('Elige un Ã¡rea para el juego.')
       return
     }
     if (!Number.isInteger(boardSize) || boardSize < MIN_BOARD_SIZE || boardSize > MAX_BOARD_SIZE) {

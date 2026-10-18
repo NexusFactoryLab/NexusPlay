@@ -122,7 +122,7 @@ export function GameFormShell({
                 <p className="flex-1">
                   La IA llenó el contenido y los ajustes del juego. <strong>Ahora te toca a ti:</strong> escribe el{' '}
                   <strong>nombre del juego</strong> y la <strong>descripción</strong>, y elige la{' '}
-                  <strong>materia</strong> — la IA no los completa. Revisa también lo que generó antes de crear el
+                  <strong>Ã¡rea</strong> — la IA no los completa. Revisa también lo que generó antes de crear el
                   juego.
                 </p>
                 <button
@@ -165,7 +165,7 @@ export function GameFormShell({
             La IA completó el contenido y los ajustes. Para poder crear el juego, escribe tú el{' '}
             <strong className="text-text-h">nombre del juego</strong> y la{' '}
             <strong className="text-text-h">descripción</strong>, y elige la{' '}
-            <strong className="text-text-h">materia</strong>. Revisa también lo que generó la IA.
+            <strong className="text-text-h">Ã¡rea</strong>. Revisa también lo que generó la IA.
           </p>
           <button
             type="button"

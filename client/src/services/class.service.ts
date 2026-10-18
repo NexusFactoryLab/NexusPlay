@@ -64,7 +64,7 @@ export function listClassGames(token: string, classId: string): Promise<GameSumm
   return request<GameSummary[]>(`/classes/${classId}/games`, { token })
 }
 
-/** POST /classes/:id/games — agrega un juego existente (de cualquier materia) a la clase. */
+/** POST /classes/:id/games — agrega un juego existente (de cualquier Ã¡rea) a la clase. */
 export function addGameToClass(token: string, classId: string, gameId: string): Promise<void> {
   return request<void>(`/classes/${classId}/games`, {
     method: 'POST',

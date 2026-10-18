@@ -394,11 +394,11 @@ function ClassDetail({
     if (!token) return
     listSubjects(token)
       .then(setSubjects)
-      .catch((err: unknown) => console.error('No se pudieron cargar las materias:', err))
+      .catch((err: unknown) => console.error('No se pudieron cargar las Ã¡reas:', err))
   }, [token])
 
   function subjectNameFor(categoryId: string): string {
-    return subjects.find((s) => s.id === categoryId)?.name ?? 'Materia'
+    return subjects.find((s) => s.id === categoryId)?.name ?? 'Ãrea'
   }
 
   async function handleRemove(gameId: string) {
@@ -510,7 +510,7 @@ function ClassDetail({
       ) : games.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-16 text-center">
           <p className="text-[15px] font-medium text-text-h">Aún no hay juegos en esta clase</p>
-          <p className="mt-1 max-w-[360px] text-[13px] text-text">Agrega juegos existentes de cualquier materia.</p>
+          <p className="mt-1 max-w-[360px] text-[13px] text-text">Agrega juegos existentes de cualquier Ã¡rea.</p>
         </div>
       ) : (
         <ul className="flex flex-col gap-2">
@@ -626,7 +626,7 @@ function AddGameModal({
   return (
     <Modal onClose={onClose} maxWidthClassName="max-w-[520px]">
       <h2 className="mb-1 text-[18px] tracking-tight text-text-h">Agregar juego a {className}</h2>
-      <p className="mb-4 text-[13px] text-text">Busca entre todos los juegos del catálogo, sin importar la materia.</p>
+      <p className="mb-4 text-[13px] text-text">Busca entre todos los juegos del catálogo, sin importar el Ã¡rea.</p>
 
       <div className="relative mb-3">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text/50" strokeWidth={2} />
