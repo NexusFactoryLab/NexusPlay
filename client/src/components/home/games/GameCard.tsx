@@ -2,8 +2,6 @@ import { Archive, Gamepad2, Sparkles, User, Users } from 'lucide-react'
 import type { GameSummary } from '../../../services/game.service'
 import { LIVE_ROOM_GAME_TYPES } from './resolveRoomCode'
 import { modeColorForGameType } from './gameModeVisuals'
-import { useAuth } from '../../../hooks/useAuth'
-import { AdaptGameCornerButton } from './AdaptGameCornerButton'
 
 type GameCardProps = {
   game: GameSummary
@@ -42,11 +40,7 @@ export function GameCard({
   justCreated = false,
   onDismissJustCreated,
 }: GameCardProps) {
-  const { user } = useAuth()
   const accentColor = color ?? game.theme.primaryColor
-  // Adaptar (issue #8): cualquier juego publicado, o uno propio/de administrador.
-  const canAdapt =
-    game.status === 'PUBLISHED' || user?.role === 'ADMIN' || user?.id === game.creatorUserId
 
   function handleClick() {
     if (justCreated) onDismissJustCreated?.()
@@ -151,9 +145,6 @@ export function GameCard({
         )}
       </div>
     </button>
-    {canAdapt && (
-      <AdaptGameCornerButton game={game} topClassName={justCreated ? 'top-9' : 'top-2'} />
-    )}
     </div>
   )
 }
