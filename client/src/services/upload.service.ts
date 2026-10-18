@@ -12,7 +12,11 @@ async function uploadFile(
   folder: string,
   errorMessage: string,
   onProgress?: (percent: number) => void,
+  draftId?: string | null,
 ): Promise<{ url: string }> {
+  // Issue #69: dentro de la creación de un juego el servidor etiqueta el
+  // recurso con `draft-<id>` para poder borrarlo si el borrador vence.
+  const query = `folder=${folder}${draftId ? `&draftId=${draftId}` : ''}`
   const formData = new FormData()
   formData.append('file', file)
 
@@ -20,7 +24,7 @@ async function uploadFile(
   if (onProgress) {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest()
-      xhr.open('POST', `${API_URL}/uploads/${endpoint}?folder=${folder}`)
+      xhr.open('POST', `${API_URL}/uploads/${endpoint}?${query}`)
       xhr.setRequestHeader('Authorization', `Bearer ${token}`)
       xhr.withCredentials = true
       xhr.upload.onprogress = (event) => {
@@ -48,7 +52,7 @@ async function uploadFile(
     })
   }
 
-  const response = await fetch(`${API_URL}/uploads/${endpoint}?folder=${folder}`, {
+  const response = await fetch(`${API_URL}/uploads/${endpoint}?${query}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
     credentials: 'include',
@@ -73,8 +77,9 @@ export function uploadImage(
   file: File,
   folder: UploadFolder,
   onProgress?: (percent: number) => void,
+  draftId?: string | null,
 ): Promise<{ url: string }> {
-  return uploadFile('image', token, file, folder, 'No se pudo subir la imagen.', onProgress)
+  return uploadFile('image', token, file, folder, 'No se pudo subir la imagen.', onProgress, draftId)
 }
 
 /** POST /uploads/audio — sube un audio a Cloudinary y devuelve su URL pública. */
@@ -82,6 +87,7 @@ export function uploadAudio(
   token: string,
   file: File,
   folder: UploadAudioFolder,
+  draftId?: string | null,
 ): Promise<{ url: string }> {
-  return uploadFile('audio', token, file, folder, 'No se pudo subir el audio.')
+  return uploadFile('audio', token, file, folder, 'No se pudo subir el audio.', undefined, draftId)
 }

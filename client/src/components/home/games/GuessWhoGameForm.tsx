@@ -7,6 +7,15 @@ import { ImageUploadField } from './ImageUploadField'
 import { AudioUploadField } from './AudioUploadField'
 import { AiGameAssistantPanel } from './AiGameAssistantPanel'
 import { useReportCreateSummary } from './aiDraftContext'
+import { useCreationDraftId } from './useCreationDraftId'
+import {
+  asSavedState,
+  clampIndex,
+  savedList,
+  savedNullableString,
+  savedNumber,
+  savedString,
+} from './creationDraftSupport'
 import { GameFormShell } from './GameFormShell'
 import { WizardPhaseNav } from './WizardPhaseNav'
 import { FormSection, PhaseLabel } from './create/FormSection'
@@ -129,6 +138,36 @@ export function GuessWhoGameForm({
         console.error('No se pudieron cargar las organizaciones del usuario:', err)
       })
   }, [token])
+
+  // Issue #69: estado completo del formulario para el borrador automático.
+  const { draftId, resuming } = useCreationDraftId()
+  const draftState = {
+    title,
+    description,
+    coverImageUrl,
+    cards,
+    maxAccusationCount,
+    traits,
+    categoryId,
+    organizationId,
+    phase,
+    selectedCard,
+  }
+
+  function restoreDraft(saved: Record<string, unknown>) {
+    const state = asSavedState(saved)
+    setTitle(savedString(state, 'title', ''))
+    setDescription(savedString(state, 'description', ''))
+    setCoverImageUrl(savedNullableString(state, 'coverImageUrl'))
+    const savedCards = savedList<CardDraft>(state, 'cards')
+    if (savedCards) setCards(savedCards)
+    setMaxAccusationCount(savedNumber(state, 'maxAccusationCount', DEFAULT_MAX_ACCUSATION_COUNT))
+    setTraits(savedList<GuessWhoTrait>(state, 'traits') ?? [])
+    setCategoryId(savedString(state, 'categoryId', ''))
+    setOrganizationId(savedString(state, 'organizationId', ''))
+    setPhase(clampIndex(savedNumber(state, 'phase', 0), TOTAL_PHASES))
+    setSelectedCard(clampIndex(savedNumber(state, 'selectedCard', 0), (savedCards ?? cards).length))
+  }
 
   useApplyAdaptation(adaptation, (adapted) => {
     setTitle(adapted.title)
@@ -284,6 +323,7 @@ export function GuessWhoGameForm({
         title: title.trim(),
         description: description.trim(),
         gameType: 'GUESS_WHO',
+        creationDraftId: draftId,
         sourceGameId: adaptation?.sourceGameId ?? undefined,
         categoryId,
         organizationId: organizationId || undefined,
@@ -333,6 +373,10 @@ export function GuessWhoGameForm({
     <GameFormShell
       backLabel="Cambiar tipo de juego"
       onBack={onBack}
+      draftId={draftId}
+      resumingDraft={resuming}
+      draftState={draftState}
+      onRestoreDraft={restoreDraft}
       title="¿Quién Es?"
       description="Cada tarjeta tiene imagen, nombre y audio opcional."
       descriptionDetail="Se juega en una sala en vivo entre 2 personas: abre la sala desde el detalle del juego una vez creado."

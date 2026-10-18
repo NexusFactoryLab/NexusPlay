@@ -6,6 +6,16 @@ import { SaveVisibilityModal } from './SaveVisibilityModal'
 import { ImageUploadField } from './ImageUploadField'
 import { AiGameAssistantPanel } from './AiGameAssistantPanel'
 import { useReportCreateSummary } from './aiDraftContext'
+import { useCreationDraftId } from './useCreationDraftId'
+import {
+  asSavedState,
+  clampIndex,
+  savedList,
+  savedNullableString,
+  savedNumber,
+  savedObject,
+  savedString,
+} from './creationDraftSupport'
 import { GameFormShell } from './GameFormShell'
 import { WizardPhaseNav } from './WizardPhaseNav'
 import { FormSection, PhaseLabel } from './create/FormSection'
@@ -178,6 +188,63 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
         console.error('No se pudieron cargar las organizaciones del usuario:', err)
       })
   }, [token])
+
+  // Issue #69: estado completo del formulario para el borrador automático.
+  const { draftId, resuming } = useCreationDraftId()
+  const draftState = {
+    title,
+    description,
+    coverImageUrl,
+    coreQuestion,
+    gridCols,
+    gridRows,
+    grid,
+    fireStart,
+    waterStart,
+    corePosition,
+    gates,
+    triggers,
+    gems,
+    placementMode,
+    categoryId,
+    organizationId,
+    phase,
+    selectedGate,
+    selectedGem,
+  }
+
+  function restoreDraft(saved: Record<string, unknown>) {
+    const state = asSavedState(saved)
+    setTitle(savedString(state, 'title', ''))
+    setDescription(savedString(state, 'description', ''))
+    setCoverImageUrl(savedNullableString(state, 'coverImageUrl'))
+    setCoreQuestion(savedString(state, 'coreQuestion', ''))
+    const savedGrid = savedList<number[]>(state, 'grid')
+    if (savedGrid) {
+      setGrid(savedGrid)
+      setGridCols(savedNumber(state, 'gridCols', DEFAULT_GRID_COLS))
+      setGridRows(savedNumber(state, 'gridRows', DEFAULT_GRID_ROWS))
+    }
+    const fire = savedObject<DualQuestCellPosition>(state, 'fireStart')
+    if (isPosition(fire)) setFireStart(fire)
+    const water = savedObject<DualQuestCellPosition>(state, 'waterStart')
+    if (isPosition(water)) setWaterStart(water)
+    const core = savedObject<DualQuestCellPosition>(state, 'corePosition')
+    if (isPosition(core)) setCorePosition(core)
+    const savedGates = savedList<DualQuestGateDraft>(state, 'gates')
+    if (savedGates) setGates(savedGates)
+    const savedTriggers = savedList<DualQuestTriggerDraft>(state, 'triggers')
+    if (savedTriggers) setTriggers(savedTriggers)
+    const savedGems = savedList<DualQuestGemDraft>(state, 'gems')
+    if (savedGems) setGems(savedGems)
+    const mode = savedObject<PlacementMode>(state, 'placementMode')
+    setPlacementMode(mode && typeof mode.kind === 'string' ? mode : { kind: 'CELL' })
+    setCategoryId(savedString(state, 'categoryId', ''))
+    setOrganizationId(savedString(state, 'organizationId', ''))
+    setPhase(clampIndex(savedNumber(state, 'phase', 0), TOTAL_PHASES))
+    setSelectedGate(clampIndex(savedNumber(state, 'selectedGate', 0), (savedGates ?? gates).length))
+    setSelectedGem(clampIndex(savedNumber(state, 'selectedGem', 0), (savedGems ?? gems).length))
+  }
 
   useApplyAdaptation(adaptation, (adapted) => {
     setTitle(adapted.title)
@@ -415,6 +482,7 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
         title: title.trim(),
         description: description.trim(),
         gameType: 'DUAL_QUEST',
+        creationDraftId: draftId,
         sourceGameId: adaptation?.sourceGameId ?? undefined,
         categoryId,
         organizationId: organizationId || undefined,
@@ -493,6 +561,10 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
     <GameFormShell
       backLabel="Cambiar tipo de juego"
       onBack={onBack}
+      draftId={draftId}
+      resumingDraft={resuming}
+      draftState={draftState}
+      onRestoreDraft={restoreDraft}
       title="Dúo Lógico"
       description="Fuego y Agua recorren el mismo mapa y se necesitan para avanzar."
       descriptionDetail="Cada rol queda bloqueado por casillas del otro. Al final arman juntos un concepto ensamblando lo que cada uno recolectó."

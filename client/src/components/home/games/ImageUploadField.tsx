@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { ImagePlus, Loader2, X } from 'lucide-react'
 import { FormField } from './create/FormField'
+import { useDraftUpload } from './aiDraftContext'
 import { useAuth } from '../../../hooks/useAuth'
 import { uploadImage, type UploadFolder } from '../../../services/upload.service'
 import { ApiError } from '../../../utils/http'
@@ -22,6 +23,7 @@ export function ImageUploadField({
   onChange,
 }: ImageUploadFieldProps) {
   const { token } = useAuth()
+  const draftUpload = useDraftUpload()
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -34,8 +36,9 @@ export function ImageUploadField({
     setError(null)
     setProgress(0)
     try {
-      const result = await uploadImage(token, file, folder, setProgress)
+      const result = await uploadImage(token, file, folder, setProgress, draftUpload?.draftId)
       onChange(result.url)
+      draftUpload?.markTouched()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'No se pudo subir la imagen.')
     } finally {

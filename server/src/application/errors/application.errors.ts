@@ -59,6 +59,12 @@ export class GameNotFoundError extends ApplicationError {
   }
 }
 
+export class GameCreationDraftNotFoundError extends ApplicationError {
+  constructor() {
+    super('No se encontró el borrador.');
+  }
+}
+
 export class GameImportJobNotFoundError extends ApplicationError {
   constructor(jobId: string) {
     super(`No se encontró un trabajo de importación con id "${jobId}".`);

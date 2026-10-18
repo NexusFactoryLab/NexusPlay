@@ -7,6 +7,15 @@ import { ImageUploadField } from './ImageUploadField'
 import { IconPickerField } from './IconPickerField'
 import { AiGameAssistantPanel } from './AiGameAssistantPanel'
 import { useReportCreateSummary } from './aiDraftContext'
+import { useCreationDraftId } from './useCreationDraftId'
+import {
+  asSavedState,
+  clampIndex,
+  savedList,
+  savedNullableString,
+  savedNumber,
+  savedString,
+} from './creationDraftSupport'
 import { GameFormShell } from './GameFormShell'
 import { WizardPhaseNav } from './WizardPhaseNav'
 import { FormSection, PhaseLabel } from './create/FormSection'
@@ -133,6 +142,34 @@ export function DominoGameForm({
         console.error('No se pudieron cargar las organizaciones del usuario:', err)
       })
   }, [token])
+
+  // Issue #69: estado completo del formulario para el borrador automático.
+  const { draftId, resuming } = useCreationDraftId()
+  const draftState = {
+    title,
+    description,
+    coverImageUrl,
+    concepts,
+    handSize,
+    categoryId,
+    organizationId,
+    phase,
+    selectedConcept,
+  }
+
+  function restoreDraft(saved: Record<string, unknown>) {
+    const state = asSavedState(saved)
+    setTitle(savedString(state, 'title', ''))
+    setDescription(savedString(state, 'description', ''))
+    setCoverImageUrl(savedNullableString(state, 'coverImageUrl'))
+    const savedConcepts = savedList<ConceptDraft>(state, 'concepts')
+    if (savedConcepts) setConcepts(savedConcepts)
+    setHandSize(savedNumber(state, 'handSize', DEFAULT_DOMINO_CONFIG.handSize))
+    setCategoryId(savedString(state, 'categoryId', ''))
+    setOrganizationId(savedString(state, 'organizationId', ''))
+    setPhase(clampIndex(savedNumber(state, 'phase', 0), TOTAL_PHASES))
+    setSelectedConcept(clampIndex(savedNumber(state, 'selectedConcept', 0), (savedConcepts ?? concepts).length))
+  }
 
   useApplyAdaptation(adaptation, (adapted) => {
     setTitle(adapted.title)
@@ -266,6 +303,7 @@ export function DominoGameForm({
         title: title.trim(),
         description: description.trim(),
         gameType: 'DOMINO',
+        creationDraftId: draftId,
         sourceGameId: adaptation?.sourceGameId ?? undefined,
         categoryId,
         organizationId: organizationId || undefined,
@@ -310,6 +348,10 @@ export function DominoGameForm({
     <GameFormShell
       backLabel="Cambiar tipo de juego"
       onBack={onBack}
+      draftId={draftId}
+      resumingDraft={resuming}
+      draftState={draftState}
+      onRestoreDraft={restoreDraft}
       title="Dominó"
       description={
         <>

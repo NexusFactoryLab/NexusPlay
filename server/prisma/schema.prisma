@@ -329,44 +329,30 @@ model RefreshTokenModel {
   @@map("refresh_tokens")
 }
 
-/// Issue #69: borrador automático del formulario de creación de juego, uno por
-/// (usuario, tipo de juego, modo). "Borrador" aquí es el trabajo a medias de la
-/// persona; no confundir con `GameDraft` del código, que es el resultado de la
-/// IA (se guarda dentro, en `aiResult`). `mode` es '' cuando el tipo no tiene
-/// modos (se evita NULL para que el unique compuesto funcione).
+/// Issue #69: borrador automático del formulario de creación de juego. Una
+/// persona puede tener varios por tipo (el id lo genera el cliente al abrir el
+/// formulario y sirve también de etiqueta `draft-<id>` en Cloudinary).
+/// "Borrador" aquí es el trabajo a medias de la persona; no confundir con
+/// `GameDraft` del código, que es el resultado de la IA (va en `aiResult`).
+/// `mode` es '' cuando el tipo no tiene modos.
 model GameCreationDraftModel {
-  id        String   @id @default(uuid())
-  userId    String   @map("user_id")
+  id        String    @id
+  userId    String    @map("user_id")
   user      UserModel @relation(fields: [userId], references: [id], onDelete: Cascade)
-  gameType  String   @map("game_type")
-  mode      String   @default("")
-  /// Valores de los campos del formulario (instantánea).
-  formState Json?    @map("form_state")
+  gameType  String    @map("game_type")
+  mode      String    @default("")
+  /// Estado completo del formulario (lo serializa cada formulario).
+  formState Json?     @map("form_state")
   /// Resultado de POST /games/ai-draft, para no volver a gastar tokens.
-  aiResult  Json?    @map("ai_result")
+  aiResult  Json?     @map("ai_result")
   /// Mensaje que se envió a la IA junto con los archivos.
-  aiMessage String?  @map("ai_message")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  aiMessage String?   @map("ai_message")
+  /// Archivos subidos a la IA, ya en Cloudinary: [{ filename, mimeType, sizeBytes, url, publicId }].
+  aiFiles   Json?     @map("ai_files")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
 
-  files GameCreationDraftFileModel[]
-
-  @@unique([userId, gameType, mode])
+  @@index([userId, updatedAt])
+  @@index([updatedAt])
   @@map("game_creation_drafts")
-}
-
-/// Archivos que la persona subió a la IA; se borran en cascada con el borrador.
-model GameCreationDraftFileModel {
-  id        String                 @id @default(uuid())
-  draftId   String                 @map("draft_id")
-  draft     GameCreationDraftModel @relation(fields: [draftId], references: [id], onDelete: Cascade)
-  filename  String
-  mimeType  String                 @map("mime_type")
-  sizeBytes Int                    @map("size_bytes")
-  data      Bytes
-  position  Int
-  createdAt DateTime               @default(now()) @map("created_at")
-
-  @@index([draftId])
-  @@map("game_creation_draft_files")
 }

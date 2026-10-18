@@ -7,6 +7,15 @@ import { ImageUploadField } from './ImageUploadField'
 import { IconPickerField } from './IconPickerField'
 import { AiGameAssistantPanel } from './AiGameAssistantPanel'
 import { useReportCreateSummary } from './aiDraftContext'
+import { useCreationDraftId } from './useCreationDraftId'
+import {
+  asSavedState,
+  clampIndex,
+  savedList,
+  savedNullableString,
+  savedNumber,
+  savedString,
+} from './creationDraftSupport'
 import { GameFormShell } from './GameFormShell'
 import { WizardPhaseNav } from './WizardPhaseNav'
 import { FormSection, PhaseLabel } from './create/FormSection'
@@ -147,6 +156,46 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
       })
   }, [token])
 
+  // Issue #69: estado completo del formulario para el borrador automático.
+  const { draftId, resuming } = useCreationDraftId()
+  const draftState = {
+    title,
+    description,
+    coverImageUrl,
+    layout,
+    lives,
+    enemySpeed,
+    collectorLabel,
+    collectorIcon,
+    enemyLabel,
+    enemyIcon,
+    items,
+    categoryId,
+    organizationId,
+    phase,
+    selectedItem,
+  }
+
+  function restoreDraft(saved: Record<string, unknown>) {
+    const state = asSavedState(saved)
+    setTitle(savedString(state, 'title', ''))
+    setDescription(savedString(state, 'description', ''))
+    setCoverImageUrl(savedNullableString(state, 'coverImageUrl'))
+    setLayout(savedString(state, 'layout', DEFAULT_MAZE_CONFIG.layout) as MazeLayout)
+    setLives(savedNumber(state, 'lives', DEFAULT_MAZE_CONFIG.lives))
+    setEnemySpeed(savedNumber(state, 'enemySpeed', DEFAULT_MAZE_CONFIG.enemySpeed))
+    setCollectorLabel(savedString(state, 'collectorLabel', ''))
+    setCollectorIcon(savedString(state, 'collectorIcon', DEFAULT_MAZE_CONFIG.collectorIcon))
+    setEnemyLabel(savedString(state, 'enemyLabel', ''))
+    setEnemyIcon(savedString(state, 'enemyIcon', DEFAULT_MAZE_CONFIG.enemyIcon))
+    const savedItems = savedList<ItemDraft>(state, 'items')
+    if (savedItems) setItems(savedItems)
+    setCategoryId(savedString(state, 'categoryId', ''))
+    setOrganizationId(savedString(state, 'organizationId', ''))
+    setPhase(clampIndex(savedNumber(state, 'phase', 0), TOTAL_PHASES))
+    setSelectedItem(clampIndex(savedNumber(state, 'selectedItem', 0), (savedItems ?? items).length))
+  }
+
   useApplyAdaptation(adaptation, (adapted) => {
     setTitle(adapted.title)
     setDescription(adapted.description)
@@ -268,6 +317,7 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
         title: title.trim(),
         description: description.trim(),
         gameType: 'MAZE_COLLECTOR',
+        creationDraftId: draftId,
         sourceGameId: adaptation?.sourceGameId ?? undefined,
         categoryId,
         organizationId: organizationId || undefined,
@@ -319,6 +369,10 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
     <GameFormShell
       backLabel="Cambiar tipo de juego"
       onBack={onBack}
+      draftId={draftId}
+      resumingDraft={resuming}
+      draftState={draftState}
+      onRestoreDraft={restoreDraft}
       title="Recolector de laberinto"
       description="Recolecta objetos temáticos en un laberinto y esquiva enemigos."
       descriptionDetail="Puedes cambiar la narrativa: por ejemplo, un camión de reciclaje esquivando nubes de contaminación, o cualquier otra idea."

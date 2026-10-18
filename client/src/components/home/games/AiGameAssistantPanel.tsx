@@ -5,7 +5,7 @@ import { useAuth } from '../../../hooks/useAuth'
 import { useToast } from '../../../hooks/useToast'
 import { generateGameDraft, type GameDraft } from '../../../services/ai-game-assistant.service'
 import { ApiError } from '../../../utils/http'
-import { downloadCreationDraftFile } from '../../../services/game-creation-draft.service'
+import { createStoredFile, materializeFiles } from './creationDraftSupport'
 import {
   useAiDraftPersist,
   useAiFillStep,
@@ -157,36 +157,16 @@ export function AiGameAssistantPanel({
     return () => window.clearInterval(timer)
   }, [generating])
 
-  // Issue #69: al elegir "Continuar" en el aviso de borrador, se recuperan el
-  // mensaje, los archivos y el resultado de la IA guardados, sin llamar a la IA.
+  // Issue #69: al retomar un borrador se recuperan el mensaje y los archivos
+  // que se enviaron a la IA (ya viven en Cloudinary; aquí solo se listan). El
+  // formulario lo restaura el shell por su cuenta: no se llama a la IA.
   const restore = persist?.restore ?? null
-  const onRestored = persist?.onRestored
   const restoredNonce = useRef(0)
   useEffect(() => {
     if (!restore || restoredNonce.current === restore.nonce) return
     restoredNonce.current = restore.nonce
-    const { draft } = restore
-    void (async () => {
-      try {
-        if (draft.aiResult) {
-          const restoredFiles = token
-            ? await Promise.all(draft.files.map((info) => downloadCreationDraftFile(token, info)))
-            : []
-          if (unmountedRef.current) return
-          setFiles(restoredFiles)
-          setMessage(draft.aiMessage ?? '')
-          markAiDraftApplied?.()
-          onDraftReady(draft.aiResult)
-          await wait(60)
-        }
-      } catch {
-        showToast('No se pudo recuperar todo el borrador de la IA.', 'error')
-      } finally {
-        if (!unmountedRef.current) onRestored?.()
-      }
-    })()
-    // Solo reacciona a una restauración nueva.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setMessage(restore.message)
+    setFiles(restore.files.map(createStoredFile))
   }, [restore])
 
   function cancelGeneration() {
@@ -261,8 +241,15 @@ export function AiGameAssistantPanel({
     try {
       // Resultado ya guardado para esta misma solicitud: no se vuelve a gastar cuota.
       const cached = persist?.findCached(message, files) ?? null
-      const draft = cached ?? (await generateGameDraft(token, gameType, files, mode, message, controller.signal))
-      if (!cached) persist?.save(draft, message, files)
+      let draft: GameDraft
+      if (cached) {
+        draft = cached
+      } else {
+        // Los archivos recuperados del borrador se descargan de Cloudinary solo si hay que reenviarlos.
+        const realFiles = await materializeFiles(files)
+        draft = await generateGameDraft(token, gameType, realFiles, mode, message, controller.signal)
+        persist?.save(draft, message, realFiles)
+      }
       // El servidor manda el borrador completo de una vez: se aplica por pasos
       // (ajustes primero, luego un elemento a la vez) y el shell lleva la vista
       // a cada campo que se llena, para que el llenado se vea y se entienda.

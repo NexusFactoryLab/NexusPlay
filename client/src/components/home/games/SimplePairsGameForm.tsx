@@ -6,6 +6,15 @@ import { SaveVisibilityModal } from './SaveVisibilityModal'
 import { ImageUploadField } from './ImageUploadField'
 import { AiGameAssistantPanel } from './AiGameAssistantPanel'
 import { useReportCreateSummary } from './aiDraftContext'
+import { useCreationDraftId } from './useCreationDraftId'
+import {
+  asSavedState,
+  clampIndex,
+  savedList,
+  savedNullableString,
+  savedNumber,
+  savedString,
+} from './creationDraftSupport'
 import { GameFormShell } from './GameFormShell'
 import { WizardPhaseNav } from './WizardPhaseNav'
 import { FormSection, PhaseLabel } from './create/FormSection'
@@ -103,6 +112,23 @@ export function SimplePairsGameForm({
         console.error('No se pudieron cargar las organizaciones del usuario:', err)
       })
   }, [token])
+
+  // Issue #69: estado completo del formulario para el borrador automático.
+  const { draftId, resuming } = useCreationDraftId()
+  const draftState = { title, description, coverImageUrl, pairs, categoryId, organizationId, phase, selectedPair }
+
+  function restoreDraft(saved: Record<string, unknown>) {
+    const state = asSavedState(saved)
+    setTitle(savedString(state, 'title', ''))
+    setDescription(savedString(state, 'description', ''))
+    setCoverImageUrl(savedNullableString(state, 'coverImageUrl'))
+    const savedPairs = savedList<PairDraft>(state, 'pairs')
+    if (savedPairs) setPairs(savedPairs)
+    setCategoryId(savedString(state, 'categoryId', ''))
+    setOrganizationId(savedString(state, 'organizationId', ''))
+    setPhase(clampIndex(savedNumber(state, 'phase', 0), TOTAL_PHASES))
+    setSelectedPair(clampIndex(savedNumber(state, 'selectedPair', 0), (savedPairs ?? pairs).length))
+  }
 
   useApplyAdaptation(adaptation, (adapted) => {
     setTitle(adapted.title)
@@ -206,6 +232,7 @@ export function SimplePairsGameForm({
         title: title.trim(),
         description: description.trim(),
         gameType: 'MEMORY_MATCH',
+        creationDraftId: draftId,
         sourceGameId: adaptation?.sourceGameId ?? undefined,
         categoryId,
         organizationId: organizationId || undefined,
@@ -249,6 +276,10 @@ export function SimplePairsGameForm({
     <GameFormShell
       backLabel="Cambiar modo"
       onBack={onBack}
+      draftId={draftId}
+      resumingDraft={resuming}
+      draftState={draftState}
+      onRestoreDraft={restoreDraft}
       title="Pares"
       description="Cada pareja tiene una imagen y el nombre del concepto que representa."
       aiPanel={

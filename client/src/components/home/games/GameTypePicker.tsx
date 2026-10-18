@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import { ArrowLeft, Bot, Ghost, Layers, Puzzle, UserRoundSearch, Dices, Flame, User, Users } from 'lucide-react'
+import { ArrowLeft, Bot, FileClock, Ghost, Layers, Puzzle, UserRoundSearch, Dices, Flame, User, Users } from 'lucide-react'
 import { LIVE_ROOM_GAME_TYPES } from './resolveRoomCode'
 import { modeColorForGameType } from './gameModeVisuals'
 
@@ -32,6 +32,8 @@ type GameTypePickerProps = {
    * bloquea su creación para todos.
    */
   archivedGameTypes?: Set<string>
+  /** Abre la lista de borradores de creación (issue #69). */
+  onViewDrafts?: () => void
 }
 
 const TYPE_OPTIONS: Array<{
@@ -90,14 +92,26 @@ const TYPE_OPTIONS: Array<{
 ]
 
 /** Primer paso al crear un juego: elegir la mecánica base. */
-export function GameTypePicker({ onClose, onSelect, archivedGameTypes }: GameTypePickerProps) {
+export function GameTypePicker({ onClose, onSelect, archivedGameTypes, onViewDrafts }: GameTypePickerProps) {
   return (
     <div className="mx-auto max-w-[900px] p-5 sm:p-8">
       <button type="button" className="nx-back inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-[13px] font-semibold text-text-h shadow-sm hover:border-accent hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent mb-4" onClick={onClose}>
         <ArrowLeft className="nx-back-icon h-4 w-4" strokeWidth={2.5} />
         Volver al menú principal
       </button>
-      <h2 className="mb-1 text-[20px] tracking-tight text-text-h">Nueva partida</h2>
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-[20px] tracking-tight text-text-h">Nueva partida</h2>
+        {onViewDrafts && (
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-[13px] font-semibold text-text-h shadow-sm hover:border-accent hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            onClick={onViewDrafts}
+          >
+            <FileClock className="h-4 w-4" strokeWidth={2.2} />
+            Ver borradores
+          </button>
+        )}
+      </div>
       <p className="mb-5 text-[13px] text-text">Elige qué tipo de juego quieres crear.</p>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">

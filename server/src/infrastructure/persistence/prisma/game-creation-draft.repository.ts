@@ -1,89 +1,116 @@
 import { Injectable } from '@nestjs/common';
+import type {
+  DraftAiFile,
+  GameCreationDraftRecord,
+  GameCreationDraftRepository,
+} from '../../../domain/ports/game-creation-draft.repository.port.js';
 import { PrismaService } from './prisma.service.js';
 
-export type DraftFileInput = { filename: string; mimeType: string; buffer: Buffer };
+type DraftRow = {
+  id: string;
+  userId: string;
+  gameType: string;
+  mode: string;
+  formState: unknown;
+  aiResult: unknown;
+  aiMessage: string | null;
+  aiFiles: unknown;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+function toRecord(row: DraftRow): GameCreationDraftRecord {
+  return {
+    id: row.id,
+    userId: row.userId,
+    gameType: row.gameType,
+    mode: row.mode,
+    formState: row.formState,
+    aiResult: row.aiResult,
+    aiMessage: row.aiMessage,
+    aiFiles: Array.isArray(row.aiFiles) ? (row.aiFiles as DraftAiFile[]) : [],
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
 
 /** Persistencia de los borradores de creación de juego (issue #69). */
 @Injectable()
-export class PrismaGameCreationDraftRepository {
+export class PrismaGameCreationDraftRepository implements GameCreationDraftRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async find(userId: string, gameType: string, mode: string) {
-    const draft = await this.prisma.gameCreationDraftModel.findUnique({
-      where: { userId_gameType_mode: { userId, gameType, mode } },
-      include: {
-        files: {
-          orderBy: { position: 'asc' },
-          select: { id: true, filename: true, mimeType: true, sizeBytes: true },
-        },
-      },
-    });
-    if (!draft) return null;
-    return {
-      gameType: draft.gameType,
-      mode: draft.mode,
-      formState: draft.formState,
-      aiResult: draft.aiResult,
-      aiMessage: draft.aiMessage,
-      updatedAt: draft.updatedAt,
-      files: draft.files,
-    };
+  async findById(id: string) {
+    const row = await this.prisma.gameCreationDraftModel.findUnique({ where: { id } });
+    return row ? toRecord(row) : null;
   }
 
-  async saveFormState(userId: string, gameType: string, mode: string, formState: unknown) {
-    const json = formState as object;
+  async findByUser(userId: string) {
+    const rows = await this.prisma.gameCreationDraftModel.findMany({
+      where: { userId },
+      orderBy: { updatedAt: 'desc' },
+    });
+    return rows.map(toRecord);
+  }
+
+  async upsertFormState(input: {
+    id: string;
+    userId: string;
+    gameType: string;
+    mode: string;
+    formState: unknown;
+  }) {
+    const formState = input.formState as object;
     await this.prisma.gameCreationDraftModel.upsert({
-      where: { userId_gameType_mode: { userId, gameType, mode } },
-      create: { userId, gameType, mode, formState: json },
-      update: { formState: json },
+      where: { id: input.id },
+      create: {
+        id: input.id,
+        userId: input.userId,
+        gameType: input.gameType,
+        mode: input.mode,
+        formState,
+      },
+      update: { formState },
     });
   }
 
-  /** Guarda el resultado de la IA con sus archivos; reemplaza los anteriores. */
-  async saveAiResult(
-    userId: string,
-    gameType: string,
-    mode: string,
-    aiResult: unknown,
-    aiMessage: string | null,
-    files: DraftFileInput[],
-  ) {
-    const json = aiResult as object;
-    await this.prisma.$transaction(async (tx) => {
-      const draft = await tx.gameCreationDraftModel.upsert({
-        where: { userId_gameType_mode: { userId, gameType, mode } },
-        create: { userId, gameType, mode, aiResult: json, aiMessage },
-        update: { aiResult: json, aiMessage },
-      });
-      await tx.gameCreationDraftFileModel.deleteMany({ where: { draftId: draft.id } });
-      if (files.length > 0) {
-        await tx.gameCreationDraftFileModel.createMany({
-          data: files.map((file, position) => ({
-            draftId: draft.id,
-            filename: file.filename,
-            mimeType: file.mimeType,
-            sizeBytes: file.buffer.length,
-            data: new Uint8Array(file.buffer),
-            position,
-          })),
-        });
-      }
+  async upsertAiResult(input: {
+    id: string;
+    userId: string;
+    gameType: string;
+    mode: string;
+    aiResult: unknown;
+    aiMessage: string | null;
+    aiFiles: DraftAiFile[];
+  }) {
+    const data = {
+      aiResult: input.aiResult as object,
+      aiMessage: input.aiMessage,
+      aiFiles: input.aiFiles as object[],
+    };
+    await this.prisma.gameCreationDraftModel.upsert({
+      where: { id: input.id },
+      create: {
+        id: input.id,
+        userId: input.userId,
+        gameType: input.gameType,
+        mode: input.mode,
+        ...data,
+      },
+      update: data,
     });
   }
 
-  async findFile(userId: string, fileId: string) {
-    const file = await this.prisma.gameCreationDraftFileModel.findFirst({
-      where: { id: fileId, draft: { userId } },
-    });
-    return file
-      ? { filename: file.filename, mimeType: file.mimeType, data: Buffer.from(file.data) }
-      : null;
+  async delete(id: string) {
+    await this.prisma.gameCreationDraftModel.deleteMany({ where: { id } });
   }
 
-  /** Sin `mode` borra los borradores de todos los modos de ese tipo de juego. */
-  async delete(userId: string, gameType: string, mode?: string) {
-    await this.prisma.gameCreationDraftModel.deleteMany({
-      where: { userId, gameType, ...(mode === undefined ? {} : { mode }) },
+  async findIdsNotUpdatedSince(before: Date, limit: number) {
+    const rows = await this.prisma.gameCreationDraftModel.findMany({
+      where: { updatedAt: { lt: before } },
+      select: { id: true },
+      orderBy: { updatedAt: 'asc' },
+      take: limit,
     });
+    return rows.map((row) => row.id);
   }
 }

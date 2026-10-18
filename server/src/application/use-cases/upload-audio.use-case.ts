@@ -10,6 +10,8 @@ export interface UploadAudioInput {
   mimeType: string;
   size: number;
   folder: string;
+  /** Etiquetas del recurso en el almacenamiento (ej. `draft-<id>` durante la creación, issue #69). */
+  tags?: string[];
 }
 
 export interface UploadAudioOutput {
@@ -28,7 +30,7 @@ export class UploadAudioUseCase {
       throw new InvalidImageError('El audio no puede pesar más de 8 MB.');
     }
 
-    const uploaded = await this.imageStorage.uploadAudio(input.buffer, input.folder);
+    const uploaded = await this.imageStorage.uploadAudio(input.buffer, input.folder, input.tags);
     return { url: uploaded.url };
   }
 }

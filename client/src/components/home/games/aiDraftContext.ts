@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect } from 'react'
 import type { GameDraft } from '../../../services/ai-game-assistant.service'
-import type { GameCreationDraft } from '../../../services/game-creation-draft.service'
+import type { CreationDraftFileInfo } from '../../../services/game-creation-draft.service'
 
 /**
  * Lo provee GameFormShell: AiGameAssistantPanel lo llama cuando la IA ya
@@ -63,10 +63,12 @@ export function useReportCreateSummary(summary: CreateSummary): void {
  * la IA (ahorro de tokens) y restaura todo cuando la persona elige Continuar.
  */
 export type AiDraftPersist = {
-  /** Se llena cuando la persona elige "Continuar"; `nonce` distingue restauraciones. */
-  restore: { nonce: number; draft: GameCreationDraft } | null
-  /** El panel avisa que terminó de restaurar (o que no había nada que restaurar). */
-  onRestored: () => void
+  /**
+   * Se llena al retomar un borrador: mensaje y archivos (ya en Cloudinary) que
+   * se enviaron a la IA. El formulario se restaura aparte, sin volver a llamar
+   * a la IA; `nonce` distingue restauraciones.
+   */
+  restore: { nonce: number; message: string; files: CreationDraftFileInfo[] } | null
   /** Resultado guardado para exactamente este mensaje y estos archivos, si existe. */
   findCached: (message: string, files: File[]) => GameDraft | null
   /** Guarda el resultado recién generado junto con sus archivos y mensaje. */
@@ -77,4 +79,18 @@ export const AiDraftPersistContext = createContext<AiDraftPersist | null>(null)
 
 export function useAiDraftPersist(): AiDraftPersist | null {
   return useContext(AiDraftPersistContext)
+}
+
+/**
+ * Lo provee GameFormShell (issue #69): id del borrador en curso y aviso de
+ * edición. Los campos de subida (imagen, audio) mandan el id para que el
+ * servidor etiquete el recurso con `draft-<id>`, y avisan al terminar una
+ * subida para que se guarde el borrador aunque no hubo evento de teclado.
+ */
+export type DraftUploadInfo = { draftId: string; markTouched: () => void }
+
+export const DraftUploadContext = createContext<DraftUploadInfo | null>(null)
+
+export function useDraftUpload(): DraftUploadInfo | null {
+  return useContext(DraftUploadContext)
 }
