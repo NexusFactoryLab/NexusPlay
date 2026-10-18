@@ -52,6 +52,7 @@ model UserModel {
   subjectsCreated          SubjectModel[]
   identityProviderAccounts IdentityProviderAccountModel[]
   gamePlayResults          GamePlayResultModel[]
+  gameCreationDrafts       GameCreationDraftModel[]
 
   @@map("users")
 }
@@ -212,10 +213,10 @@ enum SubjectStatusEnum {
   @@map("subject_status")
 }
 
-/// Ãrea raíz (parentSubjectId null, PUBLIC desde su creación por un admin) o
-/// sub-Ã¡rea (parentSubjectId con valor, nace PRIVATE). PRIVATE -> PUBLIC es
+/// Área raíz (parentSubjectId null, PUBLIC desde su creación por un admin) o
+/// sub-área (parentSubjectId con valor, nace PRIVATE). PRIVATE -> PUBLIC es
 /// irreversible; el soft-delete (deletedAt) solo aplica en PRIVATE, porque una
-/// Ã¡rea pública puede tener juegos de otros usuarios colgados debajo.
+/// área pública puede tener juegos de otros usuarios colgados debajo.
 model SubjectModel {
   id              String            @id @default(uuid())
   name            String
@@ -223,7 +224,7 @@ model SubjectModel {
   parentSubjectId String?           @map("parent_subject_id")
   parent          SubjectModel?     @relation("SubjectHierarchy", fields: [parentSubjectId], references: [id], onDelete: Restrict)
   children        SubjectModel[]    @relation("SubjectHierarchy")
-  /// null = Ã¡rea raíz creada por un admin sin registrar autoría individual.
+  /// null = área raíz creada por un admin sin registrar autoría individual.
   creatorUserId   String?           @map("creator_user_id")
   creator         UserModel?        @relation(fields: [creatorUserId], references: [id], onDelete: SetNull)
   status          SubjectStatusEnum @default(PRIVATE)
@@ -282,11 +283,11 @@ model GameTypeSettingModel {
 
 /// Registro de un intento/partida jugada por un estudiante (issue #226).
 /// Es el hecho atómico sobre el que se agregan todas las métricas: ranking de
-/// clase, desglose por juego, desglose por Ã¡rea y evolución en el tiempo.
+/// clase, desglose por juego, desglose por área y evolución en el tiempo.
 /// `gameId`/`subjectId` son strings sueltos sin FK real por el mismo motivo
 /// que `ClassGameModel.gameId`: `Game` vive en MongoDB y `Subject` sí vive en
 /// Postgres pero se referencia por id de todas formas para no acoplar esta
-/// tabla de hechos a reglas de integridad de otro agregado (un Ã¡rea
+/// tabla de hechos a reglas de integridad de otro agregado (un área
 /// eliminada no debe impedir conservar el historial de resultados).
 model GamePlayResultModel {
   id             String     @id @default(uuid())
@@ -299,7 +300,7 @@ model GamePlayResultModel {
   /// Mongo a resolver `gameType`/`title` para listar el desglose por juego.
   gameTitle      String     @map("game_title")
   subjectId      String?    @map("subject_id")
-  /// Denormalizado por el mismo motivo que `gameTitle`, y porque un Ã¡rea
+  /// Denormalizado por el mismo motivo que `gameTitle`, y porque un área
   /// puede eliminarse (soft-delete) sin que eso rompa el historial agregado.
   subjectName    String?    @map("subject_name")
   score          Int
@@ -326,4 +327,32 @@ model RefreshTokenModel {
 
   @@index([userId])
   @@map("refresh_tokens")
+}
+
+/// Issue #69: borrador automático del formulario de creación de juego. Una
+/// persona puede tener varios por tipo (el id lo genera el cliente al abrir el
+/// formulario y sirve también de etiqueta `draft-<id>` en Cloudinary).
+/// "Borrador" aquí es el trabajo a medias de la persona; no confundir con
+/// `GameDraft` del código, que es el resultado de la IA (va en `aiResult`).
+/// `mode` es '' cuando el tipo no tiene modos.
+model GameCreationDraftModel {
+  id        String    @id
+  userId    String    @map("user_id")
+  user      UserModel @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gameType  String    @map("game_type")
+  mode      String    @default("")
+  /// Estado completo del formulario (lo serializa cada formulario).
+  formState Json?     @map("form_state")
+  /// Resultado de POST /games/ai-draft, para no volver a gastar tokens.
+  aiResult  Json?     @map("ai_result")
+  /// Mensaje que se envió a la IA junto con los archivos.
+  aiMessage String?   @map("ai_message")
+  /// Archivos subidos a la IA, ya en Cloudinary: [{ filename, mimeType, sizeBytes, url, publicId }].
+  aiFiles   Json?     @map("ai_files")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@index([userId, updatedAt])
+  @@index([updatedAt])
+  @@map("game_creation_drafts")
 }

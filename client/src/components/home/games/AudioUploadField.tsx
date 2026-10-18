@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { AudioLines, Loader2, Volume2, X } from 'lucide-react'
 import { useAuth } from '../../../hooks/useAuth'
+import { useDraftUpload } from './aiDraftContext'
 import { uploadAudio, type UploadAudioFolder } from '../../../services/upload.service'
 import { ApiError } from '../../../utils/http'
 
@@ -15,6 +16,7 @@ type AudioUploadFieldProps = {
 /** Input de audio opcional por tarjeta (ej. pronunciación de un personaje/bandera). */
 export function AudioUploadField({ label, audioUrl, folder, disabled, onChange }: AudioUploadFieldProps) {
   const { token } = useAuth()
+  const draftUpload = useDraftUpload()
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -25,8 +27,9 @@ export function AudioUploadField({ label, audioUrl, folder, disabled, onChange }
     setUploading(true)
     setError(null)
     try {
-      const result = await uploadAudio(token, file, folder)
+      const result = await uploadAudio(token, file, folder, draftUpload?.draftId)
       onChange(result.url)
+      draftUpload?.markTouched()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'No se pudo subir el audio.')
     } finally {

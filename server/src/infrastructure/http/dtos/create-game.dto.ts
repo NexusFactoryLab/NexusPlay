@@ -1,4 +1,4 @@
-import { IsDefined, IsIn, IsObject, IsOptional, IsString, IsUrl, MinLength } from 'class-validator';
+import { IsDefined, IsIn, IsObject, IsOptional, IsString, IsUUID, IsUrl, MinLength } from 'class-validator';
 import { VALID_GAME_TYPES } from '../../../domain/value-objects/game-type.vo.js';
 
 class GameThemeDto {
@@ -42,6 +42,15 @@ export class CreateGameDto {
   @IsOptional()
   @IsString()
   sourceGameId?: string | null;
+
+  /**
+   * Borrador de creación del que sale este juego (issue #69). Al crear el
+   * juego con éxito se le quita la etiqueta de borrador a sus imágenes para
+   * que no se borren con él, y el borrador se elimina.
+   */
+  @IsOptional()
+  @IsUUID()
+  creationDraftId?: string;
 
   @IsOptional()
   @IsObject()

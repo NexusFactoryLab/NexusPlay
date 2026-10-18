@@ -18,7 +18,7 @@ import exploreIcon from '../../assets/welcome/emoji-explore.webp'
  * en vez de cambiar con la fuente de emojis de cada uno.
  */
 const HIGHLIGHTS = [
-  { icon: studyIcon, iconSize: [16, 17], title: 'Estudia Solo', text: 'Supera retos y Ã¡reas a tu propio ritmo.', art: studyArt, width: 110, height: 105 },
+  { icon: studyIcon, iconSize: [16, 17], title: 'Estudia Solo', text: 'Supera retos y áreas a tu propio ritmo.', art: studyArt, width: 110, height: 105 },
   { icon: competeIcon, iconSize: [19, 19], title: 'Reta y Compite', text: 'Desafía a tus amigos o a la comunidad entera.', art: competeArt, width: 110, height: 103 },
   { icon: createIcon, iconSize: [18, 18], title: 'Crea tus Mundos', text: 'Transforma tus temas en juegos interactivos.', art: createArt, width: 104, height: 99 },
   { icon: exploreIcon, iconSize: [18, 17], title: 'Explora la Comunidad', text: 'Juega miles de retos creados por otros.', art: exploreArt, width: 109, height: 107 },

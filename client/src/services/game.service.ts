@@ -259,6 +259,11 @@ type CreateGameInputBase =
 export type CreateGameInput = CreateGameInputBase & {
   /** Juego del que se adaptó este (issue #8); solo trazabilidad. */
   sourceGameId?: string | null
+  /**
+   * Borrador de creación del que sale el juego (issue #69): el servidor le
+   * quita la etiqueta de borrador a sus imágenes y elimina el borrador.
+   */
+  creationDraftId?: string
 }
 
 /** POST /games — crea un juego en estado DRAFT. Cualquier usuario autenticado puede llamarlo. */

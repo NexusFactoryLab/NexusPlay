@@ -1,11 +1,11 @@
 import type { SubjectMetric } from '../../../services/metrics.service'
 
-/** Única responsabilidad: desglose "por Ã¡rea/subÃ¡rea" del estudiante (issue #226). */
+/** Única responsabilidad: desglose "por área/subárea" del estudiante (issue #226). */
 export function StudentSubjectBreakdownTable({ subjects }: { subjects: SubjectMetric[] }) {
   if (subjects.length === 0) {
     return (
       <p className="text-[14px] text-text/70">
-        Todavía no hay resultados asociados a un Ã¡rea.
+        Todavía no hay resultados asociados a un área.
       </p>
     )
   }
@@ -14,7 +14,7 @@ export function StudentSubjectBreakdownTable({ subjects }: { subjects: SubjectMe
     <table className="w-full border-collapse text-[14px]">
       <thead>
         <tr className="border-b border-border text-left text-text/70">
-          <th className="py-2 pr-2">Ãrea</th>
+          <th className="py-2 pr-2">Área</th>
           <th className="py-2 pr-2">Puntaje</th>
           <th className="py-2 pr-2">Precisión</th>
           <th className="py-2 pr-2">Intentos</th>

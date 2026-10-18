@@ -51,7 +51,7 @@ export class SubjectController {
   }
 
   /**
-   * Todas las Ã¡reas vigentes de la plataforma, ruta separada de la raíz a
+   * Todas las áreas vigentes de la plataforma, ruta separada de la raíz a
    * propósito (mismo criterio que `GET /organizations/all`): es la única con
    * autorización de ADMIN global.
    */

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../../hooks/useAuth'
 import { listAllGameTypeSettings } from '../../../../services/game.service'
 import { GameTypePicker } from '../GameTypePicker'
+import { CreationDraftsModal } from '../CreationDraftsModal'
 import type { GameTypeChoice } from '../GameTypePicker'
 
 const ROUTE_BY_CHOICE: Record<GameTypeChoice, string> = {
@@ -29,11 +30,17 @@ export function GameTypePickerPage() {
       .catch(() => {})
   }, [token])
 
+  const [showDrafts, setShowDrafts] = useState(false)
+
   return (
-    <GameTypePicker
-      onClose={() => navigate('/')}
-      onSelect={(choice) => navigate(ROUTE_BY_CHOICE[choice])}
-      archivedGameTypes={archivedGameTypes}
-    />
+    <>
+      <GameTypePicker
+        onClose={() => navigate('/')}
+        onSelect={(choice) => navigate(ROUTE_BY_CHOICE[choice])}
+        archivedGameTypes={archivedGameTypes}
+        onViewDrafts={() => setShowDrafts(true)}
+      />
+      {showDrafts && <CreationDraftsModal onClose={() => setShowDrafts(false)} />}
+    </>
   )
 }

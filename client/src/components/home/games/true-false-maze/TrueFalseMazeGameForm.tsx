@@ -6,6 +6,16 @@ import { SaveVisibilityModal } from '../SaveVisibilityModal'
 import { ImageUploadField } from '../ImageUploadField'
 import { AiGameAssistantPanel } from '../AiGameAssistantPanel'
 import { useReportCreateSummary } from '../aiDraftContext'
+import { useCreationDraftId } from '../useCreationDraftId'
+import {
+  asSavedState,
+  clampIndex,
+  savedBoolean,
+  savedList,
+  savedNullableString,
+  savedNumber,
+  savedString,
+} from '../creationDraftSupport'
 import { GameFormShell } from '../GameFormShell'
 import { WizardPhaseNav } from '../WizardPhaseNav'
 import { FormSection, PhaseLabel } from '../create/FormSection'
@@ -130,6 +140,47 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
       })
   }, [token])
 
+  // Issue #69: estado completo del formulario para el borrador automático.
+  const { draftId, resuming } = useCreationDraftId()
+  const draftState = {
+    title,
+    description,
+    coverImageUrl,
+    lives,
+    enemyCount,
+    enemySpeed,
+    relocateSeconds,
+    shuffleQuestions,
+    lightsOut,
+    questions,
+    categoryId,
+    organizationId,
+    phase,
+    selectedQuestion,
+  }
+
+  function restoreDraft(saved: Record<string, unknown>) {
+    const state = asSavedState(saved)
+    const defaults = DEFAULT_TRUE_FALSE_MAZE_CONFIG
+    setTitle(savedString(state, 'title', ''))
+    setDescription(savedString(state, 'description', ''))
+    setCoverImageUrl(savedNullableString(state, 'coverImageUrl'))
+    setLives(savedNumber(state, 'lives', defaults.lives))
+    setEnemyCount(savedNumber(state, 'enemyCount', defaults.enemyCount))
+    setEnemySpeed(savedNumber(state, 'enemySpeed', defaults.enemySpeed))
+    setRelocateSeconds(savedNumber(state, 'relocateSeconds', defaults.relocateSeconds))
+    setShuffleQuestions(savedBoolean(state, 'shuffleQuestions', defaults.shuffleQuestions))
+    setLightsOut(savedBoolean(state, 'lightsOut', defaults.lightsOut))
+    const savedQuestions = savedList<QuestionDraft>(state, 'questions')
+    // Las claves se regeneran: las guardadas podrían chocar con las de la sesión actual.
+    const restored = savedQuestions?.map(({ key: _key, ...values }) => newQuestion(values))
+    if (restored && restored.length > 0) setQuestions(restored)
+    setCategoryId(savedString(state, 'categoryId', ''))
+    setOrganizationId(savedString(state, 'organizationId', ''))
+    setPhase(clampIndex(savedNumber(state, 'phase', 0), TOTAL_PHASES))
+    setSelectedQuestion(clampIndex(savedNumber(state, 'selectedQuestion', 0), (restored ?? questions).length))
+  }
+
   function applyAiDraft(draft: GameDraft) {
     const items = Array.isArray(draft.content) ? draft.content : []
     const drafted = items.slice(0, MAX_TF_QUESTIONS).map((item) => {
@@ -250,6 +301,7 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
         title: title.trim(),
         description: description.trim(),
         gameType: 'TRUE_FALSE_MAZE',
+        creationDraftId: draftId,
         categoryId,
         organizationId: organizationId || undefined,
         theme: coverImageUrl ? { coverImageUrl } : undefined,
@@ -302,6 +354,10 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
     <GameFormShell
       backLabel="Cambiar tipo de juego"
       onBack={onBack}
+      draftId={draftId}
+      resumingDraft={resuming}
+      draftState={draftState}
+      onRestoreDraft={restoreDraft}
       title="Laberinto Verdadero o Falso"
       description="Escribe afirmaciones: el robot entra a la sala VERDADERO o FALSO."
       descriptionDetail="Un robot recorre una nave espacial y responde cada afirmación entrando a la sala VERDADERO o FALSO, mientras esquiva medusas galácticas. Después de cada respuesta se muestra tu explicación."

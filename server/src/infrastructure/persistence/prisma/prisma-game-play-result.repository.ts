@@ -93,7 +93,7 @@ export class PrismaGamePlayResultRepository implements GamePlayResultRepository 
     const bySubject = new Map<string, SubjectAggregate>();
     for (const record of records) {
       const subjectId = record.subjectId as string;
-      const subjectName = record.subjectName ?? 'Sin Ã¡rea';
+      const subjectName = record.subjectName ?? 'Sin área';
       const existing = bySubject.get(subjectId);
       if (!existing) {
         bySubject.set(subjectId, {

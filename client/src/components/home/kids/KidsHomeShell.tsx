@@ -28,7 +28,7 @@ type KidsHomeShellProps = {
  * Reemplazo completo del "chrome" de adulto (Sidebar + búsqueda + grid de
  * texto) para todo usuario STUDENT — ver la bifurcación por rol en
  * HomeLayout.tsx. En vez de una barra lateral con secciones de texto, hay
- * una sola pantalla: elegir un "mundo" (Ã¡rea) y, dentro, elegir un juego
+ * una sola pantalla: elegir un "mundo" (área) y, dentro, elegir un juego
  * por su portada. Nada de crear/editar/borrar — un niño acá es solo
  * jugador (ver Contexto del plan).
  *

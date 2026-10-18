@@ -7,6 +7,15 @@ import { ImageUploadField } from './ImageUploadField'
 import { AudioUploadField } from './AudioUploadField'
 import { AiGameAssistantPanel } from './AiGameAssistantPanel'
 import { useReportCreateSummary } from './aiDraftContext'
+import { useCreationDraftId } from './useCreationDraftId'
+import {
+  asSavedState,
+  clampIndex,
+  savedList,
+  savedNullableString,
+  savedNumber,
+  savedString,
+} from './creationDraftSupport'
 import { GameFormShell } from './GameFormShell'
 import { WizardPhaseNav } from './WizardPhaseNav'
 import { FormSection, PhaseLabel } from './create/FormSection'
@@ -130,6 +139,36 @@ export function GuessWhoGameForm({
       })
   }, [token])
 
+  // Issue #69: estado completo del formulario para el borrador automático.
+  const { draftId, resuming } = useCreationDraftId()
+  const draftState = {
+    title,
+    description,
+    coverImageUrl,
+    cards,
+    maxAccusationCount,
+    traits,
+    categoryId,
+    organizationId,
+    phase,
+    selectedCard,
+  }
+
+  function restoreDraft(saved: Record<string, unknown>) {
+    const state = asSavedState(saved)
+    setTitle(savedString(state, 'title', ''))
+    setDescription(savedString(state, 'description', ''))
+    setCoverImageUrl(savedNullableString(state, 'coverImageUrl'))
+    const savedCards = savedList<CardDraft>(state, 'cards')
+    if (savedCards) setCards(savedCards)
+    setMaxAccusationCount(savedNumber(state, 'maxAccusationCount', DEFAULT_MAX_ACCUSATION_COUNT))
+    setTraits(savedList<GuessWhoTrait>(state, 'traits') ?? [])
+    setCategoryId(savedString(state, 'categoryId', ''))
+    setOrganizationId(savedString(state, 'organizationId', ''))
+    setPhase(clampIndex(savedNumber(state, 'phase', 0), TOTAL_PHASES))
+    setSelectedCard(clampIndex(savedNumber(state, 'selectedCard', 0), (savedCards ?? cards).length))
+  }
+
   useApplyAdaptation(adaptation, (adapted) => {
     setTitle(adapted.title)
     setDescription(adapted.description)
@@ -204,7 +243,7 @@ export function GuessWhoGameForm({
     )
   }
 
-  /** Valida solo los campos de la fase 1 (Identidad): título, descripción, Ã¡rea. */
+  /** Valida solo los campos de la fase 1 (Identidad): título, descripción, área. */
   function validateIdentityPhase(): string | null {
     if (!title.trim() || title.trim().length < 3) {
       return 'El título debe tener al menos 3 caracteres.'
@@ -213,7 +252,7 @@ export function GuessWhoGameForm({
       return 'La descripción debe tener al menos 10 caracteres.'
     }
     if (!categoryId) {
-      return 'Elige un Ã¡rea para el juego.'
+      return 'Elige un área para el juego.'
     }
     return null
   }
@@ -284,6 +323,7 @@ export function GuessWhoGameForm({
         title: title.trim(),
         description: description.trim(),
         gameType: 'GUESS_WHO',
+        creationDraftId: draftId,
         sourceGameId: adaptation?.sourceGameId ?? undefined,
         categoryId,
         organizationId: organizationId || undefined,
@@ -333,6 +373,11 @@ export function GuessWhoGameForm({
     <GameFormShell
       backLabel="Cambiar tipo de juego"
       onBack={onBack}
+      draftId={draftId}
+      resumingDraft={resuming}
+      draftState={draftState}
+      onRestoreDraft={restoreDraft}
+      adaptation={adaptation}
       title="¿Quién Es?"
       description="Cada tarjeta tiene imagen, nombre y audio opcional."
       descriptionDetail="Se juega en una sala en vivo entre 2 personas: abre la sala desde el detalle del juego una vez creado."

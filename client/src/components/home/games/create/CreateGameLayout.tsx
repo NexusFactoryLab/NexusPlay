@@ -57,7 +57,8 @@ function CreateGameLayoutContent() {
       </header>
       {/* `app-main`: mismas piezas de Fantasía que las secciones del inicio (ver index.css). */}
       <main className="app-main flex-1 overflow-y-auto">
-        <Outlet />
+        {/* Issue #69: "Continuar" otro borrador del mismo tipo cambia solo el query; la clave remonta el formulario. */}
+        <Outlet key={location.pathname + location.search} />
         <ScrollMoreHint />
       </main>
     </div>

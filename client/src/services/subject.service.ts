@@ -14,12 +14,12 @@ export type SubjectWithGameCount = Subject & {
   gameCount: number
 }
 
-/** GET /subjects — Ã¡reas públicas + las privadas propias, con conteo de juegos publicados. */
+/** GET /subjects — áreas públicas + las privadas propias, con conteo de juegos publicados. */
 export function listSubjects(token: string): Promise<SubjectWithGameCount[]> {
   return request<SubjectWithGameCount[]>('/subjects', { token })
 }
 
-/** POST /subjects — crea una sub-Ã¡rea bajo `parentSubjectId`; nace privada. */
+/** POST /subjects — crea una sub-área bajo `parentSubjectId`; nace privada. */
 export function createSubject(
   token: string,
   name: string,
@@ -39,7 +39,7 @@ export type PublishSubjectResult = Subject & {
 
 /**
  * POST /subjects/:id/publish — irreversible: solo el creador o un admin.
- * Publica en cascada todos los juegos en borrador de esta Ã¡rea.
+ * Publica en cascada todos los juegos en borrador de esta área.
  */
 export function publishSubject(token: string, subjectId: string): Promise<PublishSubjectResult> {
   return request<PublishSubjectResult>(`/subjects/${subjectId}/publish`, { method: 'POST', token })

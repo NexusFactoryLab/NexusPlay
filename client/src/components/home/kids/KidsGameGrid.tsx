@@ -13,7 +13,7 @@ type KidsGameGridProps = {
 }
 
 /**
- * Grilla de juegos dentro de un "mundo" (Ã¡rea) del Modo Kids. Reusa el
+ * Grilla de juegos dentro de un "mundo" (área) del Modo Kids. Reusa el
  * mismo `listGames` de siempre (sin filtro adicional = solo publicados,
  * ver game.service.ts) — nada de lógica de catálogo propia, solo una
  * presentación distinta pensada para tocar y no para leer.

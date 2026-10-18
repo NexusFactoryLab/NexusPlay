@@ -6,6 +6,15 @@ import { SaveVisibilityModal } from './SaveVisibilityModal'
 import { ImageUploadField } from './ImageUploadField'
 import { AiGameAssistantPanel } from './AiGameAssistantPanel'
 import { useReportCreateSummary } from './aiDraftContext'
+import { useCreationDraftId } from './useCreationDraftId'
+import {
+  asSavedState,
+  clampIndex,
+  savedList,
+  savedNullableString,
+  savedNumber,
+  savedString,
+} from './creationDraftSupport'
 import { GameFormShell } from './GameFormShell'
 import { WizardPhaseNav } from './WizardPhaseNav'
 import { FormSection, PhaseLabel } from './create/FormSection'
@@ -127,6 +136,46 @@ export function SnakesLaddersGameForm({ onClose, onCreated, onBack, onCategoryCr
         console.error('No se pudieron cargar las organizaciones del usuario:', err)
       })
   }, [token])
+
+  // Issue #69: estado completo del formulario para el borrador automático.
+  const { draftId, resuming } = useCreationDraftId()
+  const draftState = {
+    title,
+    description,
+    coverImageUrl,
+    boardSize,
+    turnDurationSeconds,
+    ladders,
+    snakes,
+    cellQuestions,
+    categoryId,
+    organizationId,
+    phase,
+    selectedLadder,
+    selectedSnake,
+    selectedCell,
+  }
+
+  function restoreDraft(saved: Record<string, unknown>) {
+    const state = asSavedState(saved)
+    setTitle(savedString(state, 'title', ''))
+    setDescription(savedString(state, 'description', ''))
+    setCoverImageUrl(savedNullableString(state, 'coverImageUrl'))
+    setBoardSize(savedNumber(state, 'boardSize', DEFAULT_BOARD_SIZE))
+    setTurnDurationSeconds(savedNumber(state, 'turnDurationSeconds', DEFAULT_TURN_DURATION_SECONDS))
+    const savedLadders = savedList<LinkDraft>(state, 'ladders')
+    if (savedLadders) setLadders(savedLadders)
+    const savedSnakes = savedList<LinkDraft>(state, 'snakes')
+    if (savedSnakes) setSnakes(savedSnakes)
+    const savedCells = savedList<CellQuestionDraft>(state, 'cellQuestions')
+    if (savedCells) setCellQuestions(savedCells)
+    setCategoryId(savedString(state, 'categoryId', ''))
+    setOrganizationId(savedString(state, 'organizationId', ''))
+    setPhase(clampIndex(savedNumber(state, 'phase', 0), TOTAL_PHASES))
+    setSelectedLadder(clampIndex(savedNumber(state, 'selectedLadder', 0), (savedLadders ?? ladders).length))
+    setSelectedSnake(clampIndex(savedNumber(state, 'selectedSnake', 0), (savedSnakes ?? snakes).length))
+    setSelectedCell(clampIndex(savedNumber(state, 'selectedCell', 0), (savedCells ?? cellQuestions).length))
+  }
 
   useApplyAdaptation(adaptation, (adapted) => {
     setTitle(adapted.title)
@@ -292,6 +341,7 @@ export function SnakesLaddersGameForm({ onClose, onCreated, onBack, onCategoryCr
         title: title.trim(),
         description: description.trim(),
         gameType: 'SNAKES_LADDERS',
+        creationDraftId: draftId,
         sourceGameId: adaptation?.sourceGameId ?? undefined,
         categoryId,
         organizationId: organizationId || undefined,
@@ -358,6 +408,11 @@ export function SnakesLaddersGameForm({ onClose, onCreated, onBack, onCategoryCr
     <GameFormShell
       backLabel="Cambiar tipo de juego"
       onBack={onBack}
+      draftId={draftId}
+      resumingDraft={resuming}
+      draftState={draftState}
+      onRestoreDraft={restoreDraft}
+      adaptation={adaptation}
       title="Escaleras y Serpientes"
       description="Escaleras y serpientes con retos: avanzar depende de responder."
       descriptionDetail="Cada escalera exige un reto de alta complejidad para subir y cada serpiente da una oportunidad de recuperación. Ciudad Sostenible es el tema por defecto, pero puedes cambiar la narrativa con tus propias preguntas."

@@ -1,14 +1,38 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { isValidElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, ArrowLeft, Check, ClipboardCheck, Gamepad2, Info, PencilLine, Sparkles, X } from 'lucide-react'
+import { useAuth } from '../../../hooks/useAuth'
+import { useToast } from '../../../hooks/useToast'
+import {
+  discardCreationDraft,
+  getCreationDraft,
+  saveCreationDraftAi,
+  saveCreationDraftForm,
+} from '../../../services/game-creation-draft.service'
+import {
+  buildAiCache,
+  findCachedAiResult,
+  classifySaveError,
+  initialTouched,
+  saveErrorMessage,
+  shouldAutosave,
+  type AiResultCache,
+} from './creationDraftSupport'
 import {
   AiDraftAppliedContext,
+  AiDraftPersistContext,
+  DraftUploadContext,
+  type DraftUploadInfo,
+  type AiDraftPersist,
   AiFillStepContext,
   AiGeneratingContext,
   CreateSummaryContext,
   type CreateSummary,
 } from './aiDraftContext'
 import { Modal } from './Modal'
+import { DraftLimitModal } from './DraftLimitModal'
+import { DraftSaveController, type DraftSaveDeps } from './draftSaveController'
 import { useOptionalCreateGameProgress } from './create/CreateGameProgressContext'
 import {
   FieldAssistContext,
@@ -89,6 +113,8 @@ function clearInvalid(field: HTMLElement) {
   delete field.dataset.nxEmpty
 }
 
+type PendingLeave = { kind: 'back' } | { kind: 'history' } | { kind: 'link'; to: string }
+
 type GameFormShellProps = {
   /** Texto del botón de volver, sin la flecha (ej. "Cambiar modo"). */
   backLabel: string
@@ -101,6 +127,22 @@ type GameFormShellProps = {
   aiPanel: ReactNode
   /** Ancho máximo de la columna del formulario manual (centrada). */
   formMaxWidthClassName?: string
+  /**
+   * Contrato de borrador (issue #69). `draftId` viene de `useCreationDraftId()`;
+   * `draftState` es el estado COMPLETO del formulario serializable (textos,
+   * selects, casillas, radios, listas "+ Agregar", URLs de imágenes, fase y
+   * elemento seleccionado) y debe incluir `title` para la lista de borradores;
+   * `onRestoreDraft` lo vuelve a aplicar tal cual se guardó.
+   */
+  draftId: string
+  resumingDraft: boolean
+  draftState: Record<string, unknown>
+  onRestoreDraft: (saved: Record<string, unknown>) => void
+  /**
+   * Borrador de "Adaptar con IA" con el que se abrió el formulario: su
+   * contenido ya adaptado se autoguarda sin esperar una edición manual.
+   */
+  adaptation?: unknown
   children: ReactNode
 }
 
@@ -118,6 +160,11 @@ export function GameFormShell({
   descriptionDetail,
   aiPanel,
   formMaxWidthClassName = 'max-w-none',
+  draftId,
+  resumingDraft,
+  draftState,
+  onRestoreDraft,
+  adaptation,
   children,
 }: GameFormShellProps) {
   // Cuántas veces se aplicó un borrador de IA (0 = nunca): cada aplicación
@@ -134,6 +181,171 @@ export function GameFormShell({
   // Cambios sin guardar: cualquier edición del usuario o un borrador de IA.
   const [dirty, setDirty] = useState(false)
   const [confirmLeave, setConfirmLeave] = useState(false)
+  const [stage, setStage] = useState<'ai' | 'manual'>('ai')
+
+  // Issue #69: borrador automático en el servidor. El tipo y el modo salen del
+  // panel de IA que ya configura cada formulario; el estado lo entrega el
+  // formulario (`draftState`) y se guarda completo, sin leer el DOM.
+  const { token } = useAuth()
+  const { showToast } = useToast()
+  const navigate = useNavigate()
+  const aiPanelProps = isValidElement(aiPanel) ? (aiPanel.props as { gameType?: string; mode?: string }) : null
+  const draftGameType = aiPanelProps?.gameType
+  const draftMode = aiPanelProps?.mode ?? ''
+  const [aiRestore, setAiRestore] = useState<AiDraftPersist['restore']>(null)
+  // Mientras se carga un borrador que se retoma no se guarda nada: así no se pisa.
+  const persistReady = useRef(!resumingDraft)
+  // La persona ya interactuó (teclado, clic, subida): antes de eso los cambios de
+  // estado son del propio formulario al cargar (categorías, valores por defecto).
+  const touched = useRef(initialTouched(adaptation))
+  const aiCache = useRef<AiResultCache | null>(null)
+  const saveTimer = useRef<number | null>(null)
+  const dirtyRef = useRef(false)
+  const pendingLeave = useRef<PendingLeave>({ kind: 'back' })
+  const historyGuarded = useRef(false)
+  const draftStateRef = useRef(draftState)
+  const restoreDraftRef = useRef(onRestoreDraft)
+  useEffect(() => {
+    dirtyRef.current = dirty
+    draftStateRef.current = draftState
+    restoreDraftRef.current = onRestoreDraft
+  })
+  const draftStateKey = JSON.stringify(draftState)
+
+  // Guardado frente al tope de 5 borradores: el controlador retiene en memoria el
+  // resultado de la IA que el servidor rechazó, avisa una sola vez con un modal y
+  // reintenta con los siguientes cambios sin reabrirlo (queda un indicador).
+  const [blocked, setBlocked] = useState(false)
+  const [showLimit, setShowLimit] = useState(false)
+  const otherErrorShown = useRef(false)
+  const [controller] = useState(() => new DraftSaveController({} as DraftSaveDeps))
+  useEffect(() => {
+    controller.deps = {
+      saveForm: (state) => {
+        if (!token || !draftGameType) return Promise.resolve()
+        return saveCreationDraftForm(token, draftId, draftGameType, draftMode, state)
+      },
+      saveAi: (payload) => {
+        if (!token || !draftGameType) return Promise.resolve()
+        return saveCreationDraftAi(
+          token,
+          draftId,
+          draftGameType,
+          draftMode,
+          payload.result,
+          payload.message,
+          payload.files,
+        )
+      },
+      discard: () => (token ? discardCreationDraft(token, draftId) : Promise.resolve()),
+      onBlocked: (first) => {
+        setBlocked(true)
+        if (first) setShowLimit(true)
+      },
+      onUnblocked: () => {
+        setBlocked(false)
+        setShowLimit(false)
+      },
+      onOtherError: (error) => {
+        if (otherErrorShown.current) return
+        otherErrorShown.current = true
+        showToast(saveErrorMessage(classifySaveError(error), error), 'error', 8000)
+      },
+    }
+  })
+
+  const saveFormNow = useCallback(() => {
+    saveTimer.current = null
+    if (!token || !draftGameType || !persistReady.current) return
+    void controller.saveForm(draftStateRef.current).then((saved) => {
+      if (saved) otherErrorShown.current = false
+    })
+  }, [token, draftGameType, controller])
+
+  const scheduleFormSave = useCallback(
+    (delayMs: number) => {
+      if (saveTimer.current !== null) window.clearTimeout(saveTimer.current)
+      saveTimer.current = window.setTimeout(saveFormNow, delayMs)
+    },
+    [saveFormNow],
+  )
+
+  useEffect(() => {
+    return () => {
+      if (saveTimer.current !== null) window.clearTimeout(saveTimer.current)
+    }
+  }, [])
+
+  // "Continuar" desde "Ver borradores": se carga el borrador y se restaura el
+  // formulario COMPLETO (sin llamar a la IA); la IA solo recupera su mensaje y
+  // sus archivos, y su resultado queda en memoria para reutilizarlo.
+  useEffect(() => {
+    if (!resumingDraft) return
+    if (!token) return
+    let cancelled = false
+    getCreationDraft(token, draftId)
+      .then((draft) => {
+        if (cancelled) return
+        if (draft.aiResult) {
+          aiCache.current = buildAiCache(
+            draft.aiMessage ?? '',
+            draft.aiFiles.map((file) => ({ name: file.filename, size: file.sizeBytes })),
+            draft.aiResult,
+          )
+        }
+        if (draft.aiResult || draft.aiMessage || draft.aiFiles.length > 0) {
+          setAiRestore({ nonce: 1, message: draft.aiMessage ?? '', files: draft.aiFiles })
+        }
+        if (draft.formState) {
+          restoreDraftRef.current(draft.formState)
+          setStage('manual')
+          setDirty(true)
+        }
+        touched.current = true
+        persistReady.current = true
+      })
+      .catch(() => {
+        if (cancelled) return
+        persistReady.current = true
+        showToast('No se pudo abrir el borrador. Empiezas uno nuevo.', 'error')
+      })
+    return () => {
+      cancelled = true
+    }
+    // Solo al abrir el formulario.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, draftId, resumingDraft])
+
+  const persistValue = useMemo<AiDraftPersist>(
+    () => ({
+      restore: aiRestore,
+      findCached: (message, files) => findCachedAiResult(aiCache.current, message, files),
+      save: (result, message, files) => {
+        aiCache.current = buildAiCache(message, files, result)
+        touched.current = true
+        if (token && draftGameType) void controller.saveAi({ result, message, files })
+      },
+    }),
+    [aiRestore, token, draftGameType, controller],
+  )
+
+  const uploadInfo = useMemo<DraftUploadInfo>(
+    () => ({
+      draftId,
+      markTouched: () => {
+        touched.current = true
+      },
+    }),
+    [draftId],
+  )
+
+  // Cualquier cambio del estado del formulario tras una interacción de la
+  // persona (o de la IA) cuenta como edición y se guarda con un pequeño retraso.
+  useEffect(() => {
+    if (!shouldAutosave({ persistReady: persistReady.current, touched: touched.current })) return
+    setDirty(true)
+    scheduleFormSave(1500)
+  }, [draftStateKey, scheduleFormSave])
   const [summary, setSummary] = useState<CreateSummary | null>(null)
   // Avance de la fase actual y vista previa del juego, medidos del propio formulario.
   const [progress, setProgress] = useState<PhaseProgress>({ ready: 0, total: 0 })
@@ -151,7 +363,6 @@ export function GameFormShell({
   // Issue #52: primero la pantalla grande de IA; "Llenar manualmente" (o
   // aplicar un borrador de IA) pasa al formulario. El formulario y el chat
   // siguen montados en ambas etapas, así que no se pierde lo escrito.
-  const [stage, setStage] = useState<'ai' | 'manual'>('ai')
   // Transición entre etapas: la actual sale (leaving) y la nueva entra
   // (entering) con sus elementos en cascada, en vez de cambiar de golpe.
   const [leaving, setLeaving] = useState(false)
@@ -189,10 +400,112 @@ export function GameFormShell({
     return () => window.removeEventListener('beforeunload', handler)
   }, [dirty])
 
+  // Botón "atrás" del navegador: al editar se agrega una entrada de historial
+  // "guardia"; si la persona retrocede con cambios sin guardar se le avisa en
+  // vez de perderlos en silencio.
+  useEffect(() => {
+    if (!dirty || historyGuarded.current) return
+    historyGuarded.current = true
+    window.history.pushState({ nxGuard: true }, '')
+  }, [dirty])
+
+  useEffect(() => {
+    const onPopState = () => {
+      if (!historyGuarded.current) return
+      if (!dirtyRef.current) {
+        historyGuarded.current = false
+        window.history.back()
+        return
+      }
+      window.history.pushState({ nxGuard: true }, '')
+      pendingLeave.current = { kind: 'history' }
+      setConfirmLeave(true)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
+
+  // Cambios de ruta por enlaces internos mientras hay cambios sin guardar.
+  useEffect(() => {
+    if (!dirty) return
+    const onClick = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+      const anchor = (event.target as Element | null)?.closest?.('a[href]') as HTMLAnchorElement | null
+      if (!anchor || anchor.target === '_blank' || anchor.hasAttribute('download')) return
+      const url = new URL(anchor.href, window.location.href)
+      if (url.origin !== window.location.origin) return
+      if (url.pathname + url.search === window.location.pathname + window.location.search) return
+      event.preventDefault()
+      event.stopPropagation()
+      pendingLeave.current = { kind: 'link', to: url.pathname + url.search + url.hash }
+      setConfirmLeave(true)
+    }
+    document.addEventListener('click', onClick, true)
+    return () => document.removeEventListener('click', onClick, true)
+  }, [dirty])
+
   const handleBack = useCallback(() => {
-    if (dirty) setConfirmLeave(true)
-    else onBack()
+    if (dirty) {
+      pendingLeave.current = { kind: 'back' }
+      setConfirmLeave(true)
+    } else onBack()
   }, [dirty, onBack])
+
+  const performLeave = useCallback(
+    (pending: PendingLeave) => {
+    if (pending.kind === 'history') {
+      // La persona ya retrocedió una vez (se repuso la guardia): se salen las dos entradas.
+      historyGuarded.current = false
+      window.history.go(-2)
+      return
+    }
+    const leave = pending.kind === 'link' ? () => navigate(pending.to) : onBack
+    if (historyGuarded.current) {
+      // Se quita primero la entrada "guardia" para no dejar una entrada extra
+      // del formulario en el historial; luego se navega.
+      historyGuarded.current = false
+      window.addEventListener('popstate', () => leave(), { once: true })
+      window.history.back()
+    } else leave()
+    },
+    [navigate, onBack],
+  )
+
+  const confirmLeaveNow = useCallback(() => {
+    // Lo escrito queda guardado como borrador: se envía lo último antes de salir.
+    // (Si el tope de borradores lo impide, el aviso de salida ya lo advirtió.)
+    if (saveTimer.current !== null) window.clearTimeout(saveTimer.current)
+    saveFormNow()
+    setConfirmLeave(false)
+    setDirty(false)
+    dirtyRef.current = false
+    performLeave(pendingLeave.current)
+  }, [saveFormNow, performLeave])
+
+  /** Eliminar otro borrador para liberar cupo y guardar ya lo pendiente (formulario e IA). */
+  const handleDeleteAndSave = useCallback(
+    async (otherDraftId: string): Promise<boolean> => {
+      if (!token) return false
+      await discardCreationDraft(token, otherDraftId)
+      const saved = await controller.retryAfterFreeingSlot(draftStateRef.current)
+      if (saved) showToast('Borrador guardado', 'success')
+      return saved
+    },
+    [token, controller, showToast],
+  )
+
+  /** Descartar todo el progreso en curso y salir como en el flujo normal. */
+  const handleDiscardProgress = useCallback(async () => {
+    if (saveTimer.current !== null) window.clearTimeout(saveTimer.current)
+    persistReady.current = false
+    await controller.discardProgress()
+    setShowLimit(false)
+    setDirty(false)
+    dirtyRef.current = false
+    showToast('Progreso descartado', 'success')
+    performLeave({ kind: 'back' })
+  }, [controller, performLeave, showToast])
+
 
   // Foco al encabezado al cambiar de fase del formulario.
   const phaseNumber = subPhase?.phase ?? 0
@@ -321,12 +634,15 @@ export function GameFormShell({
 
   // Cualquier edición del usuario cuenta como "cambios sin guardar".
   const markDirty = useCallback(() => {
+    touched.current = true
     setDirty(true)
+    scheduleFormSave(1500)
     window.requestAnimationFrame(refreshMarks)
-  }, [refreshMarks])
+  }, [refreshMarks, scheduleFormSave])
 
   const handleClickCapture = useCallback(
     (event: React.MouseEvent) => {
+      touched.current = true
       const button = (event.target as HTMLElement).closest('button')
       const text = button?.textContent?.trim() ?? ''
       if (button && /^(\+|Quitar|Agregar|Eliminar|Añadir)/i.test(text)) {
@@ -398,6 +714,7 @@ export function GameFormShell({
   }, [])
 
   const markAiDraftApplied = useCallback(() => {
+    touched.current = true
     setStage('manual')
     setEntering(true)
     setAiDraftCount((count) => count + 1)
@@ -439,6 +756,8 @@ export function GameFormShell({
   const showAiNotice = aiDraftCount > 0 && !noticeDismissed
 
   return (
+    <DraftUploadContext.Provider value={uploadInfo}>
+    <AiDraftPersistContext.Provider value={persistValue}>
     <AiDraftAppliedContext.Provider value={markAiDraftApplied}>
     <CreateSummaryContext.Provider value={setSummary}>
     <AiGeneratingContext.Provider value={setGenerating}>
@@ -496,6 +815,18 @@ export function GameFormShell({
             </button>
           </div>
         </div>
+        {blocked && !showLimit && (
+          <button
+            type="button"
+            className="nx-notice mb-4 w-full text-left"
+            onClick={() => setShowLimit(true)}
+          >
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-danger" strokeWidth={2.2} />
+            <span className="flex-1">
+              <strong>Sin guardar: borradores llenos.</strong> Pulsa para elegir qué borrador eliminar y guardar este.
+            </span>
+          </button>
+        )}
         <h2 ref={headingRef} tabIndex={-1} className="mb-1 text-[20px] tracking-tight text-text-h outline-none">
           {title}
         </h2>
@@ -678,11 +1009,40 @@ export function GameFormShell({
           )}
         </div>
       </div>
+      {showLimit && (
+        <DraftLimitModal
+          currentDraftId={draftId}
+          onKeepEditing={() => setShowLimit(false)}
+          onDeleteAndSave={handleDeleteAndSave}
+          onDiscardProgress={handleDiscardProgress}
+        />
+      )}
       {confirmLeave && (
         <Modal onClose={() => setConfirmLeave(false)} maxWidthClassName="max-w-[400px]" ariaLabel="¿Salir sin guardar?">
-          <h3 className="mb-1 text-[17px] font-semibold text-text-h">¿Salir sin guardar?</h3>
-          <p className="mb-5 text-[13.5px] text-text">Perderás lo que llevas en este juego.</p>
-          <div className="flex justify-end gap-2">
+          <h3 className="mb-1 text-[17px] font-semibold text-text-h">¿Salir sin terminar?</h3>
+          <p className="mb-5 text-[13.5px] text-text">
+            {blocked ? (
+              <>
+                <strong>Lo que llevas NO está guardado:</strong> ya tienes el máximo de borradores y se perderá si
+                sales (incluido lo que generó la IA).
+              </>
+            ) : (
+              'El juego no se ha creado. Lo que llevas queda guardado como borrador para que lo retomes después.'
+            )}
+          </p>
+          <div className="flex flex-wrap justify-end gap-2">
+            {blocked && (
+              <button
+                type="button"
+                className="rounded-lg border border-border px-4 py-2 text-[14px] font-medium text-text-h"
+                onClick={() => {
+                  setConfirmLeave(false)
+                  setShowLimit(true)
+                }}
+              >
+                Ver opciones
+              </button>
+            )}
             <button
               type="button"
               autoFocus
@@ -694,11 +1054,7 @@ export function GameFormShell({
             <button
               type="button"
               className="rounded-lg bg-danger px-4 py-2 text-[14px] font-semibold text-white"
-              onClick={() => {
-                setConfirmLeave(false)
-                setDirty(false)
-                onBack()
-              }}
+              onClick={confirmLeaveNow}
             >
               Salir
             </button>
@@ -712,5 +1068,7 @@ export function GameFormShell({
     </AiGeneratingContext.Provider>
     </CreateSummaryContext.Provider>
     </AiDraftAppliedContext.Provider>
+    </AiDraftPersistContext.Provider>
+    </DraftUploadContext.Provider>
   )
 }

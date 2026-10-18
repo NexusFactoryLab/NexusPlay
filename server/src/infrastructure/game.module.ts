@@ -59,6 +59,12 @@ import { FileTextExtractor } from './ai/file-text-extractor.js';
 import { GameController } from './http/controllers/game.controller.js';
 import { GameImportController } from './http/controllers/game-import.controller.js';
 import { GameAiDraftController } from './http/controllers/game-ai-draft.controller.js';
+import { GameCreationDraftController } from './http/controllers/game-creation-draft.controller.js';
+import { PrismaGameCreationDraftRepository } from './persistence/prisma/game-creation-draft.repository.js';
+import { GameCreationDraftService } from '../application/services/game-creation-draft.service.js';
+import { GameCreationDraftExpirationJob } from './game-creation-draft-expiration.job.js';
+import { GAME_CREATION_DRAFT_REPOSITORY } from '../domain/ports/game-creation-draft.repository.port.js';
+import { DRAFT_ASSET_STORAGE } from '../domain/ports/draft-asset-storage.port.js';
 import { GameTypeSettingController } from './http/controllers/game-type-setting.controller.js';
 import { AiProviderAttemptsController } from './http/controllers/ai-provider-attempts.controller.js';
 
@@ -73,6 +79,7 @@ const DEFAULT_AI_PROVIDER_ORDER = ['groq'];
 @Module({
   imports: [UserModule, OrganizationCoreModule, ClassCoreModule],
   controllers: [
+    GameCreationDraftController,
     GameController,
     GameImportController,
     GameAiDraftController,
@@ -82,6 +89,10 @@ const DEFAULT_AI_PROVIDER_ORDER = ['groq'];
   providers: [
     MongoService,
     PrismaService,
+    { provide: GAME_CREATION_DRAFT_REPOSITORY, useClass: PrismaGameCreationDraftRepository },
+    { provide: DRAFT_ASSET_STORAGE, useClass: CloudinaryImageStorage },
+    GameCreationDraftService,
+    GameCreationDraftExpirationJob,
     { provide: GAME_REPOSITORY, useClass: MongoGameRepository },
     { provide: GAME_TYPE_SETTING_REPOSITORY, useClass: PrismaGameTypeSettingRepository },
     { provide: GAME_IMPORT_JOB_REPOSITORY, useClass: MongoGameImportJobRepository },
