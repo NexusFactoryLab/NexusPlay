@@ -8,7 +8,13 @@ export type GuidedChatControls = {
   questions: GuidedQuestion[]
   pending: PendingQuestion | null
   isMyTurn: boolean
+  /** Sin definir = automático (torneo). */
+  autoDiscard?: boolean
   onAsk: (questionId: string) => void
+  /** Pregunta propia escrita por el jugador (issue #64). Sin definir: solo preguntas sugeridas (torneo). */
+  onAskFree?: (text: string) => void
+  /** El rival es el bot: responde las preguntas propias con IA. */
+  opponentIsBot?: boolean
   onAnswer: (requestId: string, answer: boolean) => void
 }
 
@@ -28,6 +34,8 @@ export function ChatPanel({
   inline = false,
   guided,
   error,
+  notice,
+  answerHint,
 }: {
   messages: GuessWhoChatMessage[]
   selfUserId: string | null
@@ -38,6 +46,10 @@ export function ChatPanel({
   inline?: boolean
   guided?: GuidedChatControls
   error?: string | null
+  /** Aviso fijo sobre el chat (ej. que el rival es el bot y no lee mensajes). */
+  notice?: string
+  /** Aviso al responder algo que no coincide con tu tarjeta: se muestra junto a Sí/No, no como error. */
+  answerHint?: string | null
 }) {
   const [text, setText] = useState('')
   const listRef = useRef<HTMLDivElement>(null)
@@ -46,12 +58,31 @@ export function ChatPanel({
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight })
   }, [messages.length])
 
+  // En tu turno, lo que escribes con «?» o «¿» se manda como pregunta propia
+  // (issue #64): antes Enter lo mandaba como mensaje y el bot no lo veía.
+  const canAskFree = Boolean(guided?.onAskFree && guided.isMyTurn && !guided.pending)
+  const looksLikeQuestion = /[¿?]/.test(text)
+
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
     if (!text.trim() || disconnected) return
-    onSend(text)
+    if (canAskFree && looksLikeQuestion) guided!.onAskFree!(text.trim())
+    else onSend(text)
     setText('')
   }
+
+  // La última respuesta del rival a una pregunta, destacada para que no se pierda en el chat.
+  const lastAnswer = [...messages].reverse().find((m) => m.userId !== selfUserId && /^(Sí|No)\./.test(m.text))
+  // Recién llegada, la respuesta ocupa el panel sola unos segundos; luego vuelven las sugerencias.
+  const [dismissedAnswerAt, setDismissedAnswerAt] = useState<number | null>(null)
+  const [now, setNow] = useState(() => Date.now())
+  const answerIsFresh = Boolean(lastAnswer && lastAnswer.sentAt !== dismissedAnswerAt && now - lastAnswer.sentAt < ANSWER_SPOTLIGHT_MS)
+  const lastAnswerAt = lastAnswer?.sentAt
+  useEffect(() => {
+    if (lastAnswerAt === undefined) return
+    const timer = setTimeout(() => setNow(Date.now()), Math.max(0, lastAnswerAt + ANSWER_SPOTLIGHT_MS - Date.now()))
+    return () => clearTimeout(timer)
+  }, [lastAnswerAt])
 
   return (
     <div
@@ -76,6 +107,7 @@ export function ChatPanel({
       </div>
 
       {inline && error && <p role="alert" className="mx-3 mt-2 rounded-lg border border-danger/40 bg-surface/90 p-2 text-[12px] text-danger">{error}</p>}
+      {notice && <p className="mx-3 mt-2 rounded-lg border border-accent/30 bg-accent/5 p-2 text-[12px] text-text-h">{notice}</p>}
       <div
         role="log"
         aria-live="polite"
@@ -124,22 +156,35 @@ export function ChatPanel({
 
       {guided && <div className="max-h-[45%] shrink-0 overflow-y-auto border-t border-accent/20 bg-accent/5 px-3 py-3">
         {guided.pending ? <>
-          <p className="text-[12px] font-bold text-accent">{guided.pending.askerId === selfUserId ? 'Esperando a tu rival…' : 'Tu rival pregunta'}</p>
+          <p className="text-[12px] font-bold text-accent">{guided.pending.askerId === selfUserId ? (guided.pending.free && guided.opponentIsBot ? 'El bot está pensando la respuesta con IA…' : 'Esperando a tu rival…') : guided.pending.free ? 'Tu rival hace su propia pregunta' : 'Tu rival pregunta'}</p>
           <p className="mt-1 text-[13px] font-semibold text-text-h">{guided.pending.text}</p>
-          <QuestionGroup question={guided.pending} cards={guided.cards} />
+          {guided.pending.askerId !== selfUserId && answerHint && <p role="status" className="mt-2 rounded-lg border border-amber-400/60 bg-amber-50 px-2.5 py-1.5 text-[12px] text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">{answerHint}</p>}
           {guided.pending.askerId !== selfUserId && <div className="mt-2 flex gap-2">
             {[true, false].map(answer => <button key={String(answer)} type="button" disabled={disconnected} onClick={() => guided.onAnswer(guided.pending!.requestId, answer)} className="min-h-11 flex-1 rounded-xl border border-accent bg-accent/10 px-3 py-2 font-bold text-accent focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50">{answer ? 'Sí' : 'No'}</button>)}
           </div>}
-          <p className="mt-2 text-[11px] text-text">La respuesta descarta automáticamente las opciones que no coinciden. La pregunta vence al cambiar el turno.</p>
+          <p className="mt-2 text-[11px] text-text">{guided.pending.free ? 'Es una pregunta propia: responde con la verdad sobre tu tarjeta. Quien pregunta descarta según la respuesta.' : guided.autoDiscard === false ? 'Con la respuesta, descarta tú las tarjetas que no coinciden.' : 'La respuesta descarta automáticamente las opciones que no coinciden.'} La pregunta vence al cambiar el turno.</p>
         </> : <>
-          <p className="text-[12px] font-bold text-accent">Preguntas Sí/No · descarte automático</p>
+          {lastAnswer && answerIsFresh ? <div role="status" className="rounded-xl border-2 border-accent bg-surface px-3 py-3 text-center text-text-h">
+            <p className="text-[12px] font-semibold">{lastAnswer.displayName} respondió</p>
+            <p className="my-1 text-[28px] font-extrabold leading-none text-accent">{lastAnswer.text.startsWith('Sí') ? 'Sí' : 'No'}</p>
+            <p className="text-[11px] text-text">{lastAnswer.text.replace(/^(Sí|No)\.\s*/, '')}</p>
+            <button type="button" onClick={() => setDismissedAnswerAt(lastAnswer.sentAt)} className="mt-2 rounded-lg border border-accent/40 px-3 py-1.5 text-[12px] font-semibold text-accent focus-visible:outline-2 focus-visible:outline-accent">Entendido</button>
+          </div> : <>
+          {lastAnswer && <p className="mb-2 rounded-lg border border-accent/40 bg-surface px-2.5 py-1.5 text-[12.5px] text-text-h">
+            <span className="font-semibold">{lastAnswer.displayName} respondió: </span>
+            <strong className="text-accent">{lastAnswer.text.startsWith('Sí') ? 'Sí' : 'No'}</strong>
+          </p>}
+          <p className="text-[12px] font-bold text-accent">Preguntas Sí/No · {guided.autoDiscard === false ? 'descartas tú' : 'descarte automático'}</p>
           {!guided.isMyTurn ? <p className="mt-1 text-[12px] text-text">Podrás preguntar en tu turno. Puedes escribir mensajes mientras esperas.</p> : <div className="mt-2 space-y-2">
             {guided.questions.filter(q => normalize(q.text).includes(normalize(text.trim()))).map(q => <div key={q.id}>
-              <button type="button" disabled={disconnected} onClick={() => { guided.onAsk(q.id); setText('') }} className="w-full rounded-xl border border-accent/30 bg-surface/70 px-3 py-2 text-left text-[12px] font-medium text-text-h hover:border-accent focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50" aria-label={`Preguntar: ${q.text}`}>{q.text}</button>
-              <QuestionGroup question={q} cards={guided.cards} />
+              <button type="button" disabled={disconnected} onClick={() => { guided.onAsk(q.id); setText('') }} className="w-full rounded-xl border border-accent/30 bg-surface/70 px-3 py-2 text-left text-[12px] font-medium text-text-h hover:border-accent focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50" aria-label={`Preguntar: ${q.text}`}>{q.category && <span className="mr-1.5 inline-block rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold text-accent">{q.category}</span>}{q.text}</button>
             </div>)}
-            {guided.questions.filter(q => normalize(q.text).includes(normalize(text.trim()))).length === 0 && <p className="text-[12px] text-text">{guided.questions.length ? 'Sin sugerencias para ese texto. Puedes enviar un mensaje libre.' : 'No quedan preguntas que separen las opciones. Puedes adivinar o conversar.'}</p>}
+            {guided.questions.filter(q => normalize(q.text).includes(normalize(text.trim()))).length === 0 && <p className="text-[12px] text-text">{guided.questions.length ? 'Sin sugerencias para ese texto.' : 'No quedan preguntas sugeridas que separen las tarjetas.'}</p>}
+            {guided.onAskFree && (text.trim()
+              ? <button type="button" disabled={disconnected} onClick={() => { guided.onAskFree!(text.trim()); setText('') }} className="w-full rounded-xl bg-accent px-3 py-2 text-left text-[12px] font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50">Hacer esta pregunta (Sí/No): «{text.trim()}»</button>
+              : <p className="text-[11.5px] text-text">¿Quieres preguntar otra cosa? Escríbela abajo con «?» y pulsa Enter{guided.opponentIsBot ? ' (el bot la responde con IA)' : ''}.</p>)}
           </div>}
+          </>}
         </>}
       </div>}
 
@@ -153,7 +198,7 @@ export function ChatPanel({
           aria-label="Mensaje"
           autoFocus={!inline}
           disabled={disconnected}
-          placeholder="Escribe un mensaje…"
+          placeholder={canAskFree ? 'Escribe una pregunta de Sí/No o un mensaje…' : 'Escribe un mensaje…'}
           maxLength={500}
           value={text}
           onChange={(event) => setText(event.target.value)}
@@ -166,7 +211,7 @@ export function ChatPanel({
               'linear-gradient(135deg, var(--accent), var(--accent-2))',
           }}
           disabled={!text.trim() || disconnected}
-          aria-label="Enviar mensaje"
+          aria-label={canAskFree && looksLikeQuestion ? 'Hacer la pregunta' : 'Enviar mensaje'}
         >
           <Send className="h-4 w-4" strokeWidth={2} />
         </button>
@@ -176,12 +221,7 @@ export function ChatPanel({
   )
 }
 
-const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+/** Cuánto tiempo ocupa el panel la respuesta recién llegada antes de volver a las sugerencias. */
+const ANSWER_SPOTLIGHT_MS = 6000
 
-function QuestionGroup({ question, cards }: { question: GuidedQuestion; cards: GuessWhoCard[] }) {
-  if (question.text !== '¿Tu tarjeta está en este grupo?') return null
-  return <details className="mt-1 text-[12px] text-text-h" open>
-    <summary className="cursor-pointer text-accent">Ver tarjetas del grupo</summary>
-    <ul className="mt-2 grid grid-cols-3 gap-1.5">{cards.filter(c => question.cardIds.includes(c.cardId)).map(c => <li key={c.cardId} className="rounded-lg border border-border bg-surface/80 p-1"><img src={c.imageUrl} alt="" className="h-10 w-full object-contain" /><p className="break-words text-center text-[10px]">{c.label}</p></li>)}</ul>
-  </details>
-}
+const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()

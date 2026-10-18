@@ -173,6 +173,29 @@ deben evaluar contenido real extraído del texto fuente, nunca trivia genérica.
   imageRequirement: null,
 };
 
+/**
+ * Preguntas guiadas de ¿Quién Es? (issue #58): rasgos verificables del tema
+ * que reemplazan a las preguntas por letras del nombre. Van en las dos
+ * versiones del prompt (con y sin imágenes del usuario).
+ */
+const GUESS_WHO_TRAITS_INSTRUCTIONS = `PREGUNTAS GUIADAS: durante la partida los jugadores se hacen preguntas de Sí/No para descubrir la
+tarjeta secreta del rival, y esas preguntas salen de los rasgos que escribas aquí. El objetivo es APRENDER:
+las preguntas deben exigir saber del tema, NO describir lo que se ve en la imagen (nada de colores, formas o
+"¿tiene un X dibujado?"). En "config.traits" escribe entre 15 y 25 rasgos, cada uno con un "id" corto
+(minúsculas y guiones, ej. "independencia-siglo-19"), una "question" de Sí/No con signos ¿? (máximo 140
+caracteres) y una "category" corta que agrupe preguntas del mismo tipo, usando al menos 4 categorías
+distintas (ej. para países: "Historia", "Cultura", "Deporte", "Geografía"; para dinosaurios: "Época",
+"Alimentación", "Anatomía", "Descubrimiento"). Ejemplos de nivel esperado: "¿Se independizó antes de 1850?",
+"¿Su selección de fútbol ganó un Mundial antes de 2026?", "¿Vivió en el período Cretácico?", "¿Sus fósiles
+se descubrieron en Norteamérica?". Si hay texto fuente (documentos del usuario), saca los rasgos de ese texto,
+para que las preguntas repasen lo que se está estudiando. Cada rasgo debe ser verdadero para ALGUNAS tarjetas
+pero no para todas, y entre todos deben permitir distinguir cada tarjeta de las demás. Luego, en cada
+tarjeta, "traits" lista los ids de TODOS los rasgos que son verdaderos para esa tarjeta (lista vacía si
+ninguno). Revisa cada marca: una marca equivocada hace que el juego dé una respuesta falsa. Usa solo datos
+objetivos, verificables y estables: nada de opiniones ni de datos que cambian con el tiempo (resultados
+deportivos recientes, cifras que rondan el límite, gobernantes actuales); si un dato depende de la fecha,
+fíjala en la pregunta (ej. "antes de 2026").`;
+
 const GUESS_WHO_SPEC: GamePromptSpec = {
   instructions: `Genera el contenido de un juego de "¿Quién Es?" a partir de las imágenes que subió el
 usuario (y del texto fuente, si lo hay, como contexto adicional del tema). El usuario ya subió sus
@@ -187,12 +210,21 @@ específico de esa tarjeta — ej. si es la bandera de un país, un dato interes
 (capital, población, algo llamativo); si el tema no tiene un dato "de manual" tan obvio, igual
 escribe algo breve y relevante sobre ese elemento puntual. Este dato se muestra como una burbuja de
 información dentro de la tarjeta durante la partida. No agregues "imageUrl" ni "audioUrl", solo
-"imageIndex", "label" e "info".`,
+"imageIndex", "label", "info" y "traits".
+
+${GUESS_WHO_TRAITS_INSTRUCTIONS}`,
   jsonShapeExample: `{
-  "config": { "maxAccusationCount": 6, "turnDurationSeconds": 15 },
+  "config": {
+    "maxAccusationCount": 6,
+    "turnDurationSeconds": 15,
+    "traits": [
+      { "id": "habla-espanol", "question": "¿La mayoría de su población habla español?", "category": "Cultura" },
+      { "id": "mundial-antes-2026", "question": "¿Su selección ganó un Mundial de fútbol antes de 2026?", "category": "Deporte" }
+    ]
+  },
   "content": [
-    { "imageIndex": 0, "label": "Argentina", "info": "Su capital es Buenos Aires y es el país de habla hispana más grande del mundo." },
-    { "imageIndex": 1, "label": "Brasil", "info": "Es el único país de Sudamérica cuyo idioma oficial es el portugués." }
+    { "imageIndex": 0, "label": "Argentina", "info": "Su capital es Buenos Aires y es el país de habla hispana más grande del mundo.", "traits": ["habla-espanol", "mundial-antes-2026"] },
+    { "imageIndex": 1, "label": "Brasil", "info": "Es el único país de Sudamérica cuyo idioma oficial es el portugués.", "traits": ["mundial-antes-2026"] }
   ]
 }`,
   imageRequirement: { min: 12, max: 60, enforceMinimum: false },
@@ -213,12 +245,21 @@ una foto o ilustración real que represente ese elemento concreto sin ambigüeda
 Cada elemento debe llevar un emoji DISTINTO (nunca repitas uno), porque las tarjetas no deben verse iguales;
 (3) "color": un color hexadecimal claro y agradable (ej. "#bae6fd") para el fondo de su ilustración.
 Si no se encuentra una foto real, se crea una ilustración básica con ese emoji y ese color.
-NO incluyas "imageIndex" ni "imageUrl" en ningún elemento.`,
+NO incluyas "imageIndex" ni "imageUrl" en ningún elemento.
+
+${GUESS_WHO_TRAITS_INSTRUCTIONS}`,
   textOnlyJsonShapeExample: `{
-  "config": { "maxAccusationCount": 6, "turnDurationSeconds": 15 },
+  "config": {
+    "maxAccusationCount": 6,
+    "turnDurationSeconds": 15,
+    "traits": [
+      { "id": "habla-espanol", "question": "¿La mayoría de su población habla español?", "category": "Cultura" },
+      { "id": "mundial-antes-2026", "question": "¿Su selección ganó un Mundial de fútbol antes de 2026?", "category": "Deporte" }
+    ]
+  },
   "content": [
-    { "label": "Argentina", "info": "Su capital es Buenos Aires y es el país de habla hispana más grande del mundo.", "imageQuery": "Flag of Argentina", "emoji": "🇦🇷", "color": "#bae6fd" },
-    { "label": "Brasil", "info": "Es el único país de Sudamérica cuyo idioma oficial es el portugués.", "imageQuery": "Flag of Brazil", "emoji": "🇧🇷", "color": "#bbf7d0" }
+    { "label": "Argentina", "info": "Su capital es Buenos Aires y es el país de habla hispana más grande del mundo.", "imageQuery": "Flag of Argentina", "emoji": "🇦🇷", "color": "#bae6fd", "traits": ["habla-espanol", "mundial-antes-2026"] },
+    { "label": "Brasil", "info": "Es el único país de Sudamérica cuyo idioma oficial es el portugués.", "imageQuery": "Flag of Brazil", "emoji": "🇧🇷", "color": "#bbf7d0", "traits": ["mundial-antes-2026"] }
   ]
 }`,
 };

@@ -12,6 +12,8 @@ import { DealCountdownOverlay, MatchBoard, useCountdown } from './MatchBoard'
 import { ConfettiBurst } from '../../kids/ConfettiBurst'
 import { CardInfoBubble } from './CardInfoBubble'
 import { setGuessWhoSoundMuted, startGuessWhoAmbience, stopGuessWhoAmbience } from '../../../utils/gameFeedback'
+import { BOT_CHAT_NOTICE, parseBotDifficulty } from './guessWhoBot'
+import { AutoDiscardToggle } from './AutoDiscardToggle'
 
 /**
  * Sala 1v1 de "¿Quién Es?" en página propia (ruta `/quien-es/sala/:code?`,
@@ -27,6 +29,8 @@ function GuessWhoRoomSession() {
   const { code: codeFromUrl } = useParams<{ code?: string }>()
   const [searchParams] = useSearchParams()
   const gameIdToCreate = searchParams.get('gameId')
+  const botDifficulty = parseBotDifficulty(searchParams.get('bot'))
+  const soloAutoDiscard = searchParams.get('descarte') === 'auto'
   const navigate = useNavigate()
   const { token, user } = useAuth()
   const {
@@ -39,6 +43,8 @@ function GuessWhoRoomSession() {
     clearLastFailedAccusation,
     messages,
     createRoom,
+    createSoloRoom,
+    updateAutoDiscard,
     joinRoom,
     setReady,
     updateTurnDuration,
@@ -48,6 +54,7 @@ function GuessWhoRoomSession() {
     passTurn,
     sendChatMessage,
     askQuestion,
+    askFreeQuestion,
     answerQuestion,
     leaveRoom,
   } = useGuessWhoRoom(token)
@@ -65,7 +72,8 @@ function GuessWhoRoomSession() {
       joinRoom(codeFromUrl.toUpperCase())
     } else if (gameIdToCreate) {
       startedRef.current = true
-      createRoom(gameIdToCreate)
+      if (botDifficulty) createSoloRoom(gameIdToCreate, botDifficulty, soloAutoDiscard)
+      else createRoom(gameIdToCreate)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connecting, codeFromUrl, gameIdToCreate])
@@ -193,8 +201,12 @@ function GuessWhoRoomSession() {
     )
   }
 
+  // Responder algo que no coincide con tu tarjeta no es un error de partida: es un aviso para aprender (issue #64).
+  const answerHint = error?.startsWith('Ojo:') ? error : null
+  const pageError = answerHint ? null : error
   const self = room.players.find((player) => player.isSelf)
   const opponent = room.players.find((player) => !player.isSelf)
+  const againstBot = Boolean(opponent?.isBot)
   const isMyTurn = room.phase === 'PLAYING' && room.activePlayerUserId === self?.userId
   const canAccuse =
     room.phase === 'PLAYING' && isMyTurn && (self?.discardedCardIds.length ?? 0) >= MIN_DISCARDS_TO_ACCUSE
@@ -203,9 +215,16 @@ function GuessWhoRoomSession() {
 
   if (room.phase === 'WAITING') return <MultiplayerLobby
     room={room} roomPath={`/quien-es/sala/${encodeURIComponent(room.code)}`} maxPlayers={2}
+    solo={room.players.some((player) => player.isBot)}
     isHost={Boolean(self?.isHost)} connecting={connecting} error={error}
     turnDurationSeconds={room.turnDurationSeconds} onUpdateTurnDuration={updateTurnDuration}
     onReady={setReady} onExit={handleExit} messages={messages} onSend={sendChatMessage}
+    settings={<AutoDiscardToggle
+      enabled={room.autoDiscard !== false}
+      onChange={self?.isHost ? updateAutoDiscard : undefined}
+      disabled={connecting}
+      readOnlyNote="Lo define quien creó la sala."
+    />}
   >{dealing && <DealCountdownOverlay remainingMs={dealRemainingMs} />}</MultiplayerLobby>
 
   return (
@@ -215,7 +234,8 @@ function GuessWhoRoomSession() {
       <div className="guess-who-play-shell">
         <div className="mb-4 flex items-center justify-end gap-2">
           {copyFeedback && <span className="text-[11px] font-medium text-accent" role="status">{copyFeedback}</span>}
-          <button
+          {/* En solitario no hay a quién invitar: el código no sirve para nada. */}
+          {!againstBot && <button
             type="button"
             aria-label="Copiar código de sala"
             title="Copiar código de sala"
@@ -228,7 +248,7 @@ function GuessWhoRoomSession() {
             }}
           >
             <Copy className="h-4 w-4" strokeWidth={2} />
-          </button>
+          </button>}
           <button
             type="button"
             aria-label={soundEnabled ? 'Silenciar efectos de sonido' : 'Activar efectos de sonido'}
@@ -253,12 +273,12 @@ function GuessWhoRoomSession() {
           </button>
         </div>
 
-        {error && (
+        {pageError && (
           <p
             className="mb-4 rounded-lg border border-danger/35 bg-danger/10 px-[13px] py-[11px] text-sm leading-snug text-danger"
             role="alert"
           >
-            {error}
+            {pageError}
           </p>
         )}
 
@@ -367,12 +387,14 @@ function GuessWhoRoomSession() {
         </div>
         <ChatPanel
           inline
-          error={error}
+          error={pageError}
+          answerHint={answerHint}
           messages={room.guidedChat ?? []}
           selfUserId={self?.userId ?? null}
           onSend={sendChatMessage}
+          notice={againstBot ? BOT_CHAT_NOTICE : undefined}
           disconnected={connecting || dealing}
-          guided={room.phase === 'PLAYING' ? { cards: room.cards, questions: room.suggestedQuestions ?? [], pending: room.pendingQuestion ?? null, isMyTurn, onAsk: askQuestion, onAnswer: answerQuestion } : undefined}
+          guided={room.phase === 'PLAYING' ? { cards: room.cards, questions: room.suggestedQuestions ?? [], pending: room.pendingQuestion ?? null, isMyTurn, autoDiscard: room.autoDiscard !== false, onAsk: askQuestion, onAskFree: askFreeQuestion, opponentIsBot: againstBot, onAnswer: answerQuestion } : undefined}
         />
         </div>
       </div>

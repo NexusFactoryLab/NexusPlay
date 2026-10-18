@@ -30,6 +30,10 @@ type Props = {
   onExit: () => void
   messages: GuessWhoChatMessage[]
   onSend: (text: string) => void
+  /** Ajustes propios del juego, debajo de los segundos por turno (ej. descarte automático de ¿Quién Es?). */
+  settings?: ReactNode
+  /** Partida contra el bot: sin código, enlace, QR ni chat (no hay a quién invitar). */
+  solo?: boolean
   children?: ReactNode
 }
 
@@ -50,6 +54,8 @@ export function MultiplayerLobby({
   onExit,
   messages,
   onSend,
+  settings,
+  solo = false,
   children,
 }: Props) {
   const invitationUrl = new URL(roomPath, window.location.origin).href
@@ -143,7 +149,7 @@ export function MultiplayerLobby({
               </h2>
             </div>
             <div className="flex shrink-0 gap-2">
-              <button
+              {!solo && <button
                 type="button"
                 className="relative flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-[13px] font-medium text-text-h transition-colors hover:border-accent/50 hover:text-accent"
                 onClick={() => {
@@ -158,7 +164,7 @@ export function MultiplayerLobby({
                     {unreadCount > 9 ? '9+' : unreadCount}
                   </span>
                 )}
-              </button>
+              </button>}
               <button
                 type="button"
                 className="flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-[13px] font-medium text-text-h transition-colors hover:border-accent/50 hover:text-accent"
@@ -170,7 +176,7 @@ export function MultiplayerLobby({
             </div>
           </div>
 
-          <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border border-border bg-surface/90 p-3">
+          {!solo && <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border border-border bg-surface/90 p-3">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2 text-[12.5px] text-text">
                 <span className="font-medium text-text-h">Código de sala:</span>
@@ -206,7 +212,7 @@ export function MultiplayerLobby({
               <QRCodeSVG value={invitationUrl} size={104} level="M" marginSize={2} bgColor="#ffffff" fgColor="#000000" role="img" title={`Escanea para unirte a la sala ${room.code}`} />
               <figcaption className="text-center text-[10px] font-semibold text-accent">Escanea para unirte</figcaption>
             </figure>
-          </div>
+          </div>}
         </div>
 
         {error && (
@@ -295,6 +301,8 @@ export function MultiplayerLobby({
               </p>
             </div>
           )}
+
+          {settings}
 
           <LobbyReadyControl
             players={room.players}

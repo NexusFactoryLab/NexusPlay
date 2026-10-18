@@ -439,10 +439,11 @@ export function MatchBoard({
           </div>
         </div>
 
-        <div className={`guess-who-board-cards grid flex-1 grid-cols-3 gap-2.5 sm:grid-cols-4 ${!isMyTurn ? 'opacity-60' : ''}`}>
+        <div className="guess-who-board-cards grid flex-1 grid-cols-3 gap-2.5 sm:grid-cols-4">
           {cards.map((card, index) => {
             const discarded = self.discardedCardIds.includes(card.cardId)
-            const locked = !isMyTurn
+            // Tu tablero se puede ordenar en cualquier momento, también en el turno del rival (issue #64).
+            const locked = false
             return (
               <div key={card.cardId} className="relative">
                 <button

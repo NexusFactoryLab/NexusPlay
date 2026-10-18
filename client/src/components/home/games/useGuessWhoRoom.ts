@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { io, type Socket } from 'socket.io-client'
 import type { AccusationResult, GuessWhoChatMessage, RoomStateView } from './guessWhoTypes'
+import type { BotDifficulty } from './guessWhoBot'
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:3000'
 
@@ -80,6 +81,15 @@ export function useGuessWhoRoom(token: string | null) {
     socketRef.current?.emit('room:create', { gameId })
   }, [])
 
+  /** Sala en solitario contra el bot (issue #60): arranca sola, sin lobby que esperar. */
+  const createSoloRoom = useCallback((gameId: string, difficulty: BotDifficulty, autoDiscard: boolean) => {
+    socketRef.current?.emit('room:create-solo', { gameId, difficulty, autoDiscard })
+  }, [])
+
+  const updateAutoDiscard = useCallback((autoDiscard: boolean) => {
+    socketRef.current?.emit('room:update-auto-discard', { autoDiscard })
+  }, [])
+
   const joinRoom = useCallback((code: string) => {
     waitingCodeRef.current = code
     if (socketRef.current?.connected) socketRef.current.emit('room:join', { code })
@@ -118,6 +128,10 @@ export function useGuessWhoRoom(token: string | null) {
   const askQuestion = useCallback((questionId: string) => {
     if (socketRef.current?.connected) socketRef.current.emit('room:question', { questionId })
   }, [])
+  /** Pregunta propia de Sí/No (issue #64). */
+  const askFreeQuestion = useCallback((text: string) => {
+    if (socketRef.current?.connected) socketRef.current.emit('room:free-question', { text })
+  }, [])
   const answerQuestion = useCallback((requestId: string, answer: boolean) => {
     if (socketRef.current?.connected) socketRef.current.emit('room:answer', { requestId, answer })
   }, [])
@@ -131,6 +145,7 @@ export function useGuessWhoRoom(token: string | null) {
 
   return {
     askQuestion,
+    askFreeQuestion,
     answerQuestion,
     room,
     error,
@@ -141,6 +156,8 @@ export function useGuessWhoRoom(token: string | null) {
     clearLastFailedAccusation: () => setLastFailedAccusation(null),
     messages,
     createRoom,
+    createSoloRoom,
+    updateAutoDiscard,
     joinRoom,
     setReady,
     updateTurnDuration,

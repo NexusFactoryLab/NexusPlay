@@ -1,5 +1,6 @@
 import type { GuessWhoCard } from '../../application/content-validators/guess-who.content-validator.js';
-import type { PendingQuestion, GuidedMessage } from '../services/guided-questions.js';
+import type { PendingQuestion, GuidedMessage, GuidedAnswer } from '../services/guided-questions.js';
+import type { BotDifficulty } from './guess-who-bot-policy.port.js';
 
 export const ROOM_STORE = Symbol('ROOM_STORE');
 
@@ -15,6 +16,12 @@ export interface RoomPlayer {
   secretCardId: string | null;
   /** Ids de cartas que este jugador ya descartó de su propio tablero. */
   discardedCardIds: string[];
+  /**
+   * Presente solo en el bot de una partida en solitario (issue #60): no tiene
+   * socket propio (su `socketId` es un marcador que nunca coincide con una
+   * conexión real) y juega desde GuessWhoBotRunner.
+   */
+  bot?: { difficulty: BotDifficulty };
 }
 
 export interface RoomState {
@@ -40,6 +47,14 @@ export interface RoomState {
    * cuando ambos votan true.
    */
   rematchVotes: Record<string, boolean>;
+  /**
+   * Descarte automático (issue #64): si la respuesta descarta sola. Lo elige
+   * el anfitrión en el lobby (o quien crea la partida contra el bot).
+   * Sin definir = automático.
+   */
+  autoDiscard?: boolean;
+  /** Respuestas de la partida en curso, para deducir descartes. */
+  answerLog?: GuidedAnswer[];
   /** userId del jugador que tiene el turno actual (solo relevante en fase PLAYING). */
   activePlayerUserId: string | null;
   /**
