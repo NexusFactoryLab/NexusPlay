@@ -117,7 +117,7 @@ export function GameFormShell({
   description,
   descriptionDetail,
   aiPanel,
-  formMaxWidthClassName = 'max-w-[860px]',
+  formMaxWidthClassName = 'max-w-none',
   children,
 }: GameFormShellProps) {
   // Cuántas veces se aplicó un borrador de IA (0 = nunca): cada aplicación
@@ -445,25 +445,59 @@ export function GameFormShell({
     <AiFillStepContext.Provider value={onFillStep}>
     <FieldAssistContext.Provider value={assistValue}>
     <PhaseProgressContext.Provider value={progress}>
-    <div className={`relative mx-auto p-5 sm:p-8 ${stage === 'ai' ? 'max-w-[1180px] xl:max-w-[1440px] 2xl:max-w-[1680px]' : 'max-w-[920px]'}`}>
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-[32px]">
+    <div className={`relative mx-auto p-5 sm:p-8 ${stage === 'ai' ? 'max-w-[1180px] xl:max-w-[1440px] 2xl:max-w-[1680px]' : 'max-w-[1260px]'}`}>
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0">
         <div className="absolute -top-24 -right-16 h-80 w-80 rounded-full bg-accent/20 blur-[110px]" />
         <div className="absolute top-1/3 -right-44 h-[460px] w-[460px] rounded-full bg-accent-2/20 blur-[130px]" />
         <div className="absolute bottom-[-10%] left-[-8%] h-72 w-72 rounded-full bg-accent/10 blur-[100px]" />
       </div>
 
       <div className="relative">
-        {showBackButton && (
-          <button
-            type="button"
-            title={backLabel}
-            className="nx-back inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-[13px] font-semibold text-text-h shadow-sm hover:border-accent hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent mb-4"
-            onClick={handleBack}
+        {/* Barra superior: volver a la izquierda y, a su lado, el selector de
+            modo ("Con IA" y "Manual" son dos formas de crear el mismo juego,
+            no un "volver"), siempre visible. */}
+        <div className="mb-5 flex flex-wrap items-center gap-3">
+          {showBackButton && (
+            <button
+              type="button"
+              title={backLabel}
+              className="nx-back inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-[13px] font-semibold text-text-h shadow-sm hover:border-accent hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              onClick={handleBack}
+            >
+              <ArrowLeft className="nx-back-icon h-4 w-4" strokeWidth={2.5} />
+              {backLabel}
+            </button>
+          )}
+          <div
+            role="tablist"
+            aria-label="Cómo quieres crear el juego"
+            className="nx-seg relative inline-grid grid-cols-2 rounded-full border border-border bg-code-bg p-1"
           >
-            <ArrowLeft className="nx-back-icon h-4 w-4" strokeWidth={2.5} />
-            {backLabel}
-          </button>
-        )}
+            <span aria-hidden="true" className="nx-seg-thumb" data-stage={stage} />
+            <button
+              type="button"
+              role="tab"
+              aria-selected={stage === 'ai'}
+              className="nx-seg-tab"
+              data-active={stage === 'ai'}
+              onClick={() => stage !== 'ai' && goToStage('ai')}
+            >
+              <Sparkles className="h-4 w-4" strokeWidth={2.4} />
+              Con IA
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={stage === 'manual'}
+              className="nx-seg-tab"
+              data-active={stage === 'manual'}
+              onClick={() => stage !== 'manual' && goToStage('manual')}
+            >
+              <PencilLine className="h-4 w-4" strokeWidth={2.4} />
+              Manual
+            </button>
+          </div>
+        </div>
         <h2 ref={headingRef} tabIndex={-1} className="mb-1 text-[20px] tracking-tight text-text-h outline-none">
           {title}
         </h2>
@@ -476,44 +510,11 @@ export function GameFormShell({
           )}
         </p>
 
-        {/* Selector de modo: deja claro que "Con IA" y "Manual" son dos formas
-            de crear el mismo juego (no un "volver"), con la pestaña activa
-            siempre visible. */}
-        <div
-          role="tablist"
-          aria-label="Cómo quieres crear el juego"
-          className="nx-seg relative mb-6 inline-grid grid-cols-2 rounded-full border border-border bg-code-bg p-1"
-        >
-          <span aria-hidden="true" className="nx-seg-thumb" data-stage={stage} />
-          <button
-            type="button"
-            role="tab"
-            aria-selected={stage === 'ai'}
-            className="nx-seg-tab"
-            data-active={stage === 'ai'}
-            onClick={() => stage !== 'ai' && goToStage('ai')}
-          >
-            <Sparkles className="h-4 w-4" strokeWidth={2.4} />
-            Con IA
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={stage === 'manual'}
-            className="nx-seg-tab"
-            data-active={stage === 'manual'}
-            onClick={() => stage !== 'manual' && goToStage('manual')}
-          >
-            <PencilLine className="h-4 w-4" strokeWidth={2.4} />
-            Manual
-          </button>
-        </div>
-
         <div
           className={
             stage === 'ai'
               ? `${stageMotion} grid gap-6 lg:grid-cols-2 lg:items-stretch lg:gap-8`
-              : `${stageMotion} grid gap-6`
+              : `${stageMotion} grid gap-6 lg:grid-cols-[272px_minmax(0,1fr)] lg:items-start lg:gap-8`
           }
         >
           {/*
@@ -525,19 +526,28 @@ export function GameFormShell({
           <aside className={stage === 'ai' ? 'order-1' : 'hidden'} aria-hidden={stage !== 'ai'}>
             {aiPanel}
           </aside>
-          <div ref={formColumnRef} onInputCapture={markDirty} onChangeCapture={markDirty} onClickCapture={handleClickCapture} onKeyDown={handleKeyDown} className={`nx-form order-2 mx-auto w-full ${formMaxWidthClassName} ${stage === 'ai' ? 'hidden' : ''} ${filling || (entering && stage === 'manual') ? 'nx-fill' : ''}`}>
-            {stage === 'manual' && (
-              <div
-                className="nx-progress-card nx-celebrate"
-                title="Tip: Enter pasa al siguiente campo o agrega otro elemento; Ctrl + Enter avanza o crea."
-                data-complete={progressSummary.complete} data-celebrate={celebrate}>
+          {stage === 'manual' && (
+            <aside className="nx-rail order-1" aria-label="Avance del juego">
+              <div className="nx-progress-card nx-celebrate" data-complete={progressSummary.complete} data-celebrate={celebrate}>
                 <div className="nx-progress-row">
-                  <span aria-hidden="true" className="nx-celebrate-icon nx-progress-icon">
-                    {progressSummary.complete ? (
-                      <Check className="h-[18px] w-[18px]" strokeWidth={3} />
-                    ) : (
-                      <Gamepad2 className="h-[18px] w-[18px]" strokeWidth={2.2} />
-                    )}
+                  <span aria-hidden="true" className="nx-ring">
+                    <svg viewBox="0 0 56 56" width="56" height="56">
+                      <circle className="nx-ring-bg" cx="28" cy="28" r="24" />
+                      <circle
+                        className="nx-ring-fg"
+                        cx="28"
+                        cy="28"
+                        r="24"
+                        style={{ '--nx-fill': progressSummary.fraction } as React.CSSProperties}
+                      />
+                    </svg>
+                    <span className="nx-celebrate-icon nx-ring-icon">
+                      {progressSummary.complete ? (
+                        <Check className="h-5 w-5" strokeWidth={3} />
+                      ) : (
+                        <Gamepad2 className="h-5 w-5" strokeWidth={2.2} />
+                      )}
+                    </span>
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="nx-progress-title" data-empty={!previewTitle}>
@@ -545,12 +555,6 @@ export function GameFormShell({
                     </p>
                     <p className="nx-progress-sub">{title}</p>
                   </div>
-                  {progressSummary.label && (
-                    <span className="nx-progress-chip" data-complete={progressSummary.complete}>
-                      {progressSummary.complete && <Check className="h-3 w-3" strokeWidth={3.4} />}
-                      {progressSummary.label}
-                    </span>
-                  )}
                 </div>
                 {progressSummary.label && (
                   <div
@@ -564,11 +568,35 @@ export function GameFormShell({
                     <span style={{ '--nx-fill': progressSummary.fraction } as React.CSSProperties} />
                   </div>
                 )}
+                {progressSummary.label && (
+                  <span className="nx-progress-chip" data-complete={progressSummary.complete}>
+                    {progressSummary.complete && <Check className="h-3 w-3" strokeWidth={3.4} />}
+                    {progressSummary.label}
+                  </span>
+                )}
                 <span className="sr-only" role="status">
                   {progressSummary.complete ? 'Fase completa. Puedes continuar.' : ''}
                 </span>
               </div>
-            )}
+              {subPhase && (
+                <ol className="nx-steps" aria-label="Fases del formulario">
+                  {Array.from({ length: subPhase.totalPhases }, (_, index) => {
+                    const state = index + 1 < subPhase.phase ? 'done' : index + 1 === subPhase.phase ? 'current' : 'todo'
+                    return (
+                      <li key={index} data-state={state}>
+                        <span className="nx-step-dot">{state === 'done' ? <Check className="h-3 w-3" strokeWidth={3.4} /> : index + 1}</span>
+                        <span className="nx-step-text">{state === 'current' ? subPhase.phaseLabel : `Fase ${index + 1}`}</span>
+                      </li>
+                    )
+                  })}
+                </ol>
+              )}
+              <p className="nx-rail-tip">
+                <kbd>Enter</kbd> pasa al siguiente campo · <kbd>Ctrl</kbd>+<kbd>Enter</kbd> avanza o crea
+              </p>
+            </aside>
+          )}
+          <div ref={formColumnRef} onInputCapture={markDirty} onChangeCapture={markDirty} onClickCapture={handleClickCapture} onKeyDown={handleKeyDown} className={`nx-form order-2 w-full min-w-0 ${formMaxWidthClassName} ${stage === 'ai' ? 'hidden' : ''} ${filling || (entering && stage === 'manual') ? 'nx-fill' : ''}`}>
             {showAiNotice && (
               <div
                 ref={noticeRef}

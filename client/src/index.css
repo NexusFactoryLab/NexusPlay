@@ -2956,9 +2956,6 @@ code {
   animation: nx-stage-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 [data-nx-field][data-nx-invalid='true'] {
-  border-radius: 12px;
-  outline: 2px solid var(--color-danger);
-  outline-offset: 6px;
   animation: nx-shake 0.35s ease-in-out;
 }
 [data-nx-field][data-nx-invalid='true']::after {
@@ -3212,11 +3209,44 @@ code {
   color: var(--text);
 }
 .nx-card-body {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr));
+  align-items: start;
+  gap: 20px 22px;
   min-width: 0;
   counter-reset: nx-item;
+}
+/* Los campos fluyen en dos columnas cuando hay espacio; lo ancho (textos largos,
+ * listas, avisos, botones) ocupa la fila completa. */
+.nx-card-body > :is([data-nx-wide], p, button, ul, ol, [role='alert'], .nx-actions, .nx-subbox, .nx-collapsible, .nx-notice),
+.nx-card-body > :has(textarea) {
+  grid-column: 1 / -1;
+}
+/* Los saltos entre filas del formulario también respiran, y el contenido no tapa la barra fija. */
+.nx-form { padding-bottom: 12px; }
+.create-game-layout .app-main { overflow-x: clip; }
+@media (max-width: 1023px) {
+  .nx-form:has(.nx-sticky-actions) { padding-bottom: 88px; }
+}
+/* Vida visual: los campos de cada tarjeta entran en escalera y la tarjeta se
+ * eleva un poco al pasar el cursor. */
+@keyframes nx-field-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+.nx-card:not(.nx-card-bare) > .nx-card-body > * {
+  animation: nx-field-rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.nx-card-body > *:nth-child(1) { animation-delay: 80ms; }
+.nx-card-body > *:nth-child(2) { animation-delay: 140ms; }
+.nx-card-body > *:nth-child(3) { animation-delay: 200ms; }
+.nx-card-body > *:nth-child(n + 4) { animation-delay: 260ms; }
+.nx-card:not(.nx-card-bare) { transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease; }
+.nx-card:not(.nx-card-bare):focus-within { transform: translateY(-2px); }
+@media (prefers-reduced-motion: reduce) {
+  .nx-card:not(.nx-card-bare) > .nx-card-body > * { animation: none; }
+  .nx-card:not(.nx-card-bare) { transition: none; }
+  .nx-card:not(.nx-card-bare):focus-within { transform: none; }
 }
 .nx-card-bare {
   padding: 0;
@@ -3617,10 +3647,134 @@ code {
   0% { opacity: 0.9; transform: scale(0.99); }
   100% { opacity: 0; transform: scale(1.04); }
 }
-@media (min-width: 640px) {
-  .nx-progress-card { position: sticky; top: 8px; }
-}
 .nx-progress-row { display: flex; align-items: center; gap: 14px; }
+
+/* ---- Rail lateral (escritorio): avance, fases y atajos junto al formulario ---- */
+.nx-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  animation: nx-slide-left 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.nx-rail .nx-progress-card { margin-bottom: 0; }
+.nx-rail .nx-progress-card .nx-progress-chip { margin-top: 12px; }
+@media (min-width: 1024px) {
+  .nx-rail { position: sticky; top: 14px; }
+}
+@keyframes nx-slide-left {
+  from { opacity: 0; transform: translateX(-16px); }
+  to { opacity: 1; transform: none; }
+}
+.nx-ring {
+  position: relative;
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+}
+.nx-ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+.nx-ring-bg, .nx-ring-fg { fill: none; stroke-width: 5; }
+.nx-ring-bg { stroke: color-mix(in srgb, var(--text) 16%, transparent); }
+.nx-ring-fg {
+  stroke: var(--accent);
+  stroke-linecap: round;
+  stroke-dasharray: 150.8;
+  stroke-dashoffset: calc(150.8 * (1 - var(--nx-fill, 0)));
+  transition: stroke-dashoffset 0.7s cubic-bezier(0.22, 1, 0.36, 1), stroke 0.3s ease;
+}
+.nx-progress-card[data-complete='true'] .nx-ring-fg { stroke: var(--nx-ok); }
+.nx-ring-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+}
+.nx-progress-card[data-complete='true'] .nx-ring-icon {
+  background: linear-gradient(135deg, var(--nx-ok), color-mix(in srgb, var(--nx-ok) 55%, var(--accent)));
+}
+.nx-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 14px 16px;
+  list-style: none;
+  border: 1px solid var(--nx-card-border);
+  border-radius: 20px;
+  background: var(--nx-card-bg);
+  box-shadow: var(--nx-card-shadow);
+}
+.nx-steps li {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 7px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.nx-steps li + li::before {
+  content: '';
+  position: absolute;
+  left: 11px;
+  top: -9px;
+  width: 2px;
+  height: 14px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--text) 18%, transparent);
+}
+.nx-steps li[data-state='done']::before { background: var(--accent); }
+.nx-step-dot {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 2px solid color-mix(in srgb, var(--text) 25%, transparent);
+  font-size: 11.5px;
+  font-weight: 800;
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
+.nx-steps li[data-state='current'] { color: var(--text-h); }
+.nx-steps li[data-state='current'] .nx-step-dot {
+  border-color: transparent;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: 0 6px 14px -6px var(--accent);
+}
+.nx-steps li[data-state='done'] .nx-step-dot { border-color: transparent; color: #fff; background: var(--accent); }
+.nx-rail-tip {
+  display: none;
+  margin: 0;
+  padding: 0 4px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text);
+}
+.nx-rail-tip kbd {
+  padding: 1px 6px;
+  border: 1px solid var(--nx-card-border);
+  border-radius: 6px;
+  background: var(--nx-card-bg);
+  font: 600 11px/1.5 inherit;
+  color: var(--text-h);
+}
+@media (min-width: 1024px) {
+  .nx-rail-tip { display: block; }
+  /* La pastilla de fase de cada formulario ya la cubre el rail. */
+  .nx-form .nx-phase { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nx-rail { animation: none; }
+  .nx-ring-fg, .nx-step-dot { transition: none; }
+}
 .nx-progress-icon {
   display: grid;
   flex-shrink: 0;
