@@ -5,8 +5,6 @@ import {
   AiDraftAppliedContext,
   AiFillStepContext,
   AiGeneratingContext,
-  AiPanelVariantContext,
-  AiRequestChatContext,
   CreateSummaryContext,
   type CreateSummary,
 } from './aiDraftContext'
@@ -99,27 +97,16 @@ type GameFormShellProps = {
   descriptionDetail?: string
   /** El panel de <AiGameAssistantPanel /> ya configurado por el formulario. */
   aiPanel: ReactNode
-  /**
-   * Ancho máximo de la columna de campos en pantallas grandes. Por defecto
-   * ahora no limita (solo lg:max-w-none) — el grid ya reparte el espacio
-   * entre esta columna y el panel de IA, así que restringir el ancho acá
-   * solo dejaba espacio muerto en pantallas anchas (feedback tras probar el
-   * wizard multifase, issue #218).
-   */
+  /** Ancho máximo de la columna del formulario manual (centrada). */
   formMaxWidthClassName?: string
   children: ReactNode
 }
 
 /**
- * Layout compartido por los 7 formularios de creación de juego: antes cada
- * uno centraba una sola columna angosta (max-w-[640/680/760px]) dejando
- * mucho espacio vacío a los lados en pantallas anchas. Ahora el panel de IA
- * pasa a una columna lateral fija (sticky en desktop, arriba del formulario
- * en mobile) sobre un fondo con desenfoques de color, aprovechando ese
- * espacio en vez de dejarlo muerto. El contenedor exterior también crece con
- * la pantalla (xl/2xl) en vez de topar siempre en 1180px, para que en
- * monitores grandes el formulario "respire" en vez de quedar en una columna
- * angosta centrada — en mobile sigue siendo una sola columna apilada.
+ * Layout compartido por los formularios de creación de juego. Etapa "Con IA":
+ * chat grande + tarjeta "Llenar manualmente". Etapa "Manual": una sola columna
+ * centrada con tarjetas por sección y una barra de avance fija arriba; la
+ * vuelta al chat es solo el selector segmentado "Con IA | Manual".
  */
 export function GameFormShell({
   backLabel,
@@ -128,7 +115,7 @@ export function GameFormShell({
   description,
   descriptionDetail,
   aiPanel,
-  formMaxWidthClassName = 'lg:max-w-none',
+  formMaxWidthClassName = 'max-w-[860px]',
   children,
 }: GameFormShellProps) {
   // Cuántas veces se aplicó un borrador de IA (0 = nunca): cada aplicación
@@ -454,8 +441,6 @@ export function GameFormShell({
     <CreateSummaryContext.Provider value={setSummary}>
     <AiGeneratingContext.Provider value={setGenerating}>
     <AiFillStepContext.Provider value={onFillStep}>
-    <AiRequestChatContext.Provider value={() => goToStage('ai')}>
-    <AiPanelVariantContext.Provider value={stage === 'ai' ? 'inline' : 'compact'}>
     <FieldAssistContext.Provider value={assistValue}>
     <PhaseProgressContext.Provider value={progress}>
     <div className="relative mx-auto max-w-[1180px] p-5 sm:p-8 xl:max-w-[1440px] 2xl:max-w-[1680px]">
@@ -526,32 +511,19 @@ export function GameFormShell({
           className={
             stage === 'ai'
               ? `${stageMotion} grid gap-6 lg:grid-cols-2 lg:items-stretch lg:gap-8`
-              : `${stageMotion} grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-10 xl:grid-cols-[minmax(0,1fr)_380px]`
+              : `${stageMotion} grid gap-6`
           }
         >
           {/*
-            Antes esta columna entera tenía su propio max-height + scroll
-            interno (independiente del scroll de la página). Con muchos
-            archivos subidos, un solo evento de rueda "grande" (mouse/
-            trackpad con scroll acelerado) no siempre encadena el scroll
-            sobrante hacia el contenedor de la página — algunos navegadores/
-            dispositivos sí lo hacen con ticks pequeños, otros no con un
-            evento grande, así que el usuario podía quedar "atrapado" sin
-            poder bajar hasta el fondo del formulario. Ahora esta columna NO
-            tiene scroll propio (solo sticky): AiGameAssistantPanel es solo
-            un botón acá — su lista de archivos y el resto del chat viven en
-            un modal aparte, con su propio scroll — así que los botones y el
-            formulario de abajo siempre son alcanzables con el scroll normal
-            de la página.
+            El asistente de IA solo se ve en la etapa "Con IA". En manual
+            sigue montado pero oculto, para no perder el mensaje, los
+            archivos ni el borrador en curso al alternar con el selector
+            "Con IA | Manual" (la única vuelta al chat desde el formulario).
           */}
-          <aside
-            className={
-              stage === 'ai' ? 'order-1' : `order-1 lg:order-2 lg:sticky lg:top-8 ${entering ? 'nx-slide-in' : ''}`
-            }
-          >
+          <aside className={stage === 'ai' ? 'order-1' : 'hidden'} aria-hidden={stage !== 'ai'}>
             {aiPanel}
           </aside>
-          <div ref={formColumnRef} onInputCapture={markDirty} onChangeCapture={markDirty} onClickCapture={handleClickCapture} onKeyDown={handleKeyDown} className={`order-2 w-full lg:order-1 ${formMaxWidthClassName} ${stage === 'ai' ? 'hidden' : ''} ${filling || (entering && stage === 'manual') ? 'nx-fill' : ''}`}>
+          <div ref={formColumnRef} onInputCapture={markDirty} onChangeCapture={markDirty} onClickCapture={handleClickCapture} onKeyDown={handleKeyDown} className={`nx-form order-2 mx-auto w-full ${formMaxWidthClassName} ${stage === 'ai' ? 'hidden' : ''} ${filling || (entering && stage === 'manual') ? 'nx-fill' : ''}`}>
             {stage === 'manual' && (
               <div
                 className={`nx-celebrate mb-5 rounded-xl border border-border bg-surface px-4 py-3 ${progressSummary.complete ? 'border-accent/50' : ''}`}
@@ -718,8 +690,6 @@ export function GameFormShell({
     </div>
     </PhaseProgressContext.Provider>
     </FieldAssistContext.Provider>
-    </AiPanelVariantContext.Provider>
-    </AiRequestChatContext.Provider>
     </AiFillStepContext.Provider>
     </AiGeneratingContext.Provider>
     </CreateSummaryContext.Provider>

@@ -5,12 +5,9 @@ import { useAuth } from '../../../hooks/useAuth'
 import { useToast } from '../../../hooks/useToast'
 import { generateGameDraft, type GameDraft } from '../../../services/ai-game-assistant.service'
 import { ApiError } from '../../../utils/http'
-import { Modal } from './Modal'
 import {
   useAiFillStep,
-  useAiPanelVariant,
   useMarkAiDraftApplied,
-  useRequestAiChat,
   useSetAiGenerating,
 } from './aiDraftContext'
 
@@ -101,7 +98,7 @@ type AiGameAssistantPanelProps = {
 }
 
 /**
- * Botón que abre el asistente de IA para creación de juego, con una interfaz
+ * Asistente de IA para creación de juego, con una interfaz
  * tipo chat: un campo de texto para instrucciones (Enter para enviar), un
  * botón de clip para adjuntar archivos (o arrastrarlos y soltarlos encima
  * del recuadro, issue #234) y un botón de enviar. El profesor sube SUS
@@ -128,10 +125,8 @@ export function AiGameAssistantPanel({
   const { token } = useAuth()
   const { showToast } = useToast()
   const markAiDraftApplied = useMarkAiDraftApplied()
-  const inline = useAiPanelVariant() === 'inline'
   const setShellGenerating = useSetAiGenerating()
   const fillStep = useAiFillStep()
-  const requestChat = useRequestAiChat()
   const unmountedRef = useRef(false)
   useEffect(() => {
     unmountedRef.current = false
@@ -140,7 +135,6 @@ export function AiGameAssistantPanel({
     }
   }, [])
   const inputRef = useRef<HTMLInputElement>(null)
-  const [open, setOpen] = useState(false)
   const [files, setFiles] = useState<File[]>([])
   const [message, setMessage] = useState('')
   const [generating, setGenerating] = useState(false)
@@ -221,11 +215,6 @@ export function AiGameAssistantPanel({
     addFiles(Array.from(event.dataTransfer.files ?? []))
   }
 
-  function closeModal() {
-    if (generating) return
-    setOpen(false)
-  }
-
   async function handleGenerate() {
     if (!token || !canSend) return
     setGenerating(true)
@@ -266,7 +255,6 @@ export function AiGameAssistantPanel({
       )
       setFiles([])
       setMessage('')
-      setOpen(false)
       setAnnounce('Listo: la IA terminó de armar el juego. Revisa los campos y completa lo pendiente.')
     } catch (err) {
       if (controller.signal.aborted) {
@@ -305,17 +293,6 @@ export function AiGameAssistantPanel({
                 <p className="text-[12px] text-text">Escribe el tema o sube tus archivos</p>
               </div>
             </div>
-            {!inline && (
-              <button
-                type="button"
-                aria-label="Cerrar"
-                className="shrink-0 rounded-lg p-1.5 text-text transition-colors hover:bg-code-bg hover:text-text-h disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={generating}
-                onClick={closeModal}
-              >
-                <X className="h-5 w-5" strokeWidth={2} />
-              </button>
-            )}
           </div>
 
           <p className="mb-3 text-[12.5px] leading-snug text-text">
@@ -468,32 +445,9 @@ export function AiGameAssistantPanel({
     </>
   )
 
-  if (inline) {
-    return (
-      <div className="rounded-2xl border-2 border-accent/40 bg-surface p-5 shadow-[0_20px_50px_-24px_var(--accent)] sm:p-7">
-        {chatBody}
-      </div>
-    )
-  }
-
   return (
-    <>
-      <button
-        type="button"
-        className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-[13.5px] font-semibold text-white shadow-[0_10px_24px_-10px_var(--accent)] transition-transform disabled:cursor-not-allowed disabled:opacity-60 hover:not-disabled:-translate-y-0.5"
-        style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
-        disabled={disabled}
-        onClick={() => (requestChat ? requestChat() : setOpen(true))}
-      >
-        <Sparkles className="h-4 w-4" strokeWidth={2.5} />
-        Generar con IA
-      </button>
-
-      {open && (
-        <Modal onClose={closeModal} maxWidthClassName="max-w-[520px]" ariaLabel="Generar con IA">
-          {chatBody}
-        </Modal>
-      )}
-    </>
+    <div className="rounded-2xl border-2 border-accent/40 bg-surface p-5 shadow-[0_20px_50px_-24px_var(--accent)] sm:p-7">
+      {chatBody}
+    </div>
   )
 }

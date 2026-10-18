@@ -397,8 +397,7 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
       onBack={onBack}
       title="Dúo Lógico"
       description="Fuego y Agua recorren el mismo mapa y se necesitan para avanzar."
-      descriptionDetail="Cada rol queda bloqueado por casillas del otro. Al final arman juntos un concepto ensamblando lo que cada uno recolectó."
-      formMaxWidthClassName="lg:max-w-[760px]"
+      descriptionDetail="Cada rol queda bloqueado por casillas del otro. Al final arman juntos un concepto ensamblando lo que cada uno recolectó."
       aiPanel={<AiGameAssistantPanel gameType="DUAL_QUEST" disabled={submitting} onDraftReady={applyAiDraft} />}
     >
       <form className="flex flex-col gap-[16px]" onSubmit={handleSubmit} noValidate>
