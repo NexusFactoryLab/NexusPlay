@@ -7,8 +7,14 @@ import {
   draftResumePath,
   draftTypeLabel,
   findCachedAiResult,
+  MAX_CREATION_DRAFTS,
+  classifySaveError,
+  expiryNotice,
   initialTouched,
   isStoredFile,
+  relativeTimeEs,
+  saveErrorMessage,
+  sortDraftsNewestFirst,
   materializeFiles,
   savedList,
   savedString,
@@ -79,6 +85,58 @@ describe('materializeFiles', () => {
     const stored = createStoredFile({ filename: 'a.pdf', mimeType: 'x', sizeBytes: 1, url: 'https://cdn/a' })
     const fetcher = vi.fn(async () => new Response('', { status: 404 })) as unknown as typeof fetch
     await expect(materializeFiles([stored], fetcher)).rejects.toThrow()
+  })
+})
+
+describe('lista de borradores: orden, tiempo relativo y vencimiento', () => {
+  const now = new Date('2026-10-18T12:00:00Z')
+  const ago = (ms: number) => new Date(now.getTime() - ms).toISOString()
+  const HOUR = 60 * 60 * 1000
+  const DAY = 24 * HOUR
+
+  it('ordena del más reciente al más antiguo sin tocar la lista original', () => {
+    const list = [
+      { id: 'a', updatedAt: ago(3 * DAY) },
+      { id: 'b', updatedAt: ago(HOUR) },
+      { id: 'c', updatedAt: ago(DAY) },
+    ]
+    expect(sortDraftsNewestFirst(list).map((d) => d.id)).toEqual(['b', 'c', 'a'])
+    expect(list.map((d) => d.id)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('formatea el tiempo relativo en español', () => {
+    expect(relativeTimeEs(ago(10 * 1000), now)).toBe('hace un momento')
+    expect(relativeTimeEs(ago(5 * 60 * 1000), now)).toBe('hace 5 min')
+    expect(relativeTimeEs(ago(3 * HOUR), now)).toBe('hace 3 h')
+    expect(relativeTimeEs(ago(DAY), now)).toBe('hace 1 día')
+    expect(relativeTimeEs(ago(2 * DAY + HOUR), now)).toBe('hace 2 días')
+  })
+
+  it('avisa el vencimiento solo cuando faltan 2 días o menos de los 7', () => {
+    expect(expiryNotice(ago(4 * DAY), now)).toBeNull()
+    expect(expiryNotice(ago(4 * DAY + HOUR), now)).toBeNull()
+    expect(expiryNotice(ago(5 * DAY + HOUR), now)).toBe('Vence en 2 días')
+    expect(expiryNotice(ago(6 * DAY), now)).toBe('Vence en 1 día')
+    expect(expiryNotice(ago(6 * DAY + 23 * HOUR), now)).toBe('Vence hoy')
+  })
+
+  it('el tope es de 5 borradores', () => {
+    expect(MAX_CREATION_DRAFTS).toBe(5)
+  })
+})
+
+describe('fallos del autoguardado', () => {
+  it('distingue el tope de borradores (409) de otros fallos', () => {
+    expect(classifySaveError({ status: 409 })).toBe('limit')
+    expect(classifySaveError({ status: 500 })).toBe('other')
+    expect(classifySaveError(new Error('red'))).toBe('other')
+  })
+
+  it('usa el mensaje del servidor para el tope y uno genérico para lo demás', () => {
+    expect(saveErrorMessage('limit', new Error('Alcanzaste el máximo de 5 borradores.'))).toBe(
+      'Alcanzaste el máximo de 5 borradores.',
+    )
+    expect(saveErrorMessage('other', new Error('x'))).toMatch(/No se pudo guardar el borrador/)
   })
 })
 

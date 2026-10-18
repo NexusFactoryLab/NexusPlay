@@ -1,4 +1,4 @@
-import { request } from '../utils/http'
+import { ApiError, request } from '../utils/http'
 import type { GameDraft } from './ai-game-assistant.service'
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:3000'
@@ -71,7 +71,14 @@ export async function saveCreationDraftAi(
     credentials: 'include',
     body: formData,
   })
-  if (!response.ok) throw new Error('No se pudo guardar el borrador de la IA.')
+  if (!response.ok) {
+    const payload: unknown = await response.json().catch(() => null)
+    const message =
+      payload && typeof payload === 'object' && typeof (payload as { message?: unknown }).message === 'string'
+        ? (payload as { message: string }).message
+        : 'No se pudo guardar el borrador de la IA.'
+    throw new ApiError(message, response.status)
+  }
 }
 
 /** Descartar: el servidor borra el borrador, sus archivos y sus imágenes. */

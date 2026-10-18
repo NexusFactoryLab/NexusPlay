@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import {
   DRAFT_RETENTION_DAYS,
+  MAX_DRAFTS_PER_USER,
   GameCreationDraftService,
 } from './game-creation-draft.service.js';
 import type {
@@ -9,7 +10,10 @@ import type {
   GameCreationDraftRepository,
 } from '../../domain/ports/game-creation-draft.repository.port.js';
 import type { DraftAssetStorage } from '../../domain/ports/draft-asset-storage.port.js';
-import { GameCreationDraftNotFoundError } from '../errors/application.errors.js';
+import {
+  GameCreationDraftLimitError,
+  GameCreationDraftNotFoundError,
+} from '../errors/application.errors.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -124,6 +128,44 @@ describe('GameCreationDraftService', () => {
         gameName: 'Mi dominó',
       });
       expect(list.find((d) => d.id === ID_B)?.gameName).toBe('Título de la IA');
+    });
+  });
+
+  describe('tope de borradores por persona', () => {
+    const idFor = (n: number) => `00000000-0000-4000-8000-00000000000${n}`;
+
+    it('rechaza un borrador nuevo cuando ya hay 5, en formulario y en IA', async () => {
+      for (let n = 1; n <= MAX_DRAFTS_PER_USER; n++) {
+        await service.saveFormState('u1', idFor(n), 'DOMINO', '', { title: `j${n}` });
+      }
+
+      await expect(service.saveFormState('u1', idFor(6), 'DOMINO', '', {})).rejects.toBeInstanceOf(
+        GameCreationDraftLimitError,
+      );
+      await expect(
+        service.saveAiResult('u1', idFor(7), 'DOMINO', '', { config: {}, content: [] }, null, []),
+      ).rejects.toThrow(/máximo de 5 borradores/);
+      expect(assets.uploaded).toEqual([]);
+    });
+
+    it('sigue permitiendo guardar un borrador que ya existe', async () => {
+      for (let n = 1; n <= MAX_DRAFTS_PER_USER; n++) {
+        await service.saveFormState('u1', idFor(n), 'DOMINO', '', { title: `j${n}` });
+      }
+
+      await service.saveFormState('u1', idFor(3), 'DOMINO', '', { title: 'editado' });
+
+      expect((await service.get('u1', idFor(3))).formState).toEqual({ title: 'editado' });
+    });
+
+    it('el tope es por persona y se libera al descartar o completar', async () => {
+      for (let n = 1; n <= MAX_DRAFTS_PER_USER; n++) {
+        await service.saveFormState('u1', idFor(n), 'DOMINO', '', {});
+      }
+      await expect(service.saveFormState('u2', idFor(8), 'DOMINO', '', {})).resolves.toBeUndefined();
+
+      await service.discard('u1', idFor(1));
+      await expect(service.saveFormState('u1', idFor(6), 'DOMINO', '', {})).resolves.toBeUndefined();
     });
   });
 

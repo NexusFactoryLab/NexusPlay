@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Loader2, Trash2 } from 'lucide-react'
+import { Bot, Dices, Flame, Ghost, Layers, Loader2, Puzzle, Trash2, UserRoundSearch } from 'lucide-react'
 import { useAuth } from '../../../hooks/useAuth'
 import { useToast } from '../../../hooks/useToast'
 import {
@@ -9,23 +9,35 @@ import {
   type CreationDraftSummary,
 } from '../../../services/game-creation-draft.service'
 import { Modal } from './Modal'
-import { draftResumePath, draftTypeLabel } from './creationDraftSupport'
+import { modeColorForGameType } from './gameModeVisuals'
+import {
+  MAX_CREATION_DRAFTS,
+  draftResumePath,
+  draftTypeLabel,
+  expiryNotice,
+  relativeTimeEs,
+  sortDraftsNewestFirst,
+} from './creationDraftSupport'
 
 type CreationDraftsModalProps = {
   onClose: () => void
 }
 
-function formatUpdatedAt(value: string): string {
-  const date = new Date(value)
-  return Number.isNaN(date.getTime())
-    ? ''
-    : date.toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short' })
+const ICON_BY_GAME_TYPE: Record<string, typeof Layers> = {
+  MEMORY_MATCH: Layers,
+  GUESS_WHO: UserRoundSearch,
+  DOMINO: Puzzle,
+  MAZE_COLLECTOR: Ghost,
+  SNAKES_LADDERS: Dices,
+  DUAL_QUEST: Flame,
+  TRUE_FALSE_MAZE: Bot,
 }
 
 /**
- * "Ver borradores" (issue #69): resumen de los borradores de creación de la
- * persona, con Continuar (abre el formulario con todo restaurado) y Descartar
- * (borra el borrador y sus archivos). Los borradores vencen a los 7 días.
+ * "Ver borradores" (issue #69): borradores de creación de la persona (máximo
+ * 5), del más reciente al más antiguo, con Continuar (abre el formulario con
+ * todo restaurado) y Descartar (con confirmación en la propia fila). Los
+ * borradores vencen a los 7 días sin cambios.
  */
 export function CreationDraftsModal({ onClose }: CreationDraftsModalProps) {
   const { token } = useAuth()
@@ -33,13 +45,14 @@ export function CreationDraftsModal({ onClose }: CreationDraftsModalProps) {
   const navigate = useNavigate()
   const [drafts, setDrafts] = useState<CreationDraftSummary[] | null>(null)
   const [failed, setFailed] = useState(false)
+  const [confirmingId, setConfirmingId] = useState<string | null>(null)
   const [discardingId, setDiscardingId] = useState<string | null>(null)
 
   const load = useCallback(() => {
     if (!token) return
     setFailed(false)
     listCreationDrafts(token)
-      .then(setDrafts)
+      .then((items) => setDrafts(sortDraftsNewestFirst(items)))
       .catch(() => setFailed(true))
   }, [token])
 
@@ -53,6 +66,7 @@ export function CreationDraftsModal({ onClose }: CreationDraftsModalProps) {
     try {
       await discardCreationDraft(token, draft.id)
       setDrafts((current) => (current ?? []).filter((item) => item.id !== draft.id))
+      setConfirmingId(null)
     } catch {
       showToast('No se pudo descartar el borrador.', 'error')
     } finally {
@@ -60,11 +74,21 @@ export function CreationDraftsModal({ onClose }: CreationDraftsModalProps) {
     }
   }
 
+  const now = new Date()
+
   return (
-    <Modal onClose={onClose} maxWidthClassName="max-w-[560px]" ariaLabel="Borradores de juegos">
-      <h3 className="mb-1 text-[17px] font-semibold text-text-h">Tus borradores</h3>
+    <Modal onClose={onClose} maxWidthClassName="max-w-[600px]" ariaLabel="Borradores de juegos">
+      <div className="mb-1 flex items-baseline justify-between gap-3">
+        <h3 className="text-[17px] font-semibold text-text-h">Tus borradores</h3>
+        {drafts && (
+          <span className="text-[12.5px] font-medium text-text" aria-live="polite">
+            {drafts.length} de {MAX_CREATION_DRAFTS} borradores
+          </span>
+        )}
+      </div>
       <p className="mb-4 text-[13px] text-text">
-        Lo que dejaste a medias se guarda solo. Los borradores se eliminan a los 7 días sin cambios.
+        Lo que dejaste a medias se guarda solo. Puedes tener hasta {MAX_CREATION_DRAFTS} y se eliminan a los 7 días sin
+        cambios.
       </p>
 
       {drafts === null && !failed && (
@@ -83,38 +107,74 @@ export function CreationDraftsModal({ onClose }: CreationDraftsModalProps) {
       {drafts?.length === 0 && <p className="text-[13.5px] text-text">No tienes borradores guardados.</p>}
 
       {drafts && drafts.length > 0 && (
-        <ul className="flex flex-col gap-2">
-          {drafts.map((draft) => (
-            <li
-              key={draft.id}
-              className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface px-3.5 py-3"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[14px] font-semibold text-text-h">
-                  {draft.gameName || 'Juego sin nombre'}
-                </p>
-                <p className="text-[12px] text-text">
-                  {draftTypeLabel(draft.gameType, draft.mode)} · Última modificación: {formatUpdatedAt(draft.updatedAt)}
-                </p>
-              </div>
-              <button
-                type="button"
-                className="rounded-lg bg-accent px-3.5 py-1.5 text-[13px] font-semibold text-white"
-                onClick={() => navigate(draftResumePath(draft))}
+        <ul className="flex max-h-[60vh] flex-col gap-2 overflow-y-auto pr-1">
+          {drafts.map((draft) => {
+            const Icon = ICON_BY_GAME_TYPE[draft.gameType] ?? Layers
+            const notice = expiryNotice(draft.updatedAt, now)
+            const confirming = confirmingId === draft.id
+            return (
+              <li
+                key={draft.id}
+                className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface px-3.5 py-3"
               >
-                Continuar
-              </button>
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-[13px] font-medium text-text-h hover:border-danger hover:text-danger disabled:opacity-60"
-                disabled={discardingId === draft.id}
-                onClick={() => void handleDiscard(draft)}
-              >
-                <Trash2 className="h-3.5 w-3.5" strokeWidth={2.2} />
-                Descartar
-              </button>
-            </li>
-          ))}
+                <span
+                  aria-hidden="true"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-white"
+                  style={{ background: modeColorForGameType(draft.gameType) }}
+                >
+                  <Icon className="h-5 w-5" strokeWidth={2} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[14px] font-semibold text-text-h">
+                    {draft.gameName || 'Juego sin nombre'}
+                  </p>
+                  <p className="text-[12px] text-text">
+                    {draftTypeLabel(draft.gameType, draft.mode)} · {relativeTimeEs(draft.updatedAt, now)}
+                  </p>
+                  {notice && <p className="text-[12px] font-semibold text-danger">{notice}</p>}
+                </div>
+                {confirming ? (
+                  <div className="flex items-center gap-2" role="group" aria-label="Confirmar descarte">
+                    <span className="text-[13px] font-medium text-text-h">¿Descartar?</span>
+                    <button
+                      type="button"
+                      className="rounded-lg bg-danger px-3 py-1.5 text-[13px] font-semibold text-white disabled:opacity-60"
+                      disabled={discardingId === draft.id}
+                      onClick={() => void handleDiscard(draft)}
+                    >
+                      Sí
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-lg border border-border px-3 py-1.5 text-[13px] font-medium text-text-h"
+                      disabled={discardingId === draft.id}
+                      onClick={() => setConfirmingId(null)}
+                    >
+                      No
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className="rounded-lg bg-accent px-3.5 py-1.5 text-[13px] font-semibold text-white"
+                      onClick={() => navigate(draftResumePath(draft))}
+                    >
+                      Continuar
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-[13px] font-medium text-text-h hover:border-danger hover:text-danger"
+                      onClick={() => setConfirmingId(draft.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" strokeWidth={2.2} />
+                      Descartar
+                    </button>
+                  </>
+                )}
+              </li>
+            )
+          })}
         </ul>
       )}
     </Modal>

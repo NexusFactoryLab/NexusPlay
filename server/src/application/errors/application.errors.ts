@@ -65,6 +65,14 @@ export class GameCreationDraftNotFoundError extends ApplicationError {
   }
 }
 
+export class GameCreationDraftLimitError extends ApplicationError {
+  constructor(limit: number) {
+    super(
+      `Alcanzaste el máximo de ${limit} borradores. Descarta uno desde "Ver borradores" para guardar este.`,
+    );
+  }
+}
+
 export class GameImportJobNotFoundError extends ApplicationError {
   constructor(jobId: string) {
     super(`No se encontró un trabajo de importación con id "${jobId}".`);

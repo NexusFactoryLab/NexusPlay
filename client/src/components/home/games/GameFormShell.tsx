@@ -12,8 +12,11 @@ import {
 import {
   buildAiCache,
   findCachedAiResult,
+  classifySaveError,
   initialTouched,
+  saveErrorMessage,
   shouldAutosave,
+  type SaveErrorKind,
   type AiResultCache,
 } from './creationDraftSupport'
 import {
@@ -28,6 +31,7 @@ import {
   type CreateSummary,
 } from './aiDraftContext'
 import { Modal } from './Modal'
+import { CreationDraftsModal } from './CreationDraftsModal'
 import { useOptionalCreateGameProgress } from './create/CreateGameProgressContext'
 import {
   FieldAssistContext,
@@ -207,13 +211,33 @@ export function GameFormShell({
   })
   const draftStateKey = JSON.stringify(draftState)
 
+  // Fallos del autoguardado: se avisa UNA vez por tipo de fallo (sin spamear) y,
+  // si es el tope de borradores, se ofrece ir a "Ver borradores" para descartar uno.
+  const [limitReached, setLimitReached] = useState(false)
+  const [showDrafts, setShowDrafts] = useState(false)
+  const saveErrorShown = useRef<SaveErrorKind | null>(null)
+  const handleSaveError = useCallback(
+    (error: unknown) => {
+      const kind = classifySaveError(error)
+      if (kind === 'limit') setLimitReached(true)
+      if (saveErrorShown.current === kind) return
+      saveErrorShown.current = kind
+      showToast(saveErrorMessage(kind, error), 'error', 8000)
+    },
+    [showToast],
+  )
+  const handleSaveOk = useCallback(() => {
+    saveErrorShown.current = null
+    setLimitReached(false)
+  }, [])
+
   const saveFormNow = useCallback(() => {
     saveTimer.current = null
     if (!token || !draftGameType || !persistReady.current) return
-    void saveCreationDraftForm(token, draftId, draftGameType, draftMode, draftStateRef.current).catch(
-      () => undefined,
-    )
-  }, [token, draftId, draftGameType, draftMode])
+    saveCreationDraftForm(token, draftId, draftGameType, draftMode, draftStateRef.current)
+      .then(handleSaveOk)
+      .catch(handleSaveError)
+  }, [token, draftId, draftGameType, draftMode, handleSaveOk, handleSaveError])
 
   const scheduleFormSave = useCallback(
     (delayMs: number) => {
@@ -277,13 +301,13 @@ export function GameFormShell({
         aiCache.current = buildAiCache(message, files, result)
         touched.current = true
         if (token && draftGameType) {
-          void saveCreationDraftAi(token, draftId, draftGameType, draftMode, result, message, files).catch(
-            () => undefined,
-          )
+          saveCreationDraftAi(token, draftId, draftGameType, draftMode, result, message, files)
+            .then(handleSaveOk)
+            .catch(handleSaveError)
         }
       },
     }),
-    [aiRestore, token, draftId, draftGameType, draftMode],
+    [aiRestore, token, draftId, draftGameType, draftMode, handleSaveOk, handleSaveError],
   )
 
   const uploadInfo = useMemo<DraftUploadInfo>(
@@ -740,6 +764,22 @@ export function GameFormShell({
             </button>
           </div>
         </div>
+        {limitReached && (
+          <div role="alert" className="nx-notice mb-4">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-danger" strokeWidth={2.2} />
+            <p className="flex-1">
+              <strong>Este juego no se está guardando como borrador.</strong> Ya tienes el máximo de borradores.
+              Descarta uno para que este se guarde solo.
+            </p>
+            <button
+              type="button"
+              className="shrink-0 rounded-lg bg-accent px-3 py-1.5 text-[13px] font-semibold text-white"
+              onClick={() => setShowDrafts(true)}
+            >
+              Ver borradores
+            </button>
+          </div>
+        )}
         <h2 ref={headingRef} tabIndex={-1} className="mb-1 text-[20px] tracking-tight text-text-h outline-none">
           {title}
         </h2>
@@ -922,6 +962,15 @@ export function GameFormShell({
           )}
         </div>
       </div>
+      {showDrafts && (
+        <CreationDraftsModal
+          onClose={() => {
+            setShowDrafts(false)
+            // Si se descartó uno, se reintenta guardar este borrador de inmediato.
+            scheduleFormSave(0)
+          }}
+        />
+      )}
       {confirmLeave && (
         <Modal onClose={() => setConfirmLeave(false)} maxWidthClassName="max-w-[400px]" ariaLabel="¿Salir sin guardar?">
           <h3 className="mb-1 text-[17px] font-semibold text-text-h">¿Salir sin terminar?</h3>

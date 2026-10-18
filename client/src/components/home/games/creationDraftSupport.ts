@@ -4,6 +4,62 @@ import type { CreationDraftFileInfo } from '../../../services/game-creation-draf
 /** Query param con el que "Continuar" abre un formulario con un borrador guardado. */
 export const DRAFT_QUERY_PARAM = 'borrador'
 
+// --- Lista de borradores: tope, tiempo relativo y vencimiento -----------------
+
+/** Máximo de borradores por persona (el servidor lo aplica; aquí solo se muestra). */
+export const MAX_CREATION_DRAFTS = 5
+/** Días sin cambios tras los que un borrador se elimina (igual que el servidor). */
+export const DRAFT_RETENTION_DAYS = 7
+/** Desde cuántos días restantes se avisa "Vence en…". */
+export const EXPIRY_WARNING_DAYS = 2
+
+const MINUTE_MS = 60 * 1000
+const HOUR_MS = 60 * MINUTE_MS
+const DAY_MS = 24 * HOUR_MS
+
+/** Del más reciente al más antiguo (no modifica la lista recibida). */
+export function sortDraftsNewestFirst<T extends { updatedAt: string }>(drafts: T[]): T[] {
+  return [...drafts].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+}
+
+/** "hace un momento", "hace 5 min", "hace 3 h", "hace 2 días". */
+export function relativeTimeEs(updatedAt: string, now: Date = new Date()): string {
+  const diff = Math.max(0, now.getTime() - new Date(updatedAt).getTime())
+  if (diff < MINUTE_MS) return 'hace un momento'
+  if (diff < HOUR_MS) return `hace ${Math.floor(diff / MINUTE_MS)} min`
+  if (diff < DAY_MS) return `hace ${Math.floor(diff / HOUR_MS)} h`
+  const days = Math.floor(diff / DAY_MS)
+  return days === 1 ? 'hace 1 día' : `hace ${days} días`
+}
+
+/** Aviso "Vence en N días" cuando faltan 2 días o menos; `null` si aún falta más. */
+export function expiryNotice(updatedAt: string, now: Date = new Date()): string | null {
+  const remaining = new Date(updatedAt).getTime() + DRAFT_RETENTION_DAYS * DAY_MS - now.getTime()
+  if (remaining > EXPIRY_WARNING_DAYS * DAY_MS) return null
+  if (remaining < DAY_MS) return 'Vence hoy'
+  const days = Math.ceil(remaining / DAY_MS)
+  return days === 1 ? 'Vence en 1 día' : `Vence en ${days} días`
+}
+
+// --- Fallos del autoguardado -------------------------------------------------
+
+export type SaveErrorKind = 'limit' | 'other'
+
+/** El servidor responde 409 cuando ya hay 5 borradores y este sería uno nuevo. */
+export function classifySaveError(error: unknown): SaveErrorKind {
+  return typeof error === 'object' && error !== null && (error as { status?: unknown }).status === 409
+    ? 'limit'
+    : 'other'
+}
+
+export function saveErrorMessage(kind: SaveErrorKind, error: unknown): string {
+  if (kind === 'limit') {
+    const message = error instanceof Error ? error.message : ''
+    return message || `Alcanzaste el máximo de ${MAX_CREATION_DRAFTS} borradores. Descarta uno desde "Ver borradores".`
+  }
+  return 'No se pudo guardar el borrador automáticamente. Revisa tu conexión; lo seguiremos intentando.'
+}
+
 // --- Cuándo se autoguarda ----------------------------------------------------
 
 /**

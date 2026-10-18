@@ -10,7 +10,13 @@ import {
   draftTag,
   type DraftAssetStorage,
 } from '../../domain/ports/draft-asset-storage.port.js';
-import { GameCreationDraftNotFoundError } from '../errors/application.errors.js';
+import {
+  GameCreationDraftLimitError,
+  GameCreationDraftNotFoundError,
+} from '../errors/application.errors.js';
+
+/** Máximo de borradores guardados por persona. */
+export const MAX_DRAFTS_PER_USER = 5;
 
 /** Días sin modificarse tras los cuales un borrador (y sus archivos) se elimina. */
 export const DRAFT_RETENTION_DAYS = 7;
@@ -164,9 +170,15 @@ export class GameCreationDraftService {
     return report;
   }
 
+  /** Guardar uno existente siempre se permite; uno nuevo solo si no se llegó al tope. */
   private async assertNotOwnedByOther(userId: string, id: string): Promise<void> {
     const existing = await this.drafts.findById(id);
-    if (existing && existing.userId !== userId) throw new GameCreationDraftNotFoundError();
+    if (existing) {
+      if (existing.userId !== userId) throw new GameCreationDraftNotFoundError();
+      return;
+    }
+    const owned = await this.drafts.findByUser(userId);
+    if (owned.length >= MAX_DRAFTS_PER_USER) throw new GameCreationDraftLimitError(MAX_DRAFTS_PER_USER);
   }
 }
 
