@@ -19,6 +19,10 @@ type ItemGridEditorProps = {
   tileText: (index: number) => string
   /** Miniatura de la tarjeta; sin imagen se muestra un marcador. */
   tileImage?: (index: number) => string | null | undefined
+  /** Miniatura propia (p. ej. ícono con color); tiene prioridad sobre `tileImage`. */
+  tileVisual?: (index: number) => ReactNode
+  /** Tope de elementos: al alcanzarlo se oculta "Agregar". */
+  maxItems?: number
   /** Campos del elemento seleccionado. */
   renderEditor: (index: number) => ReactNode
 }
@@ -43,6 +47,8 @@ export function ItemGridEditor({
   isComplete,
   tileText,
   tileImage,
+  tileVisual,
+  maxItems,
   renderEditor,
 }: ItemGridEditorProps) {
   const [touched, setTouched] = useState(false)
@@ -110,7 +116,13 @@ export function ItemGridEditor({
               >
                 <span className="nx-gi-num" aria-hidden="true">{index + 1}</span>
                 <span className="nx-gi-thumb" aria-hidden="true">
-                  {image ? <img src={image} alt="" loading="lazy" /> : <ImageOff className="h-5 w-5" strokeWidth={1.8} />}
+                  {tileVisual ? (
+                    tileVisual(index)
+                  ) : image ? (
+                    <img src={image} alt="" loading="lazy" />
+                  ) : (
+                    <ImageOff className="h-5 w-5" strokeWidth={1.8} />
+                  )}
                 </span>
                 <span className="nx-gi-name">{text || 'Sin nombre'}</span>
                 <span className="nx-gi-status" aria-hidden="true">
@@ -119,10 +131,12 @@ export function ItemGridEditor({
               </button>
             )
           })}
-          <button type="button" className="nx-gi-add" disabled={disabled} onClick={add}>
-            <Plus className="h-5 w-5" strokeWidth={2.6} aria-hidden="true" />
-            {addLabel}
-          </button>
+          {(maxItems === undefined || count < maxItems) && (
+            <button type="button" className="nx-gi-add" disabled={disabled} onClick={add}>
+              <Plus className="h-5 w-5" strokeWidth={2.6} aria-hidden="true" />
+              {addLabel}
+            </button>
+          )}
         </div>
 
         <div className="nx-gi-panel nx-item" ref={panelRef} data-nx-nocount>
