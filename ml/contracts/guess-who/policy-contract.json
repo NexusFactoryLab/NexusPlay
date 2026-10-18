@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "maxQuestions": 6,
+  "maxCards": 60,
+  "minDiscardsBeforeAccusation": 3,
+  "features": [
+    "remaining",
+    "opponentRemaining",
+    "guessChance",
+    "opponentGuessChance",
+    "canAccuse",
+    "askedThisTurn",
+    "question0Available",
+    "question1Available",
+    "question2Available",
+    "question3Available",
+    "question4Available",
+    "question5Available",
+    "question0YesFraction",
+    "question1YesFraction",
+    "question2YesFraction",
+    "question3YesFraction",
+    "question4YesFraction",
+    "question5YesFraction"
+  ],
+  "actions": [
+    "ASK_0",
+    "ASK_1",
+    "ASK_2",
+    "ASK_3",
+    "ASK_4",
+    "ASK_5",
+    "ACCUSE",
+    "PASS"
+  ]
+}
