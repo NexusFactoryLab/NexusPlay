@@ -1,4 +1,5 @@
 import { request } from '../utils/http'
+import { deleteCreationDraft } from './game-creation-draft.service'
 
 export type GameTheme = {
   primaryColor: string
@@ -262,12 +263,15 @@ export type CreateGameInput = CreateGameInputBase & {
 }
 
 /** POST /games — crea un juego en estado DRAFT. Cualquier usuario autenticado puede llamarlo. */
-export function createGame(token: string, input: CreateGameInput): Promise<GameDetail> {
-  return request<GameDetail>('/games', {
+export async function createGame(token: string, input: CreateGameInput): Promise<GameDetail> {
+  const game = await request<GameDetail>('/games', {
     method: 'POST',
     token,
     body: input,
   })
+  // Issue #69: el juego ya existe, el borrador de creación (y sus archivos) sobra.
+  void deleteCreationDraft(token, input.gameType).catch(() => undefined)
+  return game
 }
 
 /** PATCH /games/:id — edición parcial; solo el creador o un admin. */

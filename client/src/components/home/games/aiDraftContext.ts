@@ -1,4 +1,6 @@
 import { createContext, useContext, useEffect } from 'react'
+import type { GameDraft } from '../../../services/ai-game-assistant.service'
+import type { GameCreationDraft } from '../../../services/game-creation-draft.service'
 
 /**
  * Lo provee GameFormShell: AiGameAssistantPanel lo llama cuando la IA ya
@@ -52,4 +54,27 @@ export function useReportCreateSummary(summary: CreateSummary): void {
     report?.({ count, itemsLabel, missingImages })
   }, [report, count, itemsLabel, missingImages])
   useEffect(() => () => report?.(null), [report])
+}
+
+/**
+ * Lo provee GameFormShell (issue #69): persistencia del resultado de la IA en
+ * el borrador del servidor. El panel guarda lo que genera (con los archivos
+ * que subió), reutiliza un resultado ya guardado en vez de volver a llamar a
+ * la IA (ahorro de tokens) y restaura todo cuando la persona elige Continuar.
+ */
+export type AiDraftPersist = {
+  /** Se llena cuando la persona elige "Continuar"; `nonce` distingue restauraciones. */
+  restore: { nonce: number; draft: GameCreationDraft } | null
+  /** El panel avisa que terminó de restaurar (o que no había nada que restaurar). */
+  onRestored: () => void
+  /** Resultado guardado para exactamente este mensaje y estos archivos, si existe. */
+  findCached: (message: string, files: File[]) => GameDraft | null
+  /** Guarda el resultado recién generado junto con sus archivos y mensaje. */
+  save: (result: GameDraft, message: string, files: File[]) => void
+}
+
+export const AiDraftPersistContext = createContext<AiDraftPersist | null>(null)
+
+export function useAiDraftPersist(): AiDraftPersist | null {
+  return useContext(AiDraftPersistContext)
 }

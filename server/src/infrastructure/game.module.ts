@@ -59,6 +59,8 @@ import { FileTextExtractor } from './ai/file-text-extractor.js';
 import { GameController } from './http/controllers/game.controller.js';
 import { GameImportController } from './http/controllers/game-import.controller.js';
 import { GameAiDraftController } from './http/controllers/game-ai-draft.controller.js';
+import { GameCreationDraftController } from './http/controllers/game-creation-draft.controller.js';
+import { PrismaGameCreationDraftRepository } from './persistence/prisma/game-creation-draft.repository.js';
 import { GameTypeSettingController } from './http/controllers/game-type-setting.controller.js';
 import { AiProviderAttemptsController } from './http/controllers/ai-provider-attempts.controller.js';
 
@@ -76,12 +78,14 @@ const DEFAULT_AI_PROVIDER_ORDER = ['groq'];
     GameController,
     GameImportController,
     GameAiDraftController,
+    GameCreationDraftController,
     GameTypeSettingController,
     AiProviderAttemptsController,
   ],
   providers: [
     MongoService,
     PrismaService,
+    PrismaGameCreationDraftRepository,
     { provide: GAME_REPOSITORY, useClass: MongoGameRepository },
     { provide: GAME_TYPE_SETTING_REPOSITORY, useClass: PrismaGameTypeSettingRepository },
     { provide: GAME_IMPORT_JOB_REPOSITORY, useClass: MongoGameImportJobRepository },
