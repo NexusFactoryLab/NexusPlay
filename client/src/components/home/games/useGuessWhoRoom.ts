@@ -128,6 +128,10 @@ export function useGuessWhoRoom(token: string | null) {
   const askQuestion = useCallback((questionId: string) => {
     if (socketRef.current?.connected) socketRef.current.emit('room:question', { questionId })
   }, [])
+  /** Pregunta propia de Sí/No (issue #64). */
+  const askFreeQuestion = useCallback((text: string) => {
+    if (socketRef.current?.connected) socketRef.current.emit('room:free-question', { text })
+  }, [])
   const answerQuestion = useCallback((requestId: string, answer: boolean) => {
     if (socketRef.current?.connected) socketRef.current.emit('room:answer', { requestId, answer })
   }, [])
@@ -141,6 +145,7 @@ export function useGuessWhoRoom(token: string | null) {
 
   return {
     askQuestion,
+    askFreeQuestion,
     answerQuestion,
     room,
     error,

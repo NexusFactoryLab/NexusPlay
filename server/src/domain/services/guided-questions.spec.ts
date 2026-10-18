@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { addGuidedMessage, answerGuidedQuestion, askGuidedQuestion, contradictedCardIds, currentQuestion, guidedView, questionsFor, type GuidedState } from './guided-questions.js';
+import { addGuidedMessage, answerGuidedQuestion, askFreeQuestion, askGuidedQuestion, contradictedCardIds, declineFreeQuestion, currentQuestion, guidedView, questionsFor, type GuidedState } from './guided-questions.js';
 
 const AMERICA = { id: 'america', question: '¿Es un país de América?' };
 const ESPANOL = { id: 'habla-espanol', question: '¿La mayoría de su población habla español?' };
@@ -135,6 +135,32 @@ describe('preguntas guiadas autoritativas', () => {
     const s = state(); delete s.cards[1].traits;
     expect(texts(s)).toEqual([]);
   });
+  it('pregunta propia: ocupa la pregunta del turno, no se valida ni descarta sola (issue #64)', () => {
+    const s = state();
+    expect(() => askFreeQuestion(s, 'b', 'Luis', '¿Es grande?')).toThrow();
+    expect(() => askFreeQuestion(s, 'a', 'Ana', '  ¿?  ')).toThrow();
+    askFreeQuestion(s, 'a', 'Ana', 'su capital tiene más de 5 millones de habitantes');
+    expect(s.pendingQuestion).toMatchObject({ free: true, text: '¿su capital tiene más de 5 millones de habitantes?', askerId: 'a' });
+    expect(() => askGuidedQuestion(s, 'a', 'Ana', questionsFor(s, 'a')[0].id)).toThrow();
+    expect(() => answerGuidedQuestion(s, 'a', 'Ana', s.pendingQuestion!.requestId, true)).toThrow();
+    // Cualquier respuesta vale: el juego no conoce el dato.
+    answerGuidedQuestion(s, 'b', 'Luis', s.pendingQuestion!.requestId, false, ' (IA)');
+    expect(s.pendingQuestion).toBeNull();
+    expect(s.players[0].discardedCardIds).toEqual([]);
+    expect(s.answerLog ?? []).toEqual([]);
+    expect(s.guidedChat!.at(-1)!.text).toBe('No. (IA) Pregunta propia: descarta tú según la respuesta.');
+  });
+
+  it('el rival puede retirar una pregunta propia que no sabe responder', () => {
+    const s = state();
+    askFreeQuestion(s, 'a', 'Ana', '¿Te gusta?');
+    declineFreeQuestion(s, 'a', 'Ana', 'no vale');
+    expect(s.pendingQuestion?.free).toBe(true);
+    declineFreeQuestion(s, 'b', 'Bot', 'No sé.');
+    expect(s.pendingQuestion).toBeNull();
+    expect(s.guidedChat!.at(-1)!.text).toBe('No sé.');
+  });
+
   it('el chat libre no descarta y limita el historial y longitud', () => {
     const s = state();
     for (let i = 0; i < 90; i++) addGuidedMessage(s, 'a', 'Ana', 'Sí'.repeat(500));

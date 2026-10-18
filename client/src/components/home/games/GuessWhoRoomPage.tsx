@@ -54,6 +54,7 @@ function GuessWhoRoomSession() {
     passTurn,
     sendChatMessage,
     askQuestion,
+    askFreeQuestion,
     answerQuestion,
     leaveRoom,
   } = useGuessWhoRoom(token)
@@ -388,7 +389,7 @@ function GuessWhoRoomSession() {
           onSend={sendChatMessage}
           notice={againstBot ? BOT_CHAT_NOTICE : undefined}
           disconnected={connecting || dealing}
-          guided={room.phase === 'PLAYING' ? { cards: room.cards, questions: room.suggestedQuestions ?? [], pending: room.pendingQuestion ?? null, isMyTurn, autoDiscard: room.autoDiscard !== false, onAsk: askQuestion, onAnswer: answerQuestion } : undefined}
+          guided={room.phase === 'PLAYING' ? { cards: room.cards, questions: room.suggestedQuestions ?? [], pending: room.pendingQuestion ?? null, isMyTurn, autoDiscard: room.autoDiscard !== false, onAsk: askQuestion, onAskFree: askFreeQuestion, opponentIsBot: againstBot, onAnswer: answerQuestion } : undefined}
         />
         </div>
       </div>

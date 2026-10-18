@@ -11,6 +11,10 @@ export type GuidedChatControls = {
   /** Sin definir = automático (torneo). */
   autoDiscard?: boolean
   onAsk: (questionId: string) => void
+  /** Pregunta propia escrita por el jugador (issue #64). Sin definir: solo preguntas sugeridas (torneo). */
+  onAskFree?: (text: string) => void
+  /** El rival es el bot: responde las preguntas propias con IA. */
+  opponentIsBot?: boolean
   onAnswer: (requestId: string, answer: boolean) => void
 }
 
@@ -130,19 +134,22 @@ export function ChatPanel({
 
       {guided && <div className="max-h-[45%] shrink-0 overflow-y-auto border-t border-accent/20 bg-accent/5 px-3 py-3">
         {guided.pending ? <>
-          <p className="text-[12px] font-bold text-accent">{guided.pending.askerId === selfUserId ? 'Esperando a tu rival…' : 'Tu rival pregunta'}</p>
+          <p className="text-[12px] font-bold text-accent">{guided.pending.askerId === selfUserId ? (guided.pending.free && guided.opponentIsBot ? 'El bot está pensando la respuesta con IA…' : 'Esperando a tu rival…') : guided.pending.free ? 'Tu rival hace su propia pregunta' : 'Tu rival pregunta'}</p>
           <p className="mt-1 text-[13px] font-semibold text-text-h">{guided.pending.text}</p>
           {guided.pending.askerId !== selfUserId && <div className="mt-2 flex gap-2">
             {[true, false].map(answer => <button key={String(answer)} type="button" disabled={disconnected} onClick={() => guided.onAnswer(guided.pending!.requestId, answer)} className="min-h-11 flex-1 rounded-xl border border-accent bg-accent/10 px-3 py-2 font-bold text-accent focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50">{answer ? 'Sí' : 'No'}</button>)}
           </div>}
-          <p className="mt-2 text-[11px] text-text">{guided.autoDiscard === false ? 'Con la respuesta, descarta tú las tarjetas que no coinciden.' : 'La respuesta descarta automáticamente las opciones que no coinciden.'} La pregunta vence al cambiar el turno.</p>
+          <p className="mt-2 text-[11px] text-text">{guided.pending.free ? 'Es una pregunta propia: responde con la verdad sobre tu tarjeta. Quien pregunta descarta según la respuesta.' : guided.autoDiscard === false ? 'Con la respuesta, descarta tú las tarjetas que no coinciden.' : 'La respuesta descarta automáticamente las opciones que no coinciden.'} La pregunta vence al cambiar el turno.</p>
         </> : <>
           <p className="text-[12px] font-bold text-accent">Preguntas Sí/No · {guided.autoDiscard === false ? 'descartas tú' : 'descarte automático'}</p>
           {!guided.isMyTurn ? <p className="mt-1 text-[12px] text-text">Podrás preguntar en tu turno. Puedes escribir mensajes mientras esperas.</p> : <div className="mt-2 space-y-2">
             {guided.questions.filter(q => normalize(q.text).includes(normalize(text.trim()))).map(q => <div key={q.id}>
               <button type="button" disabled={disconnected} onClick={() => { guided.onAsk(q.id); setText('') }} className="w-full rounded-xl border border-accent/30 bg-surface/70 px-3 py-2 text-left text-[12px] font-medium text-text-h hover:border-accent focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50" aria-label={`Preguntar: ${q.text}`}>{q.category && <span className="mr-1.5 inline-block rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold text-accent">{q.category}</span>}{q.text}</button>
             </div>)}
-            {guided.questions.filter(q => normalize(q.text).includes(normalize(text.trim()))).length === 0 && <p className="text-[12px] text-text">{guided.questions.length ? 'Sin sugerencias para ese texto. Puedes enviar un mensaje libre.' : 'No quedan preguntas que separen las tarjetas: piensa cuál puede ser y adivina.'}</p>}
+            {guided.questions.filter(q => normalize(q.text).includes(normalize(text.trim()))).length === 0 && <p className="text-[12px] text-text">{guided.questions.length ? 'Sin sugerencias para ese texto.' : 'No quedan preguntas sugeridas que separen las tarjetas.'}</p>}
+            {guided.onAskFree && (text.trim()
+              ? <button type="button" disabled={disconnected} onClick={() => { guided.onAskFree!(text.trim()); setText('') }} className="w-full rounded-xl bg-accent px-3 py-2 text-left text-[12px] font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50">Hacer esta pregunta (Sí/No): «{text.trim()}»</button>
+              : <p className="text-[11.5px] text-text">¿Quieres preguntar otra cosa? Escríbela abajo como pregunta de Sí/No{guided.opponentIsBot ? ' (el bot la responde con IA)' : ''}.</p>)}
           </div>}
         </>}
       </div>}

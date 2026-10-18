@@ -23,7 +23,8 @@ export const MIN_DISCARDS_TO_ACCUSE = 3
 export type RoomPhase = 'WAITING' | 'PLAYING' | 'FINISHED'
 
 export type GuidedQuestion = { id: string; text: string; cardIds: string[]; category?: string }
-export type PendingQuestion = GuidedQuestion & { requestId: string; askerId: string; deadline: number }
+/** `free`: pregunta propia escrita por el jugador (issue #64); no descarta sola. */
+export type PendingQuestion = GuidedQuestion & { requestId: string; askerId: string; deadline: number; free?: boolean }
 export type GuidedChatState = {
   suggestedQuestions?: GuidedQuestion[]
   pendingQuestion?: PendingQuestion | null

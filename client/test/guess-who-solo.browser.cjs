@@ -22,7 +22,7 @@ createRoot(document.getElementById('root')).render(React.createElement(MemoryRou
   React.createElement(Route,{path:'/',element:React.createElement(GuessWhoRoom,{gameId:'juego-1',onExit:()=>{window.exited++}})}),
   React.createElement(Route,{path:'/quien-es/sala',element:React.createElement(Probe)}))));
 window.showChat=()=>createRoot(document.getElementById('chat')).render(React.createElement(ChatPanel,{inline:true,messages:[{userId:'bot:X',displayName:'Bot Nexus (difícil)',text:'¿Es un país de Europa?',sentAt:1}],selfUserId:'ana',onSend:()=>{},notice:BOT_CHAT_NOTICE,
-  guided:{cards:[],questions:[{id:'q',text:'¿Es un país de América?',cardIds:['0']}],pending:null,isMyTurn:true,onAsk:()=>{},onAnswer:()=>{}}}));
+  guided:{cards:[],questions:[{id:'q',text:'¿Es un país de América?',cardIds:['0']}],pending:null,isMyTurn:true,opponentIsBot:true,onAsk:()=>{},onAskFree:t=>{window.free=t},onAnswer:()=>{}}}));
 </script></body></html>`
 
 async function main(){
@@ -55,6 +55,10 @@ async function main(){
 
       await page.evaluate(()=>window.showChat())
       await page.getByText('El bot no lee el chat: usa las preguntas sugeridas para jugar.').waitFor()
+      await page.getByText(/el bot la responde con IA/).waitFor()
+      await page.locator('#chat').getByRole('textbox',{name:'Mensaje'}).fill('su capital es muy grande')
+      await page.getByRole('button',{name:/Hacer esta pregunta/}).click()
+      assert.equal(await page.evaluate(()=>window.free),'su capital es muy grande')
       await page.locator('#chat').screenshot({path:'.scratch/guess-who-solo-chat-'+width+'.png'})
       assert.deepEqual(errors,[])
       console.log('PASS '+width+'px: formato → dificultad → ruta con bot, volver sin cerrar, aviso del chat, sin scroll horizontal')

@@ -17,6 +17,8 @@ import { InMemoryDualQuestRoomStore } from './rooms/in-memory-dual-quest-room.st
 import { RoomsGateway } from './rooms/rooms.gateway.js';
 import { GUESS_WHO_BOT_POLICY } from '../domain/ports/guess-who-bot-policy.port.js';
 import { loadGuessWhoBotPolicy } from './bots/load-guess-who-bot-policy.js';
+import { GUESS_WHO_FREE_ANSWERER } from '../domain/ports/guess-who-free-answerer.port.js';
+import { GroqFreeAnswerer } from './bots/groq-free-answerer.js';
 
 @Module({
   imports: [UserModule, AnalyticsModule],
@@ -31,6 +33,8 @@ import { loadGuessWhoBotPolicy } from './bots/load-guess-who-bot-policy.js';
     // Bot de las partidas en solitario de Identidad Oculta (issue #60): el
     // Difícil usa el modelo entrenado en ml/ si hay pesos válidos (issue #62).
     { provide: GUESS_WHO_BOT_POLICY, useFactory: () => loadGuessWhoBotPolicy() },
+    // El bot responde con IA las preguntas propias del jugador (issue #64).
+    { provide: GUESS_WHO_FREE_ANSWERER, useClass: GroqFreeAnswerer },
     RoomsGateway,
   ],
 })

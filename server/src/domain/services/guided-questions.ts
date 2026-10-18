@@ -4,7 +4,13 @@ type Card = { cardId: string; label: string; traits?: { id: string; question: st
 export type GuidedQuestion = { id: string; text: string; cardIds: string[]; category?: string };
 /** Una respuesta ya dada: con ella se puede deducir qué tarjetas no son (descarte manual y bot). */
 export type GuidedAnswer = { askerId: string; cardIds: string[]; answer: boolean };
-export type PendingQuestion = GuidedQuestion & { requestId: string; askerId: string; deadline: number };
+/**
+ * `free`: pregunta propia que escribió el jugador (issue #64). El juego no
+ * conoce la respuesta: no la valida ni descarta solo.
+ */
+export type PendingQuestion = GuidedQuestion & { requestId: string; askerId: string; deadline: number; free?: boolean };
+
+const MAX_FREE_QUESTION_LENGTH = 140;
 export type GuidedMessage = { userId: string; displayName: string; text: string; sentAt: number };
 export interface GuidedState {
   phase: string;
@@ -159,13 +165,40 @@ export function askGuidedQuestion(state: GuidedState, userId: string, name: stri
   addGuidedMessage(state, userId, name, question.text);
 }
 
-export function answerGuidedQuestion(state: GuidedState, userId: string, name: string, requestId: unknown, answer: unknown) {
+/** Pregunta propia de Sí/No escrita por el jugador, en lugar de una sugerida. Ocupa la pregunta del turno igual. */
+export function askFreeQuestion(state: GuidedState, userId: string, name: string, text: unknown) {
+  if (state.phase !== 'PLAYING' || state.activePlayerUserId !== userId || !state.turnDeadline || Date.now() >= state.turnDeadline) throw new Error('Solo puedes preguntar durante tu turno.');
+  if (currentQuestion(state)) throw new Error('Espera la respuesta de tu rival.');
+  if (typeof text !== 'string') throw new Error('Escribe tu pregunta.');
+  const body = text.trim().replace(/^¿+/, '').replace(/\?+$/, '').trim();
+  if (!body) throw new Error('Escribe tu pregunta.');
+  if (body.length > MAX_FREE_QUESTION_LENGTH) throw new Error(`La pregunta es muy larga (máximo ${MAX_FREE_QUESTION_LENGTH} caracteres).`);
+  const question = `¿${body}?`;
+  state.pendingQuestion = { id: 'libre', text: question, cardIds: [], free: true, requestId: randomUUID(), askerId: userId, deadline: state.turnDeadline };
+  addGuidedMessage(state, userId, name, question);
+}
+
+/** El rival no puede (o no sabe) responder una pregunta propia: se retira y quien preguntó puede hacer otra. */
+export function declineFreeQuestion(state: GuidedState, userId: string, name: string, reason: string) {
+  const q = currentQuestion(state);
+  if (!q?.free || q.askerId === userId) return;
+  state.pendingQuestion = null;
+  addGuidedMessage(state, userId, name, reason);
+}
+
+export function answerGuidedQuestion(state: GuidedState, userId: string, name: string, requestId: unknown, answer: unknown, note = '') {
   const q = currentQuestion(state);
   if (!q || q.requestId !== requestId) throw new Error('La pregunta ya no está activa.');
   if (typeof answer !== 'boolean') throw new Error('Responde Sí o No.');
   const responder = state.players.find(p => p.userId === userId && p.userId !== q.askerId);
   const asker = state.players.find(p => p.userId === q.askerId);
   if (!responder || !asker || !responder.secretCardId) throw new Error('Solo el rival puede responder.');
+  if (q.free) {
+    // El juego no conoce la respuesta de una pregunta propia: ni la valida ni descarta.
+    state.pendingQuestion = null;
+    addGuidedMessage(state, userId, name, `${answer ? 'Sí' : 'No'}.${note} Pregunta propia: descarta tú según la respuesta.`);
+    return;
+  }
   if (q.cardIds.includes(responder.secretCardId) !== answer) throw new Error('Revisa tu tarjeta secreta: esa respuesta no coincide.');
   state.answerLog = [...(state.answerLog ?? []), { askerId: q.askerId, cardIds: q.cardIds, answer }];
   state.pendingQuestion = null;

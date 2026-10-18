@@ -55,7 +55,8 @@ import type {
 import { AnalyticsTrackerService } from '../../application/services/analytics-tracker.service.js';
 import { WsExceptionFilter } from './ws-exception.filter.js';
 import { allLobbyReady, recordLobbyReady, resetLobbyReady } from './lobby-ready.js';
-import { addGuidedMessage, askGuidedQuestion, answerGuidedQuestion, guidedView } from '../../domain/services/guided-questions.js';
+import { addGuidedMessage, askFreeQuestion, askGuidedQuestion, answerGuidedQuestion, declineFreeQuestion, guidedView } from '../../domain/services/guided-questions.js';
+import { GUESS_WHO_FREE_ANSWERER, type GuessWhoFreeAnswerer } from '../../domain/ports/guess-who-free-answerer.port.js';
 import { assertCanPassTurn, judgeAccusation, toggleDiscard } from '../../domain/services/guess-who-rules.js';
 import {
   GUESS_WHO_BOT_POLICY,
@@ -517,18 +518,26 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     @Inject(DUAL_QUEST_ROOM_STORE) private readonly dualQuestRoomStore: DualQuestRoomStore,
     private readonly analyticsTracker: AnalyticsTrackerService,
     @Optional() @Inject(GUESS_WHO_BOT_POLICY) botPolicy: GuessWhoBotPolicy = new HeuristicGuessWhoBotPolicy(),
+    @Optional() @Inject(GUESS_WHO_FREE_ANSWERER) freeAnswerer?: GuessWhoFreeAnswerer,
   ) {
     this.botRunner = new GuessWhoBotRunner(
       {
         getRoom: (code) => this.roomStore.get(code),
         ask: (room, userId, name, questionId) => this.askInRoom(room, userId, name, questionId),
-        answer: (room, userId, name, requestId, answer) => this.answerInRoom(room, userId, name, requestId, answer),
+        answer: (room, userId, name, requestId, answer, note) => this.answerInRoom(room, userId, name, requestId, answer, note),
+        declineFree: (room, userId, name, reason) => {
+          declineFreeQuestion(room, userId, name, reason);
+          this.roomStore.set(room);
+          this.broadcastState(room);
+        },
         discard: (room, userId, cardId) => this.discardInRoom(room, userId, cardId),
         accuse: (room, userId, cardId) => this.accuseInRoom(room, userId, cardId),
         passTurn: (room, userId) => this.passTurnInRoom(room, userId),
         voteRematch: (room, userId) => this.voteRematchInRoom(room, userId, true),
       },
       botPolicy,
+      Math.random,
+      freeAnswerer,
     );
     this.roomRegistry = [
       { kind: 'room', store: this.roomStore },
@@ -971,6 +980,16 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     this.askInRoom(room, socket.data.userId, socket.data.displayName, body?.questionId);
   }
 
+  /** Pregunta propia de Sí/No escrita por el jugador (issue #64). */
+  @SubscribeMessage('room:free-question')
+  handleFreeQuestion(@ConnectedSocket() socket: AuthenticatedSocket, @MessageBody() body: { text: string }) {
+    const room = this.roomStore.findBySocketId(socket.id);
+    if (!room) throw new Error('No estás en ninguna sala.');
+    askFreeQuestion(room, socket.data.userId, socket.data.displayName, body?.text);
+    this.roomStore.set(room);
+    this.broadcastState(room);
+  }
+
   @SubscribeMessage('room:answer')
   handleAnswer(@ConnectedSocket() socket: AuthenticatedSocket, @MessageBody() body: { requestId: string; answer: boolean }) {
     const room = this.roomStore.findBySocketId(socket.id);
@@ -1181,8 +1200,8 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     this.broadcastState(room);
   }
 
-  private answerInRoom(room: RoomState, userId: string, displayName: string, requestId: unknown, answer: unknown) {
-    answerGuidedQuestion(room, userId, displayName, requestId, answer);
+  private answerInRoom(room: RoomState, userId: string, displayName: string, requestId: unknown, answer: unknown, note?: string) {
+    answerGuidedQuestion(room, userId, displayName, requestId, answer, note);
     this.roomStore.set(room);
     this.broadcastState(room);
   }

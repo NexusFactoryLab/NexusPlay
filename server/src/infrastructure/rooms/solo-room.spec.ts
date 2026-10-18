@@ -6,6 +6,8 @@ import type { Server } from 'socket.io';
 import type { GameRepository } from '../../domain/ports/game.repository.port.js';
 import type { UserRepository } from '../../domain/ports/user.repository.port.js';
 import type { GuessWhoBotAction, GuessWhoBotPolicy } from '../../domain/ports/guess-who-bot-policy.port.js';
+import type { FreeAnswerCard, GuessWhoFreeAnswerer } from '../../domain/ports/guess-who-free-answerer.port.js';
+import { AI_ANSWER_NOTE, BOT_CANNOT_ANSWER } from '../bots/guess-who-bot-runner.js';
 import type { AnalyticsTrackerService } from '../../application/services/analytics-tracker.service.js';
 import { currentQuestion, questionsFor } from '../../domain/services/guided-questions.js';
 import { RoomsGateway } from './rooms.gateway.js';
@@ -36,9 +38,9 @@ const game = {
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); });
 
-function setup(botPolicy?: GuessWhoBotPolicy) {
+function setup(botPolicy?: GuessWhoBotPolicy, freeAnswerer?: GuessWhoFreeAnswerer) {
   const rooms = new InMemoryRoomStore();
-  const gateway = new RoomsGateway(new JwtService(), { findById: async (id: string) => (id === game.id ? game : null) } as unknown as GameRepository, {} as UserRepository, rooms, new InMemoryTournamentStore(), new InMemoryDominoRoomStore(), new InMemorySnakesLaddersRoomStore(), new InMemoryDualQuestRoomStore(), { track: async () => {} } as unknown as AnalyticsTrackerService, botPolicy);
+  const gateway = new RoomsGateway(new JwtService(), { findById: async (id: string) => (id === game.id ? game : null) } as unknown as GameRepository, {} as UserRepository, rooms, new InMemoryTournamentStore(), new InMemoryDominoRoomStore(), new InMemorySnakesLaddersRoomStore(), new InMemoryDualQuestRoomStore(), { track: async () => {} } as unknown as AnalyticsTrackerService, botPolicy, freeAnswerer);
   const events: { target: string; event: string }[] = [];
   gateway.server = { to: (target: string) => ({ emit: (event: string) => events.push({ target, event }) }) } as unknown as Server;
   return { gateway, rooms, events };
@@ -155,6 +157,37 @@ describe('partida en solitario contra el bot (issue #60)', () => {
     const { gateway, rooms } = setup();
     await gateway.handleCreateSolo(client('ana'), { gameId: game.id, difficulty: 'EASY' });
     expect(rooms.findBySocketId('ana')!.autoDiscard).toBe(false);
+  });
+
+  it('responde con IA una pregunta propia, solo con los datos de SU tarjeta (issue #64)', async () => {
+    const seen: { question: string; card: FreeAnswerCard }[] = [];
+    const ai: GuessWhoFreeAnswerer = { answer: async (question, card) => { seen.push({ question, card }); return true; } };
+    const { gateway, rooms } = setup(undefined, ai);
+    const human = client('ana');
+    await gateway.handleCreateSolo(human, { gameId: game.id, difficulty: 'HARD' });
+    const room = rooms.findBySocketId('ana')!;
+    vi.advanceTimersByTime(3000);
+    if (room.activePlayerUserId !== 'ana') vi.advanceTimersByTime(30_000);
+    gateway.handleFreeQuestion(human, { text: '¿Su capital es muy grande?' });
+    await vi.advanceTimersByTimeAsync(700);
+    expect(room.pendingQuestion).toBeNull();
+    expect(room.guidedChat!.at(-1)!.text).toBe(`Sí.${AI_ANSWER_NOTE} Pregunta propia: descarta tú según la respuesta.`);
+    const botCard = room.cards.find((c) => c.cardId === room.players[1].secretCardId)!;
+    expect(seen).toEqual([{ question: '¿Su capital es muy grande?', card: { label: botCard.label, info: null, facts: botCard.traits!.map((t) => t.question) } }]);
+  });
+
+  it('si la IA no sabe o no está, el bot retira la pregunta propia y el turno sigue', async () => {
+    const { gateway, rooms } = setup(undefined, { answer: async () => null });
+    const human = client('ana');
+    await gateway.handleCreateSolo(human, { gameId: game.id, difficulty: 'HARD' });
+    const room = rooms.findBySocketId('ana')!;
+    vi.advanceTimersByTime(3000);
+    if (room.activePlayerUserId !== 'ana') vi.advanceTimersByTime(30_000);
+    gateway.handleFreeQuestion(human, { text: '¿Es bonito?' });
+    await vi.advanceTimersByTimeAsync(700);
+    expect(room.pendingQuestion).toBeNull();
+    expect(room.guidedChat!.at(-1)!.text).toBe(BOT_CANNOT_ANSWER);
+    expect(room.activePlayerUserId).toBe('ana');
   });
 
   it('no reprograma su jugada por cada mensaje de chat', async () => {

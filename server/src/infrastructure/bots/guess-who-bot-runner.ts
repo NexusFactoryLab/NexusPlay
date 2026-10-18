@@ -8,6 +8,12 @@ import type {
 } from '../../domain/ports/guess-who-bot-policy.port.js';
 import { contradictedCardIds, currentQuestion, questionsFor } from '../../domain/services/guided-questions.js';
 import { MIN_DISCARDS_BEFORE_ACCUSATION } from '../../domain/services/guess-who-rules.js';
+import type { GuessWhoFreeAnswerer } from '../../domain/ports/guess-who-free-answerer.port.js';
+
+/** Lo que dice el bot cuando no puede responder una pregunta propia. */
+export const BOT_CANNOT_ANSWER = 'No estoy seguro de la respuesta a esa pregunta: prueba con otra o usa una sugerida.';
+/** Se agrega a la respuesta del bot a una pregunta propia: la dio la IA. */
+export const AI_ANSWER_NOTE = ' (respondido con IA, puede equivocarse)';
 
 /**
  * Lo que el bot puede hacer en una sala 1v1: exactamente las acciones por
@@ -17,7 +23,8 @@ import { MIN_DISCARDS_BEFORE_ACCUSATION } from '../../domain/services/guess-who-
 export interface GuessWhoBotRoomActions {
   getRoom(code: string): RoomState | undefined;
   ask(room: RoomState, botUserId: string, displayName: string, questionId: string): void;
-  answer(room: RoomState, botUserId: string, displayName: string, requestId: string, answer: boolean): void;
+  answer(room: RoomState, botUserId: string, displayName: string, requestId: string, answer: boolean, note?: string): void;
+  declineFree(room: RoomState, botUserId: string, displayName: string, reason: string): void;
   discard(room: RoomState, botUserId: string, cardId: string): void;
   accuse(room: RoomState, botUserId: string, cardId: string): void;
   passTurn(room: RoomState, botUserId: string): void;
@@ -72,6 +79,7 @@ export class GuessWhoBotRunner {
     private readonly actions: GuessWhoBotRoomActions,
     private readonly policy: GuessWhoBotPolicy,
     private readonly random: () => number = Math.random,
+    private readonly freeAnswerer?: GuessWhoFreeAnswerer,
   ) {}
 
   /** Llamar tras cada cambio de la sala: programa la próxima acción del bot, si le toca hacer algo. */
@@ -147,6 +155,26 @@ export class GuessWhoBotRunner {
     if (room.phase !== 'PLAYING') return null;
 
     const pending = currentQuestion(room);
+    if (pending?.free && pending.askerId !== bot.userId) {
+      // Pregunta propia del jugador: la IA responde con los datos de la tarjeta del bot.
+      return {
+        key: `free:${pending.requestId}`,
+        delayMs: this.withinTurn(room, [300, 600]),
+        run: async () => {
+          const card = room.cards.find((c) => c.cardId === bot.secretCardId);
+          const answer = card && this.freeAnswerer
+            ? await this.freeAnswerer.answer(pending.text, {
+                label: card.label,
+                info: card.info ?? null,
+                facts: (card.traits ?? []).map((trait) => trait.question),
+              })
+            : null;
+          if (currentQuestion(room)?.requestId !== pending.requestId) return;
+          if (answer === null) this.actions.declineFree(room, bot.userId, bot.displayName, BOT_CANNOT_ANSWER);
+          else this.actions.answer(room, bot.userId, bot.displayName, pending.requestId, answer, AI_ANSWER_NOTE);
+        },
+      };
+    }
     if (pending && pending.askerId !== bot.userId) {
       return {
         key: `answer:${pending.requestId}`,
