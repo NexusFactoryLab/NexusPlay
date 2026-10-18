@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Rocket, FolderOpen, Gem, Map, DoorOpen, Sparkles, LayoutGrid } from 'lucide-react'
+import { Rocket, Gem, Map, DoorOpen, Sparkles, LayoutGrid } from 'lucide-react'
 import type { FormEvent, ReactNode } from 'react'
 import { TextField } from '../../TextField'
 import { SaveVisibilityModal } from './SaveVisibilityModal'
@@ -7,8 +7,12 @@ import { ImageUploadField } from './ImageUploadField'
 import { AiGameAssistantPanel } from './AiGameAssistantPanel'
 import { useReportCreateSummary } from './aiDraftContext'
 import { GameFormShell } from './GameFormShell'
-import { FormSection } from './create/FormSection'
+import { WizardPhaseNav } from './WizardPhaseNav'
+import { FormSection, PhaseLabel } from './create/FormSection'
 import { FormSelect } from './create/FormSelect'
+import { InfoBubble } from './create/InfoBubble'
+import { ItemGridEditor } from './create/ItemGridEditor'
+import { useCreateGameProgress } from './create/CreateGameProgressContext'
 import type { GameDraft } from '../../../services/ai-game-assistant.service'
 import { OrganizationSelectField } from './create/OrganizationSelectField'
 import { CategorySelectField } from './create/CategorySelectField'
@@ -79,6 +83,24 @@ function isPosition(value: unknown): value is DualQuestCellPosition {
   )
 }
 
+/** Fases del formulario: identidad, mapa y reglas/contenido, cada una validada al avanzar. */
+const PHASES = [
+  { label: 'Identidad del juego' },
+  { label: 'Mapa' },
+  { label: 'Reglas y contenido' },
+] as const
+const TOTAL_PHASES = PHASES.length
+
+/** Etiqueta con burbuja de ayuda al lado. */
+function LabelWithInfo({ children, info, small }: { children: ReactNode; info: string; small?: boolean }) {
+  return (
+    <label className={`nx-label mb-1.5 flex items-center gap-1.5 font-medium text-text-h ${small ? 'text-[12px]' : 'text-[13px]'}`}>
+      {children}
+      <InfoBubble text={info} label={`Ayuda: ${typeof children === 'string' ? children : 'campo'}`} />
+    </label>
+  )
+}
+
 type DualQuestGameFormProps = {
   /** Borrador de adaptación desde otro juego (issue #8); pre-llena el formulario al montar. */
   adaptation?: AdaptedGameDraft
@@ -130,6 +152,16 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [createdGameId, setCreatedGameId] = useState<string | null>(null)
+  const [phase, setPhase] = useState(0)
+  const [selectedGate, setSelectedGate] = useState(0)
+  const [selectedGem, setSelectedGem] = useState(0)
+  const { setSubPhase } = useCreateGameProgress()
+
+  useEffect(() => {
+    setSubPhase({ phase: phase + 1, totalPhases: TOTAL_PHASES, phaseLabel: PHASES[phase].label })
+    return () => setSubPhase(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase])
 
   useEffect(() => {
     if (!token) return
@@ -268,6 +300,7 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
     if (gates.length <= 1) return
     setGates(gates.filter((g) => g.gateId !== gateId))
     setTriggers(triggers.filter((t) => t.gateId !== gateId))
+    setSelectedGate((current) => Math.max(0, Math.min(current, gates.length - 2)))
   }
 
   function updateTrigger(triggerId: string, patch: Partial<DualQuestTriggerDraft>) {
@@ -280,51 +313,99 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
 
   function removeGem(gemId: string) {
     setGems(gems.filter((g) => g.gemId !== gemId))
+    setSelectedGem((current) => Math.max(0, Math.min(current, gems.length - 2)))
+  }
+
+  /** Mueve una gema una posición en la lista (el orden es el del ensamblaje) y mantiene la selección sobre ella. */
+  function moveGem(index: number, delta: -1 | 1) {
+    const target = index + delta
+    if (target < 0 || target >= gems.length) return
+    const next = [...gems]
+    ;[next[index], next[target]] = [next[target], next[index]]
+    setGems(next)
+    setSelectedGem(target)
   }
 
   function updateGem(gemId: string, patch: Partial<DualQuestGemDraft>) {
     setGems(gems.map((g) => (g.gemId === gemId ? { ...g, ...patch } : g)))
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (!token) return
-
+  /** Fase 1 (Identidad): título, descripción, materia. */
+  function validateIdentityPhase(): string | null {
     if (!title.trim() || title.trim().length < 3) {
-      setError('El título debe tener al menos 3 caracteres.')
-      return
+      return 'El título debe tener al menos 3 caracteres.'
     }
     if (!description.trim() || description.trim().length < 10) {
-      setError('La descripción debe tener al menos 10 caracteres.')
-      return
+      return 'La descripción debe tener al menos 10 caracteres.'
     }
     if (!categoryId) {
-      setError('Elige una materia para el juego.')
-      return
+      return 'Elige una materia para el juego.'
     }
+    return null
+  }
+
+  /** Fase 2 (Mapa): la gema núcleo necesita su pregunta. */
+  function validateMapPhase(): string | null {
     if (!coreQuestion.trim()) {
-      setError('La Gema Núcleo necesita una pregunta/hipótesis.')
-      return
+      return 'La Gema Núcleo necesita una pregunta/hipótesis.'
     }
+    return null
+  }
+
+  /** Fase 3 (Reglas y contenido): compuertas, interruptores y gemas fragmento. */
+  function validateRulesPhase(): string | null {
     if (gates.length === 0) {
-      setError('Agrega al menos una compuerta.')
-      return
+      return 'Agrega al menos una compuerta.'
     }
     for (const trigger of triggers) {
       if (trigger.kind === 'QUESTION' && (!trigger.prompt?.trim() || (trigger.options ?? []).some((o) => !o.trim()))) {
-        setError('Cada interruptor de tipo pregunta necesita su reto completo.')
-        return
+        const gateAt = gates.findIndex((g) => g.gateId === trigger.gateId)
+        if (gateAt !== -1) setSelectedGate(gateAt)
+        return 'Cada interruptor de tipo pregunta necesita su reto completo.'
       }
     }
     const fireGems = gems.filter((g) => g.role === 'FIRE')
     const waterGems = gems.filter((g) => g.role === 'WATER')
     if (fireGems.length < MIN_GEMS_PER_ROLE || waterGems.length < MIN_GEMS_PER_ROLE) {
-      setError(`Necesitas al menos ${MIN_GEMS_PER_ROLE} gemas de cada rol.`)
+      return `Necesitas al menos ${MIN_GEMS_PER_ROLE} gemas de cada rol.`
+    }
+    const emptyAt = gems.findIndex((g) => !g.label.trim())
+    if (emptyAt !== -1) {
+      setSelectedGem(emptyAt)
+      return 'Cada gema necesita un nombre.'
+    }
+    return null
+  }
+
+  const VALIDATORS = [validateIdentityPhase, validateMapPhase, validateRulesPhase]
+
+  function goToNextPhase() {
+    const validationError = VALIDATORS[phase]()
+    if (validationError) {
+      setError(validationError)
       return
     }
-    if (gems.some((g) => !g.label.trim())) {
-      setError('Cada gema necesita un nombre.')
-      return
+    setError(null)
+    setPlacementMode({ kind: 'CELL' })
+    setPhase((current) => Math.min(current + 1, TOTAL_PHASES - 1))
+  }
+
+  function goToPreviousPhase() {
+    setError(null)
+    setPlacementMode({ kind: 'CELL' })
+    setPhase((current) => Math.max(current - 1, 0))
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!token) return
+
+    for (const validate of VALIDATORS) {
+      const validationError = validate()
+      if (validationError) {
+        setError(validationError)
+        return
+      }
     }
 
     setSubmitting(true)
@@ -394,6 +475,20 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
     )
   }
 
+  const board = (
+    <DualQuestBoard
+      gridCols={gridCols}
+      gridRows={gridRows}
+      grid={grid}
+      corePosition={corePosition}
+      fireStart={fireStart}
+      waterStart={waterStart}
+      gates={gates.map((g) => ({ ...g, open: false }))}
+      gems={gems.map((g) => ({ ...g, collected: false }))}
+      onCellClick={handleCellClick}
+    />
+  )
+
   return (
     <GameFormShell
       backLabel="Cambiar tipo de juego"
@@ -404,54 +499,71 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
       aiPanel={<AiGameAssistantPanel gameType="DUAL_QUEST" disabled={submitting} onDraftReady={applyAiDraft} />}
     >
       <form className="flex flex-col gap-[16px]" onSubmit={handleSubmit} noValidate>
-        <FormSection icon={Rocket} title="Cuéntanos de tu juego" subtitle="Nombre, portada y el lugar donde vivirá." tone={1}>
-<TextField label="Título del juego" type="text" value={title} disabled={submitting} onChange={setTitle} onBlur={() => {}} />
-        <TextField
-          label="Descripción"
-          type="text"
-          value={description}
-          disabled={submitting}
-          onChange={setDescription}
-          onBlur={() => {}}
-        />
+        <PhaseLabel phase={phase + 1} total={TOTAL_PHASES} label={PHASES[phase].label} />
 
-        <ImageUploadField
-          label="Portada del juego (opcional)"
-          imageUrl={coverImageUrl}
-          folder="game-covers"
-          disabled={submitting}
-          onChange={setCoverImageUrl}
-        />
-</FormSection>
-        <FormSection icon={Gem} title="La gema núcleo" subtitle="La pregunta que los dos jugadores resuelven al final." tone={2}>
-<TextField
-          label="Pregunta/hipótesis de la Gema Núcleo"
-          type="text"
-          value={coreQuestion}
-          disabled={submitting}
-          onChange={setCoreQuestion}
-          onBlur={() => {}}
-        />
-</FormSection>
+        {phase === 0 && (
+          <FormSection icon={Rocket} title="Cuéntanos de tu juego" subtitle="Nombre, portada y el lugar donde vivirá." tone={1}>
+            <TextField label="Título del juego" type="text" value={title} disabled={submitting} onChange={setTitle} onBlur={() => {}} />
+            <TextField
+              label="Descripción"
+              type="text"
+              value={description}
+              disabled={submitting}
+              onChange={setDescription}
+              onBlur={() => {}}
+            />
 
-        <FormSection icon={FolderOpen} title="Dónde vivirá" subtitle="Materia y organización para encontrarlo fácil." tone={4}>
-<CategorySelectField
-          token={token}
-          categories={categories}
-          categoryId={categoryId}
-          onCategoryIdChange={setCategoryId}
-          onCategoryCreated={(category) => {
-            setCategories((current) => [...current, category])
-            onCategoryCreated()
-          }}
-          disabled={submitting}
-          showToast={showToast}
-        />
+            <ImageUploadField
+              label="Portada del juego (opcional)"
+              imageUrl={coverImageUrl}
+              folder="game-covers"
+              disabled={submitting}
+              onChange={setCoverImageUrl}
+            />
 
-        <OrganizationSelectField organizations={organizations} value={organizationId} disabled={submitting} onChange={setOrganizationId} />
-</FormSection>
+            <CategorySelectField
+              token={token}
+              categories={categories}
+              categoryId={categoryId}
+              onCategoryIdChange={setCategoryId}
+              onCategoryCreated={(category) => {
+                setCategories((current) => [...current, category])
+                onCategoryCreated()
+              }}
+              disabled={submitting}
+              showToast={showToast}
+            />
 
-        <FormSection icon={LayoutGrid} title="Tamaño del mapa" subtitle="Cuántas columnas y filas tendrá el tablero." tone={2}>
+            <OrganizationSelectField organizations={organizations} value={organizationId} disabled={submitting} onChange={setOrganizationId} />
+          </FormSection>
+        )}
+
+        {phase === 1 && (
+        <>
+        <FormSection
+          icon={Gem}
+          title="La gema núcleo"
+          subtitle="La pregunta que los dos jugadores resuelven al final."
+          tone={2}
+          info="Es la meta del juego: los dos jugadores llegan juntos a esta gema y responden esta pregunta o hipótesis."
+        >
+          <TextField
+            label="Pregunta/hipótesis de la Gema Núcleo"
+            type="text"
+            value={coreQuestion}
+            disabled={submitting}
+            onChange={setCoreQuestion}
+            onBlur={() => {}}
+          />
+        </FormSection>
+
+        <FormSection
+          icon={LayoutGrid}
+          title="Tamaño del mapa"
+          subtitle="Cuántas columnas y filas tendrá el tablero."
+          tone={2}
+          info="Un mapa más grande da más recorrido; uno pequeño se juega más rápido. Puedes cambiarlo cuando quieras."
+        >
 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h">Columnas del mapa</label>
@@ -479,7 +591,13 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
           </div>
         </div></FormSection>
 
-        <FormSection icon={Map} title="Editor del mapa" subtitle="Elige un modo y haz clic en el mapa para colocar cada pieza." tone={2}>
+        <FormSection
+          icon={Map}
+          title="Editor del mapa"
+          subtitle="Elige un modo y haz clic en el mapa para colocar cada pieza."
+          tone={2}
+          info="Casilla: cada clic cambia el tipo de casilla. Inicio Fuego e Inicio Agua: dónde empieza cada jugador. Gema Núcleo: dónde queda la meta."
+        >
           <div className="mb-3 flex flex-wrap gap-1.5">
             <ModeButton active={placementMode.kind === 'CELL'} onClick={() => setPlacementMode({ kind: 'CELL' })}>
               Casilla
@@ -494,49 +612,80 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
               Gema Núcleo
             </ModeButton>
           </div>
-          <DualQuestBoard
-            gridCols={gridCols}
-            gridRows={gridRows}
-            grid={grid}
-            corePosition={corePosition}
-            fireStart={fireStart}
-            waterStart={waterStart}
-            gates={gates.map((g) => ({ ...g, open: false }))}
-            gems={gems.map((g) => ({ ...g, collected: false }))}
-            onCellClick={handleCellClick}
-          />
+          {board}
+        </FormSection>
+        </>
+        )}
+
+        {phase === 2 && (
+        <>
+        <FormSection
+          icon={Map}
+          title="Mapa"
+          subtitle="Pulsa «Colocar» en una compuerta, interruptor o gema y haz clic aquí."
+          tone={2}
+        >
+          {board}
         </FormSection>
 
-        <FormSection icon={DoorOpen} title="Compuertas e interruptores" subtitle="La dependencia obligatoria entre los dos jugadores." tone={3} bare>
-<div className="nx-items">
-          {gates.map((gate) => {
+        <FormSection
+          icon={DoorOpen}
+          title="Compuertas e interruptores"
+          subtitle="La dependencia obligatoria entre los dos jugadores."
+          tone={3}
+          bare
+          info="Una compuerta bloquea el paso. Se abre cuando el jugador indicado activa su interruptor, que está en otro lugar del mapa."
+        >
+<ItemGridEditor
+          itemLabel="Compuerta"
+          addLabel="+ Agregar compuerta"
+          count={gates.length}
+          minItems={1}
+          selected={selectedGate}
+          onSelect={setSelectedGate}
+          onAdd={addGate}
+          onRemove={(index) => {
+            const target = gates[index]
+            if (target) removeGate(target.gateId)
+          }}
+          disabled={submitting}
+          isComplete={(index) => {
+            const g = gates[index]
+            const t = g ? triggers.find((tr) => tr.gateId === g.gateId) : undefined
+            if (!t) return true
+            return t.kind !== 'QUESTION' || (!!t.prompt?.trim() && !(t.options ?? ['', '']).some((o) => !o.trim()) && (t.options ?? []).length >= 2)
+          }}
+          tileText={(index) => {
+            const g = gates[index]
+            return g ? `(${g.position.row},${g.position.col})` : ''
+          }}
+          tileVisual={(index) => {
+            const g = gates[index]
+            const t = g ? triggers.find((tr) => tr.gateId === g.gateId) : undefined
+            return <DoorOpen className="h-6 w-6" strokeWidth={2.2} style={{ opacity: t ? 1 : 0.5 }} />
+          }}
+          renderEditor={(index) => {
+            const gate = gates[index]
+            if (!gate) return null
             const trigger = triggers.find((t) => t.gateId === gate.gateId)
             return (
-              <div key={gate.gateId} className="nx-item">
-                <div className="nx-item-head">
-                  <p className="nx-item-title">
-                    Compuerta en ({gate.position.row},{gate.position.col})
-                  </p>
-                  {gates.length > 1 && (
-                    <button type="button" className="nx-remove" onClick={() => removeGate(gate.gateId)} disabled={submitting}>
-                      Quitar
-                    </button>
-                  )}
-                </div>
+              <div className="flex flex-col gap-3">
                 <button
                   type="button"
-                  className={`mb-3 rounded-lg border px-3 py-1.5 text-[12px] font-medium ${placementMode.kind === 'GATE' && placementMode.gateId === gate.gateId ? 'border-accent bg-accent/10 text-accent' : 'border-border text-text-h'}`}
+                  className={`self-start rounded-lg border px-3 py-1.5 text-[12px] font-medium ${placementMode.kind === 'GATE' && placementMode.gateId === gate.gateId ? 'border-accent bg-accent/10 text-accent' : 'border-border text-text-h'}`}
                   onClick={() => setPlacementMode({ kind: 'GATE', gateId: gate.gateId })}
                   disabled={submitting}
                 >
-                  Colocar en el mapa
+                  Colocar compuerta en ({gate.position.row},{gate.position.col})
                 </button>
 
                 {trigger && (
                   <div className="flex flex-col gap-3">
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div>
-                        <label className="mb-1.5 block text-[12px] font-medium text-text-h">Tipo</label>
+                        <LabelWithInfo small info="Interruptor directo: se activa al pisarlo. Pregunta: además hay que responder bien un reto.">
+                          Tipo de interruptor
+                        </LabelWithInfo>
                         <FormSelect
                           className="w-full rounded-lg border border-border bg-bg px-[13px] py-[9px] text-[13px] text-text-h outline-none focus:border-accent"
                           value={trigger.kind}
@@ -548,7 +697,9 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
                         </FormSelect>
                       </div>
                       <div>
-                        <label className="mb-1.5 block text-[12px] font-medium text-text-h">Quién lo activa</label>
+                        <LabelWithInfo small info="El jugador (Fuego o Agua) que debe llegar al interruptor para abrir la compuerta. El otro jugador no puede hacerlo.">
+                          Quién lo activa
+                        </LabelWithInfo>
                         <FormSelect
                           className="w-full rounded-lg border border-border bg-bg px-[13px] py-[9px] text-[13px] text-text-h outline-none focus:border-accent"
                           value={trigger.activatedByRole}
@@ -607,33 +758,47 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
                 )}
               </div>
             )
-          })}
-          <button
-            type="button"
-            className="nx-add border border-dashed border-border"
-            onClick={addGate}
-            disabled={submitting}
-          >
-            + Agregar compuerta
-          </button>
-        </div>
+          }}
+        />
 </FormSection>
 
-        <FormSection icon={Sparkles} title="Gemas fragmento" subtitle="El orden de esta lista es el orden correcto del ensamblaje final." tone={4} bare>
-<div className="nx-items">
-          {gems.map((gem, index) => (
-            <div key={gem.gemId} className="nx-item">
-              <div className="nx-item-head">
-                <p className="nx-item-title">
-                  #{index + 1} · {gem.role === 'FIRE' ? '🔥 Fuego' : '💧 Agua'}
-                </p>
-                {gems.length > MIN_GEMS_PER_ROLE * 2 && (
-                  <button type="button" className="nx-remove" onClick={() => removeGem(gem.gemId)} disabled={submitting}>
-                    Quitar
-                  </button>
-                )}
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <FormSection
+          icon={Sparkles}
+          title="Gemas fragmento"
+          subtitle="Piezas que cada jugador recolecta para armar el concepto final."
+          tone={4}
+          bare
+          info="Cada jugador recolecta las gemas de su rol. El orden de la lista (1, 2, 3…) es el orden correcto del ensamblaje final; usa las flechas para reordenarlas."
+        >
+        <ItemGridEditor
+          itemLabel="Gema"
+          addLabel="+ Agregar gema"
+          count={gems.length}
+          minItems={MIN_GEMS_PER_ROLE * 2}
+          selected={selectedGem}
+          onSelect={setSelectedGem}
+          onAdd={() => {
+            const fire = gems.filter((g) => g.role === 'FIRE').length
+            const water = gems.length - fire
+            addGem(fire <= water ? 'FIRE' : 'WATER')
+          }}
+          onRemove={(index) => {
+            const target = gems[index]
+            if (target) removeGem(target.gemId)
+          }}
+          disabled={submitting}
+          isComplete={(index) => !!gems[index]?.label.trim()}
+          tileText={(index) => gems[index]?.label ?? ''}
+          tileVisual={(index) => (
+            <span className="text-[22px] leading-none" aria-hidden="true">
+              {gems[index]?.role === 'WATER' ? '💧' : '🔥'}
+            </span>
+          )}
+          renderEditor={(index) => {
+            const gem = gems[index]
+            if (!gem) return null
+            return (
+              <div className="flex flex-col gap-3">
                 <TextField
                   label="Nombre del fragmento"
                   type="text"
@@ -642,27 +807,55 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
                   onChange={(v) => updateGem(gem.gemId, { label: v })}
                   onBlur={() => {}}
                 />
-                <button
-                  type="button"
-                  className={`self-end rounded-lg border px-3 py-2.5 text-[13px] font-medium ${placementMode.kind === 'GEM' && placementMode.gemId === gem.gemId ? 'border-accent bg-accent/10 text-accent' : 'border-border text-text-h'}`}
-                  onClick={() => setPlacementMode({ kind: 'GEM', gemId: gem.gemId })}
-                  disabled={submitting}
-                >
-                  Colocar en ({gem.position.row},{gem.position.col})
-                </button>
+                <div>
+                  <LabelWithInfo small info="Fuego o Agua: el jugador de ese rol es quien puede recolectar esta gema.">
+                    Quién la recolecta
+                  </LabelWithInfo>
+                  <FormSelect
+                    className="w-full rounded-lg border border-border bg-bg px-[13px] py-[9px] text-[13px] text-text-h outline-none focus:border-accent"
+                    value={gem.role}
+                    disabled={submitting}
+                    onChange={(e) => updateGem(gem.gemId, { role: e.target.value as DualQuestRole })}
+                  >
+                    <option value="FIRE">🔥 Fuego</option>
+                    <option value="WATER">💧 Agua</option>
+                  </FormSelect>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className={`rounded-lg border px-3 py-2 text-[13px] font-medium ${placementMode.kind === 'GEM' && placementMode.gemId === gem.gemId ? 'border-accent bg-accent/10 text-accent' : 'border-border text-text-h'}`}
+                    onClick={() => setPlacementMode({ kind: 'GEM', gemId: gem.gemId })}
+                    disabled={submitting}
+                  >
+                    Colocar en ({gem.position.row},{gem.position.col})
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-lg border border-border px-3 py-2 text-[13px] font-medium text-text-h"
+                    onClick={() => moveGem(index, -1)}
+                    disabled={submitting || index === 0}
+                    aria-label="Mover antes en el orden"
+                  >
+                    ← Antes
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-lg border border-border px-3 py-2 text-[13px] font-medium text-text-h"
+                    onClick={() => moveGem(index, 1)}
+                    disabled={submitting || index === gems.length - 1}
+                    aria-label="Mover después en el orden"
+                  >
+                    Después →
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
-          <div className="nx-add-row">
-            <button type="button" className="nx-add border border-dashed border-border" onClick={() => addGem('FIRE')} disabled={submitting}>
-              + Gema de Fuego
-            </button>
-            <button type="button" className="nx-add border border-dashed border-border" onClick={() => addGem('WATER')} disabled={submitting}>
-              + Gema de Agua
-            </button>
-          </div>
-        </div>
+            )
+          }}
+        />
 </FormSection>
+        </>
+        )}
 
         {error && (
           <p className="nx-alert" role="alert">
@@ -670,24 +863,42 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
           </p>
         )}
 
-        <div className="nx-sticky-actions nx-actions">
-          <button
-            type="submit"
-            className="nx-btn nx-btn-primary"
-            style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
-            disabled={submitting}
-          >
-            {submitting ? 'Creando…' : 'Crear juego'}
-          </button>
-          <button
-            type="button"
-            className="nx-btn nx-btn-secondary border border-border text-text-h"
-            onClick={onClose}
-            disabled={submitting}
-          >
-            Cancelar
-          </button>
-        </div>
+        <WizardPhaseNav
+          onBack={phase === 0 ? undefined : goToPreviousPhase}
+          backLabel="Atrás"
+          onNext={goToNextPhase}
+          isLastPhase={phase === TOTAL_PHASES - 1}
+          submitting={submitting}
+        />
+
+        {phase === TOTAL_PHASES - 1 && (
+          <div className="nx-sticky-actions nx-actions">
+            <button
+              type="submit"
+              className="nx-btn nx-btn-primary"
+              style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
+              disabled={submitting}
+            >
+              {submitting ? 'Creando…' : 'Crear juego'}
+            </button>
+            <button
+              type="button"
+              className="nx-btn nx-btn-secondary border border-border text-text-h"
+              onClick={goToPreviousPhase}
+              disabled={submitting}
+            >
+              ← Atrás
+            </button>
+            <button
+              type="button"
+              className="nx-btn nx-btn-secondary border border-border text-text-h"
+              onClick={onClose}
+              disabled={submitting}
+            >
+              Cancelar
+            </button>
+          </div>
+        )}
       </form>
     </GameFormShell>
   )
