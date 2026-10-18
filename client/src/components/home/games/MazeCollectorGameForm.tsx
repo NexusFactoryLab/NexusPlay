@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Rocket, FolderOpen, Smile, Ghost, Gem } from 'lucide-react'
+import { Rocket, FolderOpen, Smile, Ghost, Gem, SlidersHorizontal } from 'lucide-react'
 import type { FormEvent } from 'react'
 import { TextField } from '../../TextField'
 import { SaveVisibilityModal } from './SaveVisibilityModal'
@@ -8,9 +8,11 @@ import { IconPickerField } from './IconPickerField'
 import { AiGameAssistantPanel } from './AiGameAssistantPanel'
 import { useReportCreateSummary } from './aiDraftContext'
 import { GameFormShell } from './GameFormShell'
-import { FormSection } from './create/FormSection'
-import { AdvancedSettings } from './create/AdvancedSettings'
+import { WizardPhaseNav } from './WizardPhaseNav'
+import { FormSection, PhaseLabel } from './create/FormSection'
 import { FormSelect } from './create/FormSelect'
+import { ItemGridEditor } from './create/ItemGridEditor'
+import { useCreateGameProgress } from './create/CreateGameProgressContext'
 import type { GameDraft } from '../../../services/ai-game-assistant.service'
 import { OrganizationSelectField } from './create/OrganizationSelectField'
 import { CategorySelectField } from './create/CategorySelectField'
@@ -71,6 +73,14 @@ function emptyItem(index: number): ItemDraft {
   }
 }
 
+/** Fases del formulario (issue #218): Identidad, Configuración del laberinto y Contenido (objetos). */
+const PHASES = [
+  { label: 'Identidad del juego' },
+  { label: 'Configuración del laberinto' },
+  { label: 'Contenido: objetos' },
+] as const
+const TOTAL_PHASES = PHASES.length
+
 type MazeCollectorGameFormProps = {
   /** Borrador de adaptación desde otro juego (issue #8); pre-llena el formulario al montar. */
   adaptation?: AdaptedGameDraft
@@ -109,6 +119,16 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [createdGameId, setCreatedGameId] = useState<string | null>(null)
+  const [phase, setPhase] = useState(0)
+  const [selectedItem, setSelectedItem] = useState(0)
+  const { setSubPhase } = useCreateGameProgress()
+
+  // Informa al header del wizard en qué fase va este formulario; se limpia al desmontar.
+  useEffect(() => {
+    setSubPhase({ phase: phase + 1, totalPhases: TOTAL_PHASES, phaseLabel: PHASES[phase].label })
+    return () => setSubPhase(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase])
 
   useEffect(() => {
     if (!token) return
@@ -136,6 +156,8 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
 
   function applyAiDraft(draft: GameDraft) {
     const items = Array.isArray(draft.content) ? draft.content : []
+    // El panel sigue al objeto más reciente mientras la IA llena la lista.
+    setSelectedItem(Math.max(items.length - 1, 0))
     setItems(
       items.map((item, index) => {
         const raw = (item ?? {}) as Record<string, unknown>
@@ -176,39 +198,66 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
 
   function removeItem(index: number) {
     setItems((current) => (current.length > MIN_MAZE_ITEMS ? current.filter((_, i) => i !== index) : current))
+    setSelectedItem((current) => Math.max(0, Math.min(current, items.length - 2)))
+  }
+
+  /** Fase 1 (Identidad): título, descripción, materia. */
+  function validateIdentityPhase(): string | null {
+    if (!title.trim() || title.trim().length < 3) return 'El título debe tener al menos 3 caracteres.'
+    if (!description.trim() || description.trim().length < 10) return 'La descripción debe tener al menos 10 caracteres.'
+    if (!categoryId) return 'Elige una materia para el juego.'
+    return null
+  }
+
+  /** Fase 2 (Configuración): personaje y enemigos con nombre. */
+  function validateConfigPhase(): string | null {
+    if (!collectorLabel.trim() || !enemyLabel.trim()) {
+      return 'Ponle nombre al personaje que recolecta y a los enemigos.'
+    }
+    return null
+  }
+
+  /** Fase 3 (Contenido): la lista de objetos. */
+  function validateContentPhase(): string | null {
+    if (items.length < MIN_MAZE_ITEMS) return `Necesitas al menos ${MIN_MAZE_ITEMS} objetos.`
+    if (items.length > MAX_MAZE_ITEMS) return `El recolector admite como máximo ${MAX_MAZE_ITEMS} objetos.`
+    const emptyAt = items.findIndex((item) => !item.label.trim())
+    if (emptyAt !== -1) {
+      // El panel edita un objeto a la vez: se abre el primero que falta.
+      setSelectedItem(emptyAt)
+      return 'Cada objeto necesita un nombre antes de crear el juego.'
+    }
+    return null
+  }
+
+  const VALIDATORS = [validateIdentityPhase, validateConfigPhase, validateContentPhase]
+
+  function goToNextPhase() {
+    const validationError = VALIDATORS[phase]()
+    if (validationError) {
+      setError(validationError)
+      return
+    }
+    setError(null)
+    setPhase((current) => Math.min(current + 1, TOTAL_PHASES - 1))
+  }
+
+  function goToPreviousPhase() {
+    setError(null)
+    setPhase((current) => Math.max(current - 1, 0))
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!token) return
 
-    if (!title.trim() || title.trim().length < 3) {
-      setError('El título debe tener al menos 3 caracteres.')
-      return
-    }
-    if (!description.trim() || description.trim().length < 10) {
-      setError('La descripción debe tener al menos 10 caracteres.')
-      return
-    }
-    if (!categoryId) {
-      setError('Elige una materia para el juego.')
-      return
-    }
-    if (!collectorLabel.trim() || !enemyLabel.trim()) {
-      setError('Ponle nombre al personaje que recolecta y a los enemigos.')
-      return
-    }
-    if (items.length < MIN_MAZE_ITEMS) {
-      setError(`Necesitas al menos ${MIN_MAZE_ITEMS} objetos.`)
-      return
-    }
-    if (items.length > MAX_MAZE_ITEMS) {
-      setError(`El recolector admite como máximo ${MAX_MAZE_ITEMS} objetos.`)
-      return
-    }
-    if (items.some((item) => !item.label.trim())) {
-      setError('Cada objeto necesita un nombre antes de crear el juego.')
-      return
+    // Se revalida todo por si el usuario retrocedió y cambió algo.
+    for (const validate of VALIDATORS) {
+      const validationError = validate()
+      if (validationError) {
+        setError(validationError)
+        return
+      }
     }
 
     setSubmitting(true)
@@ -275,6 +324,10 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
       aiPanel={<AiGameAssistantPanel gameType="MAZE_COLLECTOR" disabled={submitting} onDraftReady={applyAiDraft} />}
     >
       <form className="flex flex-col gap-[16px]" onSubmit={handleSubmit} noValidate>
+        <PhaseLabel phase={phase + 1} total={TOTAL_PHASES} label={PHASES[phase].label} />
+
+        {phase === 0 && (
+        <>
         <FormSection icon={Rocket} title="Cuéntanos de tu juego" subtitle="Nombre, portada y el lugar donde vivirá." tone={1}>
 <TextField label="Título del juego" type="text" value={title} disabled={submitting} onChange={setTitle} onBlur={() => {}} />
         <TextField
@@ -295,7 +348,28 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
         />
 </FormSection>
 
-        <AdvancedSettings summary="Forma, vidas y velocidad">
+        <FormSection icon={FolderOpen} title="Dónde vivirá" subtitle="Materia y organización para encontrarlo fácil." tone={4}>
+          <CategorySelectField
+            token={token}
+            categories={categories}
+            categoryId={categoryId}
+            onCategoryIdChange={setCategoryId}
+            onCategoryCreated={(category) => {
+              setCategories((current) => [...current, category])
+              onCategoryCreated()
+            }}
+            disabled={submitting}
+            showToast={showToast}
+          />
+
+          <OrganizationSelectField organizations={organizations} value={organizationId} disabled={submitting} onChange={setOrganizationId} />
+        </FormSection>
+        </>
+        )}
+
+        {phase === 1 && (
+        <>
+        <FormSection icon={SlidersHorizontal} title="Reglas del laberinto" subtitle="Forma, vidas y velocidad de los enemigos." tone={4}>
         <div>
           <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="maze-layout">
             Forma del laberinto
@@ -347,7 +421,7 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
             />
           </div>
         </div>
-        </AdvancedSettings>
+        </FormSection>
 
         <FormSection icon={Smile} title="Personaje que recolecta" subtitle="Quién recorre el laberinto juntando objetos." tone={2}>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -399,107 +473,82 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
           </div>
         </FormSection>
 
-        <FormSection icon={FolderOpen} title="Dónde vivirá" subtitle="Materia y organización para encontrarlo fácil." tone={4}>
-<CategorySelectField
-          token={token}
-          categories={categories}
-          categoryId={categoryId}
-          onCategoryIdChange={setCategoryId}
-          onCategoryCreated={(category) => {
-            setCategories((current) => [...current, category])
-            onCategoryCreated()
-          }}
-          disabled={submitting}
-          showToast={showToast}
-        />
+        </>
+        )}
 
-        <OrganizationSelectField organizations={organizations} value={organizationId} disabled={submitting} onChange={setOrganizationId} />
-</FormSection>
-
+        {phase === 2 && (
         <FormSection icon={Gem} title="Objetos a recolectar" subtitle="Lo que el personaje junta, con un dato curioso de cada uno." tone={3} bare>
-<div className="nx-items">
-          {items.map((item, index) => {
+        <ItemGridEditor
+          itemLabel="Objeto"
+          addLabel="+ Agregar objeto"
+          count={items.length}
+          minItems={MIN_MAZE_ITEMS}
+          maxItems={MAX_MAZE_ITEMS}
+          selected={selectedItem}
+          onSelect={setSelectedItem}
+          onAdd={addItem}
+          onRemove={removeItem}
+          disabled={submitting}
+          isComplete={(index) => !!items[index]?.label.trim()}
+          tileText={(index) => items[index]?.label ?? ''}
+          tileVisual={(index) => {
+            const item = items[index]
+            if (!item) return null
             const Icon = iconForConcept(item.icon)
             return (
-              <div key={index} className="nx-item">
-                <div className="nx-item-head">
-                  <div className="flex items-center gap-2">
-                    <Icon className="h-4 w-4" style={{ color: item.color }} strokeWidth={2} />
-                    <span className="nx-item-num" aria-hidden="true">{index + 1}</span>
-<p className="nx-item-title">Objeto<span className="sr-only"> {index + 1}</span></p>
-                  </div>
-                  {items.length > MIN_MAZE_ITEMS && (
-                    <button
-                      type="button"
-                      className="nx-remove"
-                      onClick={() => removeItem(index)}
-                      disabled={submitting}
-                    >
-                      Quitar
-                    </button>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <TextField
-                    label="Nombre"
-                    type="text"
-                    value={item.label}
-                    disabled={submitting}
-                    onChange={(value) => updateItem(index, 'label', value)}
-                    onBlur={() => {}}
-                  />
-                  <div>
-                    <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor={`item-icon-${index}`}>
-                      Ícono
-                    </label>
-                    <IconPickerField
-                      id={`item-icon-${index}`}
-                      value={item.icon}
-                      labels={MAZE_ICON_LABELS}
-                      disabled={submitting}
-                      onChange={(key) => updateItem(index, 'icon', key)}
-                    />
-                  </div>
-                  <div>
-                    <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor={`item-color-${index}`}>
-                      Color
-                    </label>
-                    <input
-                      id={`item-color-${index}`}
-                      type="color"
-                      className="h-[45px] w-full cursor-pointer rounded-lg border border-border bg-bg px-2 py-1.5 outline-none focus:border-accent"
-                      value={item.color}
-                      disabled={submitting}
-                      onChange={(event) => updateItem(index, 'color', event.target.value)}
-                    />
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <TextField
-                    label="Dato educativo (opcional)"
-                    type="text"
-                    value={item.fact}
-                    disabled={submitting}
-                    onChange={(value) => updateItem(index, 'fact', value)}
-                    onBlur={() => {}}
-                  />
-                </div>
-              </div>
+              <span className="nx-gi-swatch" style={{ background: item.color }}>
+                <Icon className="h-6 w-6" strokeWidth={2.2} />
+              </span>
             )
-          })}
-        </div>
-
-        {items.length < MAX_MAZE_ITEMS && (
-          <button
-            type="button"
-            className="nx-add border border-dashed border-border"
-            onClick={addItem}
-            disabled={submitting}
-          >
-            + Agregar objeto
-          </button>
+          }}
+          renderEditor={(index) => (
+            <div className="flex flex-col gap-3">
+              <TextField
+                label="Nombre"
+                type="text"
+                value={items[index]?.label ?? ''}
+                disabled={submitting}
+                onChange={(value) => updateItem(index, 'label', value)}
+                onBlur={() => {}}
+              />
+              <div>
+                <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor={`item-icon-${index}`}>
+                  Ícono
+                </label>
+                <IconPickerField
+                  id={`item-icon-${index}`}
+                  value={items[index]?.icon ?? ''}
+                  labels={MAZE_ICON_LABELS}
+                  disabled={submitting}
+                  onChange={(key) => updateItem(index, 'icon', key)}
+                />
+              </div>
+              <div>
+                <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor={`item-color-${index}`}>
+                  Color
+                </label>
+                <input
+                  id={`item-color-${index}`}
+                  type="color"
+                  className="h-[45px] w-full cursor-pointer rounded-lg border border-border bg-bg px-2 py-1.5 outline-none focus:border-accent"
+                  value={items[index]?.color ?? '#888888'}
+                  disabled={submitting}
+                  onChange={(event) => updateItem(index, 'color', event.target.value)}
+                />
+              </div>
+              <TextField
+                label="Dato educativo (opcional)"
+                type="text"
+                value={items[index]?.fact ?? ''}
+                disabled={submitting}
+                onChange={(value) => updateItem(index, 'fact', value)}
+                onBlur={() => {}}
+              />
+            </div>
+          )}
+        />
+        </FormSection>
         )}
-</FormSection>
 
         {error && (
           <p className="nx-alert" role="alert">
@@ -507,24 +556,42 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
           </p>
         )}
 
-        <div className="nx-sticky-actions nx-actions">
-          <button
-            type="submit"
-            className="nx-btn nx-btn-primary"
-            style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
-            disabled={submitting}
-          >
-            {submitting ? 'Creando…' : 'Crear juego'}
-          </button>
-          <button
-            type="button"
-            className="nx-btn nx-btn-secondary border border-border text-text-h"
-            onClick={onClose}
-            disabled={submitting}
-          >
-            Cancelar
-          </button>
-        </div>
+        <WizardPhaseNav
+          onBack={phase === 0 ? undefined : goToPreviousPhase}
+          backLabel="Atrás"
+          onNext={goToNextPhase}
+          isLastPhase={phase === TOTAL_PHASES - 1}
+          submitting={submitting}
+        />
+
+        {phase === TOTAL_PHASES - 1 && (
+          <div className="nx-sticky-actions nx-actions">
+            <button
+              type="submit"
+              className="nx-btn nx-btn-primary"
+              style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
+              disabled={submitting}
+            >
+              {submitting ? 'Creando…' : 'Crear juego'}
+            </button>
+            <button
+              type="button"
+              className="nx-btn nx-btn-secondary border border-border text-text-h"
+              onClick={goToPreviousPhase}
+              disabled={submitting}
+            >
+              ← Atrás
+            </button>
+            <button
+              type="button"
+              className="nx-btn nx-btn-secondary border border-border text-text-h"
+              onClick={onClose}
+              disabled={submitting}
+            >
+              Cancelar
+            </button>
+          </div>
+        )}
       </form>
     </GameFormShell>
   )
