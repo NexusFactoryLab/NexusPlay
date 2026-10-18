@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bot, Dices, Flame, Ghost, Layers, Loader2, Puzzle, Trash2, UserRoundSearch } from 'lucide-react'
+import { Loader2, Trash2 } from 'lucide-react'
 import { useAuth } from '../../../hooks/useAuth'
 import { useToast } from '../../../hooks/useToast'
 import {
@@ -9,28 +9,11 @@ import {
   type CreationDraftSummary,
 } from '../../../services/game-creation-draft.service'
 import { Modal } from './Modal'
-import { modeColorForGameType } from './gameModeVisuals'
-import {
-  MAX_CREATION_DRAFTS,
-  draftResumePath,
-  draftTypeLabel,
-  expiryNotice,
-  relativeTimeEs,
-  sortDraftsNewestFirst,
-} from './creationDraftSupport'
+import { CreationDraftIdentity } from './CreationDraftIdentity'
+import { MAX_CREATION_DRAFTS, draftResumePath, sortDraftsNewestFirst } from './creationDraftSupport'
 
 type CreationDraftsModalProps = {
   onClose: () => void
-}
-
-const ICON_BY_GAME_TYPE: Record<string, typeof Layers> = {
-  MEMORY_MATCH: Layers,
-  GUESS_WHO: UserRoundSearch,
-  DOMINO: Puzzle,
-  MAZE_COLLECTOR: Ghost,
-  SNAKES_LADDERS: Dices,
-  DUAL_QUEST: Flame,
-  TRUE_FALSE_MAZE: Bot,
 }
 
 /**
@@ -39,7 +22,7 @@ const ICON_BY_GAME_TYPE: Record<string, typeof Layers> = {
  * todo restaurado) y Descartar (con confirmación en la propia fila). Los
  * borradores vencen a los 7 días sin cambios.
  */
-export function CreationDraftsModal({ onClose }: CreationDraftsModalProps) {
+export function CreationDraftsModal({ onClose }:CreationDraftsModalProps) {
   const { token } = useAuth()
   const { showToast } = useToast()
   const navigate = useNavigate()
@@ -109,30 +92,13 @@ export function CreationDraftsModal({ onClose }: CreationDraftsModalProps) {
       {drafts && drafts.length > 0 && (
         <ul className="flex max-h-[60vh] flex-col gap-2 overflow-y-auto pr-1">
           {drafts.map((draft) => {
-            const Icon = ICON_BY_GAME_TYPE[draft.gameType] ?? Layers
-            const notice = expiryNotice(draft.updatedAt, now)
             const confirming = confirmingId === draft.id
             return (
               <li
                 key={draft.id}
                 className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface px-3.5 py-3"
               >
-                <span
-                  aria-hidden="true"
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-white"
-                  style={{ background: modeColorForGameType(draft.gameType) }}
-                >
-                  <Icon className="h-5 w-5" strokeWidth={2} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[14px] font-semibold text-text-h">
-                    {draft.gameName || 'Juego sin nombre'}
-                  </p>
-                  <p className="text-[12px] text-text">
-                    {draftTypeLabel(draft.gameType, draft.mode)} · {relativeTimeEs(draft.updatedAt, now)}
-                  </p>
-                  {notice && <p className="text-[12px] font-semibold text-danger">{notice}</p>}
-                </div>
+                <CreationDraftIdentity draft={draft} now={now} />
                 {confirming ? (
                   <div className="flex items-center gap-2" role="group" aria-label="Confirmar descarte">
                     <span className="text-[13px] font-medium text-text-h">¿Descartar?</span>

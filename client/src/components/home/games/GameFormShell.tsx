@@ -5,6 +5,7 @@ import { AlertTriangle, ArrowLeft, Check, ClipboardCheck, Gamepad2, Info, Pencil
 import { useAuth } from '../../../hooks/useAuth'
 import { useToast } from '../../../hooks/useToast'
 import {
+  discardCreationDraft,
   getCreationDraft,
   saveCreationDraftAi,
   saveCreationDraftForm,
@@ -16,7 +17,6 @@ import {
   initialTouched,
   saveErrorMessage,
   shouldAutosave,
-  type SaveErrorKind,
   type AiResultCache,
 } from './creationDraftSupport'
 import {
@@ -31,7 +31,8 @@ import {
   type CreateSummary,
 } from './aiDraftContext'
 import { Modal } from './Modal'
-import { CreationDraftsModal } from './CreationDraftsModal'
+import { DraftLimitModal } from './DraftLimitModal'
+import { DraftSaveController, type DraftSaveDeps } from './draftSaveController'
 import { useOptionalCreateGameProgress } from './create/CreateGameProgressContext'
 import {
   FieldAssistContext,
@@ -211,33 +212,55 @@ export function GameFormShell({
   })
   const draftStateKey = JSON.stringify(draftState)
 
-  // Fallos del autoguardado: se avisa UNA vez por tipo de fallo (sin spamear) y,
-  // si es el tope de borradores, se ofrece ir a "Ver borradores" para descartar uno.
-  const [limitReached, setLimitReached] = useState(false)
-  const [showDrafts, setShowDrafts] = useState(false)
-  const saveErrorShown = useRef<SaveErrorKind | null>(null)
-  const handleSaveError = useCallback(
-    (error: unknown) => {
-      const kind = classifySaveError(error)
-      if (kind === 'limit') setLimitReached(true)
-      if (saveErrorShown.current === kind) return
-      saveErrorShown.current = kind
-      showToast(saveErrorMessage(kind, error), 'error', 8000)
-    },
-    [showToast],
-  )
-  const handleSaveOk = useCallback(() => {
-    saveErrorShown.current = null
-    setLimitReached(false)
-  }, [])
+  // Guardado frente al tope de 5 borradores: el controlador retiene en memoria el
+  // resultado de la IA que el servidor rechazó, avisa una sola vez con un modal y
+  // reintenta con los siguientes cambios sin reabrirlo (queda un indicador).
+  const [blocked, setBlocked] = useState(false)
+  const [showLimit, setShowLimit] = useState(false)
+  const otherErrorShown = useRef(false)
+  const [controller] = useState(() => new DraftSaveController({} as DraftSaveDeps))
+  useEffect(() => {
+    controller.deps = {
+      saveForm: (state) => {
+        if (!token || !draftGameType) return Promise.resolve()
+        return saveCreationDraftForm(token, draftId, draftGameType, draftMode, state)
+      },
+      saveAi: (payload) => {
+        if (!token || !draftGameType) return Promise.resolve()
+        return saveCreationDraftAi(
+          token,
+          draftId,
+          draftGameType,
+          draftMode,
+          payload.result,
+          payload.message,
+          payload.files,
+        )
+      },
+      discard: () => (token ? discardCreationDraft(token, draftId) : Promise.resolve()),
+      onBlocked: (first) => {
+        setBlocked(true)
+        if (first) setShowLimit(true)
+      },
+      onUnblocked: () => {
+        setBlocked(false)
+        setShowLimit(false)
+      },
+      onOtherError: (error) => {
+        if (otherErrorShown.current) return
+        otherErrorShown.current = true
+        showToast(saveErrorMessage(classifySaveError(error), error), 'error', 8000)
+      },
+    }
+  })
 
   const saveFormNow = useCallback(() => {
     saveTimer.current = null
     if (!token || !draftGameType || !persistReady.current) return
-    saveCreationDraftForm(token, draftId, draftGameType, draftMode, draftStateRef.current)
-      .then(handleSaveOk)
-      .catch(handleSaveError)
-  }, [token, draftId, draftGameType, draftMode, handleSaveOk, handleSaveError])
+    void controller.saveForm(draftStateRef.current).then((saved) => {
+      if (saved) otherErrorShown.current = false
+    })
+  }, [token, draftGameType, controller])
 
   const scheduleFormSave = useCallback(
     (delayMs: number) => {
@@ -300,14 +323,10 @@ export function GameFormShell({
       save: (result, message, files) => {
         aiCache.current = buildAiCache(message, files, result)
         touched.current = true
-        if (token && draftGameType) {
-          saveCreationDraftAi(token, draftId, draftGameType, draftMode, result, message, files)
-            .then(handleSaveOk)
-            .catch(handleSaveError)
-        }
+        if (token && draftGameType) void controller.saveAi({ result, message, files })
       },
     }),
-    [aiRestore, token, draftId, draftGameType, draftMode, handleSaveOk, handleSaveError],
+    [aiRestore, token, draftGameType, controller],
   )
 
   const uploadInfo = useMemo<DraftUploadInfo>(
@@ -432,14 +451,8 @@ export function GameFormShell({
     } else onBack()
   }, [dirty, onBack])
 
-  const confirmLeaveNow = useCallback(() => {
-    // Lo escrito queda guardado como borrador: se envía lo último antes de salir.
-    if (saveTimer.current !== null) window.clearTimeout(saveTimer.current)
-    saveFormNow()
-    setConfirmLeave(false)
-    setDirty(false)
-    dirtyRef.current = false
-    const pending = pendingLeave.current
+  const performLeave = useCallback(
+    (pending: PendingLeave) => {
     if (pending.kind === 'history') {
       // La persona ya retrocedió una vez (se repuso la guardia): se salen las dos entradas.
       historyGuarded.current = false
@@ -454,7 +467,45 @@ export function GameFormShell({
       window.addEventListener('popstate', () => leave(), { once: true })
       window.history.back()
     } else leave()
-  }, [saveFormNow, navigate, onBack])
+    },
+    [navigate, onBack],
+  )
+
+  const confirmLeaveNow = useCallback(() => {
+    // Lo escrito queda guardado como borrador: se envía lo último antes de salir.
+    // (Si el tope de borradores lo impide, el aviso de salida ya lo advirtió.)
+    if (saveTimer.current !== null) window.clearTimeout(saveTimer.current)
+    saveFormNow()
+    setConfirmLeave(false)
+    setDirty(false)
+    dirtyRef.current = false
+    performLeave(pendingLeave.current)
+  }, [saveFormNow, performLeave])
+
+  /** Eliminar otro borrador para liberar cupo y guardar ya lo pendiente (formulario e IA). */
+  const handleDeleteAndSave = useCallback(
+    async (otherDraftId: string): Promise<boolean> => {
+      if (!token) return false
+      await discardCreationDraft(token, otherDraftId)
+      const saved = await controller.retryAfterFreeingSlot(draftStateRef.current)
+      if (saved) showToast('Borrador guardado', 'success')
+      return saved
+    },
+    [token, controller, showToast],
+  )
+
+  /** Descartar todo el progreso en curso y salir como en el flujo normal. */
+  const handleDiscardProgress = useCallback(async () => {
+    if (saveTimer.current !== null) window.clearTimeout(saveTimer.current)
+    persistReady.current = false
+    await controller.discardProgress()
+    setShowLimit(false)
+    setDirty(false)
+    dirtyRef.current = false
+    showToast('Progreso descartado', 'success')
+    performLeave({ kind: 'back' })
+  }, [controller, performLeave, showToast])
+
 
   // Foco al encabezado al cambiar de fase del formulario.
   const phaseNumber = subPhase?.phase ?? 0
@@ -764,21 +815,17 @@ export function GameFormShell({
             </button>
           </div>
         </div>
-        {limitReached && (
-          <div role="alert" className="nx-notice mb-4">
+        {blocked && !showLimit && (
+          <button
+            type="button"
+            className="nx-notice mb-4 w-full text-left"
+            onClick={() => setShowLimit(true)}
+          >
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-danger" strokeWidth={2.2} />
-            <p className="flex-1">
-              <strong>Este juego no se está guardando como borrador.</strong> Ya tienes el máximo de borradores.
-              Descarta uno para que este se guarde solo.
-            </p>
-            <button
-              type="button"
-              className="shrink-0 rounded-lg bg-accent px-3 py-1.5 text-[13px] font-semibold text-white"
-              onClick={() => setShowDrafts(true)}
-            >
-              Ver borradores
-            </button>
-          </div>
+            <span className="flex-1">
+              <strong>Sin guardar: borradores llenos.</strong> Pulsa para elegir qué borrador eliminar y guardar este.
+            </span>
+          </button>
         )}
         <h2 ref={headingRef} tabIndex={-1} className="mb-1 text-[20px] tracking-tight text-text-h outline-none">
           {title}
@@ -962,22 +1009,40 @@ export function GameFormShell({
           )}
         </div>
       </div>
-      {showDrafts && (
-        <CreationDraftsModal
-          onClose={() => {
-            setShowDrafts(false)
-            // Si se descartó uno, se reintenta guardar este borrador de inmediato.
-            scheduleFormSave(0)
-          }}
+      {showLimit && (
+        <DraftLimitModal
+          currentDraftId={draftId}
+          onKeepEditing={() => setShowLimit(false)}
+          onDeleteAndSave={handleDeleteAndSave}
+          onDiscardProgress={handleDiscardProgress}
         />
       )}
       {confirmLeave && (
         <Modal onClose={() => setConfirmLeave(false)} maxWidthClassName="max-w-[400px]" ariaLabel="¿Salir sin guardar?">
           <h3 className="mb-1 text-[17px] font-semibold text-text-h">¿Salir sin terminar?</h3>
           <p className="mb-5 text-[13.5px] text-text">
-            El juego no se ha creado. Lo que llevas queda guardado como borrador para que lo retomes después.
+            {blocked ? (
+              <>
+                <strong>Lo que llevas NO está guardado:</strong> ya tienes el máximo de borradores y se perderá si
+                sales (incluido lo que generó la IA).
+              </>
+            ) : (
+              'El juego no se ha creado. Lo que llevas queda guardado como borrador para que lo retomes después.'
+            )}
           </p>
-          <div className="flex justify-end gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
+            {blocked && (
+              <button
+                type="button"
+                className="rounded-lg border border-border px-4 py-2 text-[14px] font-medium text-text-h"
+                onClick={() => {
+                  setConfirmLeave(false)
+                  setShowLimit(true)
+                }}
+              >
+                Ver opciones
+              </button>
+            )}
             <button
               type="button"
               autoFocus

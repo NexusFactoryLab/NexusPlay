@@ -227,6 +227,11 @@ describe('GameCreationDraftService', () => {
     it('es idempotente si la fila ya no existe', async () => {
       await expect(service.discard('u1', ID_A)).resolves.toBeUndefined();
     });
+
+    it('sin fila (borrador que el tope impidió guardar) igual borra lo subido con su etiqueta', async () => {
+      await service.discard('u1', ID_A);
+      expect(assets.deleted).toEqual([`draft-${ID_A}`]);
+    });
   });
 
   describe('deleteExpired', () => {
