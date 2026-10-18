@@ -1,15 +1,19 @@
 import { useEffect, useState } from 'react'
+import { Rocket, SlidersHorizontal, Users } from 'lucide-react'
 import type { FormEvent } from 'react'
 import { TextField } from '../../TextField'
 import { SaveVisibilityModal } from './SaveVisibilityModal'
 import { ImageUploadField } from './ImageUploadField'
 import { AudioUploadField } from './AudioUploadField'
 import { AiGameAssistantPanel } from './AiGameAssistantPanel'
+import { useReportCreateSummary } from './aiDraftContext'
 import { GameFormShell } from './GameFormShell'
 import { WizardPhaseNav } from './WizardPhaseNav'
+import { FormSection, PhaseLabel } from './create/FormSection'
 import type { GameDraft } from '../../../services/ai-game-assistant.service'
 import { OrganizationSelectField } from './create/OrganizationSelectField'
 import { CategorySelectField } from './create/CategorySelectField'
+import { ItemGridEditor } from './create/ItemGridEditor'
 import { useCreateGameProgress } from './create/CreateGameProgressContext'
 import { useAuth } from '../../../hooks/useAuth'
 import { useToast } from '../../../hooks/useToast'
@@ -91,6 +95,7 @@ export function GuessWhoGameForm({
   const [submitting, setSubmitting] = useState(false)
   const [createdGameId, setCreatedGameId] = useState<string | null>(null)
   const [phase, setPhase] = useState(0)
+  const [selectedCard, setSelectedCard] = useState(0)
   const { setSubPhase } = useCreateGameProgress()
 
   // Informa al header del wizard (CreateGameLayout) en qué fase va este
@@ -128,6 +133,8 @@ export function GuessWhoGameForm({
 
   function applyAiDraft(draft: GameDraft) {
     const items = Array.isArray(draft.content) ? draft.content : []
+    // El panel sigue a la tarjeta más reciente mientras la IA llena la lista.
+    setSelectedCard(Math.max(items.length - 1, 0))
     setCards(
       items.map((item) => {
         const raw = (item ?? {}) as Record<string, unknown>
@@ -153,6 +160,7 @@ export function GuessWhoGameForm({
 
   function removeCard(index: number) {
     setCards((current) => (current.length > MIN_CARDS ? current.filter((_, i) => i !== index) : current))
+    setSelectedCard((current) => Math.max(0, Math.min(current, cards.length - 2)))
   }
 
   /** Valida solo los campos de la fase 1 (Identidad): título, descripción, Ã¡rea. */
@@ -182,8 +190,10 @@ export function GuessWhoGameForm({
     if (cards.length < MIN_CARDS) {
       return `Necesitas al menos ${MIN_CARDS} tarjetas.`
     }
-    const incompleteCard = cards.some((card) => !card.label.trim() || !card.imageUrl)
-    if (incompleteCard) {
+    const firstIncomplete = cards.findIndex((card) => !card.label.trim() || !card.imageUrl)
+    if (firstIncomplete !== -1) {
+      // El panel edita una tarjeta a la vez: se abre la primera que falta.
+      setSelectedCard(firstIncomplete)
       return 'Cada tarjeta necesita una imagen y un nombre antes de crear el juego.'
     }
     return null
@@ -258,6 +268,8 @@ export function GuessWhoGameForm({
     showToast('Juego creado', 'success')
   }
 
+  useReportCreateSummary({ count: cards.length, itemsLabel: 'tarjetas', missingImages: cards.filter((card) => !card.imageUrl).length })
+
   if (createdGameId) {
     return (
       <SaveVisibilityModal
@@ -272,7 +284,8 @@ export function GuessWhoGameForm({
       backLabel="Cambiar tipo de juego"
       onBack={onBack}
       title="¿Quién Es?"
-      description="Cada tarjeta tiene una imagen, un nombre y un audio opcional. Se juega en una sala en vivo entre 2 personas — abre la sala desde el detalle del juego una vez creado."
+      description="Cada tarjeta tiene imagen, nombre y audio opcional."
+      descriptionDetail="Se juega en una sala en vivo entre 2 personas: abre la sala desde el detalle del juego una vez creado."
       aiPanel={
         <AiGameAssistantPanel
           gameType="GUESS_WHO"
@@ -283,12 +296,10 @@ export function GuessWhoGameForm({
       }
     >
       <form className="flex flex-col gap-[16px]" onSubmit={handleSubmit} noValidate>
-        <p className="text-[11.5px] font-semibold uppercase tracking-wide text-accent">
-          Fase {phase + 1} de {TOTAL_PHASES} · {PHASES[phase].label}
-        </p>
+        <PhaseLabel phase={phase + 1} total={TOTAL_PHASES} label={PHASES[phase].label} />
 
         {phase === 0 && (
-          <div className="flex flex-col gap-[16px] animate-[fade-in-up_0.25s_ease-out_backwards]">
+          <FormSection icon={Rocket} title="Cuéntanos de tu juego" subtitle="Nombre, portada y el lugar donde vivirá." tone={1}>
             <TextField
               label="Título del juego"
               type="text"
@@ -333,13 +344,13 @@ export function GuessWhoGameForm({
               disabled={submitting}
               onChange={setOrganizationId}
             />
-          </div>
+          </FormSection>
         )}
 
         {phase === 1 && (
-          <div className="flex flex-col gap-[16px] animate-[fade-in-up_0.25s_ease-out_backwards]">
+          <FormSection icon={SlidersHorizontal} title="Reglas del juego" subtitle="Cuándo pueden acusar los jugadores." tone={2}>
             <div>
-              <label className="mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="max-accusation-count">
+              <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="max-accusation-count">
                 Cartas restantes para poder acusar
               </label>
               <input
@@ -352,57 +363,53 @@ export function GuessWhoGameForm({
                 disabled={submitting}
                 onChange={(event) => setMaxAccusationCount(Number(event.target.value))}
               />
-              <p className="mt-1 text-[11.5px] text-text">Entre 2 y 12 tarjetas.</p>
+              <p className="nx-hint mt-1 text-[11.5px] text-text">Entre 2 y 12 tarjetas.</p>
             </div>
-          </div>
+          </FormSection>
         )}
 
         {phase === 2 && (
-        <div className="grid grid-cols-1 gap-3 animate-[fade-in-up_0.25s_ease-out_backwards] xl:grid-cols-2">
-          {cards.map((card, index) => (
-            <div key={index} className="rounded-xl border border-border p-4">
-              <div className="mb-2.5 flex items-center justify-between">
-                <p className="text-[13px] font-semibold text-text-h">Tarjeta {index + 1}</p>
-                {cards.length > MIN_CARDS && (
-                  <button
-                    type="button"
-                    className="text-[12px] font-medium text-danger"
-                    onClick={() => removeCard(index)}
-                    disabled={submitting}
-                  >
-                    Quitar
-                  </button>
-                )}
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <TextField
-                  label="Nombre"
-                  type="text"
-                  value={card.label}
-                  disabled={submitting}
-                  onChange={(value) => updateCard(index, 'label', value)}
-                  onBlur={() => {}}
-                />
-                <ImageUploadField
-                  label="Imagen"
-                  imageUrl={card.imageUrl}
-                  folder="guess-who-cards"
-                  disabled={submitting}
-                  onChange={(url) => updateCard(index, 'imageUrl', url)}
-                />
-              </div>
-              <div className="mt-3">
-                <AudioUploadField
-                  label="Audio (opcional)"
-                  audioUrl={card.audioUrl}
-                  folder="guess-who-audio"
-                  disabled={submitting}
-                  onChange={(url) => updateCard(index, 'audioUrl', url)}
-                />
-              </div>
-              <div className="mt-3">
+        <FormSection icon={Users} title="Tarjetas" subtitle="Cada tarjeta es un personaje o concepto para adivinar." tone={3} bare>
+<ItemGridEditor
+          itemLabel="Tarjeta"
+          addLabel="+ Agregar tarjeta"
+          count={cards.length}
+          minItems={MIN_CARDS}
+          selected={selectedCard}
+          onSelect={setSelectedCard}
+          onAdd={addCard}
+          onRemove={removeCard}
+          disabled={submitting}
+          isComplete={(index) => !!cards[index]?.label.trim() && !!cards[index]?.imageUrl}
+          tileText={(index) => cards[index]?.label ?? ''}
+          tileImage={(index) => cards[index]?.imageUrl}
+          renderEditor={(index) => (
+            <div className="flex flex-col gap-3">
+              <TextField
+                label="Nombre"
+                type="text"
+                value={cards[index]?.label ?? ''}
+                disabled={submitting}
+                onChange={(value) => updateCard(index, 'label', value)}
+                onBlur={() => {}}
+              />
+              <ImageUploadField
+                label="Imagen"
+                imageUrl={cards[index]?.imageUrl ?? null}
+                folder="guess-who-cards"
+                disabled={submitting}
+                onChange={(url) => updateCard(index, 'imageUrl', url)}
+              />
+              <AudioUploadField
+                label="Audio (opcional)"
+                audioUrl={cards[index]?.audioUrl ?? null}
+                folder="guess-who-audio"
+                disabled={submitting}
+                onChange={(url) => updateCard(index, 'audioUrl', url)}
+              />
+              <div>
                 <label
-                  className="mb-1.5 block text-[13px] font-medium text-text-h"
+                  className="nx-label mb-1.5 block text-[13px] font-medium text-text-h"
                   htmlFor={`card-info-${index}`}
                 >
                   Dato curioso (opcional)
@@ -412,32 +419,21 @@ export function GuessWhoGameForm({
                   rows={2}
                   maxLength={MAX_INFO_LENGTH}
                   className="w-full resize-none rounded-lg border border-border bg-bg px-[13px] py-[11px] text-[13.5px] text-text-h outline-none focus:border-accent"
-                  placeholder="Ej. su capital es Buenos Aires y es el país de habla hispana más grande del mundo."
-                  value={card.info}
+                  placeholder="Ej. su capital es Buenos Aires…"
+                  value={cards[index]?.info ?? ''}
                   disabled={submitting}
                   onChange={(event) => updateCard(index, 'info', event.target.value)}
                 />
-                <p className="mt-1 text-[11.5px] text-text">
-                  Aparece como una burbuja de información en la tarjeta durante el juego.
-                </p>
               </div>
             </div>
-          ))}
-
-          <button
-            type="button"
-            className="self-start rounded-lg border border-dashed border-border px-3.5 py-2 text-[13px] font-medium text-text-h xl:col-span-2"
-            onClick={addCard}
-            disabled={submitting}
-          >
-            + Agregar tarjeta
-          </button>
-        </div>
+          )}
+        />
+</FormSection>
         )}
 
         {error && (
           <p
-            className="rounded-lg border border-danger/35 bg-danger/10 px-[13px] py-[11px] text-sm leading-snug text-danger"
+            className="nx-alert"
             role="alert"
           >
             {error}
@@ -445,18 +441,18 @@ export function GuessWhoGameForm({
         )}
 
         <WizardPhaseNav
-          onBack={phase === 0 ? onBack : goToPreviousPhase}
-          backLabel={phase === 0 ? 'Cambiar tipo de juego' : 'Atrás'}
+          onBack={phase === 0 ? undefined : goToPreviousPhase}
+          backLabel="Atrás"
           onNext={goToNextPhase}
           isLastPhase={phase === TOTAL_PHASES - 1}
           submitting={submitting}
         />
 
         {phase === TOTAL_PHASES - 1 && (
-          <div className="flex gap-2">
+          <div className="nx-sticky-actions nx-actions">
             <button
               type="submit"
-              className="rounded-lg px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)] transition-transform hover:not-disabled:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+              className="nx-btn nx-btn-primary"
               style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
               disabled={submitting}
             >
@@ -464,7 +460,7 @@ export function GuessWhoGameForm({
             </button>
             <button
               type="button"
-              className="rounded-lg border border-border px-4 py-2.5 text-[14px] font-medium text-text-h"
+              className="nx-btn nx-btn-secondary border border-border text-text-h"
               onClick={goToPreviousPhase}
               disabled={submitting}
             >
@@ -472,7 +468,7 @@ export function GuessWhoGameForm({
             </button>
             <button
               type="button"
-              className="rounded-lg border border-border px-4 py-2.5 text-[14px] font-medium text-text-h"
+              className="nx-btn nx-btn-secondary border border-border text-text-h"
               onClick={onClose}
               disabled={submitting}
             >

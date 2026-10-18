@@ -2718,6 +2718,1663 @@ code {
   50% { opacity: 0.35; }
 }
 
+/* Issue #52: animaciones del flujo de creación de juegos (cuadrícula de
+ * tipos, etapa de IA y llenado manual). Solo transform/opacity para no
+ * provocar reflow; se apagan con prefers-reduced-motion. */
+@keyframes nx-tile-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.94); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes nx-stage-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes nx-sheen {
+  0% { transform: translateX(-120%) skewX(-18deg); }
+  60%, 100% { transform: translateX(260%) skewX(-18deg); }
+}
+
+@keyframes nx-ring-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--accent-rgb, 59, 130, 246), 0.35); }
+  50% { box-shadow: 0 0 0 8px rgba(var(--accent-rgb, 59, 130, 246), 0); }
+}
+
+.nx-tile-in {
+  animation: nx-tile-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 55ms);
+}
+
+.nx-stage-in {
+  animation: nx-stage-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.nx-tile {
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.25s ease, border-color 0.2s ease;
+}
+.nx-tile:not(:disabled):hover {
+  transform: translateY(-4px);
+  box-shadow: 0 14px 28px -14px var(--tile-color, var(--accent));
+}
+.nx-tile:not(:disabled):active {
+  transform: translateY(-1px) scale(0.97);
+}
+.nx-tile-icon {
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.nx-tile:not(:disabled):hover .nx-tile-icon {
+  transform: scale(1.12) rotate(-6deg);
+}
+
+.nx-manual-card {
+  position: relative;
+  overflow: hidden;
+  animation: nx-ring-pulse 2.6s ease-in-out infinite;
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.nx-manual-card:hover { transform: translateY(-3px); }
+.nx-manual-card:active { transform: scale(0.98); }
+.nx-manual-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+  animation: nx-sheen 3.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nx-tile-in, .nx-stage-in, .nx-manual-card, .nx-manual-card::after {
+    animation: none;
+  }
+  .nx-tile, .nx-tile-icon, .nx-manual-card { transition: none; }
+  .nx-tile:not(:disabled):hover, .nx-tile:not(:disabled):hover .nx-tile-icon,
+  .nx-manual-card:hover { transform: none; }
+}
+
+/* Issue #52: formulario "armándose" mientras la IA genera, y campos que
+ * aparecen en cascada con un destello cuando llega el borrador. */
+@keyframes nx-skeleton {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.8; }
+}
+
+@keyframes nx-field-flash {
+  0% { box-shadow: 0 0 0 0 rgba(var(--accent-rgb, 59, 130, 246), 0.55); }
+  100% { box-shadow: 0 0 0 10px rgba(var(--accent-rgb, 59, 130, 246), 0); }
+}
+
+.nx-skeleton {
+  background: var(--code-bg, rgba(127, 127, 127, 0.2));
+  animation: nx-skeleton 1.3s ease-in-out infinite;
+}
+
+.nx-fill > * {
+  animation: nx-tile-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.nx-fill > *:nth-child(2) { animation-delay: 80ms; }
+.nx-fill > *:nth-child(3) { animation-delay: 160ms; }
+.nx-fill > *:nth-child(4) { animation-delay: 240ms; }
+.nx-fill > *:nth-child(5) { animation-delay: 320ms; }
+.nx-fill > *:nth-child(n + 6) { animation-delay: 400ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .nx-skeleton, .nx-fill > * { animation: none; }
+}
+
+/* Campo que la IA acaba de llenar (GameFormShell.onFillStep). */
+@keyframes nx-just-filled {
+  0% { box-shadow: 0 0 0 0 rgba(var(--accent-rgb, 59, 130, 246), 0.7); background-color: rgba(var(--accent-rgb, 59, 130, 246), 0.18); }
+  100% { box-shadow: 0 0 0 12px rgba(var(--accent-rgb, 59, 130, 246), 0); }
+}
+
+.nx-just-filled {
+  animation: nx-just-filled 1s ease-out;
+  border-color: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nx-just-filled { animation: none; }
+}
+
+/* Salida de la etapa actual al cambiar entre Con IA y Manual. */
+@keyframes nx-stage-out {
+  to { opacity: 0; transform: translateY(-8px) scale(0.98); }
+}
+
+.nx-stage-out {
+  animation: nx-stage-out 0.22s ease-in forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nx-stage-out { animation: none; }
+}
+
+/* Botón "volver" visible (con flecha que se desliza) y selector Con IA / Manual
+ * con pastilla deslizante. Solo transform/opacity/color. */
+.nx-back {
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+.nx-back:hover { transform: translateX(-2px); box-shadow: 0 6px 16px -10px var(--accent); }
+.nx-back:active { transform: translateX(-2px) scale(0.97); }
+.nx-back-icon { transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.nx-back:hover .nx-back-icon { transform: translateX(-4px); }
+
+.nx-seg-thumb {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  border-radius: 9999px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: 0 8px 18px -8px var(--accent);
+  transition: transform 0.4s cubic-bezier(0.34, 1.3, 0.64, 1);
+}
+.nx-seg-thumb[data-stage='manual'] { transform: translateX(100%); }
+
+.nx-seg-tab {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 20px;
+  border-radius: 9999px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  transition: color 0.25s ease;
+}
+.nx-seg-tab[data-active='true'] { color: #fff; }
+.nx-seg-tab:not([data-active='true']):hover { color: var(--text-h); }
+.nx-seg-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .nx-back, .nx-back-icon, .nx-seg-thumb, .nx-seg-tab { transition: none; }
+  .nx-back:hover, .nx-back:hover .nx-back-icon { transform: none; }
+}
+
+/* Progreso segmentado del encabezado de creación: el segmento actual se
+ * llena con una barra animada y el texto de la etapa entra con fade. */
+.nx-progress-seg {
+  position: relative;
+  flex: 1;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: var(--border);
+}
+.nx-progress-seg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.nx-progress-seg[data-state='done']::after { transform: scaleX(1); }
+.nx-progress-seg[data-state='current']::after { transform: scaleX(var(--nx-fill, 0.55)); }
+
+.nx-step-label {
+  animation: nx-stage-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nx-progress-seg::after { transition: none; }
+  .nx-step-label { animation: none; }
+}
+
+/* Campos del formulario de creación (issue #52): pendiente / inválido /
+ * barra fija en celular / ajustes avanzados plegables. Solo transform y
+ * opacity animan; todo se apaga con prefers-reduced-motion. */
+[data-nx-field][data-nx-pending='true'] {
+  position: relative;
+  border-radius: 12px;
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline-offset: 6px;
+}
+[data-nx-field][data-nx-pending='true']::before {
+  content: 'Pendiente';
+  position: absolute;
+  top: -8px;
+  right: 4px;
+  z-index: 1;
+  padding: 1px 8px;
+  border-radius: 9999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  animation: nx-stage-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+[data-nx-field][data-nx-invalid='true'] {
+  animation: nx-shake 0.35s ease-in-out;
+}
+[data-nx-field][data-nx-invalid='true']::after {
+  content: attr(data-nx-msg);
+  color: var(--color-danger);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+@keyframes nx-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
+/* Ajustes avanzados: despliegue con grid 0fr -> 1fr (solo layout interno). */
+.nx-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 0.3s ease, opacity 0.25s ease;
+}
+.nx-collapse[data-open='true'] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.nx-collapse > div { overflow: hidden; min-height: 0; }
+
+/* Celular: acciones (Siguiente/Crear) fijas abajo sin tapar contenido. */
+@media (max-width: 1023px) {
+  .nx-sticky-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 30;
+    margin-inline: -4px;
+    padding: 12px 4px calc(12px + env(safe-area-inset-bottom));
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-nx-field][data-nx-pending='true']::before,
+  [data-nx-field][data-nx-invalid='true'] { animation: none; }
+  .nx-collapse { transition: none; }
+}
+
+
+/* Ayuda al llenado manual (issue #52): check por campo, avance de fase,
+ * celebración, entrada/salida de elementos de lista. Solo transform y
+ * opacity animan; todo se apaga con prefers-reduced-motion. */
+@keyframes nx-check-pop {
+  0% { transform: scale(0); opacity: 0; }
+  60% { transform: scale(1.25); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes nx-item-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes nx-celebrate-ring {
+  0% { transform: scale(0.6); opacity: 0.7; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+[data-nx-field][data-nx-done='true'] > label::after,
+[data-nx-field][data-nx-done='true'] > div:first-child > label::after {
+  content: '¹3';
+  display: inline-block;
+  margin-left: 6px;
+  width: 15px;
+  height: 15px;
+  border-radius: 9999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 15px;
+  text-align: center;
+  vertical-align: 1px;
+  animation: nx-check-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+}
+.nx-item-in { animation: nx-item-in 0.38s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+.nx-item-out {
+  opacity: 0;
+  transform: translateX(-12px) scale(0.98);
+  transition: opacity 0.18s ease-in, transform 0.18s ease-in;
+}
+.nx-form-progress-bar {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: var(--border);
+}
+.nx-form-progress-bar > span {
+  display: block;
+  height: 100%;
+  width: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  transform: scaleX(var(--nx-fill, 0));
+  transform-origin: left;
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.nx-celebrate-badge { position: relative; animation: nx-check-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) backwards; }
+.nx-celebrate-badge::after,
+.nx-celebrate[data-celebrate='true'] .nx-celebrate-icon::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 2px solid var(--accent);
+  animation: nx-celebrate-ring 0.9s ease-out 0.15s backwards;
+  pointer-events: none;
+}
+.nx-celebrate-icon { position: relative; }
+.nx-celebrate[data-celebrate='true'] .nx-celebrate-icon { animation: nx-check-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-nx-field][data-nx-done='true'] > label::after,
+  [data-nx-field][data-nx-done='true'] > div:first-child > label::after,
+  .nx-item-in, .nx-celebrate-badge, .nx-celebrate-badge::after,
+  .nx-celebrate[data-celebrate='true'] .nx-celebrate-icon,
+  .nx-celebrate[data-celebrate='true'] .nx-celebrate-icon::after { animation: none; }
+  .nx-item-out, .nx-form-progress-bar > span { transition: none; }
+}
+
+/* ============================================================
+ * Formulario manual de creación (issue #52): tarjetas por sección, campos
+ * amables, elementos numerados con color, barra de avance fija y botones
+ * con degradado. Todo cuelga de `.nx-form` y de clases `nx-*` propias (no
+ * de las combinaciones `rounded-* border-border` que reescriben Fantasía y
+ * Pradera), con variables CSS para que funcione en claro, oscuro y ambos
+ * temas. Solo transform/opacity animan; prefers-reduced-motion lo apaga.
+ * ============================================================ */
+.nx-form,
+.nx-rail {
+  --nx-card-bg: var(--surface);
+  --nx-solid: var(--surface);
+  --nx-card-border: color-mix(in srgb, var(--border) 85%, transparent);
+  --nx-card-shadow: 0 1px 0 color-mix(in srgb, #fff 55%, transparent) inset,
+    0 14px 34px -20px color-mix(in srgb, var(--accent) 45%, transparent),
+    0 2px 6px -3px rgba(20, 18, 28, 0.12);
+  --nx-field-bg: var(--bg);
+  --nx-bar-bg: color-mix(in srgb, var(--surface) 92%, transparent);
+  --nx-ring: color-mix(in srgb, var(--accent) 24%, transparent);
+  --nx-soft: color-mix(in srgb, var(--accent) 9%, transparent);
+  --nx-ok: #1c9a68;
+  --nx-title-font: var(--fx-display, var(--mw-display, var(--heading)));
+  min-width: 0;
+}
+:root[data-theme='dark'] .nx-form,
+:root[data-theme='dark'] .nx-rail,
+:root[data-theme='fantasy'] .nx-form,
+:root[data-theme='fantasy'] .nx-rail {
+  --nx-ok: #52d6a0;
+  --nx-card-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 16px 34px -20px rgba(0, 0, 0, 0.85);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light'], [data-theme='kids'], [data-theme='meadow']) .nx-form,
+  :root:not([data-theme='light'], [data-theme='kids'], [data-theme='meadow']) .nx-rail {
+    --nx-ok: #52d6a0;
+    --nx-card-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 16px 34px -20px rgba(0, 0, 0, 0.85);
+  }
+}
+[data-theme='fantasy'] .nx-form,
+[data-theme='fantasy'] .nx-rail {
+  --nx-card-bg: linear-gradient(180deg, rgba(58, 51, 98, 0.94), rgba(39, 33, 72, 0.96));
+  --nx-card-border: rgba(255, 214, 140, 0.34);
+  --nx-solid: #2a2650;
+  --nx-field-bg: #1d1a29;
+  --nx-bar-bg: rgba(31, 26, 58, 0.94);
+}
+[data-theme='meadow'] .nx-form,
+[data-theme='meadow'] .nx-rail {
+  --nx-card-bg: #fffdf8;
+  --nx-card-border: #e2cfb1;
+  --nx-solid: #fffdf8;
+  --nx-card-shadow: 0 3px 0 #ecd9b9, 0 16px 30px -18px rgba(99, 128, 155, 0.6);
+  --nx-field-bg: #ffffff;
+  --nx-bar-bg: rgba(255, 253, 248, 0.95);
+  --nx-ok: #1c9a68;
+}
+[data-theme='kids'] .nx-form,
+[data-theme='kids'] .nx-rail {
+  --nx-card-shadow: 0 3px 0 #ffe0a3, 0 14px 28px -18px rgba(255, 122, 26, 0.5);
+}
+
+/* Formulario: más aire entre secciones. */
+.nx-form > form {
+  gap: 22px;
+}
+.nx-form > * + * {
+  margin-top: 0;
+}
+
+/* ---- Tarjeta de sección ---- */
+@keyframes nx-card-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+.nx-card {
+  --nx-tone: var(--accent);
+  position: relative;
+  min-width: 0;
+  padding: 24px 24px 26px;
+  border: 1px solid var(--nx-card-border);
+  border-radius: 24px;
+  background: var(--nx-card-bg);
+  box-shadow: var(--nx-card-shadow);
+  animation: nx-card-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.nx-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  border-radius: 24px 24px 0 0;
+  background: linear-gradient(90deg, var(--nx-tone), color-mix(in srgb, var(--nx-tone) 20%, transparent) 75%);
+  pointer-events: none;
+}
+.nx-card[data-tone='2'] { --nx-tone: var(--accent-2); }
+.nx-card[data-tone='3'] { --nx-tone: #14b8a6; }
+.nx-card[data-tone='4'] { --nx-tone: #f59e0b; }
+.nx-card:nth-child(2) { animation-delay: 70ms; }
+.nx-card:nth-child(3) { animation-delay: 140ms; }
+.nx-card:nth-child(n + 4) { animation-delay: 200ms; }
+.nx-card-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.nx-card-icon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 15px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--nx-tone), color-mix(in srgb, var(--nx-tone) 55%, var(--accent-2)));
+  box-shadow: 0 10px 20px -10px var(--nx-tone), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+.nx-card-title {
+  margin: 0;
+  font-family: var(--nx-title-font);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--text-h);
+  overflow-wrap: anywhere;
+}
+.nx-card-sub {
+  margin: 3px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text);
+}
+.nx-card-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr));
+  align-items: start;
+  gap: 20px 22px;
+  min-width: 0;
+  counter-reset: nx-item;
+}
+/* Los campos fluyen en dos columnas cuando hay espacio; lo ancho (textos largos,
+ * listas, avisos, botones) ocupa la fila completa. */
+.nx-card-body > :is([data-nx-wide], p, button, ul, ol, [role='alert'], .nx-actions, .nx-subbox, .nx-collapsible, .nx-notice),
+.nx-card-body > :has(textarea) {
+  grid-column: 1 / -1;
+}
+/* Materia + sub-materia es alta: ocupa dos filas y el campo siguiente sube a su lado (sin huecos). */
+.nx-card-body { grid-auto-flow: row dense; }
+@media (min-width: 720px) {
+  .nx-card-body > :has(.nx-subbox) { grid-row: span 2; }
+}
+/* Los saltos entre filas del formulario también respiran, y el contenido no tapa la barra fija. */
+.nx-form { padding-bottom: 12px; }
+.create-game-layout .app-main { overflow-x: clip; }
+@media (max-width: 1023px) {
+  .nx-form:has(.nx-sticky-actions) { padding-bottom: 88px; }
+}
+/* Vida visual: los campos de cada tarjeta entran en escalera y la tarjeta se
+ * eleva un poco al pasar el cursor. */
+@keyframes nx-field-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+.nx-card:not(.nx-card-bare) > .nx-card-body > * {
+  animation: nx-field-rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.nx-card-body > *:nth-child(1) { animation-delay: 80ms; }
+.nx-card-body > *:nth-child(2) { animation-delay: 140ms; }
+.nx-card-body > *:nth-child(3) { animation-delay: 200ms; }
+.nx-card-body > *:nth-child(n + 4) { animation-delay: 260ms; }
+.nx-card:not(.nx-card-bare) { transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease; }
+.nx-card:not(.nx-card-bare):focus-within { transform: translateY(-2px); }
+@media (prefers-reduced-motion: reduce) {
+  .nx-card:not(.nx-card-bare) > .nx-card-body > * { animation: none; }
+  .nx-card:not(.nx-card-bare) { transition: none; }
+  .nx-card:not(.nx-card-bare):focus-within { transform: none; }
+}
+.nx-card-bare {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.nx-card-bare::before { display: none; }
+.nx-card-bare > .nx-card-head { margin-bottom: 14px; padding-inline: 2px; }
+
+/* Ajustes avanzados como tarjeta plegable. */
+.nx-collapsible { padding: 18px 24px; }
+.nx-collapsible-btn {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  color: var(--text-h);
+  cursor: pointer;
+  border-radius: 14px;
+}
+.nx-collapsible-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.nx-collapsible-btn:hover .nx-card-icon { transform: scale(1.06); }
+.nx-collapsible .nx-card-icon { transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.nx-collapsible-body { padding: 20px 6px 6px; }
+
+/* ---- Campos ---- */
+.nx-form .nx-field { gap: 8px; }
+.nx-form .nx-label {
+  line-height: 1.3;
+  font-size: 13.5px;
+  font-weight: 650;
+  letter-spacing: 0.005em;
+  color: var(--text-h);
+}
+.nx-form .nx-hint { font-size: 12.5px; line-height: 1.4; color: var(--text); }
+.nx-form .nx-error { font-size: 12.5px; font-weight: 600; }
+.nx-form .nx-feedback { animation: nx-card-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+.nx-form .nx-example-btn {
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: var(--nx-soft);
+  text-decoration: none;
+  transition: background-color 0.2s, transform 0.2s;
+}
+.nx-form .nx-example-btn:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); transform: translateY(-1px); }
+
+.nx-form .nx-input {
+  min-height: 50px;
+  border-width: 1.5px;
+  border-radius: 15px;
+  background: var(--nx-field-bg);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.nx-form .nx-input:hover:not(:focus-within) {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+.nx-form .nx-input:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--nx-ring);
+}
+.nx-form .nx-input:has(input[aria-invalid='true']) { border-color: var(--color-danger); }
+.nx-form .nx-input:has(input[aria-invalid='true']):focus-within {
+  border-color: var(--color-danger);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-danger) 22%, transparent);
+}
+.nx-form .nx-input input {
+  background: transparent;
+  box-shadow: none;
+  padding: 12px 15px;
+  font-size: 15.5px;
+}
+.nx-form [data-nx-field][data-nx-done='true'] .nx-input:not(:focus-within) {
+  border-color: color-mix(in srgb, var(--nx-ok) 55%, var(--border));
+}
+.nx-form [data-nx-field][data-nx-invalid='true'] .nx-input { border-color: var(--color-danger); }
+
+/* Campos nativos de los formularios (number, select, textarea, text). */
+.nx-form :is(input, textarea, select).border {
+  min-height: 48px;
+  padding: 12px 15px;
+  border-width: 1.5px;
+  border-radius: 15px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.nx-form :is(input, textarea, select).border:hover:not(:focus, :disabled) {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+.nx-form :is(input, textarea, select).border:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--nx-ring);
+}
+.nx-form :is(input, textarea, select).border:disabled { opacity: 0.6; }
+.nx-form input[type='radio'],
+.nx-form input[type='checkbox'] {
+  width: 19px;
+  height: 19px;
+  flex-shrink: 0;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
+/* Check de "campo listo" junto a la etiqueta (reemplaza al anterior). */
+.nx-form [data-nx-field][data-nx-done='true'] > label::after,
+.nx-form [data-nx-field][data-nx-done='true'] > div:first-child > label::after {
+  content: '\2713';
+  width: 17px;
+  height: 17px;
+  margin-left: 8px;
+  background: var(--nx-ok);
+  font-size: 11px;
+  line-height: 17px;
+  vertical-align: 1px;
+}
+
+/* Zona de imagen. */
+.nx-form .nx-drop {
+  height: auto;
+  min-height: 118px;
+  gap: 8px;
+  border: 2px dashed color-mix(in srgb, var(--accent) 38%, var(--border));
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--accent) 5%, var(--nx-solid));
+  box-shadow: none;
+  color: var(--text);
+  transition: border-color 0.2s, background-color 0.2s, transform 0.2s;
+}
+.nx-form .nx-drop svg { width: 28px; height: 28px; color: var(--accent); }
+.nx-form .nx-drop:hover:not(:disabled) {
+  border-style: solid;
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 11%, var(--nx-solid));
+  transform: translateY(-1px);
+}
+.nx-form .nx-drop:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.nx-form [data-nx-invalid='true'] .nx-drop[data-nx-image-missing='true'] {
+  border-color: color-mix(in srgb, var(--color-danger) 65%, transparent);
+  background: color-mix(in srgb, var(--color-danger) 7%, transparent);
+}
+.nx-form [data-nx-invalid='true'] .nx-drop[data-nx-image-missing='true'] svg { color: var(--color-danger); }
+.nx-form .nx-drop[class*='border-accent'] {
+  border-style: solid;
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.nx-form .nx-image-preview {
+  height: 150px;
+  border-radius: 18px;
+  border: 1px solid var(--nx-card-border);
+  box-shadow: 0 10px 22px -14px rgba(20, 18, 28, 0.5);
+}
+.nx-form .nx-image-remove {
+  width: 30px;
+  height: 30px;
+  transition: transform 0.2s, background-color 0.2s;
+}
+.nx-form .nx-image-remove:hover { transform: scale(1.1); background: var(--color-danger); }
+
+/* ---- Elementos repetidos: tarjetas numeradas con color ---- */
+.nx-items {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+  counter-reset: nx-item;
+}
+.nx-item {
+  --nx-hue: var(--accent);
+  counter-increment: nx-item;
+  position: relative;
+  min-width: 0;
+  padding: 20px 20px 22px 24px;
+  border: 1px solid var(--nx-card-border);
+  border-radius: 22px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--nx-hue) 10%, transparent), transparent 46%), var(--nx-card-bg);
+  box-shadow: var(--nx-card-shadow);
+  animation: nx-card-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.nx-item::before {
+  content: '';
+  position: absolute;
+  inset: 14px auto 14px 0;
+  width: 5px;
+  border-radius: 0 6px 6px 0;
+  background: var(--nx-hue);
+}
+.nx-item:nth-child(6n + 2) { --nx-hue: var(--accent-2); }
+.nx-item:nth-child(6n + 3) { --nx-hue: #14b8a6; }
+.nx-item:nth-child(6n + 4) { --nx-hue: #f59e0b; }
+.nx-item:nth-child(6n + 5) { --nx-hue: #3b82f6; }
+.nx-item:nth-child(6n + 6) { --nx-hue: #22c55e; }
+.nx-item[data-kind='emerald'] { --nx-hue: #10b981; }
+.nx-item[data-kind='rose'] { --nx-hue: #f43f5e; }
+.nx-item:nth-child(2) { animation-delay: 60ms; }
+.nx-item:nth-child(3) { animation-delay: 120ms; }
+.nx-item:nth-child(4) { animation-delay: 180ms; }
+.nx-item:nth-child(n + 5) { animation-delay: 220ms; }
+.nx-item-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.nx-item-head > div:not(.nx-remove) {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.nx-item-num,
+.nx-item-head:not(:has(.nx-item-num))::before {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  font-family: var(--nx-title-font);
+  font-size: 16px;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(135deg, var(--nx-hue), color-mix(in srgb, var(--nx-hue) 60%, #000));
+  box-shadow: 0 8px 16px -8px var(--nx-hue);
+}
+.nx-item-head:not(:has(.nx-item-num))::before { content: counter(nx-item); }
+.nx-item-num { order: -1; }
+.nx-item-title {
+  flex: 1;
+  margin: 0;
+  min-width: 0;
+  font-size: 15.5px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text-h);
+  overflow-wrap: anywhere;
+}
+.nx-remove {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  margin-left: auto;
+  padding: 7px 14px;
+  border: 1px solid color-mix(in srgb, var(--color-danger) 32%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-danger) 9%, transparent);
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--color-danger);
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s;
+}
+.nx-remove:hover:not(:disabled) { background: color-mix(in srgb, var(--color-danger) 18%, transparent); transform: translateY(-1px); }
+.nx-remove:focus-visible { outline: 2px solid var(--color-danger); outline-offset: 2px; }
+.nx-remove:disabled { opacity: 0.5; cursor: not-allowed; }
+.nx-remove-sm { padding: 4px 10px; font-size: 11.5px; }
+
+/* "+ Agregar": invitación grande en lugar de un botón perdido. */
+.nx-form .nx-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 56px;
+  padding: 14px 18px;
+  border: 2px dashed color-mix(in srgb, var(--accent) 45%, var(--border));
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--accent) 7%, var(--nx-solid));
+  box-shadow: none;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--accent) 72%, var(--text-h));
+  cursor: pointer;
+  transition: border-color 0.2s, background-color 0.2s, transform 0.2s;
+}
+.nx-form .nx-add:hover:not(:disabled) {
+  border-style: solid;
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--nx-solid));
+  transform: translateY(-2px);
+  filter: none;
+}
+.nx-form .nx-add:active:not(:disabled) { transform: scale(0.99); }
+.nx-form .nx-add:focus-visible,
+.nx-form .nx-add-inline:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.nx-form .nx-add:disabled { opacity: 0.55; cursor: not-allowed; }
+.nx-add-row { display: flex; flex-wrap: wrap; gap: 12px; }
+.nx-add-row > .nx-add { flex: 1 1 180px; width: auto; }
+.nx-add-inline {
+  align-self: flex-start;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--nx-soft);
+  font-size: 12.5px;
+  font-weight: 650;
+  color: color-mix(in srgb, var(--accent) 72%, var(--text-h));
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s;
+}
+.nx-add-inline:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 18%, transparent); transform: translateY(-1px); }
+
+/* Opciones de respuesta (radio + texto + quitar). */
+.nx-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 16px;
+  transition: background-color 0.2s;
+}
+.nx-option:has(input[type='radio']:checked) { background: color-mix(in srgb, var(--nx-ok) 12%, transparent); }
+.nx-option input[type='text'] { flex: 1; min-width: 0; }
+
+/* Verdadera / Falsa */
+.nx-form .nx-answer { padding: 4px; border-radius: 16px; background: var(--nx-field-bg); }
+.nx-form .nx-answer button { min-height: 40px; padding-inline: 16px; border-radius: 12px; }
+.nx-counts { margin: -4px 2px 0; font-size: 13px; }
+
+/* Escenario del laberinto V/F: siempre oscuro, como el juego. */
+.nx-scenario {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 22px;
+  border: 1px solid rgba(120, 200, 255, 0.28);
+  border-radius: 24px;
+  color: #e8f3ff;
+  background: radial-gradient(120% 150% at 0% 0%, #1d2d78 0%, #0b1033 55%, #070914 100%);
+  box-shadow: 0 18px 38px -22px rgba(8, 16, 60, 0.95);
+  animation: nx-card-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.nx-form .nx-subbox {
+  padding: 18px 20px;
+  border-width: 1.5px;
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+.nx-form .nx-subbox input.border { background: var(--nx-field-bg); }
+
+/* ---- Cabecera de fase ---- */
+.nx-phase {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 9px;
+  margin: 0;
+  padding: 7px 15px 7px 11px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  border-radius: 999px;
+  background: var(--nx-soft);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--accent) 70%, var(--text-h));
+}
+.nx-phase-name { font-weight: 600; color: var(--text); }
+.nx-phase-dots { display: inline-flex; gap: 4px; }
+.nx-phase-dots i {
+  width: 18px;
+  height: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 25%, transparent);
+  transition: background-color 0.3s;
+}
+.nx-phase-dots i[data-on='true'] { background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+
+/* ---- Avance, aviso y resumen ---- */
+.nx-progress-card {
+  position: relative;
+  z-index: 25;
+  margin-bottom: 22px;
+  padding: 14px 18px 16px;
+  border: 1px solid var(--nx-card-border);
+  border-radius: 22px;
+  background: var(--nx-bar-bg);
+  box-shadow: var(--nx-card-shadow);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.nx-progress-card[data-complete='true'] { border-color: color-mix(in srgb, var(--nx-ok) 55%, transparent); }
+.nx-progress-card::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border: 2px solid var(--nx-ok);
+  border-radius: 24px;
+  opacity: 0;
+  pointer-events: none;
+}
+.nx-progress-card[data-celebrate='true']::after { animation: nx-celebrate-glow 1s ease-out; }
+@keyframes nx-celebrate-glow {
+  0% { opacity: 0.9; transform: scale(0.99); }
+  100% { opacity: 0; transform: scale(1.04); }
+}
+.nx-progress-row { display: flex; align-items: center; gap: 14px; }
+
+/* ---- Rail lateral (escritorio): avance, fases y atajos junto al formulario ---- */
+.nx-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  animation: nx-slide-left 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.nx-rail .nx-progress-card { margin-bottom: 0; }
+.nx-rail .nx-progress-card .nx-progress-chip { margin-top: 12px; }
+@media (min-width: 1024px) {
+  .nx-rail { position: sticky; top: 14px; }
+}
+@keyframes nx-slide-left {
+  from { opacity: 0; transform: translateX(-16px); }
+  to { opacity: 1; transform: none; }
+}
+.nx-ring {
+  position: relative;
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+}
+.nx-ring > svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+.nx-ring-bg, .nx-ring-fg { fill: none; stroke-width: 5; }
+.nx-ring-bg { stroke: color-mix(in srgb, var(--text) 16%, transparent); }
+.nx-ring-fg {
+  stroke: var(--accent);
+  stroke-linecap: round;
+  stroke-dasharray: 150.8;
+  stroke-dashoffset: calc(150.8 * (1 - var(--nx-fill, 0)));
+  transition: stroke-dashoffset 0.7s cubic-bezier(0.22, 1, 0.36, 1), stroke 0.3s ease;
+}
+.nx-progress-card[data-complete='true'] .nx-ring-fg { stroke: var(--nx-ok); }
+.nx-ring-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+}
+.nx-progress-card[data-complete='true'] .nx-ring-icon {
+  background: linear-gradient(135deg, var(--nx-ok), color-mix(in srgb, var(--nx-ok) 55%, var(--accent)));
+}
+.nx-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 14px 16px;
+  list-style: none;
+  border: 1px solid var(--nx-card-border);
+  border-radius: 20px;
+  background: var(--nx-card-bg);
+  box-shadow: var(--nx-card-shadow);
+}
+.nx-steps li {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 7px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.nx-steps li + li::before {
+  content: '';
+  position: absolute;
+  left: 11px;
+  top: -9px;
+  width: 2px;
+  height: 14px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--text) 18%, transparent);
+}
+.nx-steps li[data-state='done']::before { background: var(--accent); }
+.nx-step-dot {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 2px solid color-mix(in srgb, var(--text) 25%, transparent);
+  font-size: 11.5px;
+  font-weight: 800;
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
+.nx-steps li[data-state='current'] { color: var(--text-h); }
+.nx-steps li[data-state='current'] .nx-step-dot {
+  border-color: transparent;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: 0 6px 14px -6px var(--accent);
+}
+.nx-steps li[data-state='done'] .nx-step-dot { border-color: transparent; color: #fff; background: var(--accent); }
+.nx-rail-tip {
+  display: none;
+  margin: 0;
+  padding: 0 4px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text);
+}
+.nx-rail-tip kbd {
+  padding: 1px 6px;
+  border: 1px solid var(--nx-card-border);
+  border-radius: 6px;
+  background: var(--nx-card-bg);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--text-h);
+}
+.nx-rail .nx-progress-title { white-space: normal; overflow-wrap: anywhere; }
+
+/* ---- Cuadrícula de elementos + panel de edición (ItemGridEditor) ---- */
+.nx-gi { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.nx-gi-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.nx-gi-count { font-size: 13.5px; color: var(--text); }
+.nx-gi-count strong { color: var(--text-h); font-size: 15px; }
+.nx-gi-count-sep { margin: 0 7px; opacity: 0.6; }
+.nx-gi-count [data-all='true'] { color: var(--nx-ok); font-weight: 700; }
+.nx-gi-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 13px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--nx-card-bg, var(--surface)));
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--accent);
+  animation: nx-blink 1.4s ease-in-out infinite;
+}
+@keyframes nx-blink {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 40%, transparent); }
+  50% { opacity: 0.6; box-shadow: 0 0 0 7px transparent; }
+}
+.nx-gi-layout { display: grid; gap: 16px; min-width: 0; }
+@media (min-width: 1024px) {
+  .nx-gi-layout[data-layout='side'] { grid-template-columns: minmax(0, 1fr) 340px; align-items: start; }
+  .nx-gi-layout[data-layout='side'] .nx-gi-panel { position: sticky; top: 14px; }
+}
+.nx-gi-layout[data-layout='stacked'] .nx-gi-tiles { max-height: 300px; }
+/* Pareja de opuestos: mitad positiva / mitad negativa, en la tarjeta y en el panel. */
+.nx-gi-split { display: grid; grid-template-columns: 1fr 1fr; width: 100%; height: 100%; }
+.nx-gi-split > span { display: grid; place-items: center; overflow: hidden; font-size: 22px; font-weight: 800; color: #fff; }
+.nx-gi-split img { width: 100%; height: 100%; object-fit: cover; }
+.nx-gi-split-pos { background: #10b981; }
+.nx-gi-split-neg { background: #f43f5e; }
+.nx-gi-side { display: flex; flex-direction: column; gap: 12px; min-width: 0; padding: 14px; border: 1px solid var(--nx-card-border); border-radius: 18px; background: color-mix(in srgb, var(--accent) 4%, transparent); }
+.nx-gi-side[data-side='pos'] { border-top: 3px solid #10b981; }
+.nx-gi-side[data-side='neg'] { border-top: 3px solid #f43f5e; }
+.nx-gi-side-title { margin: 0; font-size: 12.5px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-h); }
+.nx-gi-side[data-side='pos'] .nx-gi-side-title { color: #10b981; }
+.nx-gi-side[data-side='neg'] .nx-gi-side-title { color: #f43f5e; }
+.nx-gi-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(124px, 1fr));
+  gap: 12px;
+  align-content: start;
+  min-width: 0;
+  max-height: 520px;
+  padding: 4px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.nx-gi-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 8px 8px 10px;
+  border: 1.5px solid var(--nx-card-border);
+  border-radius: 16px;
+  background: var(--nx-card-bg);
+  text-align: left;
+  cursor: pointer;
+  animation: nx-field-rise 0.4s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.nx-gi-tile:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+.nx-gi-tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.nx-gi-tile[data-selected='true'] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent), 0 12px 22px -14px var(--accent);
+}
+.nx-gi-tile[data-pulse='true'] { animation: nx-field-rise 0.4s cubic-bezier(0.22, 1, 0.36, 1) backwards, nx-blink 1.4s ease-in-out 0.6s infinite; }
+.nx-gi-num {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(20, 18, 28, 0.62);
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #fff;
+}
+.nx-gi-thumb {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--nx-field-bg, var(--bg)));
+  color: color-mix(in srgb, var(--text) 55%, transparent);
+}
+.nx-gi-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.nx-gi-swatch { display: grid; place-items: center; width: 100%; height: 100%; color: #fff; }
+.nx-gi-name {
+  overflow: hidden;
+  padding-inline: 2px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-h);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nx-gi-tile:has(.nx-gi-name:empty) .nx-gi-name { color: var(--text); }
+.nx-gi-status {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--nx-solid, var(--surface));
+  color: #fff;
+}
+.nx-gi-tile[data-complete='true'] .nx-gi-status { background: var(--nx-ok); }
+.nx-gi-dot { width: 8px; height: 8px; border-radius: 999px; background: #f59e0b; animation: nx-blink-dot 1.6s ease-in-out infinite; }
+@keyframes nx-blink-dot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(0.8); } }
+.nx-gi-add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 118px;
+  padding: 10px;
+  border: 2px dashed color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--accent);
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.2s ease;
+}
+.nx-gi-add:hover:not(:disabled) { transform: translateY(-3px); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.nx-gi-add:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.nx-gi-panel {
+  min-width: 0;
+  padding: 16px 16px 18px;
+  border: 1px solid var(--nx-card-border);
+  border-radius: 22px;
+  background: var(--nx-card-bg);
+  box-shadow: var(--nx-card-shadow);
+}
+.nx-gi-panel-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.nx-gi-panel-num {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 11px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  font-size: 14px;
+  font-weight: 800;
+  color: #fff;
+}
+.nx-gi-panel-title { flex: 1; margin: 0; font-size: 14.5px; font-weight: 700; color: var(--text-h); }
+.nx-gi-panel-title span { margin-left: 4px; font-size: 12px; font-weight: 600; color: var(--text); }
+.nx-gi-nav { display: inline-flex; gap: 6px; }
+.nx-gi-nav-btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--nx-card-border);
+  border-radius: 10px;
+  background: var(--nx-field-bg, var(--bg));
+  color: var(--text-h);
+  cursor: pointer;
+  transition: transform 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+}
+.nx-gi-nav-btn:hover:not(:disabled) { transform: translateY(-1px); border-color: var(--accent); }
+.nx-gi-nav-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.nx-gi-fields { animation: nx-field-rise 0.32s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+.nx-gi-remove { margin-top: 14px; }
+@media (prefers-reduced-motion: reduce) {
+  .nx-gi-hint, .nx-gi-tile, .nx-gi-tile[data-pulse='true'], .nx-gi-dot, .nx-gi-fields { animation: none; }
+  .nx-gi-tile, .nx-gi-add, .nx-gi-nav-btn { transition: none; }
+  .nx-gi-tile:hover, .nx-gi-add:hover:not(:disabled), .nx-gi-nav-btn:hover:not(:disabled) { transform: none; }
+}
+
+/* ---- Selector propio (FormSelect): lista con el estilo del formulario ---- */
+.nx-select-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 46px;
+  padding: 11px 13px;
+  border: 1px solid var(--nx-card-border, var(--border));
+  border-radius: 15px;
+  background: var(--nx-field-bg, var(--bg));
+  font-size: 15px;
+  text-align: left;
+  color: var(--text-h);
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+.nx-select-btn:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+.nx-select-btn:focus-visible,
+.nx-select-btn[data-open='true'] {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+.nx-select-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.nx-select-btn[data-placeholder='true'] .nx-select-value { color: var(--text); }
+.nx-select-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nx-select-chevron { flex-shrink: 0; color: var(--accent); transition: transform 0.28s cubic-bezier(0.34, 1.4, 0.64, 1); }
+.nx-select-btn[data-open='true'] .nx-select-chevron { transform: rotate(180deg); }
+.nx-select-pop {
+  position: fixed;
+  z-index: 1000;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 24px 48px -18px color-mix(in srgb, var(--accent) 50%, transparent), 0 8px 18px -8px rgba(20, 18, 28, 0.3);
+  transform-origin: top center;
+  animation: nx-select-in 0.22s cubic-bezier(0.22, 1.2, 0.36, 1) backwards;
+}
+.nx-select-pop[data-up='true'] { transform-origin: bottom center; animation-name: nx-select-in-up; }
+.nx-select-list {
+  max-height: 248px;
+  margin: 0;
+  padding: 6px;
+  overflow-y: auto;
+  list-style: none;
+  scrollbar-width: thin;
+}
+.nx-select-search {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 8px 8px 2px;
+  padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  color: var(--accent);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.nx-select-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.nx-select-search input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  background: transparent;
+  font-size: 14px;
+  color: var(--text-h);
+  outline: none;
+}
+.nx-select-search input::placeholder { color: var(--text); }
+.nx-select-none { padding: 14px 12px; font-size: 13.5px; text-align: center; color: var(--text); }
+[data-theme='fantasy'] .nx-select-pop { background: #2a2650; border-color: rgba(255, 214, 140, 0.4); color: #f4efff; }
+[data-theme='fantasy'] .nx-select-search input { color: #f4efff; }
+[data-theme='meadow'] .nx-select-pop { background: #fffdf8; border-color: #e2cfb1; }
+:root[data-theme='dark'] .nx-select-pop { background: #1d1a29; }
+@keyframes nx-select-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes nx-select-in-up {
+  from { opacity: 0; transform: translateY(6px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+.nx-select-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--text-h);
+  cursor: pointer;
+  animation: nx-field-rise 0.25s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+[data-theme='fantasy'] .nx-select-option { color: #f4efff; }
+.nx-select-option[data-empty='true'] { color: var(--text); font-weight: 400; }
+.nx-select-option[data-active='true'] { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.nx-select-option[data-selected='true'] { color: var(--accent); font-weight: 700; }
+.nx-select-option[aria-disabled='true'] { opacity: 0.45; cursor: not-allowed; }
+.nx-select-option-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) {
+  .nx-select-pop, .nx-select-option { animation: none; }
+  .nx-select-btn, .nx-select-chevron, .nx-select-option { transition: none; }
+}
+
+/* ---- Burbuja de ayuda (i) con nube que se cierra sola a los 10 s ---- */
+.nx-info { position: relative; display: inline-flex; flex-shrink: 0; }
+.nx-info[data-placement='corner'] { position: absolute; top: 10px; right: 10px; z-index: 5; }
+.nx-info-btn {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--nx-card-bg, var(--surface)));
+  color: var(--accent);
+  cursor: pointer;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.2s ease, color 0.2s ease;
+}
+.nx-info-btn:hover { transform: scale(1.12); background: var(--accent); color: #fff; }
+.nx-info[data-open='true'] .nx-info-btn { background: var(--accent); color: #fff; }
+.nx-info-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.nx-info-cloud {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: -6px;
+  z-index: 40;
+  display: block;
+  width: min(300px, 78vw);
+  padding: 14px 34px 16px 16px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
+  border-radius: 20px;
+  background: var(--nx-solid, var(--surface));
+  box-shadow: 0 22px 44px -18px color-mix(in srgb, var(--accent) 55%, transparent), 0 6px 14px -6px rgba(20, 18, 28, 0.25);
+  transform-origin: top right;
+  animation: nx-cloud-in 0.38s cubic-bezier(0.34, 1.45, 0.64, 1) backwards;
+}
+.nx-info-cloud::before {
+  content: '';
+  position: absolute;
+  top: -7px;
+  right: 14px;
+  width: 14px;
+  height: 14px;
+  border-top: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
+  border-left: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
+  background: var(--nx-solid, var(--surface));
+  transform: rotate(45deg);
+}
+.nx-info-text { display: block; font-size: 13px; font-weight: 500; line-height: 1.5; color: var(--text-h); }
+.nx-info-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  color: var(--text);
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+.nx-info-close:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--text-h); }
+.nx-info-timer {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 3px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.nx-info-timer i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  transform-origin: left;
+  animation: nx-cloud-timer linear forwards;
+}
+@keyframes nx-cloud-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.86); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes nx-cloud-timer {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nx-info-cloud, .nx-info-timer i { animation: none; }
+  .nx-info-btn { transition: none; }
+}
+@media (min-width: 1024px) {
+  .nx-rail-tip { display: block; }
+  /* La pastilla de fase de cada formulario ya la cubre el rail. */
+  .nx-form .nx-phase { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nx-rail { animation: none; }
+  .nx-ring-fg, .nx-step-dot { transition: none; }
+}
+.nx-progress-icon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: 0 10px 20px -10px var(--accent), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+.nx-progress-card[data-complete='true'] .nx-progress-icon {
+  background: linear-gradient(135deg, var(--nx-ok), color-mix(in srgb, var(--nx-ok) 55%, var(--accent)));
+}
+.nx-progress-title {
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--nx-title-font);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--text-h);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nx-progress-title[data-empty='true'] { font-weight: 600; color: var(--text); }
+.nx-progress-sub {
+  margin: 2px 0 0;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nx-progress-chip {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 13px;
+  border-radius: 999px;
+  background: var(--nx-soft);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+.nx-progress-chip[data-complete='true'] {
+  background: color-mix(in srgb, var(--nx-ok) 16%, transparent);
+  color: var(--nx-ok);
+}
+.nx-progress-card .nx-form-progress-bar {
+  height: 7px;
+  margin-top: 13px;
+  background: color-mix(in srgb, var(--text) 18%, transparent);
+}
+.nx-progress-card[data-complete='true'] .nx-form-progress-bar > span {
+  background: linear-gradient(90deg, var(--nx-ok), color-mix(in srgb, var(--nx-ok) 60%, var(--accent)));
+}
+/* La barra de acciones flotante ocupa el borde inferior: el aviso "Desliza" sobra. */
+.create-game-layout:has(.nx-form:not(.hidden) .nx-actions) [data-scroll-hint] { display: none; }
+.nx-notice,
+.nx-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 22px;
+  padding: 14px 18px;
+  border-radius: 20px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-h);
+}
+.nx-notice {
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 14%, transparent), color-mix(in srgb, var(--accent-2) 10%, transparent));
+}
+.nx-notice-close {
+  flex-shrink: 0;
+  padding: 3px;
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.nx-notice-close:hover { background: var(--nx-soft); color: var(--text-h); }
+.nx-summary {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  border: 1px solid var(--nx-card-border);
+  background: var(--nx-soft);
+  font-size: 13px;
+}
+
+/* ---- Botones ---- */
+.nx-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 50px;
+  padding: 0 24px;
+  border-radius: 16px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s, filter 0.2s;
+}
+.nx-btn:disabled { cursor: not-allowed; opacity: 0.6; }
+.nx-btn:focus-visible { outline: 3px solid var(--nx-ring); outline-offset: 2px; }
+.nx-btn-primary {
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: 0 14px 26px -12px var(--accent), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+.nx-btn-primary:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.06); }
+.nx-btn-primary:active:not(:disabled) { transform: translateY(0) scale(0.98); }
+.nx-btn-secondary:hover:not(:disabled) { transform: translateY(-1px); }
+.nx-btn-secondary { background: var(--nx-card-bg); }
+
+/* Barra de acciones: siempre a la vista, como una píldora flotante. */
+.nx-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.nx-actions.nx-sticky-actions {
+  position: sticky;
+  bottom: 10px;
+  z-index: 30;
+  margin-inline: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--nx-card-border);
+  border-radius: 22px;
+  background: var(--nx-bar-bg);
+  box-shadow: var(--nx-card-shadow), 0 -8px 24px -16px rgba(20, 18, 28, 0.35);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.nx-actions > .nx-back,
+.nx-actions > .nx-btn-secondary { order: 1; }
+.nx-actions > .nx-actions-hint {
+  order: 2;
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: right;
+}
+.nx-actions > .nx-btn-primary { order: 3; margin-left: auto; min-width: 150px; }
+.nx-actions > .nx-actions-hint + .nx-btn-primary { margin-left: 0; }
+@media (max-width: 520px) {
+  .nx-actions > .nx-btn-primary { flex: 1 1 100%; order: 0; }
+  .nx-actions > .nx-actions-hint { display: none; }
+}
+
+/* Alerta de error del formulario. */
+.nx-alert {
+  padding: 13px 16px;
+  border: 1px solid color-mix(in srgb, var(--color-danger) 38%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--color-danger);
+  animation: nx-card-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+/* Celular primero: menos relleno y sin desbordes. */
+@media (max-width: 639px) {
+  .nx-card { padding: 18px 16px 20px; border-radius: 20px; }
+  .nx-collapsible { padding: 14px 16px; }
+  .nx-item { padding: 16px 14px 18px 18px; border-radius: 18px; }
+  .nx-card-head { margin-bottom: 16px; }
+  .nx-card-icon { width: 40px; height: 40px; border-radius: 13px; }
+  .nx-progress-card { padding: 12px 14px 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nx-card, .nx-item, .nx-scenario, .nx-alert, .nx-form .nx-feedback,
+  .nx-progress-card[data-celebrate='true']::after { animation: none; }
+  .nx-btn, .nx-form .nx-add, .nx-form .nx-drop, .nx-remove, .nx-add-inline, .nx-form .nx-input,
+  .nx-form :is(input, textarea, select).border, .nx-collapsible .nx-card-icon,
+  .nx-form .nx-example-btn, .nx-phase-dots i, .nx-option { transition: none; }
+  .nx-btn:hover, .nx-form .nx-add:hover, .nx-form .nx-drop:hover, .nx-remove:hover,
+  .nx-add-inline:hover, .nx-form .nx-example-btn:hover, .nx-collapsible-btn:hover .nx-card-icon { transform: none; }
+}
+
 /* ============================================================
  * Inicio en una sola pantalla (issue #47) — todos los temas.
  * En escritorio el banner, el título "Juegos" y el carrusel comparten el alto

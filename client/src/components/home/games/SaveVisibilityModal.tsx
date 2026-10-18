@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Lock, Users2 } from 'lucide-react'
+import { Check, Lock, Users2 } from 'lucide-react'
 import { Modal } from './Modal'
 
 type Visibility = 'private' | 'community'
@@ -35,7 +35,14 @@ export function SaveVisibilityModal({ onChoose, onDone }: SaveVisibilityModalPro
 
   return (
     <Modal onClose={() => {}} maxWidthClassName="max-w-[440px]">
-      <h2 className="mb-1 text-[19px] tracking-tight text-text-h">¿Dónde quieres guardarlo?</h2>
+      <span
+        aria-hidden="true"
+        className="nx-celebrate-badge mb-3 flex h-11 w-11 items-center justify-center rounded-full text-white"
+        style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
+      >
+        <Check className="h-6 w-6" strokeWidth={3} />
+      </span>
+      <h2 className="mb-1 text-[19px] tracking-tight text-text-h">¡Tu juego está listo! ¿Dónde lo guardamos?</h2>
       <p className="mb-6 text-[13px] text-text">Puedes cambiar esto más adelante desde el juego.</p>
       <div className="flex flex-col gap-3">
         <button

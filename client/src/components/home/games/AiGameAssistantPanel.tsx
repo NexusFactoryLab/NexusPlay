@@ -1,12 +1,15 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
-import { FileText, Loader2, Paperclip, Send, Sparkles, Upload, X } from 'lucide-react'
+import { FileText, Loader2, Paperclip, RotateCcw, Send, Sparkles, Upload, X } from 'lucide-react'
 import { useAuth } from '../../../hooks/useAuth'
 import { useToast } from '../../../hooks/useToast'
 import { generateGameDraft, type GameDraft } from '../../../services/ai-game-assistant.service'
 import { ApiError } from '../../../utils/http'
-import { Modal } from './Modal'
-import { useMarkAiDraftApplied } from './aiDraftContext'
+import {
+  useAiFillStep,
+  useMarkAiDraftApplied,
+  useSetAiGenerating,
+} from './aiDraftContext'
 
 const ACCEPTED = '.pdf,.doc,.docx,.xls,.xlsx,.csv,image/*'
 const DEFAULT_MAX_FILES = 5
@@ -27,37 +30,35 @@ type AiGameHint = {
 const AI_GAME_HINTS: Record<string, AiGameHint> = {
   TRUE_FALSE_MAZE: {
     summary:
-      'La IA escribe de 8 a 15 afirmaciones de verdadero o falso con su explicación, y ajusta las vidas, las medusas y la velocidad según la dificultad que pidas.',
+      'La IA escribe las afirmaciones V/F y ajusta la dificultad.',
     placeholder: 'Ej.: "La fotosíntesis, nivel fácil para primaria" o "Segunda Guerra Mundial, difícil, 12 afirmaciones"…',
   },
   GUESS_WHO: {
-    summary: 'La IA arma las tarjetas con su nombre y un dato curioso de cada una.',
+    summary: 'La IA arma las tarjetas con nombre y dato curioso.',
     placeholder: 'Ej.: "Animales de la selva amazónica" o "Banderas de Sudamérica"…',
   },
   'MEMORY_MATCH:PAIRS': {
-    summary: 'La IA arma las parejas imagen-concepto con el nombre de cada concepto.',
+    summary: 'La IA arma las parejas imagen-concepto.',
     placeholder: 'Ej.: "Figuras y sólidos geométricos básicos" o "Partes de la célula"…',
   },
   'MEMORY_MATCH:OPPOSITES': {
-    summary: 'La IA arma parejas de conceptos opuestos, cada lado con su descripción.',
+    summary: 'La IA arma las parejas de conceptos opuestos.',
     placeholder: 'Ej.: "Ácidos y bases" o "Causas y consecuencias de la Revolución Francesa"…',
   },
   DOMINO: {
-    summary: 'La IA elige de 6 a 10 conceptos clave del tema y les asigna un color.',
+    summary: 'La IA elige los conceptos clave del tema.',
     placeholder: 'Ej.: "Energías renovables" o "Personajes de la Independencia"…',
   },
   MAZE_COLLECTOR: {
-    summary:
-      'La IA elige los objetos que se recolectan, con un dato educativo de cada uno, y los nombres del recolector y del enemigo.',
+    summary: 'La IA elige los objetos, sus datos y los personajes.',
     placeholder: 'Ej.: "Reciclaje: qué va en cada caneca" o "Animales en peligro de extinción"…',
   },
   SNAKES_LADDERS: {
-    summary:
-      'La IA diseña el tablero (escaleras y serpientes) y escribe una pregunta de opción múltiple para cada casilla clave.',
+    summary: 'La IA diseña el tablero y las preguntas.',
     placeholder: 'Ej.: "El sistema solar" o "Tablas de multiplicar del 6 al 9"…',
   },
   DUAL_QUEST: {
-    summary: 'La IA diseña el mapa, las compuertas, las preguntas y las gemas que arman la pregunta final.',
+    summary: 'La IA diseña el mapa, las preguntas y las gemas.',
     placeholder: 'Ej.: "El ciclo del agua" o "Estados de la materia"…',
   },
 }
@@ -65,6 +66,16 @@ const AI_GAME_HINTS: Record<string, AiGameHint> = {
 function hintFor(gameType: string, mode?: string): AiGameHint | undefined {
   return (mode ? AI_GAME_HINTS[`${gameType}:${mode}`] : undefined) ?? AI_GAME_HINTS[gameType]
 }
+
+/** Mensajes que rotan mientras la IA trabaja, para que se sienta el avance. */
+const PROGRESS_MESSAGES = [
+  'Leyendo tu material…',
+  'Armando el contenido…',
+  'Ajustando la dificultad…',
+  'Revisando que todo encaje…',
+]
+
+const wait = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms))
 
 type AiGameAssistantPanelProps = {
   gameType: string
@@ -87,7 +98,7 @@ type AiGameAssistantPanelProps = {
 }
 
 /**
- * Botón que abre el asistente de IA para creación de juego, con una interfaz
+ * Asistente de IA para creación de juego, con una interfaz
  * tipo chat: un campo de texto para instrucciones (Enter para enviar), un
  * botón de clip para adjuntar archivos (o arrastrarlos y soltarlos encima
  * del recuadro, issue #234) y un botón de enviar. El profesor sube SUS
@@ -114,12 +125,38 @@ export function AiGameAssistantPanel({
   const { token } = useAuth()
   const { showToast } = useToast()
   const markAiDraftApplied = useMarkAiDraftApplied()
+  const setShellGenerating = useSetAiGenerating()
+  const fillStep = useAiFillStep()
+  const unmountedRef = useRef(false)
+  useEffect(() => {
+    unmountedRef.current = false
+    return () => {
+      unmountedRef.current = true
+    }
+  }, [])
   const inputRef = useRef<HTMLInputElement>(null)
-  const [open, setOpen] = useState(false)
   const [files, setFiles] = useState<File[]>([])
   const [message, setMessage] = useState('')
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [progressIndex, setProgressIndex] = useState(0)
+  const [announce, setAnnounce] = useState('')
+  const abortRef = useRef<AbortController | null>(null)
+
+  // Mensajes de progreso rotativos mientras la IA genera.
+  useEffect(() => {
+    if (!generating) return
+    setProgressIndex(0)
+    const timer = window.setInterval(
+      () => setProgressIndex((index) => Math.min(index + 1, PROGRESS_MESSAGES.length - 1)),
+      2800,
+    )
+    return () => window.clearInterval(timer)
+  }, [generating])
+
+  function cancelGeneration() {
+    abortRef.current?.abort()
+  }
 
   const hint = hintFor(gameType, mode)
   const maxFiles = imagesRequired ? imagesRequired.max + EXTRA_REFERENCE_FILES : DEFAULT_MAX_FILES
@@ -178,34 +215,57 @@ export function AiGameAssistantPanel({
     addFiles(Array.from(event.dataTransfer.files ?? []))
   }
 
-  function closeModal() {
-    if (generating) return
-    setOpen(false)
-  }
-
   async function handleGenerate() {
     if (!token || !canSend) return
     setGenerating(true)
+    setShellGenerating?.(true)
     setError(null)
+    setAnnounce('')
+    const controller = new AbortController()
+    abortRef.current = controller
     try {
-      const draft = await generateGameDraft(token, gameType, files, mode, message)
-      onDraftReady(draft)
-      // El formulario muestra un aviso fijo con lo que falta llenar a mano (nombre, descripción, Ã¡rea).
+      const draft = await generateGameDraft(token, gameType, files, mode, message, controller.signal)
+      // El servidor manda el borrador completo de una vez: se aplica por pasos
+      // (ajustes primero, luego un elemento a la vez) y el shell lleva la vista
+      // a cada campo que se llena, para que el llenado se vea y se entienda.
+      // El último paso aplica el borrador completo, así que el resultado final
+      // es idéntico al de aplicarlo de golpe.
       markAiDraftApplied?.()
+      await wait(450)
+      const items = Array.isArray(draft.content) ? draft.content : []
+      const stepDelay = Math.min(450, Math.max(140, Math.floor(2600 / Math.max(items.length, 1))))
+      if (items.length > 0 && !unmountedRef.current) {
+        onDraftReady({ ...draft, content: [] })
+        fillStep?.(0)
+        await wait(500)
+        for (let count = 1; count < items.length && !unmountedRef.current; count++) {
+          onDraftReady({ ...draft, content: items.slice(0, count) })
+          await wait(40)
+          fillStep?.(count)
+          await wait(stepDelay)
+        }
+      }
+      onDraftReady(draft)
+      await wait(40)
+      fillStep?.(items.length)
       showToast(
-        draft.notice
-          ? `Juego configurado con IA. ${draft.notice} Ahora escribe tú el nombre y la descripción, y elige el Ã¡rea.`
-          : 'Juego configurado con IA — ahora escribe tú el nombre y la descripción, y elige el Ã¡rea.',
+        draft.notice ? `¡Listo! ${draft.notice}` : '¡Listo! Revisa el juego y completa nombre, descripción y área.',
         'success',
-        8000,
+        6000,
       )
       setFiles([])
       setMessage('')
-      setOpen(false)
+      setAnnounce('Listo: la IA terminó de armar el juego. Revisa los campos y completa lo pendiente.')
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'No se pudo configurar el juego con IA.')
+      if (controller.signal.aborted) {
+        setError('Cancelaste la generación. Puedes intentarlo de nuevo.')
+      } else {
+        setError(err instanceof ApiError ? err.message : 'No se pudo configurar el juego con IA.')
+      }
     } finally {
+      abortRef.current = null
       setGenerating(false)
+      setShellGenerating?.(false)
     }
   }
 
@@ -218,21 +278,8 @@ export function AiGameAssistantPanel({
     }
   }
 
-  return (
+  const chatBody = (
     <>
-      <button
-        type="button"
-        className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-[13.5px] font-semibold text-white shadow-[0_10px_24px_-10px_var(--accent)] transition-transform disabled:cursor-not-allowed disabled:opacity-60 hover:not-disabled:-translate-y-0.5"
-        style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
-        disabled={disabled}
-        onClick={() => setOpen(true)}
-      >
-        <Sparkles className="h-4 w-4" strokeWidth={2.5} />
-        Generar con IA
-      </button>
-
-      {open && (
-        <Modal onClose={closeModal} maxWidthClassName="max-w-[520px]" ariaLabel="Generar con IA">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div className="flex items-center gap-2.5">
               <span
@@ -243,49 +290,21 @@ export function AiGameAssistantPanel({
               </span>
               <div>
                 <h2 className="text-[17px] font-semibold text-text-h">Generar con IA</h2>
-                <p className="text-[12px] text-text">Sube tus archivos, o escribe directamente el tema</p>
+                <p className="text-[12px] text-text">Escribe el tema o sube tus archivos</p>
               </div>
             </div>
-            <button
-              type="button"
-              aria-label="Cerrar"
-              className="shrink-0 rounded-lg p-1.5 text-text transition-colors hover:bg-code-bg hover:text-text-h disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={generating}
-              onClick={closeModal}
-            >
-              <X className="h-5 w-5" strokeWidth={2} />
-            </button>
           </div>
 
-          <p className="mb-3 text-[12px] leading-relaxed text-text">
-            {hint && <span className="font-medium text-text-h">{hint.summary} </span>}
-            {imagesRequired ? (
-              enforcesMinimum ? (
-                <>
-                  Si tienes tus imágenes, arrástralas aquí o súbelas con el clip (al menos {imagesRequired.min}): se
-                  usan esas, y la IA le asigna a cada una el concepto que le corresponde. También puedes agregar
-                  PDF/Word/Excel/CSV de referencia (opcional). O escribe solo el tema, sin ninguna imagen: la IA arma
-                  el contenido completo y consigue las imágenes ella misma — busca una foto libre en Wikimedia Commons
-                  y, si no encuentra, crea una ilustración básica — para que ninguna tarjeta quede vacía.
-                </>
-              ) : (
-                <>
-                  Si tienes tus imágenes, arrástralas aquí o súbelas como prefieras: cada imagen suelta, o un solo
-                  PDF/Word con varias fotos adentro (la IA las extrae automáticamente). Se usan esas, y la IA les
-                  asigna el concepto. Recomendamos al menos {imagesRequired.min}, pero no es obligatorio. O escribe
-                  solo el tema, sin ninguna imagen: la IA arma el contenido completo y consigue las imágenes ella
-                  misma — busca una foto libre en Wikimedia Commons y, si no encuentra, crea una ilustración básica —
-                  para que ninguna tarjeta quede vacía.
-                </>
-              )
-            ) : (
+          <p className="mb-3 text-[12.5px] leading-snug text-text">
+            {hint && <span className="font-medium text-text-h">{hint.summary}</span>}
+            {imagesRequired && (
               <>
-                Adjunta PDF, Word, Excel, CSV o imágenes con tu propio material (incluso una foto de tus apuntes): la
-                IA lee la información y llena el resto del formulario con ese tema. También puedes escribir el tema
-                directamente en el cuadro de texto, sin adjuntar nada.
+                {' '}
+                {enforcesMinimum
+                  ? `Sube al menos ${imagesRequired.min} imágenes o escribe solo el tema.`
+                  : 'Tus imágenes son opcionales: escribe solo el tema si prefieres.'}
               </>
-            )}{' '}
-            No se aceptan links, solo archivos que subas tú (o el texto que escribas, sin ningún archivo).
+            )}
           </p>
 
           <input
@@ -317,7 +336,7 @@ export function AiGameAssistantPanel({
                 }`}
               >
                 <Upload className={`h-4 w-4 shrink-0 ${isDraggingFiles ? 'animate-bounce' : ''}`} strokeWidth={2} />
-                {isDraggingFiles ? 'Suelta los archivos aquí' : 'Arrastra tus archivos aquí, o usa el clip (opcional)'}
+                {isDraggingFiles ? 'Suelta los archivos aquí' : 'Arrastra archivos aquí (opcional)'}
               </p>
             )}
 
@@ -385,16 +404,50 @@ export function AiGameAssistantPanel({
             </div>
           </div>
 
-          {error && (
-            <p
-              className="mt-2.5 rounded-lg border border-danger/35 bg-danger/10 px-[13px] py-[11px] text-[12.5px] leading-snug text-danger"
+          <p className="sr-only" role="status" aria-live="polite">
+            {generating ? PROGRESS_MESSAGES[progressIndex] : announce}
+          </p>
+
+          {generating && (
+            <div className="mt-2.5 flex items-center justify-between gap-3 rounded-lg border border-accent/30 bg-accent/10 px-3 py-2">
+              <p key={progressIndex} className="nx-step-label flex items-center gap-2 text-[12.5px] font-medium text-text-h">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" strokeWidth={2.5} />
+                {PROGRESS_MESSAGES[progressIndex]}
+              </p>
+              <button
+                type="button"
+                className="shrink-0 rounded-md px-2 py-1 text-[12px] font-semibold text-text-h hover:bg-code-bg"
+                onClick={cancelGeneration}
+              >
+                Cancelar
+              </button>
+            </div>
+          )}
+
+          {error && !generating && (
+            <div
+              className="mt-2.5 flex items-start justify-between gap-3 rounded-lg border border-danger/35 bg-danger/10 px-[13px] py-[11px] text-[12.5px] leading-snug text-danger"
               role="alert"
             >
-              {error}
-            </p>
+              <p className="flex-1">{error}</p>
+              {canSend && (
+                <button
+                  type="button"
+                  className="inline-flex shrink-0 items-center gap-1 rounded-md border border-danger/40 px-2 py-1 text-[12px] font-semibold hover:bg-danger/10"
+                  onClick={handleGenerate}
+                >
+                  <RotateCcw className="h-3 w-3" strokeWidth={2.5} />
+                  Reintentar
+                </button>
+              )}
+            </div>
           )}
-        </Modal>
-      )}
     </>
+  )
+
+  return (
+    <div className="rounded-2xl border-2 border-accent/40 bg-surface p-5 shadow-[0_20px_50px_-24px_var(--accent)] sm:p-7">
+      {chatBody}
+    </div>
   )
 }

@@ -1,14 +1,18 @@
 import { useEffect, useState } from 'react'
+import { Rocket, ArrowLeftRight } from 'lucide-react'
 import type { FormEvent } from 'react'
 import { TextField } from '../../TextField'
 import { SaveVisibilityModal } from './SaveVisibilityModal'
 import { ImageUploadField } from './ImageUploadField'
 import { AiGameAssistantPanel } from './AiGameAssistantPanel'
+import { useReportCreateSummary } from './aiDraftContext'
 import { GameFormShell } from './GameFormShell'
 import { WizardPhaseNav } from './WizardPhaseNav'
+import { FormSection, PhaseLabel } from './create/FormSection'
 import type { GameDraft } from '../../../services/ai-game-assistant.service'
 import { OrganizationSelectField } from './create/OrganizationSelectField'
 import { CategorySelectField } from './create/CategorySelectField'
+import { ItemGridEditor } from './create/ItemGridEditor'
 import { useCreateGameProgress } from './create/CreateGameProgressContext'
 import { useAuth } from '../../../hooks/useAuth'
 import { useToast } from '../../../hooks/useToast'
@@ -83,6 +87,7 @@ export function OppositesGameForm({
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [phase, setPhase] = useState(0)
+  const [selectedPair, setSelectedPair] = useState(0)
   const { setSubPhase } = useCreateGameProgress()
 
   // Informa al header del wizard (CreateGameLayout) en qué fase va este
@@ -120,6 +125,8 @@ export function OppositesGameForm({
 
   function applyAiDraft(draft: GameDraft) {
     const items = Array.isArray(draft.content) ? draft.content : []
+    // El panel sigue a la pareja más reciente mientras la IA llena la lista.
+    setSelectedPair(Math.max(items.length - 1, 0))
     setPairs(
       items.map((item) => {
         const raw = (item ?? {}) as Record<string, unknown>
@@ -147,6 +154,7 @@ export function OppositesGameForm({
 
   function removePair(index: number) {
     setPairs((current) => (current.length > 2 ? current.filter((_, i) => i !== index) : current))
+    setSelectedPair((current) => Math.max(0, Math.min(current, pairs.length - 2)))
   }
 
   /** Valida solo los campos de la fase 1 (Identidad): título, descripción, Ã¡rea. */
@@ -165,14 +173,16 @@ export function OppositesGameForm({
 
   /** Valida solo los campos de la fase 2 (Contenido): el bloque repetible de parejas. */
   function validateContentPhase(): string | null {
-    const incompletePair = pairs.some(
+    const firstIncomplete = pairs.findIndex(
       (pair) =>
         !pair.posTitle.trim() ||
         !pair.posDescription.trim() ||
         !pair.negTitle.trim() ||
         !pair.negDescription.trim(),
     )
-    if (incompletePair) {
+    if (firstIncomplete !== -1) {
+      // El panel edita una pareja a la vez: se abre la primera que falta.
+      setSelectedPair(firstIncomplete)
       return 'Completa todos los campos de cada pareja antes de crear el juego.'
     }
     return null
@@ -249,6 +259,8 @@ export function OppositesGameForm({
     showToast('Juego creado', 'success')
   }
 
+  useReportCreateSummary({ count: pairs.length, itemsLabel: 'parejas', missingImages: pairs.reduce((total, pair) => total + (pair.posImageUrl ? 0 : 1) + (pair.negImageUrl ? 0 : 1), 0) })
+
   if (createdGameId) {
     return (
       <SaveVisibilityModal
@@ -269,12 +281,10 @@ export function OppositesGameForm({
       }
     >
       <form className="flex flex-col gap-[16px]" onSubmit={handleSubmit} noValidate>
-        <p className="text-[11.5px] font-semibold uppercase tracking-wide text-accent">
-          Fase {phase + 1} de {TOTAL_PHASES} · {PHASES[phase].label}
-        </p>
+        <PhaseLabel phase={phase + 1} total={TOTAL_PHASES} label={PHASES[phase].label} />
 
         {phase === 0 && (
-          <div className="flex flex-col gap-[16px] animate-[fade-in-up_0.25s_ease-out_backwards]">
+          <FormSection icon={Rocket} title="Cuéntanos de tu juego" subtitle="Nombre, portada y el lugar donde vivirá." tone={1}>
             <TextField
               label="Título del juego"
               type="text"
@@ -319,91 +329,115 @@ export function OppositesGameForm({
               disabled={submitting}
               onChange={setOrganizationId}
             />
-          </div>
+          </FormSection>
         )}
 
         {phase === 1 && (
-        <div className="grid grid-cols-1 gap-3 animate-[fade-in-up_0.25s_ease-out_backwards] xl:grid-cols-2">
-          {pairs.map((pair, index) => (
-            <div key={index} className="rounded-xl border border-border p-4">
-              <div className="mb-2.5 flex items-center justify-between">
-                <p className="text-[13px] font-semibold text-text-h">Pareja {index + 1}</p>
-                {pairs.length > 2 && (
-                  <button
-                    type="button"
-                    className="text-[12px] font-medium text-danger"
-                    onClick={() => removePair(index)}
+        <FormSection icon={ArrowLeftRight} title="Parejas de opuestos" subtitle="Un concepto y su contrario, con texto e imagen opcional." tone={3} bare>
+<ItemGridEditor
+          itemLabel="Pareja"
+          addLabel="+ Agregar pareja"
+          layout="stacked"
+          count={pairs.length}
+          minItems={2}
+          selected={selectedPair}
+          onSelect={setSelectedPair}
+          onAdd={addPair}
+          onRemove={removePair}
+          disabled={submitting}
+          isComplete={(index) => {
+            const pair = pairs[index]
+            return (
+              !!pair &&
+              !!pair.posTitle.trim() &&
+              !!pair.posDescription.trim() &&
+              !!pair.negTitle.trim() &&
+              !!pair.negDescription.trim()
+            )
+          }}
+          tileText={(index) => {
+            const pair = pairs[index]
+            if (!pair) return ''
+            const positive = pair.posTitle.trim()
+            const negative = pair.negTitle.trim()
+            return positive || negative ? `${positive || '…'} ↔ ${negative || '…'}` : ''
+          }}
+          tileVisual={(index) => {
+            const pair = pairs[index]
+            return (
+              <span className="nx-gi-split" aria-hidden="true">
+                <span className="nx-gi-split-pos">{pair?.posImageUrl ? <img src={pair.posImageUrl} alt="" loading="lazy" /> : '+'}</span>
+                <span className="nx-gi-split-neg">{pair?.negImageUrl ? <img src={pair.negImageUrl} alt="" loading="lazy" /> : '−'}</span>
+              </span>
+            )
+          }}
+          renderEditor={(index) => {
+            const pair = pairs[index]
+            if (!pair) return null
+            return (
+              <div className="grid grid-cols-1 gap-x-6 gap-y-3 md:grid-cols-2">
+                <div className="nx-gi-side" data-side="pos">
+                  <p className="nx-gi-side-title">Positivo</p>
+                  <TextField
+                    label="Título"
+                    type="text"
+                    value={pair.posTitle}
                     disabled={submitting}
-                  >
-                    Quitar
-                  </button>
-                )}
+                    onChange={(value) => updatePair(index, 'posTitle', value)}
+                    onBlur={() => {}}
+                  />
+                  <TextField
+                    label="Descripción"
+                    type="text"
+                    value={pair.posDescription}
+                    disabled={submitting}
+                    onChange={(value) => updatePair(index, 'posDescription', value)}
+                    onBlur={() => {}}
+                  />
+                  <ImageUploadField
+                    label="Imagen (opcional)"
+                    imageUrl={pair.posImageUrl}
+                    folder="memory-cards"
+                    disabled={submitting}
+                    onChange={(url) => updatePair(index, 'posImageUrl', url)}
+                  />
+                </div>
+                <div className="nx-gi-side" data-side="neg">
+                  <p className="nx-gi-side-title">Negativo</p>
+                  <TextField
+                    label="Título"
+                    type="text"
+                    value={pair.negTitle}
+                    disabled={submitting}
+                    onChange={(value) => updatePair(index, 'negTitle', value)}
+                    onBlur={() => {}}
+                  />
+                  <TextField
+                    label="Descripción"
+                    type="text"
+                    value={pair.negDescription}
+                    disabled={submitting}
+                    onChange={(value) => updatePair(index, 'negDescription', value)}
+                    onBlur={() => {}}
+                  />
+                  <ImageUploadField
+                    label="Imagen (opcional)"
+                    imageUrl={pair.negImageUrl}
+                    folder="memory-cards"
+                    disabled={submitting}
+                    onChange={(url) => updatePair(index, 'negImageUrl', url)}
+                  />
+                </div>
               </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <TextField
-                  label="Positivo · Título"
-                  type="text"
-                  value={pair.posTitle}
-                  disabled={submitting}
-                  onChange={(value) => updatePair(index, 'posTitle', value)}
-                  onBlur={() => {}}
-                />
-                <TextField
-                  label="Negativo · Título"
-                  type="text"
-                  value={pair.negTitle}
-                  disabled={submitting}
-                  onChange={(value) => updatePair(index, 'negTitle', value)}
-                  onBlur={() => {}}
-                />
-                <TextField
-                  label="Positivo · Descripción"
-                  type="text"
-                  value={pair.posDescription}
-                  disabled={submitting}
-                  onChange={(value) => updatePair(index, 'posDescription', value)}
-                  onBlur={() => {}}
-                />
-                <TextField
-                  label="Negativo · Descripción"
-                  type="text"
-                  value={pair.negDescription}
-                  disabled={submitting}
-                  onChange={(value) => updatePair(index, 'negDescription', value)}
-                  onBlur={() => {}}
-                />
-                <ImageUploadField
-                  label="Positivo · Imagen (opcional)"
-                  imageUrl={pair.posImageUrl}
-                  folder="memory-cards"
-                  disabled={submitting}
-                  onChange={(url) => updatePair(index, 'posImageUrl', url)}
-                />
-                <ImageUploadField
-                  label="Negativo · Imagen (opcional)"
-                  imageUrl={pair.negImageUrl}
-                  folder="memory-cards"
-                  disabled={submitting}
-                  onChange={(url) => updatePair(index, 'negImageUrl', url)}
-                />
-              </div>
-            </div>
-          ))}
-
-          <button
-            type="button"
-            className="self-start rounded-lg border border-dashed border-border px-3.5 py-2 text-[13px] font-medium text-text-h xl:col-span-2"
-            onClick={addPair}
-            disabled={submitting}
-          >
-            + Agregar pareja
-          </button>
-        </div>
+            )
+          }}
+        />
+</FormSection>
         )}
 
         {error && (
           <p
-            className="rounded-lg border border-danger/35 bg-danger/10 px-[13px] py-[11px] text-sm leading-snug text-danger"
+            className="nx-alert"
             role="alert"
           >
             {error}
@@ -411,18 +445,18 @@ export function OppositesGameForm({
         )}
 
         <WizardPhaseNav
-          onBack={phase === 0 ? onBack : goToPreviousPhase}
-          backLabel={phase === 0 ? 'Cambiar modo' : 'Atrás'}
+          onBack={phase === 0 ? undefined : goToPreviousPhase}
+          backLabel="Atrás"
           onNext={goToNextPhase}
           isLastPhase={phase === TOTAL_PHASES - 1}
           submitting={submitting}
         />
 
         {phase === TOTAL_PHASES - 1 && (
-          <div className="flex gap-2">
+          <div className="nx-sticky-actions nx-actions">
             <button
               type="submit"
-              className="rounded-lg px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)] transition-transform hover:not-disabled:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+              className="nx-btn nx-btn-primary"
               style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
               disabled={submitting}
             >
@@ -430,7 +464,7 @@ export function OppositesGameForm({
             </button>
             <button
               type="button"
-              className="rounded-lg border border-border px-4 py-2.5 text-[14px] font-medium text-text-h"
+              className="nx-btn nx-btn-secondary border border-border text-text-h"
               onClick={goToPreviousPhase}
               disabled={submitting}
             >
@@ -438,7 +472,7 @@ export function OppositesGameForm({
             </button>
             <button
               type="button"
-              className="rounded-lg border border-border px-4 py-2.5 text-[14px] font-medium text-text-h"
+              className="nx-btn nx-btn-secondary border border-border text-text-h"
               onClick={onClose}
               disabled={submitting}
             >

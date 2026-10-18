@@ -1,4 +1,5 @@
-import { Bot, Ghost, Layers, Puzzle, UserRoundSearch, Dices, Flame, User, Users } from 'lucide-react'
+import type { CSSProperties } from 'react'
+import { ArrowLeft, Bot, Ghost, Layers, Puzzle, UserRoundSearch, Dices, Flame, User, Users } from 'lucide-react'
 import { LIVE_ROOM_GAME_TYPES } from './resolveRoomCode'
 import { modeColorForGameType } from './gameModeVisuals'
 
@@ -60,7 +61,7 @@ const TYPE_OPTIONS: Array<{
   },
   {
     choice: 'MAZE_COLLECTOR',
-    title: 'Recolector de laberinto',
+    title: 'Recolector',
     description:
       'Un jugador recorre un laberinto recolectando objetos temáticos mientras esquiva enemigos. Cambia la narrativa a tu Ã¡rea.',
     icon: Ghost,
@@ -81,7 +82,7 @@ const TYPE_OPTIONS: Array<{
   },
   {
     choice: 'TRUE_FALSE_MAZE',
-    title: 'Laberinto Verdadero o Falso',
+    title: 'Laberinto V/F',
     description:
       'Un robot recorre una nave espacial y responde cada afirmación entrando a la sala VERDADERO o FALSO, mientras esquiva medusas galácticas. Tú escribes las afirmaciones.',
     icon: Bot,
@@ -91,12 +92,16 @@ const TYPE_OPTIONS: Array<{
 /** Primer paso al crear un juego: elegir la mecánica base. */
 export function GameTypePicker({ onClose, onSelect, archivedGameTypes }: GameTypePickerProps) {
   return (
-    <div className="mx-auto max-w-[520px] p-8">
+    <div className="mx-auto max-w-[900px] p-5 sm:p-8">
+      <button type="button" className="nx-back inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-[13px] font-semibold text-text-h shadow-sm hover:border-accent hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent mb-4" onClick={onClose}>
+        <ArrowLeft className="nx-back-icon h-4 w-4" strokeWidth={2.5} />
+        Volver al menú principal
+      </button>
       <h2 className="mb-1 text-[20px] tracking-tight text-text-h">Nueva partida</h2>
-      <p className="mb-6 text-[13px] text-text">Elige qué tipo de juego quieres crear.</p>
+      <p className="mb-5 text-[13px] text-text">Elige qué tipo de juego quieres crear.</p>
 
-      <div className="flex flex-col gap-3">
-        {TYPE_OPTIONS.map(({ choice, title, description, icon: Icon }) => {
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        {TYPE_OPTIONS.map(({ choice, title, description, icon: Icon }, index) => {
           const isArchived = archivedGameTypes?.has(GAME_TYPE_BY_CHOICE[choice]) ?? false
           const isMultiplayer = LIVE_ROOM_GAME_TYPES.includes(GAME_TYPE_BY_CHOICE[choice])
 
@@ -105,49 +110,39 @@ export function GameTypePicker({ onClose, onSelect, archivedGameTypes }: GameTyp
               key={choice}
               type="button"
               disabled={isArchived}
+              title={description}
+              style={{ '--i': index, '--tile-color': modeColorForGameType(GAME_TYPE_BY_CHOICE[choice]) } as CSSProperties}
               className={
                 isArchived
-                  ? 'flex items-start gap-3.5 rounded-xl border border-border p-4 text-left opacity-50 cursor-not-allowed'
-                  : 'flex items-start gap-3.5 rounded-xl border border-border p-4 text-left transition-colors hover:border-accent hover:bg-accent/5'
+                  ? 'nx-tile nx-tile-in flex flex-col items-center gap-2 rounded-xl border border-border p-4 text-center opacity-50 cursor-not-allowed'
+                  : 'nx-tile nx-tile-in flex flex-col items-center gap-2 rounded-xl border border-border p-4 text-center hover:border-accent hover:bg-accent/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent'
               }
               onClick={isArchived ? undefined : () => onSelect(choice)}
             >
               <span
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-white"
+                className="nx-tile-icon flex h-14 w-14 items-center justify-center rounded-xl text-white shadow-md"
                 style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
               >
-                <Icon className="h-5 w-5" strokeWidth={2} />
+                <Icon className="h-7 w-7" strokeWidth={2} />
               </span>
-              <span>
-                <span className="flex flex-wrap items-center gap-2">
-                  <span className="block text-[14.5px] font-semibold text-text-h">{title}</span>
-                  <span
-                    className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-semibold text-white"
-                    style={{ background: modeColorForGameType(GAME_TYPE_BY_CHOICE[choice]) }}
-                  >
-                    {isMultiplayer ? <Users className="h-3 w-3" strokeWidth={2.5} /> : <User className="h-3 w-3" strokeWidth={2.5} />}
-                    {isMultiplayer ? 'Multijugador' : '1 jugador'}
-                  </span>
-                  {isArchived && (
-                    <span className="rounded-full bg-border px-2 py-0.5 text-[10.5px] font-medium text-text">
-                      Archivado temporalmente
-                    </span>
-                  )}
+              <span className="text-[14px] font-semibold leading-tight text-text-h">{title}</span>
+              <span
+                className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-semibold text-white"
+                style={{ background: modeColorForGameType(GAME_TYPE_BY_CHOICE[choice]) }}
+              >
+                {isMultiplayer ? <Users className="h-3 w-3" strokeWidth={2.5} /> : <User className="h-3 w-3" strokeWidth={2.5} />}
+                {isMultiplayer ? 'Multijugador' : '1 jugador'}
+              </span>
+              {isArchived && (
+                <span className="rounded-full bg-border px-2 py-0.5 text-[10.5px] font-medium text-text">
+                  Archivado temporalmente
                 </span>
-                <span className="mt-0.5 block text-[12.5px] leading-snug text-text">{description}</span>
-              </span>
+              )}
             </button>
           )
         })}
       </div>
 
-      <button
-        type="button"
-        className="mt-6 w-full rounded-lg border border-border px-4 py-2.5 text-[14px] font-medium text-text-h"
-        onClick={onClose}
-      >
-        Cancelar
-      </button>
     </div>
   )
 }
