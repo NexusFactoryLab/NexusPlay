@@ -202,11 +202,11 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
     setSelectedItem((current) => Math.max(0, Math.min(current, items.length - 2)))
   }
 
-  /** Fase 1 (Identidad): título, descripción, materia. */
+  /** Fase 1 (Identidad): título, descripción, área. */
   function validateIdentityPhase(): string | null {
     if (!title.trim() || title.trim().length < 3) return 'El título debe tener al menos 3 caracteres.'
     if (!description.trim() || description.trim().length < 10) return 'La descripción debe tener al menos 10 caracteres.'
-    if (!categoryId) return 'Elige una materia para el juego.'
+    if (!categoryId) return 'Elige un área para el juego.'
     return null
   }
 

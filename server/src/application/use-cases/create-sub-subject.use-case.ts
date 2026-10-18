@@ -20,8 +20,8 @@ export interface CreateSubSubjectInput {
 }
 
 /**
- * Sub-materia: cualquier usuario autenticado (profesor o admin) puede crearla
- * bajo una materia raíz existente. Nace PRIVATE — solo su creador la ve hasta
+ * Sub-Ã¡rea: cualquier usuario autenticado (profesor o admin) puede crearla
+ * bajo un Ã¡rea raíz existente. Nace PRIVATE — solo su creador la ve hasta
  * que decida publicarla (ver `PublishSubjectUseCase`).
  */
 @Injectable()

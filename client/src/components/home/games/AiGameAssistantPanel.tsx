@@ -249,7 +249,7 @@ export function AiGameAssistantPanel({
       await wait(40)
       fillStep?.(items.length)
       showToast(
-        draft.notice ? `¡Listo! ${draft.notice}` : '¡Listo! Revisa el juego y completa nombre, descripción y materia.',
+        draft.notice ? `¡Listo! ${draft.notice}` : '¡Listo! Revisa el juego y completa nombre, descripción y área.',
         'success',
         6000,
       )

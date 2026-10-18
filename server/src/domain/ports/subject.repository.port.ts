@@ -17,6 +17,6 @@ export interface SubjectRepository {
   findAll(): Promise<Subject[]>;
   /** Hijas directas (`parentSubjectId = id`), en cualquier estado (PUBLIC o PRIVATE). */
   findByParentId(parentId: string): Promise<Subject[]>;
-  /** Soft-delete: solo debe invocarse sobre una materia que pasó `canBeDeletedBy`. */
+  /** Soft-delete: solo debe invocarse sobre un Ã¡rea que pasó `canBeDeletedBy`. */
   softDelete(id: string): Promise<void>;
 }

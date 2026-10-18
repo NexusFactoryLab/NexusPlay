@@ -63,7 +63,7 @@ const TYPE_OPTIONS: Array<{
     choice: 'MAZE_COLLECTOR',
     title: 'Recolector',
     description:
-      'Un jugador recorre un laberinto recolectando objetos temáticos mientras esquiva enemigos. Cambia la narrativa a tu materia.',
+      'Un jugador recorre un laberinto recolectando objetos temáticos mientras esquiva enemigos. Cambia la narrativa a tu Ã¡rea.',
     icon: Ghost,
   },
   {

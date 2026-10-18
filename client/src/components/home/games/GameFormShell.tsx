@@ -206,7 +206,7 @@ export function GameFormShell({
   /**
    * Marcas visuales sobre los campos (`[data-nx-field]`), sin que cada
    * formulario tenga que implementarlas: "pendiente" para título, descripción
-   * y materia vacíos tras llenar con IA.
+   * y área vacíos tras llenar con IA.
    */
   const refreshMarks = useCallback(() => {
     const root = formColumnRef.current
@@ -231,7 +231,7 @@ export function GameFormShell({
       if (countable && done) field.dataset.nxDone = 'true'
       else delete field.dataset.nxDone
       if (control && identityKind(label) === 'title') setPreviewTitle(control.value.trim())
-      const isIdentity = /^(t[ií]tulo|descripci[oó]n|materia|nombre del juego)/.test(label)
+      const isIdentity = /^(t[ií]tulo|descripci[oó]n|[aá]rea|materia|nombre del juego)/.test(label)
       const empty = !!control && control.value.trim().length === 0
       if (aiDraftCount > 0 && isIdentity && empty) field.dataset.nxPending = 'true'
       else delete field.dataset.nxPending
@@ -603,7 +603,7 @@ export function GameFormShell({
               >
                 <PencilLine className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={2.2} />
                 <p className="flex-1">
-                  <strong>La IA ya llenó el juego.</strong> Falta tu parte: nombre, descripción y materia.
+                  <strong>La IA ya llenó el juego.</strong> Falta tu parte: nombre, descripción y área.
                 </p>
                 <button
                   type="button"

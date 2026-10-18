@@ -223,7 +223,7 @@ export function SnakesLaddersGameForm({ onClose, onCreated, onBack, onCategoryCr
   function validateIdentityPhase(): string | null {
     if (!title.trim() || title.trim().length < 3) return 'El título debe tener al menos 3 caracteres.'
     if (!description.trim() || description.trim().length < 10) return 'La descripción debe tener al menos 10 caracteres.'
-    if (!categoryId) return 'Elige una materia para el juego.'
+    if (!categoryId) return 'Elige un área para el juego.'
     return null
   }
 

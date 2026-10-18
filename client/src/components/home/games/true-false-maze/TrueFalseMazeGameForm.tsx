@@ -172,11 +172,11 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
     setSelectedQuestion((current) => Math.max(0, Math.min(current, questions.length - 2)))
   }
 
-  /** Fase 1 (Identidad): título, descripción y materia. */
+  /** Fase 1 (Identidad): título, descripción y área. */
   function validateIdentityPhase(): string | null {
     if (title.trim().length < 3) return 'El título debe tener al menos 3 caracteres.'
     if (description.trim().length < 10) return 'La descripción debe tener al menos 10 caracteres.'
-    if (!categoryId) return 'Elige una materia para el juego.'
+    if (!categoryId) return 'Elige un área para el juego.'
     return null
   }
 

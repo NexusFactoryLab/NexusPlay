@@ -5,7 +5,7 @@ import { ScoreOverTimeChart } from './ScoreOverTimeChart'
 
 /**
  * Vista de métricas propias del estudiante (issue #226): desglose por juego,
- * por materia y evolución en el tiempo. Compone un hook de datos + tres
+ * por Ã¡rea y evolución en el tiempo. Compone un hook de datos + tres
  * componentes de presentación — cada uno con su propia razón de cambio.
  */
 export function MyMetricsPage() {
@@ -20,7 +20,7 @@ export function MyMetricsPage() {
       <header>
         <h2 className="text-[22px] tracking-tight text-text-h">Mis métricas</h2>
         <p className="text-[14px] text-text">
-          Revisa en qué materias y juegos vas mejor, y cómo ha evolucionado tu progreso.
+          Revisa en qué Ã¡reas y juegos vas mejor, y cómo ha evolucionado tu progreso.
         </p>
       </header>
 
@@ -30,7 +30,7 @@ export function MyMetricsPage() {
       </section>
 
       <section>
-        <h3 className="mb-2 text-[16px] font-semibold text-text">Por materia</h3>
+        <h3 className="mb-2 text-[16px] font-semibold text-text">Por Ã¡rea</h3>
         <StudentSubjectBreakdownTable subjects={metrics.bySubject} />
       </section>
 

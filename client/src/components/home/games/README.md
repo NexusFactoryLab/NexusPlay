@@ -67,7 +67,7 @@ Mongo, y su forma la garantiza el validador.
 
 7. **Formulario de creación** `<Tipo>GameForm.tsx`, calcado del molde de `GuessWhoGameForm.tsx` o
    `DominoGameForm.tsx`:
-   - Campos comunes: título, descripción, portada opcional, materia (con creación inline).
+   - Campos comunes: título, descripción, portada opcional, área (con creación inline).
    - Campos propios del tipo (el contenido) más los parámetros de `config`.
    - Validación en cliente que **espeje la del validador del backend**, para dar el error antes del
      viaje de red. El backend sigue siendo la autoridad.

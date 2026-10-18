@@ -119,7 +119,7 @@ export const MAX_DOMINO_CONCEPTS = 10
  * siendo data pura en la base, y el cliente resuelve el dibujo. Cubre
  * categorías amplias (naturaleza, ciudad, tecnología, salud, alimentación,
  * transporte, arte, ciencia, deportes, animales, clima, objetos comunes)
- * para servir a cualquier materia, no solo temática ambiental.
+ * para servir a cualquier Ã¡rea, no solo temática ambiental.
  */
 export const DOMINO_ICONS: Record<string, LucideIcon> = {
   // Genéricos / comunes (primero, para que emptyConcept() empiece por acá)
