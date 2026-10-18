@@ -51,6 +51,7 @@ async function startSolo(difficulty = 'HARD', botPolicy?: GuessWhoBotPolicy, aut
   const human = client('ana');
   await ctx.gateway.handleCreateSolo(human, { gameId: game.id, difficulty, autoDiscard });
   const room = ctx.rooms.findBySocketId('ana')!;
+  ctx.gateway.handleReady(human, { ready: true });
   vi.advanceTimersByTime(3000);
   return { ...ctx, human, room, bot: room.players[1] };
 }
@@ -84,14 +85,24 @@ function playAgainstPassiveHuman({ gateway, human, room, bot }: Awaited<ReturnTy
 }
 
 describe('partida en solitario contra el bot (issue #60)', () => {
-  it('crea la sala con el bot listo, arranca sola y nadie más puede entrar', async () => {
+  it('abre el lobby con el bot listo, arranca cuando el jugador está listo y nadie más puede entrar', async () => {
     const { gateway, rooms, events } = setup();
-    await gateway.handleCreateSolo(client('ana'), { gameId: game.id, difficulty: 'HARD' });
+    const human = client('ana');
+    await gateway.handleCreateSolo(human, { gameId: game.id, difficulty: 'HARD' });
     const room = rooms.findBySocketId('ana')!;
     expect(room.players.map((p) => p.displayName)).toEqual(['ana', 'Bot Nexus (difícil)']);
     expect(room.players[1].bot).toEqual({ difficulty: 'HARD' });
-    expect(room.players.every((p) => p.ready)).toBe(true);
+    expect(room.players.map((p) => p.ready)).toEqual([false, true]);
+    vi.advanceTimersByTime(5000);
+    expect(room.phase).toBe('WAITING');
+    // En el lobby elige segundos por turno y descarte: el bot sigue listo.
+    gateway.handleUpdateTurnDuration(human, { turnDurationSeconds: 45 });
+    gateway.handleUpdateAutoDiscard(human, { autoDiscard: true });
+    expect(room.players[1].ready).toBe(true);
+    gateway.handleReady(human, { ready: true });
     vi.advanceTimersByTime(3000);
+    expect(room.turnDurationSeconds).toBe(45);
+    expect(room.autoDiscard).toBe(true);
     expect(room.phase).toBe('PLAYING');
     expect(room.players.every((p) => p.secretCardId)).toBe(true);
     expect(room.players[0].secretCardId).not.toBe(room.players[1].secretCardId);
@@ -166,6 +177,7 @@ describe('partida en solitario contra el bot (issue #60)', () => {
     const human = client('ana');
     await gateway.handleCreateSolo(human, { gameId: game.id, difficulty: 'HARD' });
     const room = rooms.findBySocketId('ana')!;
+    gateway.handleReady(human, { ready: true });
     vi.advanceTimersByTime(3000);
     if (room.activePlayerUserId !== 'ana') vi.advanceTimersByTime(30_000);
     gateway.handleFreeQuestion(human, { text: '¿Su capital es muy grande?' });
@@ -181,6 +193,7 @@ describe('partida en solitario contra el bot (issue #60)', () => {
     const human = client('ana');
     await gateway.handleCreateSolo(human, { gameId: game.id, difficulty: 'HARD' });
     const room = rooms.findBySocketId('ana')!;
+    gateway.handleReady(human, { ready: true });
     vi.advanceTimersByTime(3000);
     if (room.activePlayerUserId !== 'ana') vi.advanceTimersByTime(30_000);
     gateway.handleFreeQuestion(human, { text: '¿Es bonito?' });

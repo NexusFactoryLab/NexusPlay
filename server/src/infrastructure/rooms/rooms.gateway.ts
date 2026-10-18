@@ -756,9 +756,10 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
 
   /**
    * Partida en solitario contra el bot (issue #60): la misma sala 1v1, con el
-   * bot como segundo jugador. Los dos entran listos, así que arranca la
-   * cuenta regresiva de inmediato; nadie más puede unirse (la sala ya está
-   * llena) y se cierra cuando el jugador sale.
+   * bot como segundo jugador, siempre listo. El jugador ve el lobby para
+   * elegir los segundos por turno y el descarte automático, y la partida
+   * arranca cuando marca «Listo» (issue #64). Nadie más puede unirse (la
+   * sala ya está llena) y se cierra cuando el jugador sale.
    */
   @SubscribeMessage('room:create-solo')
   async handleCreateSolo(
@@ -789,7 +790,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
           socketId: socket.id,
           userId: socket.data.userId,
           displayName: socket.data.displayName,
-          ready: true,
+          ready: false,
           secretCardId: null,
           discardedCardIds: [],
         },

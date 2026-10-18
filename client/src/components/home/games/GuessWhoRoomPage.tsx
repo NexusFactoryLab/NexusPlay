@@ -212,6 +212,7 @@ function GuessWhoRoomSession() {
 
   if (room.phase === 'WAITING') return <MultiplayerLobby
     room={room} roomPath={`/quien-es/sala/${encodeURIComponent(room.code)}`} maxPlayers={2}
+    solo={room.players.some((player) => player.isBot)}
     isHost={Boolean(self?.isHost)} connecting={connecting} error={error}
     turnDurationSeconds={room.turnDurationSeconds} onUpdateTurnDuration={updateTurnDuration}
     onReady={setReady} onExit={handleExit} messages={messages} onSend={sendChatMessage}

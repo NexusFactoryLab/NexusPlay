@@ -55,12 +55,21 @@ export function ChatPanel({
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight })
   }, [messages.length])
 
+  // En tu turno, lo que escribes con «?» o «¿» se manda como pregunta propia
+  // (issue #64): antes Enter lo mandaba como mensaje y el bot no lo veía.
+  const canAskFree = Boolean(guided?.onAskFree && guided.isMyTurn && !guided.pending)
+  const looksLikeQuestion = /[¿?]/.test(text)
+
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
     if (!text.trim() || disconnected) return
-    onSend(text)
+    if (canAskFree && looksLikeQuestion) guided!.onAskFree!(text.trim())
+    else onSend(text)
     setText('')
   }
+
+  // La última respuesta del rival a una pregunta, destacada para que no se pierda en el chat.
+  const lastAnswer = [...messages].reverse().find((m) => m.userId !== selfUserId && /^(Sí|No)\./.test(m.text))
 
   return (
     <div
@@ -141,6 +150,11 @@ export function ChatPanel({
           </div>}
           <p className="mt-2 text-[11px] text-text">{guided.pending.free ? 'Es una pregunta propia: responde con la verdad sobre tu tarjeta. Quien pregunta descarta según la respuesta.' : guided.autoDiscard === false ? 'Con la respuesta, descarta tú las tarjetas que no coinciden.' : 'La respuesta descarta automáticamente las opciones que no coinciden.'} La pregunta vence al cambiar el turno.</p>
         </> : <>
+          {lastAnswer && <p role="status" className="mb-2 rounded-lg border border-accent/40 bg-surface px-2.5 py-1.5 text-[12.5px] text-text-h">
+            <span className="font-semibold">{lastAnswer.displayName} respondió: </span>
+            <strong className="text-accent">{lastAnswer.text.startsWith('Sí') ? 'Sí' : 'No'}</strong>
+            <span className="block text-[11px] text-text">{lastAnswer.text.replace(/^(Sí|No)\.\s*/, '')}</span>
+          </p>}
           <p className="text-[12px] font-bold text-accent">Preguntas Sí/No · {guided.autoDiscard === false ? 'descartas tú' : 'descarte automático'}</p>
           {!guided.isMyTurn ? <p className="mt-1 text-[12px] text-text">Podrás preguntar en tu turno. Puedes escribir mensajes mientras esperas.</p> : <div className="mt-2 space-y-2">
             {guided.questions.filter(q => normalize(q.text).includes(normalize(text.trim()))).map(q => <div key={q.id}>
@@ -149,7 +163,7 @@ export function ChatPanel({
             {guided.questions.filter(q => normalize(q.text).includes(normalize(text.trim()))).length === 0 && <p className="text-[12px] text-text">{guided.questions.length ? 'Sin sugerencias para ese texto.' : 'No quedan preguntas sugeridas que separen las tarjetas.'}</p>}
             {guided.onAskFree && (text.trim()
               ? <button type="button" disabled={disconnected} onClick={() => { guided.onAskFree!(text.trim()); setText('') }} className="w-full rounded-xl bg-accent px-3 py-2 text-left text-[12px] font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50">Hacer esta pregunta (Sí/No): «{text.trim()}»</button>
-              : <p className="text-[11.5px] text-text">¿Quieres preguntar otra cosa? Escríbela abajo como pregunta de Sí/No{guided.opponentIsBot ? ' (el bot la responde con IA)' : ''}.</p>)}
+              : <p className="text-[11.5px] text-text">¿Quieres preguntar otra cosa? Escríbela abajo con «?» y pulsa Enter{guided.opponentIsBot ? ' (el bot la responde con IA)' : ''}.</p>)}
           </div>}
         </>}
       </div>}
@@ -164,7 +178,7 @@ export function ChatPanel({
           aria-label="Mensaje"
           autoFocus={!inline}
           disabled={disconnected}
-          placeholder="Escribe un mensaje…"
+          placeholder={canAskFree ? 'Escribe una pregunta de Sí/No o un mensaje…' : 'Escribe un mensaje…'}
           maxLength={500}
           value={text}
           onChange={(event) => setText(event.target.value)}
@@ -177,7 +191,7 @@ export function ChatPanel({
               'linear-gradient(135deg, var(--accent), var(--accent-2))',
           }}
           disabled={!text.trim() || disconnected}
-          aria-label="Enviar mensaje"
+          aria-label={canAskFree && looksLikeQuestion ? 'Hacer la pregunta' : 'Enviar mensaje'}
         >
           <Send className="h-4 w-4" strokeWidth={2} />
         </button>

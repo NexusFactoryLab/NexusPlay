@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { Bot } from 'lucide-react'
 import { Modal } from './Modal'
 import { BOT_DIFFICULTY_OPTIONS, soloRoomPath } from './guessWhoBot'
-import { AutoDiscardToggle } from './AutoDiscardToggle'
 
 type GuessWhoRoomProps = {
   gameId: string
@@ -23,7 +22,6 @@ type GuessWhoRoomProps = {
 export function GuessWhoRoom({ gameId, onExit }: GuessWhoRoomProps) {
   const navigate = useNavigate()
   const [choosingBot, setChoosingBot] = useState(false)
-  const [autoDiscard, setAutoDiscard] = useState(false)
 
   return (
     <Modal onClose={onExit} maxWidthClassName="max-w-[440px]">
@@ -67,7 +65,7 @@ export function GuessWhoRoom({ gameId, onExit }: GuessWhoRoomProps) {
         ) : (
           <>
             <p className="text-[13px] text-text">
-              El bot juega con las mismas reglas que una persona y responde siempre la verdad.
+              El bot juega con las mismas reglas que una persona y responde siempre la verdad. En la sala eliges los segundos por turno y el descarte automático.
             </p>
             <div className="flex flex-col gap-2">
               {BOT_DIFFICULTY_OPTIONS.map((option) => (
@@ -75,14 +73,13 @@ export function GuessWhoRoom({ gameId, onExit }: GuessWhoRoomProps) {
                   key={option.id}
                   type="button"
                   className="rounded-2xl border border-border bg-surface px-4 py-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/50 hover:bg-accent/5"
-                  onClick={() => navigate(soloRoomPath(gameId, option.id, autoDiscard))}
+                  onClick={() => navigate(soloRoomPath(gameId, option.id))}
                 >
                   <span className="block text-[14.5px] font-semibold text-text-h">{option.label}</span>
                   <span className="mt-0.5 block text-[12.5px] leading-snug text-text">{option.description}</span>
                 </button>
               ))}
             </div>
-            <AutoDiscardToggle enabled={autoDiscard} onChange={setAutoDiscard} />
           </>
         )}
 
