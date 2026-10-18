@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Check, ExternalLink, X, Rocket, FolderOpen, ListChecks, SlidersHorizontal } from 'lucide-react'
+import { Check, ExternalLink, X, Rocket, ListChecks, SlidersHorizontal } from 'lucide-react'
 import { TextField } from '../../../TextField'
 import { SaveVisibilityModal } from '../SaveVisibilityModal'
 import { ImageUploadField } from '../ImageUploadField'
@@ -10,6 +10,7 @@ import { GameFormShell } from '../GameFormShell'
 import { WizardPhaseNav } from '../WizardPhaseNav'
 import { FormSection, PhaseLabel } from '../create/FormSection'
 import { FormSelect } from '../create/FormSelect'
+import { InfoBubble } from '../create/InfoBubble'
 import { ItemGridEditor } from '../create/ItemGridEditor'
 import { useCreateGameProgress } from '../create/CreateGameProgressContext'
 import { OrganizationSelectField } from '../create/OrganizationSelectField'
@@ -350,9 +351,7 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
           disabled={submitting}
           onChange={setCoverImageUrl}
         />
-</FormSection>
 
-        <FormSection icon={FolderOpen} title="Dónde vivirá" subtitle="Materia y organización para encontrarlo fácil." tone={4}>
           <CategorySelectField
             token={token}
             categories={categories}
@@ -375,9 +374,15 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
         <FormSection icon={SlidersHorizontal} title="Ajustes de la partida" subtitle="Dificultad y reglas de la nave." tone={2}>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="tf-lives">
-                Baterías (vidas)
-              </label>
+              <div className="mb-1.5 flex items-center gap-1.5">
+                <label className="nx-label text-[13px] font-medium text-text-h" htmlFor="tf-lives">
+                  Baterías (vidas)
+                </label>
+                <InfoBubble
+                  label="Ayuda: baterías"
+                  text="Las vidas del robot. Cada vez que una medusa lo toca o se equivoca de sala, pierde una batería; sin baterías, termina la partida."
+                />
+              </div>
               <FormSelect
                 id="tf-lives"
                 className={SELECT_CLASS}
@@ -393,9 +398,15 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
               </FormSelect>
             </div>
             <div>
-              <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="tf-enemies">
-                Medusas galácticas
-              </label>
+              <div className="mb-1.5 flex items-center gap-1.5">
+                <label className="nx-label text-[13px] font-medium text-text-h" htmlFor="tf-enemies">
+                  Medusas galácticas
+                </label>
+                <InfoBubble
+                  label="Ayuda: medusas galácticas"
+                  text="Los enemigos que persiguen al robot por la nave. Más medusas hacen el juego más difícil."
+                />
+              </div>
               <FormSelect
                 id="tf-enemies"
                 className={SELECT_CLASS}
@@ -411,9 +422,15 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
               </FormSelect>
             </div>
             <div>
-              <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="tf-speed">
-                Velocidad de las medusas
-              </label>
+              <div className="mb-1.5 flex items-center gap-1.5">
+                <label className="nx-label text-[13px] font-medium text-text-h" htmlFor="tf-speed">
+                  Velocidad de las medusas
+                </label>
+                <InfoBubble
+                  label="Ayuda: velocidad de las medusas"
+                  text="Qué tan rápido persiguen al robot. Lenta es ideal para empezar; Rápida exige reflejos además de conocimiento."
+                />
+              </div>
               <FormSelect
                 id="tf-speed"
                 className={SELECT_CLASS}
@@ -427,9 +444,15 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
               </FormSelect>
             </div>
             <div>
-              <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="tf-relocate">
-                Las salas cambian de lugar
-              </label>
+              <div className="mb-1.5 flex items-center gap-1.5">
+                <label className="nx-label text-[13px] font-medium text-text-h" htmlFor="tf-relocate">
+                  Las salas cambian de lugar
+                </label>
+                <InfoBubble
+                  label="Ayuda: las salas cambian de lugar"
+                  text="Las salas VERDADERO y FALSO se intercambian de posición cada cierto tiempo, para que el jugador lea la afirmación en vez de memorizar dónde está cada sala."
+                />
+              </div>
               <FormSelect
                 id="tf-relocate"
                 className={SELECT_CLASS}
@@ -454,9 +477,12 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
                 disabled={submitting}
                 onChange={(event) => setShuffleQuestions(event.target.checked)}
               />
-              <span>
+              <span className="inline-flex items-center gap-1.5">
                 Barajar las afirmaciones en cada partida
-                <span className="block text-[12px] text-text">Desmarca para mantener tu orden.</span>
+                <InfoBubble
+                  label="Ayuda: barajar las afirmaciones"
+                  text="Las afirmaciones salen en orden distinto en cada partida. Desmárcalo si quieres que se muestren siempre en el orden que escribiste."
+                />
               </span>
             </label>
             <label className="flex items-start gap-2.5 text-[13.5px] text-text-h">
@@ -467,11 +493,12 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
                 disabled={submitting}
                 onChange={(event) => setLightsOut(event.target.checked)}
               />
-              <span>
+              <span className="inline-flex items-center gap-1.5">
                 Apagones sorpresa
-                <span className="block text-[12px] text-text">
-                  La nave se oscurece unos segundos.
-                </span>
+                <InfoBubble
+                  label="Ayuda: apagones sorpresa"
+                  text="De vez en cuando la nave se oscurece unos segundos y se ve menos del mapa. Añade tensión; déjalo apagado para una partida más tranquila."
+                />
               </span>
             </label>
           </div>

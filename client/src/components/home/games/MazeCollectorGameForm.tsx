@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Rocket, FolderOpen, Smile, Ghost, Gem, SlidersHorizontal } from 'lucide-react'
+import { Rocket, Smile, Ghost, Gem, SlidersHorizontal } from 'lucide-react'
 import type { FormEvent } from 'react'
 import { TextField } from '../../TextField'
 import { SaveVisibilityModal } from './SaveVisibilityModal'
@@ -11,6 +11,7 @@ import { GameFormShell } from './GameFormShell'
 import { WizardPhaseNav } from './WizardPhaseNav'
 import { FormSection, PhaseLabel } from './create/FormSection'
 import { FormSelect } from './create/FormSelect'
+import { InfoBubble } from './create/InfoBubble'
 import { ItemGridEditor } from './create/ItemGridEditor'
 import { useCreateGameProgress } from './create/CreateGameProgressContext'
 import type { GameDraft } from '../../../services/ai-game-assistant.service'
@@ -346,9 +347,7 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
           disabled={submitting}
           onChange={setCoverImageUrl}
         />
-</FormSection>
 
-        <FormSection icon={FolderOpen} title="Dónde vivirá" subtitle="Materia y organización para encontrarlo fácil." tone={4}>
           <CategorySelectField
             token={token}
             categories={categories}
@@ -371,9 +370,15 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
         <>
         <FormSection icon={SlidersHorizontal} title="Reglas del laberinto" subtitle="Forma, vidas y velocidad de los enemigos." tone={4}>
         <div>
-          <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="maze-layout">
-            Forma del laberinto
-          </label>
+          <div className="mb-1.5 flex items-center gap-1.5">
+            <label className="nx-label text-[13px] font-medium text-text-h" htmlFor="maze-layout">
+              Forma del laberinto
+            </label>
+            <InfoBubble
+              label="Ayuda: forma del laberinto"
+              text="Es el dibujo del mapa por el que se mueve el personaje. Clásico es el más sencillo; Ciudad es grande, con calles y edificios, y toma más tiempo recorrerlo."
+            />
+          </div>
           <FormSelect
             id="maze-layout"
             className="w-full rounded-lg border border-border bg-bg px-[13px] py-[11px] text-[15px] text-text-h outline-none focus:border-accent"
@@ -391,9 +396,15 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="maze-lives">
-              Vidas
-            </label>
+            <div className="mb-1.5 flex items-center gap-1.5">
+              <label className="nx-label text-[13px] font-medium text-text-h" htmlFor="maze-lives">
+                Vidas
+              </label>
+              <InfoBubble
+                label="Ayuda: vidas"
+                text="Cuántas veces puede tocarlo un enemigo antes de perder la partida. Entre 1 y 5."
+              />
+            </div>
             <input
               id="maze-lives"
               type="number"
@@ -406,9 +417,15 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
             />
           </div>
           <div>
-            <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="maze-enemy-speed">
-              Velocidad de los enemigos
-            </label>
+            <div className="mb-1.5 flex items-center gap-1.5">
+              <label className="nx-label text-[13px] font-medium text-text-h" htmlFor="maze-enemy-speed">
+                Velocidad de los enemigos
+              </label>
+              <InfoBubble
+                label="Ayuda: velocidad de los enemigos"
+                text="Qué tan rápido persiguen al personaje: 1 es lento y 3 es rápido. Súbela para hacer el juego más difícil."
+              />
+            </div>
             <input
               id="maze-enemy-speed"
               type="number"
@@ -423,7 +440,7 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
         </div>
         </FormSection>
 
-        <FormSection icon={Smile} title="Personaje que recolecta" subtitle="Quién recorre el laberinto juntando objetos." tone={2}>
+        <FormSection icon={Smile} title="Personaje que recolecta" subtitle="Quién recorre el laberinto juntando objetos." tone={2} info="Es el personaje que controla el jugador. Ponle un nombre que encaje con tu tema (por ejemplo, Camión de reciclaje) y elige un ícono.">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <TextField
               label="Nombre"
@@ -448,7 +465,7 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
           </div>
         </FormSection>
 
-        <FormSection icon={Ghost} title="Enemigos" subtitle="Quiénes lo persiguen por el laberinto." tone={2}>
+        <FormSection icon={Ghost} title="Enemigos" subtitle="Quiénes lo persiguen por el laberinto." tone={2} info="Son los que persiguen al personaje por el mapa y le quitan vidas. Dales un nombre y un ícono acordes al tema (por ejemplo, Nubes de contaminación).">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <TextField
               label="Nombre"

@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { InfoBubble } from './InfoBubble'
 
 type FormSectionProps = {
   icon: LucideIcon
@@ -13,6 +14,8 @@ type FormSectionProps = {
   /** Sin fondo de tarjeta: solo el encabezado (para listas cuyos elementos ya son tarjetas). */
   bare?: boolean
   className?: string
+  /** Explicación de la sección: aparece en una burbuja (i) en la esquina de la tarjeta. */
+  info?: string
 }
 
 /**
@@ -21,9 +24,10 @@ type FormSectionProps = {
  * las combinaciones `rounded border-border` que los temas Fantasía/Pradera
  * reescriben), así que se ve bien en todos los temas y en claro/oscuro.
  */
-export function FormSection({ icon: Icon, title, subtitle, children, tone = 1, bare = false, className = '' }: FormSectionProps) {
+export function FormSection({ icon: Icon, title, subtitle, children, tone = 1, bare = false, className = '', info }: FormSectionProps) {
   return (
     <section className={`nx-card ${bare ? 'nx-card-bare' : ''} ${className}`} data-tone={tone}>
+      {info && <InfoBubble placement="corner" label={`Ayuda: ${title}`} text={info} />}
       <header className="nx-card-head">
         <span className="nx-card-icon" aria-hidden="true">
           <Icon className="h-[19px] w-[19px]" strokeWidth={2.2} />

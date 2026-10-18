@@ -128,6 +128,7 @@ export function CategorySelectField({
             </label>
             <FormSelect
               id="game-sub-category"
+              searchable
               className="w-full rounded-lg border border-border bg-bg px-[13px] py-[11px] text-[15px] text-text-h outline-none focus:border-accent"
               value={categoryId !== rootId ? categoryId : ''}
               disabled={disabled}
