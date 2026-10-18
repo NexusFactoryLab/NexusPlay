@@ -5,6 +5,7 @@ import { stepFromPath } from './steps'
 import { headerSegmentFill } from './fieldAssist'
 import { CreateGameProgressProvider, useCreateGameProgress } from './CreateGameProgressContext'
 import { ScrollMoreHint } from '../../../ScrollMoreHint'
+import { MeadowScenery } from '../../FantasyDecor'
 
 function CreateGameLayoutContent() {
   const location = useLocation()
@@ -12,8 +13,9 @@ function CreateGameLayoutContent() {
   const { label, step, total } = stepFromPath(location.pathname, subPhase)
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-bg">
-      <header className="shrink-0 border-b border-border px-5 pb-3 pt-4 sm:px-8">
+    <div className="create-game-layout fixed inset-0 flex flex-col bg-bg">
+      <MeadowScenery />
+      <header className="create-game-header shrink-0 border-b border-border px-5 pb-3 pt-4 sm:px-8">
         <div className="flex items-center gap-3">
           <span
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white"
@@ -53,7 +55,8 @@ function CreateGameLayoutContent() {
           ))}
         </div>
       </header>
-      <main className="flex-1 overflow-y-auto">
+      {/* `app-main`: mismas piezas de Fantasía que las secciones del inicio (ver index.css). */}
+      <main className="app-main flex-1 overflow-y-auto">
         <Outlet />
         <ScrollMoreHint />
       </main>

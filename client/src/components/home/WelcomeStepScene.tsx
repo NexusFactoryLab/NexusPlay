@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react'
-import { ArrowLeft, BookOpen, Bot, Building2, ChevronLeft, Compass, Gamepad2, KeyRound, Lock, LogOut, Moon, Palette, Plus, Search, Settings, Sun, UserRound, Users, Users2, Zap } from 'lucide-react'
+import { ArrowLeft, BookOpen, Bot, Building2, ChevronLeft, Compass, Gamepad2, KeyRound, Lock, LogOut, Palette, Plus, Search, Settings, UserRound, Users, Users2, Zap } from 'lucide-react'
 
 /** Duración de cada bucle: el dedo va al elemento, lo toca y se ve el resultado. */
 const LOOP = '4s'
@@ -32,16 +32,23 @@ const SPOTS: Record<string, [string, string]> = {
   join: ['70%', '74px'],
   create: ['45%', '74px'],
   search: ['42%', '6px'],
-  'theme-toggle': ['80%', '6px'],
-  settings: ['87%', '6px'],
-  profile: ['94%', '6px'],
+  settings: ['91%', '6px'],
+  profile: ['9%', '38px'],
   'menu-toggle': ['24%', '16px'],
 }
 
 /**
+ * Dónde queda el dedo sobre el primer ítem del menú (debajo del logo y del
+ * avatar), medido en el navegador: cada ítem baja 15px y los de
+ * Administración 12px más por su título.
+ */
+const NAV_TOP = 62
+const ADMIN_LABEL_PX = 12
+
+/**
  * Mini escena animada de cada paso del recorrido de bienvenida. Es una copia
- * en pequeño del inicio real —mismo menú con sus íconos y nombres, la barra
- * de arriba (Buscar juegos, Guía, tema, tuerca y perfil) y el banner con
+ * en pequeño del inicio real —mismo menú con el avatar arriba, sus íconos y
+ * nombres, la barra de arriba (Buscar juegos, Guía y tuerca) y el banner con
  * "Crear un juego nuevo" y "Unirme con código"— para que la persona
  * reconozca lo que ve. En cada bucle un dedo va hasta el elemento del paso,
  * lo toca y aparece lo que pasa después (la ventana del código, el panel de
@@ -53,27 +60,36 @@ export function WelcomeStepScene({ target }: { target: string }) {
 
   const navItem = NAV.find((item) => item.target === target)
   const showNav = NAV.filter((item, i) => i < 2 || item.target === 'nav-community' || item.target === 'nav-own-games' || item === navItem)
-  const theming = target === 'theme-toggle'
   const collapsing = target === 'menu-toggle'
   const spot: [string, string] | undefined = navItem
-    ? ['9%', `${24 + showNav.indexOf(navItem) * 15 + (ADMIN_TARGETS.includes(navItem.target) ? 9 : 0)}px`]
+    ? ['9%', `${NAV_TOP + showNav.indexOf(navItem) * 15 + (ADMIN_TARGETS.includes(navItem.target) ? ADMIN_LABEL_PX : 0)}px`]
     : SPOTS[target]
 
   return (
     <div
       aria-hidden="true"
-      className={`tour-scene relative mb-3 flex h-[172px] overflow-hidden rounded-2xl border border-border bg-bg text-left ${theming ? 'tour-scene-theme' : ''}`}
+      className="tour-scene relative mb-3 flex h-[172px] overflow-hidden rounded-2xl border border-border bg-bg text-left"
     >
       {/* Menú lateral, como Sidebar.tsx */}
       <div
         className="relative flex shrink-0 flex-col gap-[3px] border-r border-border bg-bg px-1.5 py-2"
         style={{ width: 80, animation: collapsing ? `tour-scene-collapse ${LOOP} ease-in-out infinite` : undefined }}
       >
-        <span className="mb-1.5 flex items-center gap-1 px-0.5">
+        <span className="mb-1.5 flex items-center gap-1 px-0.5 leading-none">
           <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[4px] text-white" style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}>
             <Zap className="h-2 w-2" fill="currentColor" strokeWidth={0} />
           </span>
           <Label collapsing={collapsing} className="text-[7.5px] font-bold text-text-h">NexusPlay</Label>
+        </span>
+        {/* Avatar con las iniciales, arriba en el menú como en la barra lateral real */}
+        <span className={`mb-1 flex items-center gap-1 rounded-md border px-0.5 py-[2px] leading-none ${target === 'profile' ? 'border-accent' : 'border-border'}`}>
+          <span
+            className="flex h-3 w-3 shrink-0 items-center justify-center rounded-full text-[5px] font-bold text-white"
+            style={{ background: 'linear-gradient(135deg, var(--accent-2), var(--accent))', boxShadow: '0 0 0 1px #f5b62a' }}
+          >
+            TÚ
+          </span>
+          <Label collapsing={collapsing} className="text-[6px] font-semibold text-text-h">Tu perfil</Label>
         </span>
         {showNav.map((item, i) => {
           const firstAdmin = ADMIN_TARGETS.includes(item.target) && !ADMIN_TARGETS.includes(showNav[i - 1]?.target ?? '')
@@ -83,7 +99,7 @@ export function WelcomeStepScene({ target }: { target: string }) {
             : item === navItem ? { animation: `tour-scene-nav-lit ${LOOP} ease-in-out infinite` } : undefined
           return (
             <span key={item.target} className="contents">
-              {firstAdmin && <span className="mt-1 px-1 text-[5px] font-semibold tracking-wide text-text/60 uppercase">Administración</span>}
+              {firstAdmin && <span className="mt-1 px-1 text-[5px] leading-none font-semibold tracking-wide text-text/60 uppercase">Administración</span>}
               <span className="flex h-[12px] items-center gap-1 rounded-[4px] px-1 text-text" style={style}>
                 <Icon className="h-2 w-2 shrink-0" strokeWidth={2.5} />
                 <Label collapsing={collapsing} className="text-[6.5px] font-medium">{item.label}</Label>
@@ -112,18 +128,7 @@ export function WelcomeStepScene({ target }: { target: string }) {
             <span className="flex h-[12px] items-center gap-0.5 rounded-full px-1 text-[5.5px] font-bold text-white" style={{ background: 'linear-gradient(90deg, #7c3aed, #a21caf)' }}>
               <Compass className="h-1.5 w-1.5" /> Guía
             </span>
-            <Pill lit={theming}>
-              {theming ? (
-                <span className="relative h-2 w-2">
-                  <Sun className="absolute inset-0 h-2 w-2 text-[#f59e0b]" style={{ animation: `tour-scene-sun ${LOOP} ease-in-out infinite` }} />
-                  <Moon className="absolute inset-0 h-2 w-2 text-[#a78bfa]" style={{ animation: `tour-scene-moon ${LOOP} ease-in-out infinite` }} />
-                </span>
-              ) : <Sun className="h-2 w-2" />}
-            </Pill>
             <Pill lit={target === 'settings'}><Settings className="h-2 w-2" /></Pill>
-            <span className={`flex h-[12px] w-[12px] items-center justify-center rounded-full ${target === 'profile' ? 'bg-accent text-white' : 'bg-code-bg text-text/70'}`}>
-              <UserRound className="h-2 w-2" />
-            </span>
           </span>
         </div>
 
@@ -173,11 +178,22 @@ export function WelcomeStepScene({ target }: { target: string }) {
               <p className="text-[7.5px] font-bold text-text-h">Configuración</p>
               <Row icon={<UserRound className="h-2 w-2" />} text="Perfil" />
               <Row icon={<Palette className="h-2 w-2" />} text="Temas" lit />
-              <span className="mt-1 flex gap-1">{['#7c3aed', '#06b6d4', '#ff7a1a', '#22c55e'].map((c) => <span key={c} className="h-2.5 w-2.5 rounded-full" style={{ background: c }} />)}</span>
+              <span className="mt-1 flex flex-col gap-[2px] text-[5.5px] font-semibold text-text-h">
+                <span className="flex items-center gap-1 rounded-[3px] bg-accent/20 px-1 py-[1px]" style={{ animation: `tour-scene-nav-lit ${LOOP} ease-in-out infinite` }}>
+                  ✨ Fantasía
+                  <span className="ml-auto rounded-full px-1 text-[4.5px] font-bold" style={{ background: '#ffc83d', color: '#3f230e' }}>Nuevo</span>
+                </span>
+                <span className="flex items-center gap-1 px-1">
+                  🌤️ Pradera
+                  <span className="ml-auto rounded-full px-1 text-[4.5px] font-bold" style={{ background: '#ffc83d', color: '#3f230e' }}>Nuevo</span>
+                </span>
+                <span className="flex items-center gap-1 px-1">☀️ Claro</span>
+                <span className="flex items-center gap-1 px-1">🌙 Oscuro</span>
+              </span>
             </Result>
           )}
           {target === 'profile' && (
-            <Result className="top-0 right-1 w-[52%]">
+            <Result className="top-0 left-1 w-[52%]">
               <Row icon={<UserRound className="h-2 w-2" />} text="Mi perfil" lit />
               <Row icon={<LogOut className="h-2 w-2" />} text="Cerrar sesión" danger />
             </Result>

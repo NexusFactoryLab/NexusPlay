@@ -1,17 +1,21 @@
-import { Check, Moon, Sparkles, Sun } from 'lucide-react'
+import { Check, CloudSun, Moon, Sparkles, Sun, Wand2 } from 'lucide-react'
 import { useTheme } from '../../hooks/useTheme'
 import type { Theme } from '../../hooks/useTheme'
 import previewLight from '../../assets/themes/preview-light.webp'
 import previewDark from '../../assets/themes/preview-dark.webp'
 import previewKids from '../../assets/themes/preview-kids.webp'
+import previewFantasy from '../../assets/themes/preview-fantasy.webp'
+import previewMeadow from '../../assets/themes/preview-meadow.webp'
 
 type ThemeOption = {
   value: Theme
   label: string
   description: string
   icon: typeof Sun
-  /** Captura real de la página con este tema — si falta, se usa `preview` (Modo niños, que no es una captura sino un estilo). */
+  /** Captura real de la página con este tema — si falta, se usa `preview`. */
   previewImage?: string
+  /** Muestra la etiqueta "Nuevo" sobre la vista previa (Fantasía y Pradera, issue #47). */
+  isNew?: boolean
   /**
    * Colores propios de ESTE tema (no del tema activo ahora mismo): la tarjeta
    * de "Claro" debe verse clara aunque estés en Oscuro, y viceversa, para que
@@ -22,9 +26,27 @@ type ThemeOption = {
 
 const THEME_OPTIONS: ThemeOption[] = [
   {
+    value: 'fantasy',
+    label: 'Fantasía',
+    description: 'Nuevo y el tema por defecto: cielo nocturno, piedra, madera y pergamino, como un mundo de aventura.',
+    icon: Wand2,
+    previewImage: previewFantasy,
+    isNew: true,
+    preview: { bg: '#1b1546', surface: '#2a2350', accent: '#7b5cff', accent2: '#ffc83d', text: '#f4f1ff' },
+  },
+  {
+    value: 'meadow',
+    label: 'Pradera',
+    description: 'Nuevo: la aventura de día, con cielo claro, nubes, madera clara y colores suaves.',
+    icon: CloudSun,
+    previewImage: previewMeadow,
+    isNew: true,
+    preview: { bg: '#bfe0f7', surface: '#fbe7c8', accent: '#4f8fe0', accent2: '#f2705e', text: '#4a2c17' },
+  },
+  {
     value: 'light',
     label: 'Claro',
-    description: 'El tema por defecto: fondo claro, alto contraste, ideal para el día a día.',
+    description: 'Minimalista: fondo claro, alto contraste, ideal para el día a día.',
     icon: Sun,
     previewImage: previewLight,
     preview: { bg: '#f2f0ec', surface: '#ffffff', accent: '#7c3aed', accent2: '#ff3d8a', text: '#14121c' },
@@ -32,7 +54,7 @@ const THEME_OPTIONS: ThemeOption[] = [
   {
     value: 'dark',
     label: 'Oscuro',
-    description: 'Fondo oscuro que descansa la vista en ambientes con poca luz.',
+    description: 'Minimalista: fondo oscuro que descansa la vista en ambientes con poca luz.',
     icon: Moon,
     previewImage: previewDark,
     preview: { bg: '#0b0b12', surface: '#16161f', accent: '#a685f5', accent2: '#ff6ba3', text: '#f1f0f8' },
@@ -70,8 +92,8 @@ export function ThemesSection() {
         dispositivo.
       </p>
 
-      {/* El panel de esta pantalla es más ancho que el resto (ver SettingsPanel), así que 3 columnas ya caben cómodas. */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      {/* El panel de esta pantalla es más ancho que el resto (ver SettingsPanel): las 4 opciones van en 2×2. */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {THEME_OPTIONS.map((option) => {
           const Icon = option.icon
           const active = theme === option.value
@@ -119,6 +141,14 @@ export function ThemesSection() {
                       <Icon className="h-5 w-5" strokeWidth={2} />
                     </span>
                   </div>
+                )}
+                {option.isNew && (
+                  <span
+                    className="absolute top-3 left-3 rounded-full px-2.5 py-0.5 text-[11px] font-bold shadow-[0_4px_10px_-3px_rgba(0,0,0,0.5)]"
+                    style={{ background: '#ffc83d', color: '#3f230e' }}
+                  >
+                    ✨ Nuevo
+                  </span>
                 )}
                 {active && (
                   <span

@@ -6,8 +6,10 @@ export const GAME_REPOSITORY = Symbol('GAME_REPOSITORY');
 export interface FindAllGamesFilter {
   status?: GameStatusName;
   creatorUserId?: string;
-  /** Excluye los juegos del creador dado — usado para "Comunidad" (juegos de otros). */
-  excludeCreatorUserId?: string;
+  /** Solo los juegos con alguno de estos slugs (demos del Inicio). */
+  slugs?: string[];
+  /** Excluye los juegos con estos slugs (Comunidad no repite los demos del Inicio). */
+  excludeSlugs?: string[];
   categoryId?: string;
   /** Filtra juegos institucionales de una organización concreta. */
   organizationId?: string;
@@ -52,8 +54,12 @@ export interface GameRepository {
   existsBySlug(slug: string): Promise<boolean>;
   findAll(filter: FindAllGamesFilter): Promise<PaginatedGames>;
   delete(id: string): Promise<void>;
-  /** Conteo de juegos PUBLISHED agrupados por categoría, para el catálogo de materias. */
-  countPublishedByCategory(): Promise<Map<string, number>>;
+  /**
+   * Conteo de juegos PUBLISHED agrupados por categoría, para el catálogo de
+   * materias. `excludeGameTypes` deja fuera los tipos archivados (issue #156)
+   * para quien no puede verlos.
+   */
+  countPublishedByCategory(excludeGameTypes?: string[]): Promise<Map<string, number>>;
   /**
    * Publica en bloque (DRAFT -> PUBLISHED) todos los juegos de una categoría.
    * Usado por la cascada de "publicar materia": es un `updateMany` atómico a

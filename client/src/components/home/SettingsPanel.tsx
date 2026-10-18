@@ -10,9 +10,10 @@ type SettingsPanelProps = {
 
 type SettingsView = 'menu' | 'profile' | 'themes'
 
-const SECTIONS: { value: Exclude<SettingsView, 'menu'>; label: string; description: string; icon: typeof User }[] = [
+const SECTIONS: { value: Exclude<SettingsView, 'menu'>; label: string; description: string; icon: typeof User; badge?: string }[] = [
   { value: 'profile', label: 'Configuración del perfil', description: 'Tus datos de cuenta', icon: User },
-  { value: 'themes', label: 'Temas', description: 'Apariencia de la página', icon: Palette },
+  // La guía de bienvenida anuncia el tema Fantasía aquí (issue #47).
+  { value: 'themes', label: 'Temas', description: 'Apariencia de la página', icon: Palette, badge: '✨ Nuevos temas' },
 ]
 
 /**
@@ -30,7 +31,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
   return (
     <Modal
       onClose={onClose}
-      // "Temas" necesita más ancho: con 3 tarjetas conviene un recuadro más
+      // "Temas" necesita más ancho: con 4 tarjetas (2×2) conviene un recuadro más
       // amplio que el del menú o el formulario de perfil.
       maxWidthClassName={view === 'themes' ? 'max-w-[760px]' : 'max-w-[560px]'}
       maxHeightClassName="max-h-[92vh]"
@@ -76,7 +77,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 key={item.value}
                 type="button"
                 onClick={() => setView(item.value)}
-                className="group flex w-full items-center gap-3.5 rounded-2xl border-[2.5px] border-transparent p-4 text-left transition-transform hover:-translate-y-0.5"
+                className="settings-menu-item group flex w-full items-center gap-3.5 rounded-2xl border-[2.5px] border-transparent p-4 text-left transition-transform hover:-translate-y-0.5"
                 style={{
                   background:
                     'linear-gradient(var(--surface), var(--surface)) padding-box, linear-gradient(120deg, var(--accent-2), var(--accent)) border-box',
@@ -89,7 +90,14 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                   <Icon className="h-5 w-5" strokeWidth={2} />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[15px] font-semibold text-text-h">{item.label}</span>
+                  <span className="flex min-w-0 items-center gap-2 text-[15px] font-semibold text-text-h">
+                    <span className="truncate">{item.label}</span>
+                    {item.badge && (
+                      <span className="shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-bold" style={{ background: '#ffc83d', color: '#3f230e' }}>
+                        {item.badge}
+                      </span>
+                    )}
+                  </span>
                   <span className="block truncate text-[12.5px] text-text">{item.description}</span>
                 </span>
                 <ChevronRight className="h-4 w-4 shrink-0 text-text transition-transform group-hover:translate-x-0.5" strokeWidth={2} />

@@ -163,9 +163,10 @@ export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds }: 
         onClick={start}
         aria-label="Repetir recorrido de bienvenida"
         data-tour-active={forcedInvite ? 'true' : undefined}
-        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border bg-linear-to-r px-3 py-2 text-sm font-semibold shadow-md hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${isKids ? 'border-orange-400 from-amber-200 to-orange-300 text-[#3a2a6d] shadow-orange-400/30' : 'border-violet-500 from-violet-600 to-fuchsia-700 text-white shadow-violet-500/25'} ${forcedInvite ? 'relative z-50' : ''}`}
+        className={`tour-guide-btn inline-flex shrink-0 items-center gap-1.5 rounded-full border bg-linear-to-r px-3 py-2 text-sm font-semibold shadow-md hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${isKids ? 'border-orange-400 from-amber-200 to-orange-300 text-[#3a2a6d] shadow-orange-400/30' : 'border-violet-500 from-violet-600 to-fuchsia-700 text-white shadow-violet-500/25'} ${forcedInvite ? 'relative z-50' : ''}`}
       >
-        <Compass className="h-4 w-4" aria-hidden="true" /> Guía
+        <Compass className="fx-line-icon h-4 w-4" aria-hidden="true" />
+        <span className="fx-emoji tour-guide-compass" aria-hidden="true">🧭</span> Guía
       </button>
 
       {forcedInvite && (

@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { SlidersHorizontal, User, Users, X } from 'lucide-react'
 import { MULTI_MODE_COLOR, SOLO_MODE_COLOR, type GameModeFilter } from './gameModeVisuals'
+import { Modal } from './Modal'
 
 export type GameTypeFilterOption = {
   gameType: string
@@ -21,12 +22,12 @@ type GameFiltersPanelProps = {
 }
 
 /**
- * Filtro clásico de catálogo (issue #216): un botón "Filtro" — nada
- * desplegable dentro del mismo recuadro — que al hacer click abre un
- * recuadro flotante propio (popover) con las casillas agrupadas por
- * sección (Modo de juego / Tipo de juego), superpuesto sobre el contenido
- * en vez de empujarlo. Se cierra al hacer click fuera o con el botón "X" de
- * su encabezado. Varias casillas se combinan a la vez (OR dentro de cada
+ * Filtro clásico de catálogo (issue #216): un botón "Filtro" que al hacer
+ * click abre su propia ventana (Modal) con las casillas agrupadas por
+ * sección (Modo de juego / Tipo de juego). Antes era un recuadro flotante
+ * dentro del <main>: al abrirse alargaba el área desplazable y aparecía un
+ * scroll hacia abajo (issue #47); como ventana queda encima de todo sin
+ * mover la página. Se cierra con "Listo", la "X", Escape o tocando fuera. Varias casillas se combinan a la vez (OR dentro de cada
  * sección, AND entre secciones) y el filtrado es 100% en cliente sobre los
  * juegos ya cargados por GamesSection — no dispara peticiones nuevas.
  */
@@ -41,28 +42,17 @@ export function GameFiltersPanel({
   onClear,
 }: GameFiltersPanelProps) {
   const [open, setOpen] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
   const hasActiveFilters = activeModes.size > 0 || activeTypes.size > 0
   const activeCount = activeModes.size + activeTypes.size
 
-  useEffect(() => {
-    if (!open) return
-    function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [open])
-
   return (
-    <div ref={containerRef} className="relative inline-block">
+    <div className="relative inline-block">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setOpen(true)}
+        aria-haspopup="dialog"
         aria-expanded={open}
-        className="flex items-center gap-1.5 rounded-xl border border-border bg-surface px-4 py-2.5 text-[13px] font-semibold text-text-h transition-colors hover:border-accent"
+        className="game-filters-btn flex items-center gap-1.5 rounded-xl border border-border bg-surface px-4 py-2.5 text-[13px] font-semibold text-text-h transition-colors hover:border-accent"
       >
         <SlidersHorizontal className="h-4 w-4" strokeWidth={2.5} />
         Filtro
@@ -74,9 +64,10 @@ export function GameFiltersPanel({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-[calc(100%+8px)] z-20 flex w-[260px] flex-col gap-5 rounded-2xl border border-border bg-surface p-4 shadow-[var(--shadow)]">
+        <Modal onClose={() => setOpen(false)} maxWidthClassName="max-w-[380px]" ariaLabelledBy="game-filters-title">
+          <div className="flex flex-col gap-5">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[13px] font-semibold text-text-h">Filtro</span>
+            <h2 id="game-filters-title" className="text-[20px] tracking-tight text-text-h">Filtro</h2>
             <button
               type="button"
               aria-label="Cerrar filtro"
@@ -133,7 +124,17 @@ export function GameFiltersPanel({
               </div>
             </div>
           )}
-        </div>
+
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="rounded-xl px-4 py-2.5 text-[14px] font-semibold text-white"
+            style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
+          >
+            Listo
+          </button>
+          </div>
+        </Modal>
       )}
     </div>
   )

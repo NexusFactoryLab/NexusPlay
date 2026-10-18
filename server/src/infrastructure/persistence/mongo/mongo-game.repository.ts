@@ -143,7 +143,11 @@ export class MongoGameRepository implements GameRepository, OnModuleInit {
     const query: Record<string, unknown> = {};
     if (filter.status) query.status = filter.status;
     if (filter.creatorUserId) query.creatorUserId = filter.creatorUserId;
-    if (filter.excludeCreatorUserId) query.creatorUserId = { $ne: filter.excludeCreatorUserId };
+    if (filter.slugs) {
+      query.slug = { $in: filter.slugs };
+    } else if (filter.excludeSlugs && filter.excludeSlugs.length > 0) {
+      query.slug = { $nin: filter.excludeSlugs };
+    }
     if (filter.categoryId) query.categoryId = filter.categoryId;
     if (filter.organizationId) query.organizationId = filter.organizationId;
     // El caller (list-games.use-case.ts) ya corta antes de llegar aquí si
@@ -187,10 +191,14 @@ export class MongoGameRepository implements GameRepository, OnModuleInit {
     await this.collection.deleteOne({ _id: id });
   }
 
-  async countPublishedByCategory(): Promise<Map<string, number>> {
+  async countPublishedByCategory(excludeGameTypes?: string[]): Promise<Map<string, number>> {
+    const match: Record<string, unknown> = { status: 'PUBLISHED' };
+    if (excludeGameTypes && excludeGameTypes.length > 0) {
+      match.gameType = { $nin: excludeGameTypes };
+    }
     const results = await this.collection
       .aggregate<{ _id: string; count: number }>([
-        { $match: { status: 'PUBLISHED' } },
+        { $match: match },
         { $group: { _id: '$categoryId', count: { $sum: 1 } } },
       ])
       .toArray();

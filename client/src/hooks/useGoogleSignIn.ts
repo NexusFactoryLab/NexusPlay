@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuth } from './useAuth'
-import { useTheme, type Theme } from './useTheme'
+import { isDarkTheme, useTheme, type Theme } from './useTheme'
 import { ApiError } from '../utils/http'
 
 const GSI_SCRIPT_SRC = 'https://accounts.google.com/gsi/client'
@@ -65,8 +65,9 @@ export function useGoogleSignIn(containerRef: React.RefObject<HTMLDivElement | n
 
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined
   // 'kids' usa fondo claro (ver --color-bg en index.css), así que el botón
-  // outline (claro) también le sirve; solo 'dark' necesita el botón oscuro.
-  const gsiTheme = theme === 'dark' ? 'filled_black' : 'outline'
+  // outline (claro) también le sirve; solo los temas oscuros ('dark' y
+  // 'fantasy') necesitan el botón oscuro.
+  const gsiTheme = isDarkTheme(theme) ? 'filled_black' : 'outline'
 
   const handleCredential = useCallback(
     async (response: GoogleCredentialResponse) => {

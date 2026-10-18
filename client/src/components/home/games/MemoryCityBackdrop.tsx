@@ -1,4 +1,4 @@
-import { useTheme } from '../../../hooks/useTheme'
+import { isDarkTheme, useTheme } from '../../../hooks/useTheme'
 
 type Palette = {
   skyTop: string
@@ -157,7 +157,7 @@ function Cloud({ x, y, scale, color }: { x: number; y: number; scale: number; co
  */
 export function MemoryCityBackdrop() {
   const { theme } = useTheme()
-  const p = theme === 'dark' ? NIGHT : DUSK
+  const p = isDarkTheme(theme) ? NIGHT : DUSK
 
   return (
     <svg
