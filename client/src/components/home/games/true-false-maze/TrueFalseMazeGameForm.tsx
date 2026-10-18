@@ -9,6 +9,7 @@ import { useReportCreateSummary } from '../aiDraftContext'
 import { GameFormShell } from '../GameFormShell'
 import { FormSection } from '../create/FormSection'
 import { AdvancedSettings } from '../create/AdvancedSettings'
+import { FormSelect } from '../create/FormSelect'
 import { OrganizationSelectField } from '../create/OrganizationSelectField'
 import { CategorySelectField } from '../create/CategorySelectField'
 import type { GameDraft } from '../../../../services/ai-game-assistant.service'
@@ -293,7 +294,7 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
               <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="tf-lives">
                 Baterías (vidas)
               </label>
-              <select
+              <FormSelect
                 id="tf-lives"
                 className={SELECT_CLASS}
                 value={lives}
@@ -305,13 +306,13 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
                     {value}
                   </option>
                 ))}
-              </select>
+              </FormSelect>
             </div>
             <div>
               <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="tf-enemies">
                 Medusas galácticas
               </label>
-              <select
+              <FormSelect
                 id="tf-enemies"
                 className={SELECT_CLASS}
                 value={enemyCount}
@@ -323,13 +324,13 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
                     {value}
                   </option>
                 ))}
-              </select>
+              </FormSelect>
             </div>
             <div>
               <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="tf-speed">
                 Velocidad de las medusas
               </label>
-              <select
+              <FormSelect
                 id="tf-speed"
                 className={SELECT_CLASS}
                 value={enemySpeed}
@@ -339,13 +340,13 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
                 <option value={1}>Lenta</option>
                 <option value={2}>Normal</option>
                 <option value={3}>Rápida</option>
-              </select>
+              </FormSelect>
             </div>
             <div>
               <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="tf-relocate">
                 Las salas cambian de lugar
               </label>
-              <select
+              <FormSelect
                 id="tf-relocate"
                 className={SELECT_CLASS}
                 value={relocateSeconds}
@@ -357,7 +358,7 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
                     {option.label}
                   </option>
                 ))}
-              </select>
+              </FormSelect>
             </div>
           </div>
           <div className="mt-3 flex flex-col gap-2">

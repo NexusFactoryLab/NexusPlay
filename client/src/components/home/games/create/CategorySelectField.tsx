@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createSubject, type SubjectWithGameCount } from '../../../../services/subject.service'
 import { ApiError } from '../../../../utils/http'
 import { InfoBubble } from './InfoBubble'
+import { FormSelect } from './FormSelect'
 
 type CategorySelectFieldProps = {
   token: string | null
@@ -94,8 +95,9 @@ export function CategorySelectField({
       <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="game-category">
         Materia
       </label>
-      <select
+      <FormSelect
         id="game-category"
+        searchable
         className="w-full rounded-lg border border-border bg-bg px-[13px] py-[11px] text-[15px] text-text-h outline-none focus:border-accent"
         value={rootId}
         disabled={disabled}
@@ -107,7 +109,7 @@ export function CategorySelectField({
             {category.name}
           </option>
         ))}
-      </select>
+      </FormSelect>
 
       <div className="nx-subbox relative mt-4 rounded-xl border-2 border-accent/40 bg-accent/5 p-4">
         <InfoBubble
@@ -124,7 +126,7 @@ export function CategorySelectField({
             <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="game-sub-category">
               Elige una sub-materia existente
             </label>
-            <select
+            <FormSelect
               id="game-sub-category"
               className="w-full rounded-lg border border-border bg-bg px-[13px] py-[11px] text-[15px] text-text-h outline-none focus:border-accent"
               value={categoryId !== rootId ? categoryId : ''}
@@ -137,7 +139,7 @@ export function CategorySelectField({
                   {category.name}
                 </option>
               ))}
-            </select>
+            </FormSelect>
           </div>
         ) : (
           <p className="mt-2 text-[13px] text-text">Aún no hay sub-materias: crea la primera.</p>

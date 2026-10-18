@@ -8,6 +8,7 @@ import { AiGameAssistantPanel } from './AiGameAssistantPanel'
 import { useReportCreateSummary } from './aiDraftContext'
 import { GameFormShell } from './GameFormShell'
 import { FormSection } from './create/FormSection'
+import { FormSelect } from './create/FormSelect'
 import type { GameDraft } from '../../../services/ai-game-assistant.service'
 import { OrganizationSelectField } from './create/OrganizationSelectField'
 import { CategorySelectField } from './create/CategorySelectField'
@@ -399,7 +400,7 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
       onBack={onBack}
       title="Dúo Lógico"
       description="Fuego y Agua recorren el mismo mapa y se necesitan para avanzar."
-      descriptionDetail="Cada rol queda bloqueado por casillas del otro. Al final arman juntos un concepto ensamblando lo que cada uno recolectó."
+      descriptionDetail="Cada rol queda bloqueado por casillas del otro. Al final arman juntos un concepto ensamblando lo que cada uno recolectó."
       aiPanel={<AiGameAssistantPanel gameType="DUAL_QUEST" disabled={submitting} onDraftReady={applyAiDraft} />}
     >
       <form className="flex flex-col gap-[16px]" onSubmit={handleSubmit} noValidate>
@@ -536,7 +537,7 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div>
                         <label className="mb-1.5 block text-[12px] font-medium text-text-h">Tipo</label>
-                        <select
+                        <FormSelect
                           className="w-full rounded-lg border border-border bg-bg px-[13px] py-[9px] text-[13px] text-text-h outline-none focus:border-accent"
                           value={trigger.kind}
                           disabled={submitting}
@@ -544,11 +545,11 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
                         >
                           <option value="SWITCH">Interruptor directo</option>
                           <option value="QUESTION">Pregunta</option>
-                        </select>
+                        </FormSelect>
                       </div>
                       <div>
                         <label className="mb-1.5 block text-[12px] font-medium text-text-h">Quién lo activa</label>
-                        <select
+                        <FormSelect
                           className="w-full rounded-lg border border-border bg-bg px-[13px] py-[9px] text-[13px] text-text-h outline-none focus:border-accent"
                           value={trigger.activatedByRole}
                           disabled={submitting}
@@ -556,7 +557,7 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
                         >
                           <option value="FIRE">🔥 Fuego</option>
                           <option value="WATER">💧 Agua</option>
-                        </select>
+                        </FormSelect>
                       </div>
                     </div>
                     <button

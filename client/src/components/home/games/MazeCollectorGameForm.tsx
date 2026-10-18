@@ -10,6 +10,7 @@ import { useReportCreateSummary } from './aiDraftContext'
 import { GameFormShell } from './GameFormShell'
 import { FormSection } from './create/FormSection'
 import { AdvancedSettings } from './create/AdvancedSettings'
+import { FormSelect } from './create/FormSelect'
 import type { GameDraft } from '../../../services/ai-game-assistant.service'
 import { OrganizationSelectField } from './create/OrganizationSelectField'
 import { CategorySelectField } from './create/CategorySelectField'
@@ -299,7 +300,7 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
           <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="maze-layout">
             Forma del laberinto
           </label>
-          <select
+          <FormSelect
             id="maze-layout"
             className="w-full rounded-lg border border-border bg-bg px-[13px] py-[11px] text-[15px] text-text-h outline-none focus:border-accent"
             value={layout}
@@ -311,7 +312,7 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
                 {option.label}
               </option>
             ))}
-          </select>
+          </FormSelect>
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

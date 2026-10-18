@@ -3962,6 +3962,120 @@ code {
   .nx-gi-tile:hover, .nx-gi-add:hover:not(:disabled), .nx-gi-nav-btn:hover:not(:disabled) { transform: none; }
 }
 
+/* ---- Selector propio (FormSelect): lista con el estilo del formulario ---- */
+.nx-select-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 46px;
+  padding: 11px 13px;
+  border: 1px solid var(--nx-card-border, var(--border));
+  border-radius: 15px;
+  background: var(--nx-field-bg, var(--bg));
+  font-size: 15px;
+  text-align: left;
+  color: var(--text-h);
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+.nx-select-btn:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+.nx-select-btn:focus-visible,
+.nx-select-btn[data-open='true'] {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+.nx-select-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.nx-select-btn[data-placeholder='true'] .nx-select-value { color: var(--text); }
+.nx-select-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nx-select-chevron { flex-shrink: 0; color: var(--accent); transition: transform 0.28s cubic-bezier(0.34, 1.4, 0.64, 1); }
+.nx-select-btn[data-open='true'] .nx-select-chevron { transform: rotate(180deg); }
+.nx-select-pop {
+  position: fixed;
+  z-index: 1000;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 24px 48px -18px color-mix(in srgb, var(--accent) 50%, transparent), 0 8px 18px -8px rgba(20, 18, 28, 0.3);
+  transform-origin: top center;
+  animation: nx-select-in 0.22s cubic-bezier(0.22, 1.2, 0.36, 1) backwards;
+}
+.nx-select-pop[data-up='true'] { transform-origin: bottom center; animation-name: nx-select-in-up; }
+.nx-select-list {
+  max-height: 248px;
+  margin: 0;
+  padding: 6px;
+  overflow-y: auto;
+  list-style: none;
+  scrollbar-width: thin;
+}
+.nx-select-search {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 8px 8px 2px;
+  padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  color: var(--accent);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.nx-select-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.nx-select-search input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  background: transparent;
+  font-size: 14px;
+  color: var(--text-h);
+  outline: none;
+}
+.nx-select-search input::placeholder { color: var(--text); }
+.nx-select-none { padding: 14px 12px; font-size: 13.5px; text-align: center; color: var(--text); }
+[data-theme='fantasy'] .nx-select-pop { background: #2a2650; border-color: rgba(255, 214, 140, 0.4); color: #f4efff; }
+[data-theme='fantasy'] .nx-select-search input { color: #f4efff; }
+[data-theme='meadow'] .nx-select-pop { background: #fffdf8; border-color: #e2cfb1; }
+:root[data-theme='dark'] .nx-select-pop { background: #1d1a29; }
+@keyframes nx-select-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes nx-select-in-up {
+  from { opacity: 0; transform: translateY(6px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+.nx-select-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--text-h);
+  cursor: pointer;
+  animation: nx-field-rise 0.25s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+[data-theme='fantasy'] .nx-select-option { color: #f4efff; }
+.nx-select-option[data-empty='true'] { color: var(--text); font-weight: 400; }
+.nx-select-option[data-active='true'] { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.nx-select-option[data-selected='true'] { color: var(--accent); font-weight: 700; }
+.nx-select-option[aria-disabled='true'] { opacity: 0.45; cursor: not-allowed; }
+.nx-select-option-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) {
+  .nx-select-pop, .nx-select-option { animation: none; }
+  .nx-select-btn, .nx-select-chevron, .nx-select-option { transition: none; }
+}
+
 /* ---- Burbuja de ayuda (i) con nube que se cierra sola a los 10 s ---- */
 .nx-info { position: relative; display: inline-flex; flex-shrink: 0; }
 .nx-info[data-placement='corner'] { position: absolute; top: 10px; right: 10px; z-index: 5; }

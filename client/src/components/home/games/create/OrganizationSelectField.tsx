@@ -1,5 +1,6 @@
 import type { OrganizationWithMyRole } from '../../../../services/organization.service'
 import { InfoBubble } from './InfoBubble'
+import { FormSelect } from './FormSelect'
 
 type OrganizationSelectFieldProps = {
   organizations: OrganizationWithMyRole[]
@@ -32,7 +33,7 @@ export function OrganizationSelectField({
           text="Si eliges una organización, el juego nace institucional: cualquier miembro puede usarlo."
         />
       </div>
-      <select
+      <FormSelect
         id="game-organization"
         className="w-full rounded-lg border border-border bg-bg px-[13px] py-[11px] text-[15px] text-text-h outline-none focus:border-accent"
         value={value}
@@ -45,7 +46,7 @@ export function OrganizationSelectField({
             {org.name}
           </option>
         ))}
-      </select>
+      </FormSelect>
     </div>
   )
 }
