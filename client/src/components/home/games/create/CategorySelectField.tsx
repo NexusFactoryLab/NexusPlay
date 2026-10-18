@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createSubject, type SubjectWithGameCount } from '../../../../services/subject.service'
 import { ApiError } from '../../../../utils/http'
+import { InfoBubble } from './InfoBubble'
 
 type CategorySelectFieldProps = {
   token: string | null
@@ -108,17 +109,16 @@ export function CategorySelectField({
         ))}
       </select>
 
-      <div className="nx-subbox mt-4 rounded-xl border-2 border-accent/40 bg-accent/5 p-4">
+      <div className="nx-subbox relative mt-4 rounded-xl border-2 border-accent/40 bg-accent/5 p-4">
+        <InfoBubble
+          placement="corner"
+          label="Ayuda: sub-materia"
+          text="Una sub-materia es un tema dentro de la materia (por ejemplo, Fracciones dentro de Matemáticas). Crearla ayuda a ordenar tus juegos y a que los demás los encuentren más fácil."
+        />
         <p className="text-[14px] font-semibold text-text-h">Sub-materia</p>
-        <p className="mt-0.5 text-[13px] leading-snug text-text">
-          Una sub-materia es un tema dentro de la materia (por ejemplo, Fracciones dentro de Matemáticas).
-          Crearla ayuda a ordenar tus juegos y a que los demás los encuentren más fácil.
-        </p>
 
         {!rootId ? (
-          <p className="mt-3 text-[13px] font-medium text-text-h">
-            Elige una materia arriba para ver o crear sus sub-materias.
-          </p>
+          <p className="mt-2 text-[13px] text-text">Primero elige una materia.</p>
         ) : subCategories.length > 0 ? (
           <div className="mt-3">
             <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="game-sub-category">
@@ -140,9 +140,7 @@ export function CategorySelectField({
             </select>
           </div>
         ) : (
-          <p className="mt-3 text-[13px] font-medium text-text-h">
-            Esta materia todavía no tiene sub-materias: crea la primera.
-          </p>
+          <p className="mt-2 text-[13px] text-text">Aún no hay sub-materias: crea la primera.</p>
         )}
 
         <label className="nx-label mb-1.5 mt-3 block text-[13px] font-medium text-text-h" htmlFor="game-new-sub-category">

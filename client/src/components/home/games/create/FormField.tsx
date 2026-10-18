@@ -1,5 +1,5 @@
-import { Info } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { InfoBubble } from './InfoBubble'
 
 type FormFieldProps = {
   label: string
@@ -29,11 +29,7 @@ export function FormField({ label, htmlFor, hint, tooltip, error, children }: Fo
         >
           {label}
         </LabelTag>
-        {tooltip && (
-          <span title={tooltip} aria-label={tooltip} role="img" className="inline-flex text-text">
-            <Info className="h-3.5 w-3.5" strokeWidth={2.2} />
-          </span>
-        )}
+        {tooltip && <InfoBubble text={tooltip} label={`Ayuda: ${label}`} />}
       </div>
       {children}
       {hint && !error && <p className="nx-hint text-[12px] leading-snug text-text">{hint}</p>}

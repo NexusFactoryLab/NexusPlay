@@ -3686,7 +3686,7 @@ code {
   width: 56px;
   height: 56px;
 }
-.nx-ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+.nx-ring > svg { position: absolute; inset: 0; transform: rotate(-90deg); }
 .nx-ring-bg, .nx-ring-fg { fill: none; stroke-width: 5; }
 .nx-ring-bg { stroke: color-mix(in srgb, var(--text) 16%, transparent); }
 .nx-ring-fg {
@@ -3782,6 +3782,93 @@ code {
   color: var(--text-h);
 }
 .nx-rail .nx-progress-title { white-space: normal; overflow-wrap: anywhere; }
+
+/* ---- Burbuja de ayuda (i) con nube que se cierra sola a los 10 s ---- */
+.nx-info { position: relative; display: inline-flex; flex-shrink: 0; }
+.nx-info[data-placement='corner'] { position: absolute; top: 10px; right: 10px; z-index: 5; }
+.nx-info-btn {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--nx-card-bg, var(--surface)));
+  color: var(--accent);
+  cursor: pointer;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.2s ease, color 0.2s ease;
+}
+.nx-info-btn:hover { transform: scale(1.12); background: var(--accent); color: #fff; }
+.nx-info[data-open='true'] .nx-info-btn { background: var(--accent); color: #fff; }
+.nx-info-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.nx-info-cloud {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: -6px;
+  z-index: 40;
+  display: block;
+  width: min(300px, 78vw);
+  padding: 14px 34px 16px 16px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
+  border-radius: 20px;
+  background: var(--nx-solid, var(--surface));
+  box-shadow: 0 22px 44px -18px color-mix(in srgb, var(--accent) 55%, transparent), 0 6px 14px -6px rgba(20, 18, 28, 0.25);
+  transform-origin: top right;
+  animation: nx-cloud-in 0.38s cubic-bezier(0.34, 1.45, 0.64, 1) backwards;
+}
+.nx-info-cloud::before {
+  content: '';
+  position: absolute;
+  top: -7px;
+  right: 14px;
+  width: 14px;
+  height: 14px;
+  border-top: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
+  border-left: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
+  background: var(--nx-solid, var(--surface));
+  transform: rotate(45deg);
+}
+.nx-info-text { display: block; font-size: 13px; font-weight: 500; line-height: 1.5; color: var(--text-h); }
+.nx-info-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  color: var(--text);
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+.nx-info-close:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--text-h); }
+.nx-info-timer {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 3px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.nx-info-timer i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  transform-origin: left;
+  animation: nx-cloud-timer linear forwards;
+}
+@keyframes nx-cloud-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.86); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes nx-cloud-timer {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nx-info-cloud, .nx-info-timer i { animation: none; }
+  .nx-info-btn { transition: none; }
+}
 @media (min-width: 1024px) {
   .nx-rail-tip { display: block; }
   /* La pastilla de fase de cada formulario ya la cubre el rail. */

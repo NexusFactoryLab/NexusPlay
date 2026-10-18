@@ -1,4 +1,5 @@
 import type { OrganizationWithMyRole } from '../../../../services/organization.service'
+import { InfoBubble } from './InfoBubble'
 
 type OrganizationSelectFieldProps = {
   organizations: OrganizationWithMyRole[]
@@ -22,9 +23,15 @@ export function OrganizationSelectField({
 
   return (
     <div data-nx-field>
-      <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="game-organization">
-        Organización (opcional)
-      </label>
+      <div className="mb-1.5 flex items-center gap-1.5">
+        <label className="nx-label text-[13px] font-medium text-text-h" htmlFor="game-organization">
+          Organización (opcional)
+        </label>
+        <InfoBubble
+          label="Ayuda: organización"
+          text="Si eliges una organización, el juego nace institucional: cualquier miembro puede usarlo."
+        />
+      </div>
       <select
         id="game-organization"
         className="w-full rounded-lg border border-border bg-bg px-[13px] py-[11px] text-[15px] text-text-h outline-none focus:border-accent"
@@ -39,9 +46,6 @@ export function OrganizationSelectField({
           </option>
         ))}
       </select>
-      <p className="nx-hint mt-1.5 text-[12px] text-text">
-        Si eliges una organización, el juego nace institucional: cualquier miembro puede usarlo.
-      </p>
     </div>
   )
 }
