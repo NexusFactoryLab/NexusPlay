@@ -8,6 +8,8 @@ export type GuidedChatControls = {
   questions: GuidedQuestion[]
   pending: PendingQuestion | null
   isMyTurn: boolean
+  /** Sin definir = automático (torneo). */
+  autoDiscard?: boolean
   onAsk: (questionId: string) => void
   onAnswer: (requestId: string, answer: boolean) => void
 }
@@ -134,12 +136,12 @@ export function ChatPanel({
           {guided.pending.askerId !== selfUserId && <div className="mt-2 flex gap-2">
             {[true, false].map(answer => <button key={String(answer)} type="button" disabled={disconnected} onClick={() => guided.onAnswer(guided.pending!.requestId, answer)} className="min-h-11 flex-1 rounded-xl border border-accent bg-accent/10 px-3 py-2 font-bold text-accent focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50">{answer ? 'Sí' : 'No'}</button>)}
           </div>}
-          <p className="mt-2 text-[11px] text-text">La respuesta descarta automáticamente las opciones que no coinciden. La pregunta vence al cambiar el turno.</p>
+          <p className="mt-2 text-[11px] text-text">{guided.autoDiscard === false ? 'Con la respuesta, descarta tú las tarjetas que no coinciden.' : 'La respuesta descarta automáticamente las opciones que no coinciden.'} La pregunta vence al cambiar el turno.</p>
         </> : <>
-          <p className="text-[12px] font-bold text-accent">Preguntas Sí/No · descarte automático</p>
+          <p className="text-[12px] font-bold text-accent">Preguntas Sí/No · {guided.autoDiscard === false ? 'descartas tú' : 'descarte automático'}</p>
           {!guided.isMyTurn ? <p className="mt-1 text-[12px] text-text">Podrás preguntar en tu turno. Puedes escribir mensajes mientras esperas.</p> : <div className="mt-2 space-y-2">
             {guided.questions.filter(q => normalize(q.text).includes(normalize(text.trim()))).map(q => <div key={q.id}>
-              <button type="button" disabled={disconnected} onClick={() => { guided.onAsk(q.id); setText('') }} className="w-full rounded-xl border border-accent/30 bg-surface/70 px-3 py-2 text-left text-[12px] font-medium text-text-h hover:border-accent focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50" aria-label={`Preguntar: ${q.text}`}>{q.text}</button>
+              <button type="button" disabled={disconnected} onClick={() => { guided.onAsk(q.id); setText('') }} className="w-full rounded-xl border border-accent/30 bg-surface/70 px-3 py-2 text-left text-[12px] font-medium text-text-h hover:border-accent focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50" aria-label={`Preguntar: ${q.text}`}>{q.category && <span className="mr-1.5 inline-block rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold text-accent">{q.category}</span>}{q.text}</button>
               <QuestionGroup question={q} cards={guided.cards} />
             </div>)}
             {guided.questions.filter(q => normalize(q.text).includes(normalize(text.trim()))).length === 0 && <p className="text-[12px] text-text">{guided.questions.length ? 'Sin sugerencias para ese texto. Puedes enviar un mensaje libre.' : 'No quedan preguntas que separen las opciones. Puedes adivinar o conversar.'}</p>}

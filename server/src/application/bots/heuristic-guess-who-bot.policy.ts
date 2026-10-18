@@ -20,6 +20,13 @@ const ACCUSE_RULES: Record<Exclude<BotDifficulty, 'EASY'>, { maxCandidates: numb
 const MEDIUM_BEST_QUESTION_RATE = 0.7;
 
 /**
+ * Con descarte manual, en cada paso el bot descarta una tarjeta que ya se
+ * deduce con esta probabilidad: el Difícil siempre; el Medio y el Fácil a
+ * veces se olvidan, como una persona que no recuerda el dato.
+ */
+const DEDUCE_RATE: Record<BotDifficulty, number> = { EASY: 0.5, MEDIUM: 0.85, HARD: 1 };
+
+/**
  * Bot por reglas, con errores deliberados en las dificultades bajas
  * (issue #60):
  * - Difícil: usa todo lo que sabe (su carta no es la del rival, las que
@@ -35,6 +42,10 @@ export class HeuristicGuessWhoBotPolicy implements GuessWhoBotPolicy {
 
     const known = knownNonCandidates(observation).filter((id) => observation.remainingCardIds.includes(id));
     if (difficulty !== 'EASY' && known.length > 0) return { type: 'DISCARD', cardId: known[0] };
+    const deducible = observation.deducibleCardIds.filter((id) => observation.remainingCardIds.includes(id));
+    if (deducible.length > 0 && (difficulty === 'HARD' || random() < DEDUCE_RATE[difficulty])) {
+      return { type: 'DISCARD', cardId: deducible[0] };
+    }
 
     const candidates = candidatesOf(observation);
     if (!observation.askedThisTurn && candidates.length > 1) {

@@ -31,6 +31,7 @@ function observation(overrides: Partial<GuessWhoBotObservation> = {}): GuessWhoB
     remainingCardIds: ['a', 'b', 'c', 'd'],
     ownSecretCardId: null,
     wrongGuessCardIds: [],
+    deducibleCardIds: [],
     opponentRemainingCount: 10,
     questions: [{ id: 'q0', cardIds: ['a', 'b'] }, { id: 'q1', cardIds: ['a'] }],
     askedThisTurn: false,

@@ -46,8 +46,12 @@ async function main(){
       await dialog.getByRole('heading',{name:'Elige tu formato'}).waitFor()
       assert.equal(await page.evaluate(()=>window.exited),0)
       await dialog.getByRole('button',{name:'Solo, contra el bot'}).click()
+      const toggle=dialog.getByRole('switch',{name:'Descarte automático'})
+      assert.equal(await toggle.getAttribute('aria-checked'),'false')
+      await toggle.click()
+      assert.equal(await toggle.getAttribute('aria-checked'),'true')
       await dialog.getByRole('button',{name:/^Difícil/}).click()
-      await page.getByText('Sala: /quien-es/sala?gameId=juego-1&bot=HARD').waitFor()
+      await page.getByText('Sala: /quien-es/sala?gameId=juego-1&bot=HARD&descarte=auto').waitFor()
 
       await page.evaluate(()=>window.showChat())
       await page.getByText('El bot no lee el chat: usa las preguntas sugeridas para jugar.').waitFor()

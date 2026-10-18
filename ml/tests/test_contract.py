@@ -38,11 +38,16 @@ def test_constantes_iguales_al_contrato_del_servidor():
 @pytest.mark.parametrize("case", QUESTIONS["cases"], ids=lambda case: f"{len(case['cards'])}cartas")
 def test_preguntas_iguales_al_servidor(case):
     texts = QUESTIONS["traitQuestions"]
+    categories = QUESTIONS["traitCategories"]
     cards = [
-        Card(card_id, None if traits is None else tuple((trait, texts[trait]) for trait in traits))
+        Card(card_id, None if traits is None else tuple((trait, texts[trait], categories.get(trait)) for trait in traits))
         for card_id, traits in case["cards"]
     ]
-    got = [{"text": question.text, "cardIds": list(question.card_ids)} for question in questions_for(cards, case["discarded"])]
+    seed = f"{case['userId']}|{case['turnDeadline'] or 0}"
+    got = [
+        {"text": q.text, "cardIds": list(q.card_ids), **({"category": q.category} if q.category else {})}
+        for q in questions_for(cards, case["discarded"], seed)
+    ]
     assert got == case["expected"]
 
 
@@ -53,6 +58,7 @@ def test_los_casos_cubren_lo_importante():
     assert any("grupo" in text for text in texts), "pregunta del grupo (sin rasgos o sin clasificar)"
     assert any(len(case["expected"]) == MAX_QUESTIONS for case in cases), "tope de 6 sugerencias"
     assert any(traits and "copia" in traits for case in cases for _, traits in case["cards"]), "particiones repetidas"
+    assert any(len({q.get("category") for q in case["expected"]}) >= 3 for case in cases), "varias categorías"
 
 
 @pytest.mark.parametrize("case", FEATURE_CASES)

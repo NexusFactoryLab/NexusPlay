@@ -179,17 +179,22 @@ deben evaluar contenido real extraído del texto fuente, nunca trivia genérica.
  * versiones del prompt (con y sin imágenes del usuario).
  */
 const GUESS_WHO_TRAITS_INSTRUCTIONS = `PREGUNTAS GUIADAS: durante la partida los jugadores se hacen preguntas de Sí/No para descubrir la
-tarjeta secreta del rival, y esas preguntas salen de los rasgos que escribas aquí. En "config.traits"
-escribe entre 6 y 10 rasgos del tema, cada uno con un "id" corto (minúsculas y guiones, ej. "europa") y una
-"question" de Sí/No con signos ¿? (máximo 140 caracteres) que un estudiante pueda responder mirando su
-tarjeta o sabiendo del tema (ej. "¿Es un país de Europa?", "¿Su bandera tiene al menos una estrella?",
-"¿Es un mamífero?"). Si hay texto fuente (documentos del usuario), saca los rasgos de ese texto, para que
-las preguntas repasen lo que se está estudiando. Cada rasgo debe ser verdadero para ALGUNAS tarjetas pero no
-para todas (ideal: cerca de la mitad), y entre todos deben permitir distinguir cada tarjeta de las demás.
-Luego, en cada tarjeta, "traits" lista los ids de TODOS los rasgos que son verdaderos para esa tarjeta
-(lista vacía si ninguno). Revisa cada marca: una marca equivocada hace que el juego dé una respuesta falsa.
-Usa solo rasgos objetivos y estables: nada de opiniones ni de datos que cambian con el tiempo (resultados
-deportivos recientes, cifras que rondan el límite, gobernantes actuales).`;
+tarjeta secreta del rival, y esas preguntas salen de los rasgos que escribas aquí. El objetivo es APRENDER:
+las preguntas deben exigir saber del tema, NO describir lo que se ve en la imagen (nada de colores, formas o
+"¿tiene un X dibujado?"). En "config.traits" escribe entre 15 y 25 rasgos, cada uno con un "id" corto
+(minúsculas y guiones, ej. "independencia-siglo-19"), una "question" de Sí/No con signos ¿? (máximo 140
+caracteres) y una "category" corta que agrupe preguntas del mismo tipo, usando al menos 4 categorías
+distintas (ej. para países: "Historia", "Cultura", "Deporte", "Geografía"; para dinosaurios: "Época",
+"Alimentación", "Anatomía", "Descubrimiento"). Ejemplos de nivel esperado: "¿Se independizó antes de 1850?",
+"¿Su selección de fútbol ganó un Mundial antes de 2026?", "¿Vivió en el período Cretácico?", "¿Sus fósiles
+se descubrieron en Norteamérica?". Si hay texto fuente (documentos del usuario), saca los rasgos de ese texto,
+para que las preguntas repasen lo que se está estudiando. Cada rasgo debe ser verdadero para ALGUNAS tarjetas
+pero no para todas, y entre todos deben permitir distinguir cada tarjeta de las demás. Luego, en cada
+tarjeta, "traits" lista los ids de TODOS los rasgos que son verdaderos para esa tarjeta (lista vacía si
+ninguno). Revisa cada marca: una marca equivocada hace que el juego dé una respuesta falsa. Usa solo datos
+objetivos, verificables y estables: nada de opiniones ni de datos que cambian con el tiempo (resultados
+deportivos recientes, cifras que rondan el límite, gobernantes actuales); si un dato depende de la fecha,
+fíjala en la pregunta (ej. "antes de 2026").`;
 
 const GUESS_WHO_SPEC: GamePromptSpec = {
   instructions: `Genera el contenido de un juego de "¿Quién Es?" a partir de las imágenes que subió el
@@ -213,13 +218,13 @@ ${GUESS_WHO_TRAITS_INSTRUCTIONS}`,
     "maxAccusationCount": 6,
     "turnDurationSeconds": 15,
     "traits": [
-      { "id": "habla-espanol", "question": "¿La mayoría de su población habla español?" },
-      { "id": "estrella", "question": "¿Su bandera tiene al menos una estrella?" }
+      { "id": "habla-espanol", "question": "¿La mayoría de su población habla español?", "category": "Cultura" },
+      { "id": "mundial-antes-2026", "question": "¿Su selección ganó un Mundial de fútbol antes de 2026?", "category": "Deporte" }
     ]
   },
   "content": [
-    { "imageIndex": 0, "label": "Argentina", "info": "Su capital es Buenos Aires y es el país de habla hispana más grande del mundo.", "traits": ["habla-espanol"] },
-    { "imageIndex": 1, "label": "Brasil", "info": "Es el único país de Sudamérica cuyo idioma oficial es el portugués.", "traits": ["estrella"] }
+    { "imageIndex": 0, "label": "Argentina", "info": "Su capital es Buenos Aires y es el país de habla hispana más grande del mundo.", "traits": ["habla-espanol", "mundial-antes-2026"] },
+    { "imageIndex": 1, "label": "Brasil", "info": "Es el único país de Sudamérica cuyo idioma oficial es el portugués.", "traits": ["mundial-antes-2026"] }
   ]
 }`,
   imageRequirement: { min: 12, max: 60, enforceMinimum: false },
@@ -248,13 +253,13 @@ ${GUESS_WHO_TRAITS_INSTRUCTIONS}`,
     "maxAccusationCount": 6,
     "turnDurationSeconds": 15,
     "traits": [
-      { "id": "habla-espanol", "question": "¿La mayoría de su población habla español?" },
-      { "id": "estrella", "question": "¿Su bandera tiene al menos una estrella?" }
+      { "id": "habla-espanol", "question": "¿La mayoría de su población habla español?", "category": "Cultura" },
+      { "id": "mundial-antes-2026", "question": "¿Su selección ganó un Mundial de fútbol antes de 2026?", "category": "Deporte" }
     ]
   },
   "content": [
-    { "label": "Argentina", "info": "Su capital es Buenos Aires y es el país de habla hispana más grande del mundo.", "imageQuery": "Flag of Argentina", "emoji": "🇦🇷", "color": "#bae6fd", "traits": ["habla-espanol"] },
-    { "label": "Brasil", "info": "Es el único país de Sudamérica cuyo idioma oficial es el portugués.", "imageQuery": "Flag of Brazil", "emoji": "🇧🇷", "color": "#bbf7d0", "traits": ["estrella"] }
+    { "label": "Argentina", "info": "Su capital es Buenos Aires y es el país de habla hispana más grande del mundo.", "imageQuery": "Flag of Argentina", "emoji": "🇦🇷", "color": "#bae6fd", "traits": ["habla-espanol", "mundial-antes-2026"] },
+    { "label": "Brasil", "info": "Es el único país de Sudamérica cuyo idioma oficial es el portugués.", "imageQuery": "Flag of Brazil", "emoji": "🇧🇷", "color": "#bbf7d0", "traits": ["mundial-antes-2026"] }
   ]
 }`,
 };

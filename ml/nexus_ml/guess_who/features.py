@@ -43,6 +43,14 @@ class PolicyInput:
     """Por cada pregunta sugerida (máx. 6, en el orden del servidor): candidatas que responden «Sí»."""
 
 
+def questions_for_policy(questions, candidates):
+    """Las sugerencias ordenadas por cuánto parten a las candidatas (orden estable), como questionsForPolicy del servidor."""
+    half = len(candidates) / 2
+    members = [set(question.card_ids) for question in questions[:MAX_QUESTIONS]]
+    scored = [(abs(sum(1 for c in candidates if c in m) - half), q) for q, m in zip(questions[:MAX_QUESTIONS], members)]
+    return [question for _, question in sorted(scored, key=lambda item: item[0])]
+
+
 def encode(policy_input: PolicyInput) -> list[float]:
     remaining = max(policy_input.remaining, 1)
     available = [k < len(policy_input.question_yes_counts) for k in range(MAX_QUESTIONS)]

@@ -74,16 +74,16 @@ Las pruebas de contrato fallan a propósito: el bot estaría aprendiendo un jueg
 
 ## Modelo actual y lo que aprendió
 
-Entrenado con 1.000.000 de pasos (7 minutos en CPU). Resultados con 5.000 partidas por política, en semillas distintas de las del entrenamiento y contra la misma mezcla de rivales simulados:
+Entrenado con 1.000.000 de pasos (unos 25 minutos en CPU), con sugerencias variadas por categoría (issue #64). Resultados con 5.000 partidas por política, en semillas distintas de las del entrenamiento y contra la misma mezcla de rivales simulados:
 
 | Rival | Bot por reglas (Difícil) | Modelo |
 |---|---|---|
-| cuidadoso | 66,6 % | 80,1 % |
-| casual | 85,5 % | 90,3 % |
-| rápido (2 preguntas por turno) | 30,5 % | 45,7 % |
-| arriesgado | 37,3 % | 53,6 % |
-| bot Difícil por reglas | 52,9 % | 66,9 % |
-| **Total** | **54,6 %** | **67,3 %** |
+| cuidadoso | 67,7 % | 82,2 % |
+| casual | 82,7 % | 88,4 % |
+| rápido (2 preguntas por turno) | 28,2 % | 42,1 % |
+| arriesgado | 37,1 % | 54,0 % |
+| bot Difícil por reglas | 50,9 % | 65,1 % |
+| **Total** | **53,3 %** | **66,4 %** |
 
 **Qué aprendió:**
 - Siempre hace la pregunta que mejor parte a sus candidatas, igual que el bot por reglas.

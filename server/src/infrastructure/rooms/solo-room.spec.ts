@@ -44,10 +44,10 @@ function setup(botPolicy?: GuessWhoBotPolicy) {
   return { gateway, rooms, events };
 }
 
-async function startSolo(difficulty = 'HARD', botPolicy?: GuessWhoBotPolicy) {
+async function startSolo(difficulty = 'HARD', botPolicy?: GuessWhoBotPolicy, autoDiscard = true) {
   const ctx = setup(botPolicy);
   const human = client('ana');
-  await ctx.gateway.handleCreateSolo(human, { gameId: game.id, difficulty });
+  await ctx.gateway.handleCreateSolo(human, { gameId: game.id, difficulty, autoDiscard });
   const room = ctx.rooms.findBySocketId('ana')!;
   vi.advanceTimersByTime(3000);
   return { ...ctx, human, room, bot: room.players[1] };
@@ -140,6 +140,23 @@ describe('partida en solitario contra el bot (issue #60)', () => {
     }
   });
 
+  it('con descarte manual, el bot descarta por su cuenta lo que se deduce de sus respuestas (issue #64)', async () => {
+    const solo = await startSolo('HARD', undefined, false);
+    expect(solo.room.autoDiscard).toBe(false);
+    const botQuestions = playAgainstPassiveHuman(solo);
+    expect(solo.room.phase).toBe('FINISHED');
+    expect(solo.room.winnerUserId).toBe(solo.bot.userId);
+    expect(botQuestions).toBeGreaterThan(0);
+    // El humano nunca descartó: con descarte manual la respuesta no descarta sola.
+    expect(solo.room.players[0].discardedCardIds).toEqual([]);
+  });
+
+  it('sin elegir, la partida contra el bot arranca con descarte manual', async () => {
+    const { gateway, rooms } = setup();
+    await gateway.handleCreateSolo(client('ana'), { gameId: game.id, difficulty: 'EASY' });
+    expect(rooms.findBySocketId('ana')!.autoDiscard).toBe(false);
+  });
+
   it('no reprograma su jugada por cada mensaje de chat', async () => {
     const { gateway, human, room, bot } = await startSolo('HARD');
     if (room.activePlayerUserId === 'ana') gateway.handlePassTurn(human);
@@ -224,7 +241,7 @@ describe('partida en solitario contra el bot (issue #60)', () => {
     vi.advanceTimersByTime(4_000);
     expect(seen).toHaveLength(1);
     expect(Object.keys(seen[0] as object).sort()).toEqual(
-      ['askedThisTurn', 'canAccuse', 'difficulty', 'opponentRemainingCount', 'ownSecretCardId', 'questions', 'remainingCardIds', 'wrongGuessCardIds'],
+      ['askedThisTurn', 'canAccuse', 'deducibleCardIds', 'difficulty', 'opponentRemainingCount', 'ownSecretCardId', 'questions', 'remainingCardIds', 'wrongGuessCardIds'],
     );
     expect((seen[0] as { ownSecretCardId: string }).ownSecretCardId).toBe(room.players[1].secretCardId);
   });

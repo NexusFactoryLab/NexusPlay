@@ -26,6 +26,12 @@ export interface GuessWhoBotObservation {
   ownSecretCardId: string | null;
   /** Cartas que ya acusó sin acertar en esta partida. */
   wrongGuessCardIds: string[];
+  /**
+   * Con descarte manual (issue #64): tarjetas de su tablero que contradicen
+   * alguna respuesta a sus preguntas, es decir, lo que descartaría quien sabe
+   * del tema. Con descarte automático siempre está vacía.
+   */
+  deducibleCardIds: string[];
   /** Cuántas tarjetas le quedan al rival en su tablero (se ve en pantalla). */
   opponentRemainingCount: number;
   /** Preguntas sugeridas, en el orden del servidor (primero las que mejor parten su tablero). */

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { addGuidedMessage, answerGuidedQuestion, askGuidedQuestion, currentQuestion, guidedView, questionsFor, type GuidedState } from './guided-questions.js';
+import { addGuidedMessage, answerGuidedQuestion, askGuidedQuestion, contradictedCardIds, currentQuestion, guidedView, questionsFor, type GuidedState } from './guided-questions.js';
 
 const AMERICA = { id: 'america', question: '¿Es un país de América?' };
 const ESPANOL = { id: 'habla-espanol', question: '¿La mayoría de su población habla español?' };
@@ -21,11 +21,10 @@ function state(): GuidedState {
 const texts = (s: GuidedState, userId = 'a') => questionsFor(s, userId).map(q => q.text);
 afterEach(() => vi.useRealTimers());
 describe('preguntas guiadas autoritativas', () => {
-  it('salen de los rasgos, ordenadas por cuánto parten el tablero, y no consultan la identidad secreta', () => {
+  it('salen de los rasgos y no consultan la identidad secreta', () => {
     const s = state(), questions = questionsFor(s, 'a');
-    // América parte 3/3; Español y Europa 2/4 (empate: orden de aparición); Estrella 1/5.
-    expect(questions.map(q => q.text)).toEqual([AMERICA.question, ESPANOL.question, EUROPA.question, ESTRELLA.question]);
-    expect(questions[0].cardIds).toEqual(['0', '2', '3']);
+    expect(new Set(questions.map(q => q.text))).toEqual(new Set([AMERICA.question, ESPANOL.question, EUROPA.question, ESTRELLA.question]));
+    expect(questions.find(q => q.text === AMERICA.question)?.cardIds).toEqual(['0', '2', '3']);
     expect(questions.some(q => /letra|vocal/i.test(q.text))).toBe(false);
     s.players[1].secretCardId = '5';
     expect(questionsFor(s, 'a')).toEqual(questions);
@@ -45,7 +44,7 @@ describe('preguntas guiadas autoritativas', () => {
     expect(s.activePlayerUserId).toBe('a');
   });
   it('rechaza falsificaciones, auto-respuesta y respuestas incorrectas sin cambiar descartes', () => {
-    const s = state(), q = questionsFor(s, 'a')[0];
+    const s = state(), q = questionsFor(s, 'a').find(q => q.text === AMERICA.question)!;
     expect(() => askGuidedQuestion(s, 'b', 'Luis', q.id)).toThrow();
     expect(() => askGuidedQuestion(s, 'intruso', 'X', q.id)).toThrow();
     expect(() => askGuidedQuestion(s, 'a', 'Ana', 'inventada')).toThrow();
@@ -74,11 +73,11 @@ describe('preguntas guiadas autoritativas', () => {
   it('quita las preguntas que ya no separan y las que parten igual o justo al revés que otra', () => {
     const s = state();
     s.players[0].discardedCardIds = ['1'];
-    // Sin Japón, América (0,2,3) y Europa (4,5) son la misma pregunta al revés: queda la primera.
-    expect(texts(s)).toEqual([AMERICA.question, ESPANOL.question, ESTRELLA.question]);
+    // Sin Japón, América (0,2,3) y Europa (4,5) son la misma pregunta al revés: queda la que parte mejor (empate: la primera).
+    expect(new Set(texts(s))).toEqual(new Set([AMERICA.question, ESPANOL.question, ESTRELLA.question]));
     s.players[0].discardedCardIds = ['1', '4', '5'];
     // Ya solo quedan países de América: esa pregunta no descartaría nada.
-    expect(texts(s)).toEqual([ESPANOL.question, ESTRELLA.question]);
+    expect(new Set(texts(s))).toEqual(new Set([ESPANOL.question, ESTRELLA.question]));
   });
   it('la respuesta sale del rasgo aunque quien pregunta haya descartado por error la carta del rival', () => {
     const s = state();
@@ -90,6 +89,39 @@ describe('preguntas guiadas autoritativas', () => {
     answerGuidedQuestion(s, 'b', 'Luis', s.pendingQuestion!.requestId, true);
     expect(s.players[0].discardedCardIds).toEqual(['2', '1', '4', '5']);
   });
+  it('mezcla categorías y cambia las sugerencias de un turno a otro, pero no dentro del mismo turno (issue #64)', () => {
+    const s = state();
+    s.cards = Array.from({ length: 16 }, (_, i) => ({
+      cardId: String(i),
+      label: `Tarjeta ${i}`,
+      traits: Array.from({ length: 10 }, (_, k) => ({ id: `r${k}`, question: `¿Rasgo ${k}?`, category: k < 8 ? 'Historia' : 'Deporte' }))
+        .filter((_, k) => ((i >> (k % 4)) & 1) === 1 || (k >= 4 && i % (k - 2) === 0)),
+    }));
+    const first = questionsFor(s, 'a');
+    expect(first.length).toBeLessThanOrEqual(6);
+    expect(new Set(first.map(q => q.category))).toEqual(new Set(['Historia', 'Deporte']));
+    expect(questionsFor(s, 'a')).toEqual(first);
+    const orders = new Set(Array.from({ length: 12 }, (_, turn) => {
+      s.turnDeadline = 1_000 + turn;
+      return questionsFor(s, 'a').map(q => q.text).join('|');
+    }));
+    expect(orders.size).toBeGreaterThan(1);
+  });
+
+  it('con descarte manual la respuesta no descarta: el jugador decide, y se puede deducir qué no es', () => {
+    const s = state();
+    s.autoDiscard = false;
+    const q = questionsFor(s, 'a').find(q => q.text === AMERICA.question)!;
+    askGuidedQuestion(s, 'a', 'Ana', q.id);
+    answerGuidedQuestion(s, 'b', 'Luis', s.pendingQuestion!.requestId, true);
+    expect(s.players[0].discardedCardIds).toEqual([]);
+    expect(s.guidedChat!.at(-1)!.text).toBe('Sí. Descarta tú las tarjetas que no coinciden.');
+    expect(contradictedCardIds(s, 'a')).toEqual(['1', '4', '5']);
+    s.players[0].discardedCardIds = ['1'];
+    expect(contradictedCardIds(s, 'a')).toEqual(['4', '5']);
+    expect(contradictedCardIds(s, 'b')).toEqual([]);
+  });
+
   it('sugiere como mucho 6 preguntas', () => {
     const s = state();
     s.cards = Array.from({ length: 12 }, (_, i) => ({ cardId: String(i), label: `Tarjeta ${i}`, traits: i < 10 ? [{ id: `r${i}`, question: `¿Rasgo ${i}?` }] : [] }));

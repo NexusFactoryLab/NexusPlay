@@ -21,6 +21,7 @@ function render(){root.render(React.createElement(GuessWhoTraitsEditor,{catalog,
   onAdd:()=>{catalog=[...catalog,{id:newTraitId(catalog),question:''}];render()},
   onRemove:id=>{catalog=catalog.filter(t=>t.id!==id);cards=cards.map(c=>({...c,traitIds:c.traitIds.filter(x=>x!==id)}));render()},
   onChangeQuestion:(id,question)=>{catalog=catalog.map(t=>t.id===id?{...t,question}:t);render()},
+  onChangeCategory:(id,category)=>{catalog=catalog.map(t=>t.id===id?{...t,category}:t);render()},
   onToggleCard:(index,id)=>{cards=cards.map((c,i)=>i!==index?c:{...c,traitIds:c.traitIds.includes(id)?c.traitIds.filter(x=>x!==id):[...c.traitIds,id]});render()}}))}
 render();
 </script></body></html>`
@@ -52,6 +53,8 @@ async function main(){
       await input.waitFor()
       assert.match((await page.evaluate(()=>window.state())).error,/Escribe el texto de la pregunta 2/)
       await input.fill('es un país de Europa')
+      await page.getByRole('combobox',{name:'Categoría (opcional)'}).nth(1).fill('Geografía')
+      assert.equal((await page.evaluate(()=>window.state())).catalog[1].category,'Geografía')
       assert.match((await page.evaluate(()=>window.state())).error,/no separa/)
       const europa=page.getByRole('list',{name:'Tarjetas que responden «Sí» a la pregunta 2'})
       for(const label of ['Francia','Italia','Alemania','España']) await europa.getByRole('button',{name:label}).click()

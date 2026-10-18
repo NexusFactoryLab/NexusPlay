@@ -71,7 +71,7 @@ def play_opponent_turn(
     low, high = style.questions_per_turn
     for _ in range(int(rng.integers(low, high + 1))):
         pool = candidates_of(cards, opponent, style)
-        questions = questions_for(cards, opponent.discarded)
+        questions = questions_for(cards, opponent.discarded, f"rival|{len(opponent.discarded)}")
         if len(pool) <= 1 or not questions:
             break
         index = best_question(questions, pool) if style.question == "best" else None

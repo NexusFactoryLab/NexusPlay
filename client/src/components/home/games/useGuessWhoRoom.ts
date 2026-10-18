@@ -82,8 +82,12 @@ export function useGuessWhoRoom(token: string | null) {
   }, [])
 
   /** Sala en solitario contra el bot (issue #60): arranca sola, sin lobby que esperar. */
-  const createSoloRoom = useCallback((gameId: string, difficulty: BotDifficulty) => {
-    socketRef.current?.emit('room:create-solo', { gameId, difficulty })
+  const createSoloRoom = useCallback((gameId: string, difficulty: BotDifficulty, autoDiscard: boolean) => {
+    socketRef.current?.emit('room:create-solo', { gameId, difficulty, autoDiscard })
+  }, [])
+
+  const updateAutoDiscard = useCallback((autoDiscard: boolean) => {
+    socketRef.current?.emit('room:update-auto-discard', { autoDiscard })
   }, [])
 
   const joinRoom = useCallback((code: string) => {
@@ -148,6 +152,7 @@ export function useGuessWhoRoom(token: string | null) {
     messages,
     createRoom,
     createSoloRoom,
+    updateAutoDiscard,
     joinRoom,
     setReady,
     updateTurnDuration,

@@ -1,5 +1,5 @@
 import type { GuessWhoCard } from '../../application/content-validators/guess-who.content-validator.js';
-import type { PendingQuestion, GuidedMessage } from '../services/guided-questions.js';
+import type { PendingQuestion, GuidedMessage, GuidedAnswer } from '../services/guided-questions.js';
 import type { BotDifficulty } from './guess-who-bot-policy.port.js';
 
 export const ROOM_STORE = Symbol('ROOM_STORE');
@@ -47,6 +47,14 @@ export interface RoomState {
    * cuando ambos votan true.
    */
   rematchVotes: Record<string, boolean>;
+  /**
+   * Descarte automático (issue #64): si la respuesta descarta sola. Lo elige
+   * el anfitrión en el lobby (o quien crea la partida contra el bot).
+   * Sin definir = automático.
+   */
+  autoDiscard?: boolean;
+  /** Respuestas de la partida en curso, para deducir descartes. */
+  answerLog?: GuidedAnswer[];
   /** userId del jugador que tiene el turno actual (solo relevante en fase PLAYING). */
   activePlayerUserId: string | null;
   /**

@@ -177,6 +177,10 @@ export function GuessWhoGameForm({
     setTraits((current) => current.map((trait) => (trait.id === traitId ? { ...trait, question } : trait)))
   }
 
+  function changeTraitCategory(traitId: string, category: string) {
+    setTraits((current) => current.map((trait) => (trait.id === traitId ? { ...trait, category } : trait)))
+  }
+
   function toggleCardTrait(cardIndex: number, traitId: string) {
     setCards((current) =>
       current.map((card, i) =>
@@ -489,6 +493,7 @@ export function GuessWhoGameForm({
             onAdd={addTrait}
             onRemove={removeTrait}
             onChangeQuestion={changeTraitQuestion}
+            onChangeCategory={changeTraitCategory}
             onToggleCard={toggleCardTrait}
           />
         )}

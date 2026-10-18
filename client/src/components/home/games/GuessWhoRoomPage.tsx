@@ -13,6 +13,7 @@ import { ConfettiBurst } from '../../kids/ConfettiBurst'
 import { CardInfoBubble } from './CardInfoBubble'
 import { setGuessWhoSoundMuted, startGuessWhoAmbience, stopGuessWhoAmbience } from '../../../utils/gameFeedback'
 import { BOT_CHAT_NOTICE, parseBotDifficulty } from './guessWhoBot'
+import { AutoDiscardToggle } from './AutoDiscardToggle'
 
 /**
  * Sala 1v1 de "¿Quién Es?" en página propia (ruta `/quien-es/sala/:code?`,
@@ -29,6 +30,7 @@ function GuessWhoRoomSession() {
   const [searchParams] = useSearchParams()
   const gameIdToCreate = searchParams.get('gameId')
   const botDifficulty = parseBotDifficulty(searchParams.get('bot'))
+  const soloAutoDiscard = searchParams.get('descarte') === 'auto'
   const navigate = useNavigate()
   const { token, user } = useAuth()
   const {
@@ -42,6 +44,7 @@ function GuessWhoRoomSession() {
     messages,
     createRoom,
     createSoloRoom,
+    updateAutoDiscard,
     joinRoom,
     setReady,
     updateTurnDuration,
@@ -68,7 +71,7 @@ function GuessWhoRoomSession() {
       joinRoom(codeFromUrl.toUpperCase())
     } else if (gameIdToCreate) {
       startedRef.current = true
-      if (botDifficulty) createSoloRoom(gameIdToCreate, botDifficulty)
+      if (botDifficulty) createSoloRoom(gameIdToCreate, botDifficulty, soloAutoDiscard)
       else createRoom(gameIdToCreate)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -211,6 +214,12 @@ function GuessWhoRoomSession() {
     isHost={Boolean(self?.isHost)} connecting={connecting} error={error}
     turnDurationSeconds={room.turnDurationSeconds} onUpdateTurnDuration={updateTurnDuration}
     onReady={setReady} onExit={handleExit} messages={messages} onSend={sendChatMessage}
+    settings={<AutoDiscardToggle
+      enabled={room.autoDiscard !== false}
+      onChange={self?.isHost ? updateAutoDiscard : undefined}
+      disabled={connecting}
+      readOnlyNote="Lo define quien creó la sala."
+    />}
   >{dealing && <DealCountdownOverlay remainingMs={dealRemainingMs} />}</MultiplayerLobby>
 
   return (
@@ -379,7 +388,7 @@ function GuessWhoRoomSession() {
           onSend={sendChatMessage}
           notice={againstBot ? BOT_CHAT_NOTICE : undefined}
           disconnected={connecting || dealing}
-          guided={room.phase === 'PLAYING' ? { cards: room.cards, questions: room.suggestedQuestions ?? [], pending: room.pendingQuestion ?? null, isMyTurn, onAsk: askQuestion, onAnswer: answerQuestion } : undefined}
+          guided={room.phase === 'PLAYING' ? { cards: room.cards, questions: room.suggestedQuestions ?? [], pending: room.pendingQuestion ?? null, isMyTurn, autoDiscard: room.autoDiscard !== false, onAsk: askQuestion, onAnswer: answerQuestion } : undefined}
         />
         </div>
       </div>

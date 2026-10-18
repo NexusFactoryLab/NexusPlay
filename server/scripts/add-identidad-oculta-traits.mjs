@@ -1,4 +1,4 @@
-// Agrega a cada tarjeta del demo Identidad Oculta (banderas) los rasgos de las preguntas guiadas (issue #58).
+// Agrega (o reemplaza) en cada tarjeta del demo Identidad Oculta (banderas) los rasgos de las preguntas guiadas (issues #58 y #64).
 // Vista previa por defecto (muestra qué rasgos recibe cada país). --apply exige --backup con una ruta local no versionada.
 // node server/scripts/add-identidad-oculta-traits.mjs --env-file server/.env
 // node server/scripts/add-identidad-oculta-traits.mjs --env-file server/.env --apply --backup ./identidad-oculta-antes.json
@@ -15,39 +15,44 @@ const target = {
   gameType: 'GUESS_WHO',
 };
 
-// Solo datos objetivos y estables: nada que cambie con el tiempo (por ejemplo,
-// quién ganó el último Mundial) ni cifras cerca del límite. Las de la bandera
-// se pueden comprobar mirando la tarjeta.
+// Preguntas de conocimiento por categoría (issues #58 y #64): nada que se
+// responda mirando la bandera. Solo datos objetivos y estables; lo que depende
+// de la fecha la fija en la pregunta («antes de 2026»).
 const TRAITS = {
-  america: '¿Es un país de América?',
-  sudamerica: '¿Es un país de Sudamérica?',
-  europa: '¿Es un país de Europa?',
-  'habla-espanol': '¿La mayoría de su población habla español?',
-  'capital-hemisferio-sur': '¿Su capital está en el hemisferio sur?',
-  'mas-100-millones': '¿Tiene más de 100 millones de habitantes?',
-  'franjas-verticales': '¿Su bandera tiene franjas verticales?',
-  'franjas-horizontales': '¿Su bandera tiene franjas horizontales?',
-  'tres-franjas': '¿Su bandera tiene exactamente tres franjas?',
-  estrella: '¿Su bandera tiene al menos una estrella?',
-  verde: '¿El verde es uno de los colores principales de su bandera?',
+  america: { question: '¿Es un país de América?', category: 'Geografía' },
+  sudamerica: { question: '¿Es un país de Sudamérica?', category: 'Geografía' },
+  europa: { question: '¿Es un país de Europa?', category: 'Geografía' },
+  'capital-hemisferio-sur': { question: '¿Su capital está en el hemisferio sur?', category: 'Geografía' },
+  'limita-con-brasil': { question: '¿Limita con Brasil?', category: 'Geografía' },
+  'mas-100-millones': { question: '¿Tiene más de 100 millones de habitantes?', category: 'Geografía' },
+  'colonia-espanola': { question: '¿Fue colonia de España?', category: 'Historia' },
+  'eje-segunda-guerra': { question: '¿Formó parte del Eje en la Segunda Guerra Mundial?', category: 'Historia' },
+  monarquia: { question: '¿Es una monarquía (tiene rey o emperador)?', category: 'Historia' },
+  'habla-espanol': { question: '¿La mayoría de su población habla español?', category: 'Cultura' },
+  'lengua-romance': { question: '¿Su idioma principal viene del latín (lengua romance)?', category: 'Cultura' },
+  'moneda-peso': { question: '¿Su moneda se llama peso?', category: 'Cultura' },
+  'nobel-literatura': { question: '¿Alguien de este país ganó el Nobel de Literatura?', category: 'Cultura' },
+  'campeon-mundial': { question: '¿Su selección ganó un Mundial de fútbol antes de 2026?', category: 'Deporte' },
+  'sede-mundial': { question: '¿Fue sede de un Mundial de fútbol antes de 2026?', category: 'Deporte' },
+  'sede-olimpicos': { question: '¿Fue sede de unos Juegos Olímpicos de verano?', category: 'Deporte' },
 };
 
 const BY_LABEL = {
-  Colombia: ['america', 'sudamerica', 'habla-espanol', 'franjas-horizontales', 'tres-franjas'],
-  Argentina: ['america', 'sudamerica', 'habla-espanol', 'capital-hemisferio-sur', 'franjas-horizontales', 'tres-franjas'],
-  Brasil: ['america', 'sudamerica', 'capital-hemisferio-sur', 'mas-100-millones', 'estrella', 'verde'],
-  México: ['america', 'habla-espanol', 'mas-100-millones', 'franjas-verticales', 'tres-franjas', 'verde'],
-  Francia: ['europa', 'franjas-verticales', 'tres-franjas'],
-  Italia: ['europa', 'franjas-verticales', 'tres-franjas', 'verde'],
-  Japón: ['mas-100-millones'],
-  Alemania: ['europa', 'franjas-horizontales', 'tres-franjas'],
-  España: ['europa', 'habla-espanol', 'franjas-horizontales', 'tres-franjas'],
-  Perú: ['america', 'sudamerica', 'habla-espanol', 'capital-hemisferio-sur', 'franjas-verticales', 'tres-franjas'],
-  Chile: ['america', 'sudamerica', 'habla-espanol', 'capital-hemisferio-sur', 'franjas-horizontales', 'estrella'],
-  'Estados Unidos': ['america', 'mas-100-millones', 'franjas-horizontales', 'estrella'],
+  Colombia: ['america', 'sudamerica', 'limita-con-brasil', 'colonia-espanola', 'habla-espanol', 'lengua-romance', 'moneda-peso', 'nobel-literatura'],
+  Argentina: ['america', 'sudamerica', 'capital-hemisferio-sur', 'limita-con-brasil', 'colonia-espanola', 'habla-espanol', 'lengua-romance', 'moneda-peso', 'campeon-mundial', 'sede-mundial'],
+  Brasil: ['america', 'sudamerica', 'capital-hemisferio-sur', 'mas-100-millones', 'lengua-romance', 'campeon-mundial', 'sede-mundial', 'sede-olimpicos'],
+  México: ['america', 'mas-100-millones', 'colonia-espanola', 'habla-espanol', 'lengua-romance', 'moneda-peso', 'nobel-literatura', 'sede-mundial', 'sede-olimpicos'],
+  Francia: ['europa', 'lengua-romance', 'nobel-literatura', 'campeon-mundial', 'sede-mundial', 'sede-olimpicos'],
+  Italia: ['europa', 'eje-segunda-guerra', 'lengua-romance', 'nobel-literatura', 'campeon-mundial', 'sede-mundial', 'sede-olimpicos'],
+  Japón: ['mas-100-millones', 'eje-segunda-guerra', 'monarquia', 'nobel-literatura', 'sede-mundial', 'sede-olimpicos'],
+  Alemania: ['europa', 'eje-segunda-guerra', 'nobel-literatura', 'campeon-mundial', 'sede-mundial', 'sede-olimpicos'],
+  España: ['europa', 'monarquia', 'habla-espanol', 'lengua-romance', 'nobel-literatura', 'campeon-mundial', 'sede-mundial', 'sede-olimpicos'],
+  Perú: ['america', 'sudamerica', 'capital-hemisferio-sur', 'limita-con-brasil', 'colonia-espanola', 'habla-espanol', 'lengua-romance', 'nobel-literatura'],
+  Chile: ['america', 'sudamerica', 'capital-hemisferio-sur', 'colonia-espanola', 'habla-espanol', 'lengua-romance', 'moneda-peso', 'nobel-literatura', 'sede-mundial'],
+  'Estados Unidos': ['america', 'mas-100-millones', 'nobel-literatura', 'sede-mundial', 'sede-olimpicos'],
 };
 
-const traitsFor = (label) => BY_LABEL[label].map((id) => ({ id, question: TRAITS[id] }));
+const traitsFor = (label) => BY_LABEL[label].map((id) => ({ id, ...TRAITS[id] }));
 const unchanged = ({ content, updatedAt, version, ...rest }) => rest;
 const withoutTraits = (content) => content.map(({ traits, ...card }) => card);
 
@@ -84,10 +89,9 @@ async function main() {
       console.log(JSON.stringify({ status: 'already_updated', id: before._id, slug: before.slug }));
       return;
     }
-    assert.ok(before.content.every((card) => !('traits' in card)), 'Algunas tarjetas ya tienen rasgos distintos; revisar antes de actualizar');
 
     if (!args.includes('--apply')) {
-      console.log(JSON.stringify({ status: 'preview', id: before._id, slug: before.slug, questions: TRAITS }, null, 2));
+      console.log(JSON.stringify({ status: 'preview', id: before._id, slug: before.slug, replacesExistingTraits: before.content.some((card) => 'traits' in card), questions: TRAITS }, null, 2));
       console.table(Object.fromEntries(content.map((card) => [card.label, Object.fromEntries(Object.keys(TRAITS).map((id) => [id, BY_LABEL[card.label].includes(id) ? 'Sí' : '']))])));
       return;
     }

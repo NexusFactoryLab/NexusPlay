@@ -12,6 +12,7 @@ import numpy as np
 from .rules import Card
 
 NO_TRAITS_SHARE = 0.15
+CATEGORIES = ("Historia", "Cultura", "Deporte", "Geografía", "Ciencia")
 
 
 def random_deck(rng: np.random.Generator) -> list[Card]:
@@ -21,11 +22,13 @@ def random_deck(rng: np.random.Generator) -> list[Card]:
         return [Card(card_id, None) for card_id in ids]
 
     traits = []
-    for k in range(int(rng.integers(3, 13))):
+    # Como los juegos de la IA (issue #64): de 15 a 25 rasgos en varias categorías; a veces menos (hechos a mano).
+    count = int(rng.integers(15, 26)) if rng.random() < 0.7 else int(rng.integers(3, 15))
+    for k in range(count):
         share = rng.uniform(0.1, 0.6)
         members = {card_id for card_id in ids if rng.random() < share}
-        traits.append((f"t{k}", f"¿Rasgo {k}?", members))
+        traits.append((f"t{k}", f"¿Rasgo {k}?", CATEGORIES[int(rng.integers(len(CATEGORIES)))], members))
     return [
-        Card(card_id, tuple((trait_id, question) for trait_id, question, members in traits if card_id in members))
+        Card(card_id, tuple((tid, question, category) for tid, question, category, members in traits if card_id in members))
         for card_id in ids
     ]

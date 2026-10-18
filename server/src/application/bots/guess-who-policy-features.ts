@@ -45,6 +45,21 @@ export interface PolicyInput {
   questionYesCounts: number[];
 }
 
+/**
+ * Las sugerencias llegan mezcladas por categoría (issue #64); el modelo las
+ * ve ordenadas por cuánto parten a las candidatas (orden estable), así la
+ * posición k significa siempre lo mismo. `ml/` ordena igual.
+ */
+export function questionsForPolicy<Q extends { cardIds: string[] }>(questions: Q[], candidates: string[]): Q[] {
+  const half = candidates.length / 2;
+  const yes = (question: Q) => candidates.filter((id) => question.cardIds.includes(id)).length;
+  return questions
+    .slice(0, POLICY_MAX_QUESTIONS)
+    .map((question) => ({ question, score: Math.abs(yes(question) - half) }))
+    .sort((a, b) => a.score - b.score)
+    .map(({ question }) => question);
+}
+
 export function policyInputFromObservation(observation: GuessWhoBotObservation): PolicyInput {
   const candidates = candidatesOf(observation);
   return {
@@ -52,8 +67,7 @@ export function policyInputFromObservation(observation: GuessWhoBotObservation):
     opponentRemaining: observation.opponentRemainingCount,
     canAccuse: observation.canAccuse,
     askedThisTurn: observation.askedThisTurn,
-    questionYesCounts: observation.questions
-      .slice(0, POLICY_MAX_QUESTIONS)
+    questionYesCounts: questionsForPolicy(observation.questions, candidates)
       .map((question) => candidates.filter((id) => question.cardIds.includes(id)).length),
   };
 }

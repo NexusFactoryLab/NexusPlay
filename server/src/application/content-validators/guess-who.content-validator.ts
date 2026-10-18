@@ -17,6 +17,8 @@ import type { ContentValidationOptions, ContentValidator } from './content-valid
 export interface GuessWhoTrait {
   id: string;
   question: string;
+  /** Tema de la pregunta (Historia, Cultura, Deporte…): las sugerencias mezclan categorías (issue #64). */
+  category?: string;
 }
 
 export interface GuessWhoCard {
@@ -56,7 +58,8 @@ const DEFAULT_CONFIG: GuessWhoConfig = {
 const MAX_LABEL_LENGTH = 120;
 const MAX_URL_LENGTH = 2048;
 const MAX_INFO_LENGTH = 500;
-const MAX_TRAITS_PER_CARD = 12;
+const MAX_TRAITS_PER_CARD = 25;
+const MAX_TRAIT_CATEGORY_LENGTH = 30;
 const MAX_TRAIT_ID_LENGTH = 40;
 const MAX_TRAIT_QUESTION_LENGTH = 140;
 const MIN_CARDS = 12;
@@ -178,12 +181,18 @@ export class GuessWhoContentValidator implements ContentValidator {
           `la tarjeta en la posición ${index} tiene un rasgo sin id o sin pregunta válidos.`,
         );
       }
+      if (trait.category !== undefined && trait.category !== null && !isNonEmptyString(trait.category, MAX_TRAIT_CATEGORY_LENGTH)) {
+        throw new InvalidGameContentError(
+          `la tarjeta en la posición ${index} tiene un rasgo con categoría inválida (máximo ${MAX_TRAIT_CATEGORY_LENGTH} caracteres).`,
+        );
+      }
       const id = trait.id.trim();
       if (seen.has(id)) {
         throw new InvalidGameContentError(`la tarjeta en la posición ${index} repite el rasgo "${id}".`);
       }
       seen.add(id);
-      return { id, question: trait.question.trim() };
+      const category = typeof trait.category === 'string' ? trait.category.trim() : '';
+      return { id, question: trait.question.trim(), ...(category ? { category } : {}) };
     });
   }
 }

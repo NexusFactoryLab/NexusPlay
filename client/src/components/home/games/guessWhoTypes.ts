@@ -1,5 +1,5 @@
 /** Rasgo verificable de una tarjeta: de él sale una pregunta guiada de Sí/No (issue #58). */
-export type GuessWhoTrait = { id: string; question: string }
+export type GuessWhoTrait = { id: string; question: string; category?: string }
 
 export type GuessWhoCard = {
   cardId: string
@@ -22,7 +22,7 @@ export const MIN_DISCARDS_TO_ACCUSE = 3
 
 export type RoomPhase = 'WAITING' | 'PLAYING' | 'FINISHED'
 
-export type GuidedQuestion = { id: string; text: string; cardIds: string[] }
+export type GuidedQuestion = { id: string; text: string; cardIds: string[]; category?: string }
 export type PendingQuestion = GuidedQuestion & { requestId: string; askerId: string; deadline: number }
 export type GuidedChatState = {
   suggestedQuestions?: GuidedQuestion[]
@@ -54,6 +54,8 @@ export type RoomStateView = GuidedChatState & {
   cards: GuessWhoCard[]
   maxAccusationCount: number
   turnDurationSeconds: number
+  /** Descarte automático (issue #64): si la respuesta descarta sola. */
+  autoDiscard?: boolean
   phase: RoomPhase
   winnerUserId: string | null
   activePlayerUserId: string | null

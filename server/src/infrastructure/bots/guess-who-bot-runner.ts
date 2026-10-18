@@ -6,7 +6,7 @@ import type {
   GuessWhoBotObservation,
   GuessWhoBotPolicy,
 } from '../../domain/ports/guess-who-bot-policy.port.js';
-import { currentQuestion, questionsFor } from '../../domain/services/guided-questions.js';
+import { contradictedCardIds, currentQuestion, questionsFor } from '../../domain/services/guided-questions.js';
 import { MIN_DISCARDS_BEFORE_ACCUSATION } from '../../domain/services/guess-who-rules.js';
 
 /**
@@ -28,7 +28,8 @@ type Range = readonly [min: number, max: number];
 
 /** Pausas (ms) para que el bot no juegue a velocidad de máquina: la primera acción de su turno es la más pensada. */
 const THINK_MS: Record<BotDifficulty, Range> = { EASY: [2500, 4500], MEDIUM: [1800, 3500], HARD: [1200, 2500] };
-const NEXT_ACTION_MS: Range = [600, 1200];
+/** Entre una acción y la siguiente del mismo turno (sobre todo descartes, que pueden ser varios). */
+const NEXT_ACTION_MS: Range = [350, 700];
 const DECIDE_AFTER_ANSWER_MS: Range = [1000, 2000];
 const ANSWER_MS: Range = [1000, 2200];
 const REMATCH_VOTE_MS = 1500;
@@ -210,6 +211,7 @@ export class GuessWhoBotRunner {
       remainingCardIds: room.cards.filter((card) => !bot.discardedCardIds.includes(card.cardId)).map((card) => card.cardId),
       ownSecretCardId: bot.secretCardId,
       wrongGuessCardIds: [...memory.wrongGuesses],
+      deducibleCardIds: contradictedCardIds(room, bot.userId),
       opponentRemainingCount: room.cards.length - (opponent?.discardedCardIds.length ?? 0),
       questions: questionsFor(room, bot.userId).map(({ id, cardIds }) => ({ id, cardIds })),
       askedThisTurn: memory.askedOnTurn === room.turnDeadline,

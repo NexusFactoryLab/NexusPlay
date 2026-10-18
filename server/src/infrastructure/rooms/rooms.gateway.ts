@@ -409,6 +409,7 @@ export function toClientView(room: RoomState, forSocketId: string) {
     cards: room.cards,
     maxAccusationCount: room.maxAccusationCount,
     turnDurationSeconds: room.turnDurationSeconds,
+    autoDiscard: room.autoDiscard !== false,
     phase: room.phase,
     winnerUserId: room.winnerUserId,
     activePlayerUserId: room.activePlayerUserId,
@@ -713,6 +714,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       hostUserId: socket.data.userId,
       maxAccusationCount: (game.config.maxAccusationCount as number | undefined) ?? 6,
       turnDurationSeconds: (game.config.turnDurationSeconds as number | undefined) ?? 15,
+      autoDiscard: false,
       phase: 'WAITING',
       players: [
         {
@@ -752,7 +754,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   @SubscribeMessage('room:create-solo')
   async handleCreateSolo(
     @ConnectedSocket() socket: AuthenticatedSocket,
-    @MessageBody() body: { gameId: string; difficulty: string },
+    @MessageBody() body: { gameId: string; difficulty: string; autoDiscard?: boolean },
   ) {
     const difficulty = body?.difficulty;
     if (!isBotDifficulty(difficulty)) throw new Error('Elige la dificultad del bot: fácil, medio o difícil.');
@@ -771,6 +773,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       hostUserId: socket.data.userId,
       maxAccusationCount: (game.config.maxAccusationCount as number | undefined) ?? 6,
       turnDurationSeconds: (game.config.turnDurationSeconds as number | undefined) ?? 15,
+      autoDiscard: body?.autoDiscard === true,
       phase: 'WAITING',
       players: [
         {
@@ -925,6 +928,26 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     resetLobbyReady(room.players);
     keepBotsReady(room.players);
     room.turnDurationSeconds = turnDurationSeconds;
+    this.roomStore.set(room);
+    this.broadcastState(room);
+  }
+
+  /** El anfitrión activa o desactiva el descarte automático mientras espera al rival (issue #64). */
+  @SubscribeMessage('room:update-auto-discard')
+  handleUpdateAutoDiscard(
+    @ConnectedSocket() socket: AuthenticatedSocket,
+    @MessageBody() body: { autoDiscard: boolean },
+  ) {
+    const room = this.roomStore.findBySocketId(socket.id);
+    if (!room) throw new Error('No estás en ninguna sala.');
+    if (room.phase !== 'WAITING') throw new Error('La partida ya está en curso o terminó.');
+    if (socket.data.userId !== room.hostUserId) throw new Error('Solo quien creó la sala puede cambiar el descarte automático.');
+    if (typeof body?.autoDiscard !== 'boolean') throw new Error('Indica si quieres el descarte automático.');
+    if (room.autoDiscard === body.autoDiscard) return;
+    this.cancelDealCountdown('room:' + room.code);
+    resetLobbyReady(room.players);
+    keepBotsReady(room.players);
+    room.autoDiscard = body.autoDiscard;
     this.roomStore.set(room);
     this.broadcastState(room);
   }
@@ -1102,6 +1125,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   private dealNewGame(room: RoomState) {
     room.pendingQuestion = null;
     room.guidedChat = [];
+    room.answerLog = [];
     const shuffled = shuffle(room.cards);
     room.players[0].secretCardId = shuffled[0].cardId;
     room.players[1].secretCardId = shuffled[1].cardId;

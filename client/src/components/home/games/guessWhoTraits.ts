@@ -8,9 +8,13 @@ import type { GuessWhoTrait } from './guessWhoTypes'
  * sola vez y quitar una tarjeta se lleva sus marcas.
  */
 
-/** Mismos topes que el validador del servidor: una tarjeta tiene como mucho 12 rasgos. */
-export const MAX_TRAITS = 12
+/** Mismos topes que el validador del servidor: una tarjeta tiene como mucho 25 rasgos. */
+export const MAX_TRAITS = 25
 export const MAX_TRAIT_QUESTION_LENGTH = 140
+export const MAX_TRAIT_CATEGORY_LENGTH = 30
+
+/** Categorías sugeridas en el formulario (se puede escribir cualquier otra). */
+export const SUGGESTED_CATEGORIES = ['Historia', 'Cultura', 'Geografía', 'Deporte', 'Ciencia', 'Arte', 'Naturaleza']
 
 /** Texto de la pregunta que el juego usa cuando no hay rasgos (ver guided-questions.ts del servidor). */
 export const FALLBACK_QUESTION = '¿Tu tarjeta está en este grupo?'
@@ -19,13 +23,13 @@ type WithTraits = { traits?: unknown }
 
 /** Catálogo de preguntas a partir de los rasgos de las tarjetas (de un borrador de IA o de un juego adaptado). */
 export function traitCatalogFromCards(cards: WithTraits[]): GuessWhoTrait[] {
-  const catalog = new Map<string, string>()
+  const catalog = new Map<string, GuessWhoTrait>()
   for (const card of cards) {
     for (const trait of readTraits(card.traits)) {
-      if (!catalog.has(trait.id)) catalog.set(trait.id, trait.question)
+      if (!catalog.has(trait.id)) catalog.set(trait.id, trait)
     }
   }
-  return [...catalog].slice(0, MAX_TRAITS).map(([id, question]) => ({ id, question }))
+  return [...catalog.values()].slice(0, MAX_TRAITS)
 }
 
 /** Ids de los rasgos de una tarjeta que están en el catálogo. */
@@ -44,7 +48,10 @@ export function traitsForCard(traitIds: string[], catalog: GuessWhoTrait[]): Gue
   if (catalog.length === 0) return undefined
   return catalog
     .filter((trait) => traitIds.includes(trait.id))
-    .map((trait) => ({ id: trait.id, question: formatQuestion(trait.question) }))
+    .map((trait) => {
+      const category = trait.category?.trim().slice(0, MAX_TRAIT_CATEGORY_LENGTH)
+      return { id: trait.id, question: formatQuestion(trait.question), ...(category ? { category } : {}) }
+    })
 }
 
 /** "es un país de europa" -> "¿es un país de europa?": los signos se agregan solos si faltan. */
@@ -82,8 +89,8 @@ function readTraits(raw: unknown): GuessWhoTrait[] {
   if (!Array.isArray(raw)) return []
   return raw.flatMap((item) => {
     const trait = (item ?? {}) as Record<string, unknown>
-    return typeof trait.id === 'string' && trait.id.trim() && typeof trait.question === 'string' && trait.question.trim()
-      ? [{ id: trait.id.trim(), question: trait.question.trim() }]
-      : []
+    if (!(typeof trait.id === 'string' && trait.id.trim() && typeof trait.question === 'string' && trait.question.trim())) return []
+    const category = typeof trait.category === 'string' ? trait.category.trim() : ''
+    return [{ id: trait.id.trim(), question: trait.question.trim(), ...(category ? { category } : {}) }]
   })
 }

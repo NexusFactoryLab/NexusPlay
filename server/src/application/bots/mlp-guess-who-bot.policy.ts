@@ -12,6 +12,7 @@ import {
   encodePolicyFeatures,
   policyActionMask,
   policyInputFromObservation,
+  questionsForPolicy,
 } from './guess-who-policy-features.js';
 
 export type MlpActivation = 'tanh' | 'relu' | 'identity';
@@ -97,13 +98,16 @@ export class MlpGuessWhoBotPolicy implements GuessWhoBotPolicy {
   decideTurnAction(observation: GuessWhoBotObservation, random: () => number): GuessWhoBotAction | Promise<GuessWhoBotAction> {
     if (observation.difficulty !== 'HARD') return this.fallback.decideTurnAction(observation, random);
 
-    const known = [observation.ownSecretCardId, ...observation.wrongGuessCardIds]
+    // Con descarte manual también descarta lo que ya se deduce de las respuestas.
+    const known = [observation.ownSecretCardId, ...observation.wrongGuessCardIds, ...observation.deducibleCardIds]
       .filter((id): id is string => id !== null && observation.remainingCardIds.includes(id));
     if (known.length > 0) return { type: 'DISCARD', cardId: known[0] };
 
     const input = policyInputFromObservation(observation);
     const action = bestAllowedAction(mlpForward(this.weights.layers, encodePolicyFeatures(input)), policyActionMask(input));
-    if (action < POLICY_MAX_QUESTIONS) return { type: 'ASK', questionId: observation.questions[action].id };
+    if (action < POLICY_MAX_QUESTIONS) {
+      return { type: 'ASK', questionId: questionsForPolicy(observation.questions, candidatesOf(observation))[action].id };
+    }
     if (action === ACCUSE_ACTION) {
       const candidates = candidatesOf(observation);
       return { type: 'ACCUSE', cardId: candidates[Math.floor(random() * candidates.length)] };

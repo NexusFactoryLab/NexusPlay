@@ -227,6 +227,16 @@ describe('normalizeDraft — ¿Quién Es?', () => {
       expect(cards[3].traits).toEqual([]);
     });
 
+    it('conserva la categoría de cada rasgo (issue #64)', () => {
+      const { content } = normalizeDraft({ gameType: 'GUESS_WHO' }, {
+        traits: [{ id: 'mundial', question: '¿Ganó un Mundial antes de 2026?', category: ' Deporte ' }, { id: 'europa', question: '¿Es de Europa?' }],
+      }, [{ label: 'Italia', traits: ['mundial', 'europa'] }, { label: 'Japón', traits: [] }]);
+      expect((content as Card[])[0].traits).toEqual([
+        { id: 'mundial', question: '¿Ganó un Mundial antes de 2026?', category: 'Deporte' },
+        { id: 'europa', question: '¿Es de Europa?' },
+      ]);
+    });
+
     it('acepta ids con otra forma o rasgos completos dentro de la tarjeta, y completa los signos ¿?', () => {
       const { content } = normalizeDraft({ gameType: 'GUESS_WHO' }, { traits: [{ id: 'Habla Español', question: 'La mayoría habla español' }] }, [
         { label: 'Perú', traits: ['habla-espanol', { id: 'europa', question: '¿Es un país de Europa?' }] },
@@ -252,8 +262,8 @@ describe('normalizeDraft — ¿Quién Es?', () => {
       expect(new Set(ids)).toEqual(new Set(['america', 'habla-espanol']));
     });
 
-    it('si hay más de 12 rasgos útiles, se queda con los que mejor parten el mazo', () => {
-      const traits = Array.from({ length: 14 }, (_, i) => ({ id: `r${i}`, question: `¿Rasgo ${i}?` }));
+    it('si hay más de 25 rasgos útiles, se queda con los que mejor parten el mazo', () => {
+      const traits = Array.from({ length: 27 }, (_, i) => ({ id: `r${i}`, question: `¿Rasgo ${i}?` }));
       // r0 y r1 los tiene una sola tarjeta de 20; el resto, la mitad.
       const cards = Array.from({ length: 20 }, (_, i) => ({
         label: `País ${i}`,
@@ -261,7 +271,7 @@ describe('normalizeDraft — ¿Quién Es?', () => {
       }));
       const { content } = normalizeDraft({ gameType: 'GUESS_WHO' }, { traits }, cards);
       const ids = new Set((content as Card[]).flatMap((card) => card.traits!.map((trait) => trait.id)));
-      expect(ids.size).toBe(12);
+      expect(ids.size).toBe(25);
       expect(ids.has('r0')).toBe(false);
       expect(ids.has('r1')).toBe(false);
     });

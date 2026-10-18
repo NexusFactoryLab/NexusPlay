@@ -135,11 +135,12 @@ function normalizeMemoryOpposites(config: Record<string, unknown>, content: unkn
 // --- ¿Quién Es? -------------------------------------------------------------
 
 /** Mismos topes que GuessWhoContentValidator: rasgos por tarjeta, largo del id y de la pregunta. */
-const GUESS_WHO_MAX_TRAITS = 12;
+const GUESS_WHO_MAX_TRAITS = 25;
+const GUESS_WHO_TRAIT_CATEGORY_MAX = 30;
 const GUESS_WHO_TRAIT_ID_MAX = 40;
 const GUESS_WHO_TRAIT_QUESTION_MAX = 140;
 
-type GuessWhoTraitDraft = { id: string; question: string };
+type GuessWhoTraitDraft = { id: string; question: string; category?: string };
 
 function normalizeGuessWho(config: Record<string, unknown>, content: unknown, options: NormalizeDraftOptions): NormalizedDraft {
   // El catálogo de rasgos viaja en la config solo para ahorrar tokens: se
@@ -195,14 +196,17 @@ function traitQuestion(value: unknown): string | null {
  * tarjeta, también de esos objetos. Ante dos preguntas para el mismo id
  * gana la primera.
  */
-function guessWhoTraitCatalog(rawCatalog: unknown, content: unknown): Map<string, string> {
-  const catalog = new Map<string, string>();
+function guessWhoTraitCatalog(rawCatalog: unknown, content: unknown): Map<string, Omit<GuessWhoTraitDraft, 'id'>> {
+  const catalog = new Map<string, Omit<GuessWhoTraitDraft, 'id'>>();
   const add = (raw: unknown) => {
     if (typeof raw !== 'object' || raw === null) return;
     const trait = raw as Record<string, unknown>;
     const question = traitQuestion(trait.question);
     const id = traitSlug(trait.id) ?? traitSlug(question);
-    if (id && question && !catalog.has(id)) catalog.set(id, question);
+    const category = nonEmptyString(trait.category);
+    if (id && question && !catalog.has(id)) {
+      catalog.set(id, { question, ...(category ? { category: truncate(category, GUESS_WHO_TRAIT_CATEGORY_MAX) } : {}) });
+    }
   };
   if (Array.isArray(rawCatalog)) rawCatalog.forEach(add);
   if (Array.isArray(content)) {
@@ -215,7 +219,7 @@ function guessWhoTraitCatalog(rawCatalog: unknown, content: unknown): Map<string
 }
 
 /** Ids del catálogo que el modelo marcó en la tarjeta (acepta `"europa"` o `{ id: "europa" }`), sin repetir. */
-function cardTraitIds(rawTraits: unknown, catalog: Map<string, string>): string[] {
+function cardTraitIds(rawTraits: unknown, catalog: Map<string, unknown>): string[] {
   if (!Array.isArray(rawTraits)) return [];
   const ids = rawTraits
     .map((raw) => traitSlug(typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>).id : raw))
@@ -230,7 +234,7 @@ function cardTraitIds(rawTraits: unknown, catalog: Map<string, string>): string[
  * mejor parten el mazo (más cerca de la mitad). Las tarjetas salen con sus
  * rasgos ya completos (`{ id, question }`), como los guarda el juego.
  */
-function keepUsefulTraits(cards: unknown, catalog: Map<string, string>): unknown {
+function keepUsefulTraits(cards: unknown, catalog: Map<string, Omit<GuessWhoTraitDraft, 'id'>>): unknown {
   if (!Array.isArray(cards) || catalog.size === 0) return cards;
   const items = cards as Array<Record<string, unknown> & { traits?: string[] }>;
   const counts = new Map<string, number>();
@@ -246,7 +250,7 @@ function keepUsefulTraits(cards: unknown, catalog: Map<string, string>): unknown
     if (kept.size === 0) return card;
     const own: GuessWhoTraitDraft[] = (traits ?? [])
       .filter((id) => kept.has(id))
-      .map((id) => ({ id, question: catalog.get(id)! }));
+      .map((id) => ({ id, ...catalog.get(id)! }));
     return { ...card, traits: own };
   });
 }

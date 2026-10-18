@@ -30,6 +30,8 @@ type Props = {
   onExit: () => void
   messages: GuessWhoChatMessage[]
   onSend: (text: string) => void
+  /** Ajustes propios del juego, debajo de los segundos por turno (ej. descarte automático de ¿Quién Es?). */
+  settings?: ReactNode
   children?: ReactNode
 }
 
@@ -50,6 +52,7 @@ export function MultiplayerLobby({
   onExit,
   messages,
   onSend,
+  settings,
   children,
 }: Props) {
   const invitationUrl = new URL(roomPath, window.location.origin).href
@@ -295,6 +298,8 @@ export function MultiplayerLobby({
               </p>
             </div>
           )}
+
+          {settings}
 
           <LobbyReadyControl
             players={room.players}

@@ -1,6 +1,6 @@
 import { Check } from 'lucide-react'
 import type { GuessWhoTrait } from './guessWhoTypes'
-import { FALLBACK_QUESTION, MAX_TRAITS, MAX_TRAIT_QUESTION_LENGTH } from './guessWhoTraits'
+import { FALLBACK_QUESTION, MAX_TRAITS, MAX_TRAIT_CATEGORY_LENGTH, MAX_TRAIT_QUESTION_LENGTH, SUGGESTED_CATEGORIES } from './guessWhoTraits'
 
 type EditorCard = { imageUrl: string | null; label: string; traitIds: string[] }
 
@@ -18,6 +18,7 @@ export function GuessWhoTraitsEditor({
   onAdd,
   onRemove,
   onChangeQuestion,
+  onChangeCategory,
   onToggleCard,
 }: {
   catalog: GuessWhoTrait[]
@@ -26,6 +27,7 @@ export function GuessWhoTraitsEditor({
   onAdd: () => void
   onRemove: (traitId: string) => void
   onChangeQuestion: (traitId: string, question: string) => void
+  onChangeCategory: (traitId: string, category: string) => void
   onToggleCard: (cardIndex: number, traitId: string) => void
 }) {
   return (
@@ -35,6 +37,10 @@ export function GuessWhoTraitsEditor({
         <p className="mt-1 text-text">
           Los jugadores eligen estas preguntas para descubrir la tarjeta del rival, y la respuesta descarta
           tarjetas sola. Escribe preguntas sobre el tema y marca las tarjetas para las que la respuesta es «Sí».
+        </p>
+        <p className="mt-1 text-text">
+          Para aprender más, pregunta lo que hay que saber (historia, cultura, deporte…), no lo que se ve en la
+          imagen. La categoría ayuda a que el juego mezcle temas en cada turno.
         </p>
         <p className="mt-1 text-text">Es opcional: sin preguntas, el juego propone «{FALLBACK_QUESTION}».</p>
       </div>
@@ -66,6 +72,20 @@ export function GuessWhoTraitsEditor({
               disabled={disabled}
               onChange={(event) => onChangeQuestion(trait.id, event.target.value)}
             />
+            <label className="mt-2 block text-[12px] font-medium text-text-h" htmlFor={`trait-category-${trait.id}`}>
+              Categoría (opcional)
+            </label>
+            <input
+              id={`trait-category-${trait.id}`}
+              type="text"
+              list="guess-who-trait-categories"
+              maxLength={MAX_TRAIT_CATEGORY_LENGTH}
+              className="mt-1 w-full rounded-lg border border-border bg-bg px-[13px] py-2 text-[13px] text-text-h outline-none focus:border-accent sm:w-1/2"
+              placeholder="Historia"
+              value={trait.category ?? ''}
+              disabled={disabled}
+              onChange={(event) => onChangeCategory(trait.id, event.target.value)}
+            />
             <p className="mt-2 text-[12px] text-text">
               Responden «Sí»: {yes} de {cards.length} tarjetas
             </p>
@@ -94,6 +114,10 @@ export function GuessWhoTraitsEditor({
           </div>
         )
       })}
+
+      <datalist id="guess-who-trait-categories">
+        {SUGGESTED_CATEGORIES.map((category) => <option key={category} value={category} />)}
+      </datalist>
 
       <button
         type="button"

@@ -21,7 +21,7 @@ import numpy as np
 from gymnasium import spaces
 
 from .deck import random_deck
-from .features import ACCUSE, ACTIONS, FEATURES, MAX_QUESTIONS, PolicyInput, action_mask, encode_array
+from .features import ACCUSE, ACTIONS, FEATURES, MAX_QUESTIONS, PolicyInput, action_mask, encode_array, questions_for_policy
 from .opponents import STYLES, OpponentStyle, PlayerState, play_opponent_turn
 from .rules import MIN_DISCARDS_BEFORE_ACCUSATION, Card, Question, apply_answer, questions_for, truthful_answer
 
@@ -103,8 +103,10 @@ class GuessWhoEnv(gym.Env):
         self._refresh()
 
     def _refresh(self) -> None:
-        self.questions = questions_for(self.cards, self.bot.discarded)[:MAX_QUESTIONS]
         self.candidates = [card.card_id for card in self.cards if card.card_id not in self.bot.discarded]
+        # Sugerencias variadas por turno (como el servidor), vistas por el modelo en orden de cuánto parten.
+        suggested = questions_for(self.cards, self.bot.discarded, f"bot|{self.rounds}")
+        self.questions = questions_for_policy(suggested, self.candidates)
         members = [set(question.card_ids) for question in self.questions]
         self.policy_input = PolicyInput(
             remaining=len(self.candidates),

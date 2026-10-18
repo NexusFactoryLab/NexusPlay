@@ -55,7 +55,10 @@ function seeded(seed: number) {
   };
 }
 
-type Trait = { id: string; question: string };
+type Trait = { id: string; question: string; category?: string };
+
+/** Categoría de cada rasgo de los casos (issue #64): las sugerencias se reparten entre categorías. */
+const TRAIT_CATEGORIES: Record<string, string> = { t0: 'Historia', t1: 'Historia', t2: 'Deporte', t3: 'Deporte', t4: 'Cultura', copia: 'Historia' };
 
 /** Texto de cada rasgo de los casos: el archivo guarda solo los ids. */
 const TRAIT_QUESTIONS: Record<string, string> = {
@@ -69,7 +72,11 @@ function questionCases() {
   const int = (min: number, max: number) => min + Math.floor(random() * (max - min + 1));
   return Array.from({ length: 60 }, () => {
     const size = int(2, 16);
-    const traits: Trait[] = Array.from({ length: int(0, 7) }, (_, k) => ({ id: `t${k}`, question: TRAIT_QUESTIONS[`t${k}`] }));
+    const traits: Trait[] = Array.from({ length: int(0, 7) }, (_, k) => ({
+      id: `t${k}`,
+      question: TRAIT_QUESTIONS[`t${k}`],
+      ...(TRAIT_CATEGORIES[`t${k}`] ? { category: TRAIT_CATEGORIES[`t${k}`] } : {}),
+    }));
     const share = 0.1 + random() * 0.6;
     const cards: { cardId: string; label: string; traits?: Trait[] }[] = Array.from({ length: size }, (_, i) => ({
       cardId: `c${i}`,
@@ -83,24 +90,28 @@ function questionCases() {
       for (const card of cards) {
         const hasBase = card.traits?.some((t) => t.id === base) ?? false;
         const id = hasBase ? 'copia' : 'contrario';
-        card.traits?.push({ id, question: TRAIT_QUESTIONS[id] });
+        card.traits?.push({ id, question: TRAIT_QUESTIONS[id], ...(TRAIT_CATEGORIES[id] ? { category: TRAIT_CATEGORIES[id] } : {}) });
       }
     }
     if (traits.length > 0 && random() < 0.1) delete cards[int(0, size - 1)].traits;
     const discarded = cards.filter(() => random() < 0.3).map((card) => card.cardId);
     if (discarded.length === size) discarded.pop();
+    // La semilla de la selección variada sale del jugador y del turno.
+    const turnDeadline = random() < 0.2 ? null : int(1, 2_000_000_000);
     const state: GuidedState = {
       phase: 'PLAYING',
       cards,
       players: [{ userId: 'bot', secretCardId: null, discardedCardIds: discarded }],
       activePlayerUserId: 'bot',
-      turnDeadline: null,
+      turnDeadline,
     };
     return {
       // [cardId, ids de sus rasgos o null si no está clasificada]
       cards: cards.map((card) => [card.cardId, card.traits?.map((trait) => trait.id) ?? null]),
       discarded,
-      expected: questionsFor(state, 'bot').map(({ text, cardIds }) => ({ text, cardIds })),
+      userId: 'bot',
+      turnDeadline,
+      expected: questionsFor(state, 'bot').map(({ text, cardIds, category }) => ({ text, cardIds, ...(category ? { category } : {}) })),
     };
   });
 }
@@ -138,6 +149,7 @@ describe('contrato con el entrenamiento en ml/ (issue #62)', () => {
     matchesContract('questions.fixture.json', {
       generatedBy: 'server/src/application/bots/guess-who-ml-contract.spec.ts',
       traitQuestions: TRAIT_QUESTIONS,
+      traitCategories: TRAIT_CATEGORIES,
       cases: questionCases(),
     });
   });

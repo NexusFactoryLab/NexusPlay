@@ -17,6 +17,13 @@ describe('GuessWhoContentValidator — rasgos de las preguntas guiadas', () => {
     expect(content[1].traits).toEqual([]);
   });
 
+  it('conserva la categoría opcional de cada rasgo (issue #64)', () => {
+    const content = validator.validateContent(
+      cards((i) => ({ traits: i === 0 ? [{ id: 'mundial', question: '¿Ganó un Mundial?', category: ' Deporte ' }] : [] })),
+    ) as GuessWhoCard[];
+    expect(content[0].traits).toEqual([{ id: 'mundial', question: '¿Ganó un Mundial?', category: 'Deporte' }]);
+  });
+
   it('una tarjeta sin rasgos queda sin la clave (no clasificada), no con una lista vacía', () => {
     const content = validator.validateContent(cards()) as GuessWhoCard[];
     expect(content.every((card) => !('traits' in card))).toBe(true);
@@ -26,7 +33,8 @@ describe('GuessWhoContentValidator — rasgos de las preguntas guiadas', () => {
 
   it.each([
     ['no es una lista', 'europa'],
-    ['más de 12 rasgos', Array.from({ length: 13 }, (_, i) => ({ id: `r${i}`, question: `¿Rasgo ${i}?` }))],
+    ['más de 25 rasgos', Array.from({ length: 26 }, (_, i) => ({ id: `r${i}`, question: `¿Rasgo ${i}?` }))],
+    ['categoría demasiado larga', [{ id: 'europa', question: '¿Es de Europa?', category: 'x'.repeat(31) }]],
     ['rasgo sin pregunta', [{ id: 'europa' }]],
     ['rasgo sin id', [{ question: '¿Es de Europa?' }]],
     ['id demasiado largo', [{ id: 'x'.repeat(41), question: '¿Es de Europa?' }]],

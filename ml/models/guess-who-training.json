@@ -16,96 +16,96 @@
     "ent_coef": 0.01,
     "clip_range": 0.2
   },
-  "trainingSeconds": 431,
+  "trainingSeconds": 1343,
   "evaluation": {
     "modelo": {
       "games": 2000,
-      "wins": 1339,
-      "losses": 661,
+      "wins": 1289,
+      "losses": 711,
       "draws": 0,
-      "winRate": 0.6695
+      "winRate": 0.6445
     },
     "reglas": {
       "games": 2000,
-      "wins": 1058,
-      "losses": 942,
+      "wins": 1041,
+      "losses": 959,
       "draws": 0,
-      "winRate": 0.529
+      "winRate": 0.5205
     }
   },
   "evaluationByOpponent": {
     "modelo": {
       "cuidadoso": {
         "games": 400,
-        "wins": 335,
-        "losses": 65,
+        "wins": 333,
+        "losses": 67,
         "draws": 0,
-        "winRate": 0.8375
+        "winRate": 0.8325
       },
       "casual": {
         "games": 400,
-        "wins": 356,
-        "losses": 44,
+        "wins": 352,
+        "losses": 48,
         "draws": 0,
-        "winRate": 0.89
+        "winRate": 0.88
       },
       "rapido": {
         "games": 400,
-        "wins": 172,
-        "losses": 228,
+        "wins": 165,
+        "losses": 235,
         "draws": 0,
-        "winRate": 0.43
+        "winRate": 0.4125
       },
       "arriesgado": {
         "games": 400,
-        "wins": 216,
-        "losses": 184,
+        "wins": 193,
+        "losses": 207,
         "draws": 0,
-        "winRate": 0.54
+        "winRate": 0.4825
       },
       "bot-dificil": {
         "games": 400,
-        "wins": 260,
-        "losses": 140,
+        "wins": 246,
+        "losses": 154,
         "draws": 0,
-        "winRate": 0.65
+        "winRate": 0.615
       }
     },
     "reglas": {
       "cuidadoso": {
         "games": 400,
-        "wins": 278,
-        "losses": 122,
+        "wins": 272,
+        "losses": 128,
         "draws": 0,
-        "winRate": 0.695
+        "winRate": 0.68
       },
       "casual": {
         "games": 400,
-        "wins": 327,
-        "losses": 73,
+        "wins": 326,
+        "losses": 74,
         "draws": 0,
-        "winRate": 0.8175
+        "winRate": 0.815
       },
       "rapido": {
         "games": 400,
-        "wins": 116,
-        "losses": 284,
+        "wins": 113,
+        "losses": 287,
         "draws": 0,
-        "winRate": 0.29
+        "winRate": 0.2825
       },
       "arriesgado": {
         "games": 400,
-        "wins": 139,
-        "losses": 261,
+        "wins": 134,
+        "losses": 266,
         "draws": 0,
-        "winRate": 0.3475
+        "winRate": 0.335
       },
       "bot-dificil": {
         "games": 400,
-        "wins": 198,
-        "losses": 202,
+        "wins": 196,
+        "losses": 204,
         "draws": 0,
-        "winRate": 0.495
+        "winRate": 0.49
       }
     }
   }

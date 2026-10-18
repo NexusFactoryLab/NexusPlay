@@ -16,8 +16,8 @@ export function parseBotDifficulty(value: string | null | undefined): BotDifficu
   return BOT_DIFFICULTY_OPTIONS.some((option) => option.id === value) ? (value as BotDifficulty) : null
 }
 
-export function soloRoomPath(gameId: string, difficulty: BotDifficulty): string {
-  return `/quien-es/sala?gameId=${encodeURIComponent(gameId)}&bot=${difficulty}`
+export function soloRoomPath(gameId: string, difficulty: BotDifficulty, autoDiscard = false): string {
+  return `/quien-es/sala?gameId=${encodeURIComponent(gameId)}&bot=${difficulty}${autoDiscard ? '&descarte=auto' : ''}`
 }
 
 /** Aviso del chat cuando el rival es el bot: no lee mensajes libres. */
