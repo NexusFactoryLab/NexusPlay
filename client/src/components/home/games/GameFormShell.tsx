@@ -125,9 +125,7 @@ export function GameFormShell({
   const [aiDraftCount, setAiDraftCount] = useState(0)
   const [noticeDismissed, setNoticeDismissed] = useState(false)
   const noticeRef = useRef<HTMLDivElement>(null)
-  // En las fases siguientes del formulario el "Atrás" de cada fase ya cubre el volver.
   const subPhase = useOptionalCreateGameProgress()?.subPhase ?? null
-  const showBackButton = !subPhase || subPhase.phase <= 1
   const formColumnRef = useRef<HTMLDivElement>(null)
   const headingRef = useRef<HTMLHeadingElement>(null)
   // Formularios de una sola página (sin fases) muestran el resumen siempre.
@@ -459,17 +457,15 @@ export function GameFormShell({
             modo ("Con IA" y "Manual" son dos formas de crear el mismo juego,
             no un "volver"), siempre visible. */}
         <div className="mb-5 flex flex-wrap items-center gap-3">
-          {showBackButton && (
-            <button
-              type="button"
-              title={backLabel}
-              className="nx-back inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-[13px] font-semibold text-text-h shadow-sm hover:border-accent hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              onClick={handleBack}
-            >
-              <ArrowLeft className="nx-back-icon h-4 w-4" strokeWidth={2.5} />
-              {backLabel}
-            </button>
-          )}
+          <button
+            type="button"
+            title={backLabel}
+            className="nx-back inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-[13px] font-semibold text-text-h shadow-sm hover:border-accent hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            onClick={handleBack}
+          >
+            <ArrowLeft className="nx-back-icon h-4 w-4" strokeWidth={2.5} />
+            {backLabel}
+          </button>
           <div
             role="tablist"
             aria-label="Cómo quieres crear el juego"
