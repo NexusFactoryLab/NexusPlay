@@ -160,7 +160,7 @@ function GuessWhoRoomSession() {
       return (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-bg">
           <div className="mx-auto flex min-h-full max-w-[420px] flex-col justify-center p-5 sm:p-8">
-            <p className="mb-3 text-[14px] text-text-h">Ingresa el código de una sala de "¿Quién Es?" para unirte:</p>
+            <p className="mb-3 text-[14px] text-text-h">Ingresa el código de una sala de Identidad Oculta para unirte:</p>
             <div className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-6">
               <input
                 value={joinCodeInput}

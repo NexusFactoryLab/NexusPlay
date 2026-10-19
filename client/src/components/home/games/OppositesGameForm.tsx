@@ -306,7 +306,7 @@ export function OppositesGameForm({
       draftState={draftState}
       onRestoreDraft={restoreDraft}
       adaptation={adaptation}
-      title="Conceptos opuestos"
+       title="MatchMente: conceptos opuestos"
       description="Cada pareja tiene un aspecto positivo y su contraparte negativa."
       aiPanel={
         <AiGameAssistantPanel gameType="MEMORY_MATCH" mode="OPPOSITES" disabled={submitting} onDraftReady={applyAiDraft} />

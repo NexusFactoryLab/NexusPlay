@@ -413,7 +413,7 @@ export function SnakesLaddersGameForm({ onClose, onCreated, onBack, onCategoryCr
       draftState={draftState}
       onRestoreDraft={restoreDraft}
       adaptation={adaptation}
-      title="Escaleras y Serpientes"
+       title="Escaleras y serpientes"
       description="Escaleras y serpientes con retos: avanzar depende de responder."
       descriptionDetail="Cada escalera exige un reto de alta complejidad para subir y cada serpiente da una oportunidad de recuperación. Ciudad Sostenible es el tema por defecto, pero puedes cambiar la narrativa con tus propias preguntas."
       aiPanel={<AiGameAssistantPanel gameType="SNAKES_LADDERS" disabled={submitting} onDraftReady={applyAiDraft} />}

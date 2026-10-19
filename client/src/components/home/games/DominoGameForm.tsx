@@ -353,7 +353,7 @@ export function DominoGameForm({
       draftState={draftState}
       onRestoreDraft={restoreDraft}
       adaptation={adaptation}
-      title="Dominó"
+       title="Dominexo"
       description={
         <>
           Cada mitad de una ficha es un concepto tuyo en vez de un número. Con {concepts.length}{' '}

@@ -19,7 +19,7 @@ function DualQuestPixiDemoPageSession() {
     <div className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-slate-950">
       <div className="flex shrink-0 items-center justify-between gap-3 p-4">
         <div>
-          <h1 className="text-xl font-bold text-white">Dúo Lógico · Motor PixiJS (demo local)</h1>
+          <h1 className="text-xl font-bold text-white">Dúo Lógico Pixi · Demo local</h1>
           <p className="text-sm text-slate-400">
             Lumen: A/D moverse, W saltar o nadar, S bucear. Gota: flechas izquierda/derecha, arriba saltar o nadar,
             abajo bucear.

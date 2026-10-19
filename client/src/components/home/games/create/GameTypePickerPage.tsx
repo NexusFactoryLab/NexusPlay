@@ -5,6 +5,7 @@ import { listAllGameTypeSettings } from '../../../../services/game.service'
 import { GameTypePicker } from '../GameTypePicker'
 import { CreationDraftsModal } from '../CreationDraftsModal'
 import type { GameTypeChoice } from '../GameTypePicker'
+import { resolveGameTypeDisplayName } from '../gameTypePublicNames'
 
 const ROUTE_BY_CHOICE: Record<GameTypeChoice, string> = {
   CARDS: '/juegos/crear/cartas',
@@ -20,12 +21,17 @@ export function GameTypePickerPage() {
   const navigate = useNavigate()
   const { token } = useAuth()
   const [archivedGameTypes, setArchivedGameTypes] = useState<Set<string>>(new Set())
+  const [displayNames, setDisplayNames] = useState<Map<string, string>>(new Map())
 
   useEffect(() => {
     if (!token) return
     listAllGameTypeSettings(token)
       .then((settings) => {
         setArchivedGameTypes(new Set(settings.filter((s) => s.isArchived).map((s) => s.gameType)))
+        setDisplayNames(new Map(settings.map((setting) => [
+          setting.gameType,
+          resolveGameTypeDisplayName(setting.gameType, setting.displayName),
+        ])))
       })
       .catch(() => {})
   }, [token])
@@ -38,6 +44,7 @@ export function GameTypePickerPage() {
         onClose={() => navigate('/')}
         onSelect={(choice) => navigate(ROUTE_BY_CHOICE[choice])}
         archivedGameTypes={archivedGameTypes}
+        displayNames={displayNames}
         onViewDrafts={() => setShowDrafts(true)}
       />
       {showDrafts && <CreationDraftsModal onClose={() => setShowDrafts(false)} />}

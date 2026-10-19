@@ -378,7 +378,7 @@ export function GuessWhoGameForm({
       draftState={draftState}
       onRestoreDraft={restoreDraft}
       adaptation={adaptation}
-      title="¿Quién Es?"
+       title="Identidad Oculta"
       description="Cada tarjeta tiene imagen, nombre y audio opcional."
       descriptionDetail="Se juega en una sala en vivo entre 2 personas: abre la sala desde el detalle del juego una vez creado."
       aiPanel={

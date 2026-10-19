@@ -61,7 +61,7 @@ export function MemoryMatchPlayPage() {
             status: 'error',
             message:
               target.kind === 'guess-who-room'
-                ? 'Este juego es una sala en vivo de ¿Quién Es?: ábrelo desde el inicio con el botón Jugar.'
+                ? 'Este juego es una sala en vivo de Identidad Oculta: ábrelo desde el inicio con el botón Jugar.'
                 : UNSUPPORTED_GAME_MESSAGE,
           })
           return

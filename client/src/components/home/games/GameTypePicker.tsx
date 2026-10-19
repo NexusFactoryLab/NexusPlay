@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react'
 import { ArrowLeft, Bot, FileClock, Ghost, Layers, Puzzle, UserRoundSearch, Dices, Flame, User, Users } from 'lucide-react'
 import { LIVE_ROOM_GAME_TYPES } from './resolveRoomCode'
 import { modeColorForGameType } from './gameModeVisuals'
+import { resolveGameTypeDisplayName } from './gameTypePublicNames'
 
 export type GameTypeChoice =
   | 'CARDS'
@@ -26,6 +27,8 @@ const GAME_TYPE_BY_CHOICE: Record<GameTypeChoice, string> = {
 type GameTypePickerProps = {
   onClose: () => void
   onSelect: (choice: GameTypeChoice) => void
+  /** Nombres recibidos de GET /game-types, ya resueltos con la política editorial. */
+  displayNames?: ReadonlyMap<string, string>
   /**
    * Tipos de juego archivados (issue #156): sus opciones quedan deshabilitadas
    * visualmente y sin `onClick`, sin excepción para ADMIN — archivar un tipo
@@ -38,53 +41,45 @@ type GameTypePickerProps = {
 
 const TYPE_OPTIONS: Array<{
   choice: GameTypeChoice
-  title: string
   description: string
   icon: typeof Layers
 }> = [
   {
     choice: 'CARDS',
-    title: 'Cartas',
     description: 'Juego de memoria: parejas de imagen y concepto, o conceptos opuestos.',
     icon: Layers,
   },
   {
     choice: 'GUESS_WHO',
-    title: '¿Quién Es?',
     description: 'Es un juego parecido a Adivina Quién: dos jugadores, cada uno adivina la tarjeta secreta del otro.',
     icon: UserRoundSearch,
   },
   {
     choice: 'DOMINO',
-    title: 'Dominó',
     description:
       'Dominó temático: cada mitad de ficha es un concepto tuyo en vez de un número. Un jugador contra el tablero.',
     icon: Puzzle,
   },
   {
     choice: 'MAZE_COLLECTOR',
-    title: 'Recolector',
     description:
       'Un jugador recorre un laberinto recolectando objetos temáticos mientras esquiva enemigos. Cambia la narrativa a tu área.',
     icon: Ghost,
   },
   {
     choice: 'SNAKES_LADDERS',
-    title: 'Escaleras y Serpientes',
     description:
       'De 2 a 4 jugadores en tiempo real. El avance depende de responder retos: escaleras exigen preguntas de alta complejidad, serpientes dan una oportunidad de recuperación.',
     icon: Dices,
   },
   {
     choice: 'DUAL_QUEST',
-    title: 'Dúo Lógico',
     description:
       'Cooperativo de 2 jugadores en tiempo real: Fuego y Agua recorren el mismo mapa, cada uno bloqueado por casillas del otro, y arman juntos un concepto al final.',
     icon: Flame,
   },
   {
     choice: 'TRUE_FALSE_MAZE',
-    title: 'Laberinto V/F',
     description:
       'Un robot recorre una nave espacial y responde cada afirmación entrando a la sala VERDADERO o FALSO, mientras esquiva medusas galácticas. Tú escribes las afirmaciones.',
     icon: Bot,
@@ -92,7 +87,7 @@ const TYPE_OPTIONS: Array<{
 ]
 
 /** Primer paso al crear un juego: elegir la mecánica base. */
-export function GameTypePicker({ onClose, onSelect, archivedGameTypes, onViewDrafts }: GameTypePickerProps) {
+export function GameTypePicker({ onClose, onSelect, displayNames, archivedGameTypes, onViewDrafts }: GameTypePickerProps) {
   return (
     <div className="mx-auto max-w-[900px] p-5 sm:p-8">
       <button type="button" className="nx-back inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-[13px] font-semibold text-text-h shadow-sm hover:border-accent hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent mb-4" onClick={onClose}>
@@ -115,9 +110,11 @@ export function GameTypePicker({ onClose, onSelect, archivedGameTypes, onViewDra
       <p className="mb-5 text-[13px] text-text">Elige qué tipo de juego quieres crear.</p>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-        {TYPE_OPTIONS.map(({ choice, title, description, icon: Icon }, index) => {
-          const isArchived = archivedGameTypes?.has(GAME_TYPE_BY_CHOICE[choice]) ?? false
-          const isMultiplayer = LIVE_ROOM_GAME_TYPES.includes(GAME_TYPE_BY_CHOICE[choice])
+        {TYPE_OPTIONS.map(({ choice, description, icon: Icon }, index) => {
+          const gameType = GAME_TYPE_BY_CHOICE[choice]
+          const title = resolveGameTypeDisplayName(gameType, displayNames?.get(gameType))
+          const isArchived = archivedGameTypes?.has(gameType) ?? false
+          const isMultiplayer = LIVE_ROOM_GAME_TYPES.includes(gameType)
 
           return (
             <button
@@ -125,7 +122,7 @@ export function GameTypePicker({ onClose, onSelect, archivedGameTypes, onViewDra
               type="button"
               disabled={isArchived}
               title={description}
-              style={{ '--i': index, '--tile-color': modeColorForGameType(GAME_TYPE_BY_CHOICE[choice]) } as CSSProperties}
+              style={{ '--i': index, '--tile-color': modeColorForGameType(gameType) } as CSSProperties}
               className={
                 isArchived
                   ? 'nx-tile nx-tile-in flex flex-col items-center gap-2 rounded-xl border border-border p-4 text-center opacity-50 cursor-not-allowed'
@@ -142,7 +139,7 @@ export function GameTypePicker({ onClose, onSelect, archivedGameTypes, onViewDra
               <span className="text-[14px] font-semibold leading-tight text-text-h">{title}</span>
               <span
                 className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-semibold text-white"
-                style={{ background: modeColorForGameType(GAME_TYPE_BY_CHOICE[choice]) }}
+                style={{ background: modeColorForGameType(gameType) }}
               >
                 {isMultiplayer ? <Users className="h-3 w-3" strokeWidth={2.5} /> : <User className="h-3 w-3" strokeWidth={2.5} />}
                 {isMultiplayer ? 'Multijugador' : '1 jugador'}

@@ -438,11 +438,11 @@ function DominoRoomPageSession() {
       <div className="domino-premium-shell mx-auto flex min-h-full w-full max-w-[1600px] flex-col p-3 sm:h-full sm:p-5">
         <header className={`domino-premium-header ${room?.phase === 'PLAYING' ? 'domino-premium-header--playing' : ''} mb-1.5 flex flex-wrap items-center justify-between gap-2 rounded-2xl border px-3 py-1.5 sm:flex-nowrap`}>
           {room?.phase === 'PLAYING' ? (
-            <span className="sr-only">{room.gameTitle ?? 'Dominó'}, sala en vivo. {isMyTurn ? 'Es tu turno.' : 'Es el turno del rival.'}</span>
+            <span className="sr-only">{room.gameTitle ?? 'Dominexo'}, sala en vivo. {isMyTurn ? 'Es tu turno.' : 'Es el turno del rival.'}</span>
           ) : (
             <div className="min-w-0">
               <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-accent">
-                {room?.gameTitle ?? 'Dominó'}
+                {room?.gameTitle ?? 'Dominexo'}
               </p>
               <div className="flex items-center gap-1.5">
                 <h1 className="text-[15px] font-bold tracking-tight text-text-h">Sala en vivo</h1>

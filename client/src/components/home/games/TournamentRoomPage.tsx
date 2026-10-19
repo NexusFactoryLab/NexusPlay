@@ -122,7 +122,7 @@ function TournamentSession() {
       <div className="fixed inset-0 z-50 overflow-y-auto bg-bg">
         <div className="mx-auto flex min-h-full max-w-[420px] flex-col justify-center p-5 sm:p-8">
           <div className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-6">
-            <p className="text-[14px] text-text-h">Ingresa el código de un torneo de "¿Quién Es?" para unirte:</p>
+            <p className="text-[14px] text-text-h">Ingresa el código de un torneo de Identidad Oculta para unirte:</p>
             <input
               value={joinCodeInput}
               onChange={(event) => setJoinCodeInput(event.target.value)}

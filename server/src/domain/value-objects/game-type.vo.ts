@@ -36,6 +36,27 @@ export const VALID_GAME_TYPES: readonly GameTypeName[] = [
   'TRUE_FALSE_MAZE',
 ];
 
+/**
+ * Nombre editorial predeterminado de cada mecánica. Los identificadores
+ * técnicos se mantienen como contratos de persistencia, rutas y reglas; este
+ * mapa solo resuelve el texto humano cuando todavía no existe una
+ * configuración administrativa para el tipo.
+ */
+export const GAME_TYPE_PUBLIC_NAMES: Readonly<Record<GameTypeName, string>> = {
+  MEMORY_MATCH: 'MatchMente',
+  GUESS_WHO: 'Identidad Oculta',
+  DOMINO: 'Dominexo',
+  MAZE_COLLECTOR: 'Laberinto recolector',
+  SNAKES_LADDERS: 'Escaleras y serpientes',
+  DUAL_QUEST: 'Dúo Lógico',
+  DUAL_QUEST_PIXI: 'Dúo Lógico Pixi',
+  TRUE_FALSE_MAZE: 'Laberinto Verdadero o Falso',
+};
+
+export function publicGameTypeName(gameType: GameTypeName): string {
+  return GAME_TYPE_PUBLIC_NAMES[gameType];
+}
+
 export class GameType {
   private static readonly instances = new Map<GameTypeName, GameType>();
 

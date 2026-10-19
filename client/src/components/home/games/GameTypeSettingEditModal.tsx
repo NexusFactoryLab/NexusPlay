@@ -7,6 +7,7 @@ import {
   type GameTypeSetting,
 } from '../../../services/game.service'
 import { ApiError } from '../../../utils/http'
+import { resolveGameTypeDisplayName } from './gameTypePublicNames'
 
 type GameTypeSettingEditModalProps = {
   setting: GameTypeSetting
@@ -22,6 +23,7 @@ type GameTypeSettingEditModalProps = {
  */
 export function GameTypeSettingEditModal({ setting, onClose, onSaved }: GameTypeSettingEditModalProps) {
   const { token } = useAuth()
+  const publicName = resolveGameTypeDisplayName(setting.gameType, setting.displayName)
   const [displayName, setDisplayName] = useState(setting.displayName)
   const [description, setDescription] = useState(setting.description ?? '')
   const [saving, setSaving] = useState(false)
@@ -66,7 +68,7 @@ export function GameTypeSettingEditModal({ setting, onClose, onSaved }: GameType
     <div className="mx-auto max-w-[480px] p-8">
       <h2 className="mb-1 text-[20px] tracking-tight text-text-h">Editar tipo de juego</h2>
       <p className="mb-6 text-[13px] text-text">
-        {setting.gameType} · {setting.isArchived ? 'Archivado' : 'Activo'}
+        {publicName} · {setting.gameType} · {setting.isArchived ? 'Archivado' : 'Activo'}
       </p>
 
       {error && (
@@ -74,14 +76,18 @@ export function GameTypeSettingEditModal({ setting, onClose, onSaved }: GameType
       )}
 
       <label className="mb-3 block">
-        <span className="mb-1 block text-[13px] font-medium text-text-h">Nombre visible</span>
+        <span className="mb-1 block text-[13px] font-medium text-text-h">Nombre configurado</span>
         <input
           type="text"
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
           maxLength={80}
           className="w-full rounded-lg border border-border px-3 py-2 text-[14px]"
+          aria-describedby="configured-display-name-help"
         />
+        <span id="configured-display-name-help" className="mt-1 block text-[12px] text-text">
+          Se conserva para administración. La interfaz muestra el nombre editorial: {publicName}.
+        </span>
       </label>
 
       <label className="mb-6 block">

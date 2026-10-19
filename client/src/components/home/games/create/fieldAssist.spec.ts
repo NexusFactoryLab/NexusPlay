@@ -42,7 +42,7 @@ describe('fieldAssist', () => {
   })
 
   it('ofrece ejemplo por tipo y uno genérico de respaldo', () => {
-    expect(examplesFor('Pares').title).toContain('Animales')
+    expect(examplesFor('MatchMente: parejas').title).toContain('Animales')
     expect(examplesFor('Otro').title).toBeTruthy()
   })
 })

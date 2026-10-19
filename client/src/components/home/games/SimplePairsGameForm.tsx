@@ -281,7 +281,7 @@ export function SimplePairsGameForm({
       draftState={draftState}
       onRestoreDraft={restoreDraft}
       adaptation={adaptation}
-      title="Pares"
+       title="MatchMente: parejas"
       description="Cada pareja tiene una imagen y el nombre del concepto que representa."
       aiPanel={
         <AiGameAssistantPanel

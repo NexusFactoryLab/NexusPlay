@@ -4,6 +4,7 @@ import { GamesSection } from '../GamesSection'
 import { useHomeSearch } from '../homeSearchContext'
 import { useAuth } from '../../../hooks/useAuth'
 import { listAllGameTypeSettings } from '../../../services/game.service'
+import { resolveGameTypeDisplayName } from './gameTypePublicNames'
 
 /**
  * Componente delgado (issue #156): lee `:gameType` de la URL y monta
@@ -33,7 +34,7 @@ export function GameTypeGamesPage() {
     listAllGameTypeSettings(token)
       .then((settings) => {
         const match = settings.find((s) => s.gameType === gameType)
-        setDisplayName(match?.displayName)
+        setDisplayName(resolveGameTypeDisplayName(gameType, match?.displayName))
       })
       .catch(() => {})
   }, [token, gameType])
