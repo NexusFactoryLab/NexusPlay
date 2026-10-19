@@ -120,8 +120,14 @@ export class AdaptGameUseCase implements UseCase<AdaptGameInput, AdaptGameOutput
         );
       }
       const draft = this.deterministicAdapter.adapt(game, targetName, input.mode);
+      // Es un juego NUEVO: no se heredan título, descripción ni portada del
+      // original (solo materia, color y los conceptos). `sourceGameId` queda
+      // únicamente como trazabilidad.
       return {
         ...base,
+        title: '',
+        description: '',
+        theme: { primaryColor: game.theme.primaryColor, coverImageUrl: null },
         config: draft.config,
         content: draft.content,
         notice: [adaptedNotice, ...draft.notices].join(' '),

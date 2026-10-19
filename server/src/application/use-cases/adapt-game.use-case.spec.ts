@@ -191,7 +191,15 @@ describe('AdaptGameUseCase — motor de adaptación (issue #50)', () => {
     expect(generate).not.toHaveBeenCalled();
     expect(canUseAi).not.toHaveBeenCalled();
     expect(adapt).toHaveBeenCalledOnce();
-    expect(result).toMatchObject({ sourceGameId: 'game-1', title: 'Sistema solar', content: [{ label: 'Marte' }] });
+    // Juego nuevo: sin título, descripción ni portada del original; conserva materia y color.
+    expect(result).toMatchObject({
+      sourceGameId: 'game-1',
+      title: '',
+      description: '',
+      categoryId: 'cat-1',
+      theme: { primaryColor: '#112233', coverImageUrl: null },
+      content: [{ label: 'Marte' }],
+    });
     expect(result.notice).toContain('Adaptado de');
     expect(result.notice).toContain('Faltan imágenes.');
   });
