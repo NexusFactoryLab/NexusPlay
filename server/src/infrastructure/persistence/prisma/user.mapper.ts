@@ -1,5 +1,6 @@
-import type { RoleModel, UserModel } from '../../../generated/prisma/client.js';
+import { Prisma, type RoleModel, type UserModel } from '../../../generated/prisma/client.js';
 import { User } from '../../../domain/entities/user.entity.js';
+import { AvatarConfig } from '../../../domain/value-objects/avatar-config.vo.js';
 import { Email } from '../../../domain/value-objects/email.vo.js';
 import { Password } from '../../../domain/value-objects/password.vo.js';
 import { PersonName } from '../../../domain/value-objects/person-name.vo.js';
@@ -18,6 +19,7 @@ export class UserMapper {
       hasChosenRole: record.hasChosenRole,
       displayName: record.displayName,
       avatarUrl: record.avatarUrl,
+      avatarConfig: AvatarConfig.restore(record.avatarConfig),
       birthDate: record.birthDate,
       locale: record.locale,
       isActive: record.isActive,
@@ -42,6 +44,8 @@ export class UserMapper {
       roleName: props.role.getName(),
       hasChosenRole: props.hasChosenRole,
       avatarUrl: props.avatarUrl,
+      // Un Json? de Prisma se vacía con DbNull (un null suelto no compila).
+      avatarConfig: props.avatarConfig ? props.avatarConfig.toJSON() : Prisma.DbNull,
       birthDate: props.birthDate,
       locale: props.locale,
       isActive: props.isActive,

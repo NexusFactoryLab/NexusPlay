@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -25,6 +26,8 @@ import { ChangeUserRoleUseCase } from '../../../application/use-cases/change-use
 import { ChangeOwnRoleUseCase } from '../../../application/use-cases/change-own-role.use-case.js';
 import { ResetUserPasswordUseCase } from '../../../application/use-cases/reset-user-password.use-case.js';
 import { UpdateUserProfileByAdminUseCase } from '../../../application/use-cases/update-user-profile-by-admin.use-case.js';
+import { UpdateUserAvatarUseCase } from '../../../application/use-cases/update-user-avatar.use-case.js';
+import { GetUsersAvatarsUseCase } from '../../../application/use-cases/get-users-avatars.use-case.js';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard.js';
 import { RolesGuard } from '../guards/roles.guard.js';
 import { Roles } from '../decorators/roles.decorator.js';
@@ -36,6 +39,8 @@ import { ChangeUserRoleDto } from '../dtos/change-user-role.dto.js';
 import { ChangeOwnRoleDto } from '../dtos/change-own-role.dto.js';
 import { ListUsersQueryDto } from '../dtos/list-users-query.dto.js';
 import { CreateUserDto } from '../dtos/create-user.dto.js';
+import { UpdateUserAvatarDto } from '../dtos/update-user-avatar.dto.js';
+import { GetUsersAvatarsQueryDto } from '../dtos/get-users-avatars-query.dto.js';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard)
@@ -55,6 +60,8 @@ export class UserController {
     private readonly changeOwnRoleUseCase: ChangeOwnRoleUseCase,
     private readonly resetUserPasswordUseCase: ResetUserPasswordUseCase,
     private readonly updateUserProfileByAdminUseCase: UpdateUserProfileByAdminUseCase,
+    private readonly updateUserAvatarUseCase: UpdateUserAvatarUseCase,
+    private readonly getUsersAvatarsUseCase: GetUsersAvatarsUseCase,
   ) {}
 
   @Get('me')
@@ -86,6 +93,15 @@ export class UserController {
     });
   }
 
+  /**
+   * Avatares de los jugadores de una sala (issue #77). Va antes de `:id`:
+   * si no, Nest tomaría "avatars" como el id de un usuario.
+   */
+  @Get('avatars')
+  getAvatars(@Query() query: GetUsersAvatarsQueryDto) {
+    return this.getUsersAvatarsUseCase.execute({ userIds: query.ids });
+  }
+
   @Get(':id')
   getById(@CurrentUserId() requestingUserId: string, @Param('id') userId: string) {
     return this.getUserByIdUseCase.execute({ userId, requestingUserId });
@@ -98,6 +114,11 @@ export class UserController {
       ...dto,
       birthDate: dto.birthDate ? new Date(dto.birthDate) : undefined,
     });
+  }
+
+  @Put('me/avatar')
+  updateAvatar(@CurrentUserId() userId: string, @Body() dto: UpdateUserAvatarDto) {
+    return this.updateUserAvatarUseCase.execute({ userId, avatar: { ...dto } });
   }
 
   @Patch('me/password')

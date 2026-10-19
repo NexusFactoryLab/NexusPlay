@@ -6,6 +6,8 @@ import { LobbyReadyControl } from './LobbyReadyControl'
 import { ChatPanel } from './ChatPanel'
 import type { GuessWhoChatMessage } from './guessWhoTypes'
 import { QRCodeSVG } from 'qrcode.react'
+import { AvatarCircle } from '../../avatar/AvatarCircle'
+import { usePlayersAvatars } from '../../avatar/usePlayersAvatars'
 
 type LobbyPlayer = {
   userId: string
@@ -59,6 +61,8 @@ export function MultiplayerLobby({
   children,
 }: Props) {
   const invitationUrl = new URL(roomPath, window.location.origin).href
+  // Avatar de cada jugador (issue #77); los bots y quien no tenga avatar salen con iniciales.
+  const avatars = usePlayersAvatars(room.players.map((player) => player.userId))
   const [chatOpen, setChatOpen] = useState(false)
   const [readCount, setReadCount] = useState(messages.length)
   const unreadCount = Math.max(0, messages.length - readCount)
@@ -233,8 +237,9 @@ export function MultiplayerLobby({
               {room.players.map((player) => (
                 <span
                   key={player.userId}
-                  className="rounded-full border border-accent/20 bg-accent/5 px-3 py-1.5 text-[12.5px] font-medium text-text-h"
+                  className="inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent/5 py-1 pr-3 pl-1 text-[12.5px] font-medium text-text-h"
                 >
+                  <AvatarCircle config={avatars[player.userId]} name={player.displayName} className="h-10 w-10 text-[13px]" />
                   {player.role === 'FIRE'
                     ? '🔥 '
                     : player.role === 'WATER'

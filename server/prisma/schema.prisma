@@ -37,6 +37,9 @@ model UserModel {
   /// mostrarla en cada login.
   hasChosenRole            Boolean                        @default(false) @map("has_chosen_role")
   avatarUrl                String?                        @map("avatar_url")
+  /// Issue #77: avatar armado por piezas (tono de piel, peinado, ropa…). El
+  /// formato lo valida `AvatarConfig`; null = la cuenta aún no tiene avatar.
+  avatarConfig             Json?                          @map("avatar_config")
   birthDate                DateTime?                      @map("birth_date")
   locale                   String                         @default("es-CO")
   isActive                 Boolean                        @default(true) @map("is_active")

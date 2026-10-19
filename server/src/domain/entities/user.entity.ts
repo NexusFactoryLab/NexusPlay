@@ -1,4 +1,5 @@
 import { InvalidUserStateError } from '../errors/user.errors.js';
+import type { AvatarConfig } from '../value-objects/avatar-config.vo.js';
 import { Email } from '../value-objects/email.vo.js';
 import { Password } from '../value-objects/password.vo.js';
 import { PersonName } from '../value-objects/person-name.vo.js';
@@ -13,6 +14,11 @@ export interface UserProps {
   hasChosenRole: boolean;
   displayName: string;
   avatarUrl: string | null;
+  /**
+   * Avatar armado por piezas (issue #77). Opcional para no obligar a tocar
+   * cada `fromPersistence` existente: ausente equivale a "sin avatar".
+   */
+  avatarConfig?: AvatarConfig | null;
   birthDate: Date | null;
   locale: string;
   isActive: boolean;
@@ -100,6 +106,10 @@ export class User {
     return this.props.avatarUrl;
   }
 
+  get avatarConfig(): AvatarConfig | null {
+    return this.props.avatarConfig ?? null;
+  }
+
   get birthDate(): Date | null {
     return this.props.birthDate;
   }
@@ -150,6 +160,12 @@ export class User {
 
   changeAvatar(avatarUrl: string | null): void {
     this.props.avatarUrl = avatarUrl;
+    this.touch();
+  }
+
+  /** Guarda el avatar armado en "Configurar avatar" (issue #77); null lo quita. */
+  customizeAvatar(avatarConfig: AvatarConfig | null): void {
+    this.props.avatarConfig = avatarConfig;
     this.touch();
   }
 

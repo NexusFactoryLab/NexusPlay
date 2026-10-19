@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown, LogOut } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { ChevronDown, LogOut, Shirt } from 'lucide-react'
 import type { AuthUser } from '../../services/auth.service'
+import { AvatarCircle } from '../avatar/AvatarCircle'
+import { AvatarPortrait } from '../avatar/AvatarPortrait'
+import { initialsOf, normalizeAvatar } from '../avatar/avatarConfig'
 
 type ProfileMenuProps = {
   user: AuthUser
@@ -18,13 +22,6 @@ const ROLE_LABELS: Record<string, string> = {
   TEACHER: 'Profesor',
   STUDENT: 'Estudiante',
   ADMIN: 'Administrador',
-}
-
-/** Iniciales del nombre (máximo dos), p. ej. "Camilo Pardo" → "CP". */
-function initialsOf(displayName: string): string {
-  const words = displayName.trim().split(/\s+/).filter(Boolean)
-  const initials = words.slice(0, 2).map((word) => word.charAt(0).toUpperCase()).join('')
-  return initials || '?'
 }
 
 /**
@@ -60,6 +57,8 @@ export function ProfileMenu({ user, onSignOut, placement = 'header', collapsed =
 
   const roleLabel = ROLE_LABELS[user.role?.toUpperCase() ?? '']
   const initials = initialsOf(user.displayName)
+  // Avatar armado (issue #77): reemplaza a las iniciales y a la foto de Google.
+  const avatar = normalizeAvatar(user.avatarConfig)
 
   if (placement === 'header') {
     return (
@@ -72,16 +71,20 @@ export function ProfileMenu({ user, onSignOut, placement = 'header', collapsed =
           aria-expanded={open}
           onClick={() => setOpen((current) => !current)}
         >
-          <span
-            className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full text-[14px] font-semibold text-white"
-            style={{ background: 'linear-gradient(135deg, var(--accent-2), var(--accent))' }}
-          >
-            {user.avatarUrl ? (
-              <img src={user.avatarUrl} alt="" className="h-full w-full object-cover" />
-            ) : (
-              initials.charAt(0)
-            )}
-          </span>
+          {avatar ? (
+            <AvatarCircle config={avatar} name={user.displayName} className="h-8 w-8" />
+          ) : (
+            <span
+              className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full text-[14px] font-semibold text-white"
+              style={{ background: 'linear-gradient(135deg, var(--accent-2), var(--accent))' }}
+            >
+              {user.avatarUrl ? (
+                <img src={user.avatarUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                initials.charAt(0)
+              )}
+            </span>
+          )}
           <span className="flex min-w-0 max-w-[140px] flex-col items-start leading-tight">
             <span className="w-full truncate text-[13.5px] font-medium text-text-h">
               {user.displayName}
@@ -129,14 +132,20 @@ export function ProfileMenu({ user, onSignOut, placement = 'header', collapsed =
           style={{ background: 'linear-gradient(135deg, #ffe08a, #f5a524 55%, #b8730f)' }}
           aria-hidden="true"
         >
-          <span
-            className={`flex items-center justify-center rounded-full font-bold tracking-tight text-white ${
-              collapsed ? 'h-9 w-9 text-[13px]' : 'h-11 w-11 text-[16px]'
-            }`}
-            style={{ background: 'linear-gradient(135deg, var(--accent-2), var(--accent))' }}
-          >
-            {initials}
-          </span>
+          {avatar ? (
+            <span className={`avatar-portrait-bg block overflow-hidden rounded-full ${collapsed ? 'h-9 w-9' : 'h-11 w-11'}`}>
+              <AvatarPortrait config={avatar} />
+            </span>
+          ) : (
+            <span
+              className={`flex items-center justify-center rounded-full font-bold tracking-tight text-white ${
+                collapsed ? 'h-9 w-9 text-[13px]' : 'h-11 w-11 text-[16px]'
+              }`}
+              style={{ background: 'linear-gradient(135deg, var(--accent-2), var(--accent))' }}
+            >
+              {initials}
+            </span>
+          )}
         </span>
         {!collapsed && (
           <>
@@ -175,6 +184,7 @@ function ProfileDropdown({
   onClose: () => void
   className: string
 }) {
+  const navigate = useNavigate()
   return (
     <div
       role="menu"
@@ -186,6 +196,18 @@ function ProfileDropdown({
         </p>
         <p className="truncate text-[12px] text-text">{user.email}</p>
       </div>
+      <button
+        type="button"
+        role="menuitem"
+        className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-[14px] text-text-h hover:bg-code-bg"
+        onClick={() => {
+          onClose()
+          navigate('/avatar')
+        }}
+      >
+        <Shirt className="h-4 w-4 text-accent" strokeWidth={2} />
+        Configurar avatar
+      </button>
       <button
         type="button"
         role="menuitem"

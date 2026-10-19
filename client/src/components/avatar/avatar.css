@@ -1,0 +1,795 @@
+/*
+ * "Personaliza tu avatar" (issue #77). Todo cuelga de .avatar-studio y de
+ * variables --av-*: cada tema de la página (claro, oscuro, Pradera, Fantasía,
+ * Kids) solo redefine las variables, así el cielo, los paneles y la isla se
+ * adaptan sin duplicar la estructura.
+ */
+
+.avatar-studio {
+  --av-font: 'Baloo 2', var(--heading);
+  --av-sky: linear-gradient(180deg, #cfe7fb 0%, #e8f3fd 52%, #f8f1fb 100%);
+  --av-cloud: rgba(255, 255, 255, 0.92);
+  --av-stars: 0;
+  --av-frame: rgba(255, 255, 255, 0.92);
+  --av-frame-shadow: 0 24px 60px -30px rgba(20, 18, 28, 0.45);
+  --av-panel-bg: rgba(255, 255, 255, 0.94);
+  --av-panel-grain: none;
+  --av-panel-border: #d9dfeb;
+  --av-panel-ring: rgba(255, 255, 255, 0.85);
+  --av-plaque-bg: linear-gradient(135deg, var(--accent), var(--accent-2));
+  --av-plaque-text: #ffffff;
+  --av-label: var(--text-h);
+  --av-muted: var(--text);
+  --av-tile-bg: #f5f2ec;
+  --av-tile-border: #e4ddd0;
+  --av-tile-hover: #ece6da;
+  --av-tile-active: #6fd3ff;
+  --av-tab-bg: rgba(0, 0, 0, 0.04);
+  --av-tab-active-bg: var(--surface);
+  --av-tab-active-text: var(--accent);
+  --av-sign-bg: linear-gradient(180deg, #b8834f 0%, #9a6534 55%, #7a4a24 100%);
+  --av-sign-border: #5c3416;
+  --av-sign-text: #fffaf0;
+  --av-sign-highlight: #ffd84a;
+  --av-grass-top: #8fdc68;
+  --av-grass: #5cb848;
+  --av-dirt: #a8703f;
+  --av-dirt-dark: #6f4524;
+  --av-pill-bg: linear-gradient(180deg, #f6e2bf, #e8c690);
+  --av-pill-border: #b98b52;
+  --av-pill-text: #5a3a1c;
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  /* Fuera del Home de adulto (Modo Kids) no hay un <main> con alto fijo. */
+  height: max(620px, calc(100dvh - 150px));
+  font-family: var(--sans);
+  color: var(--av-label);
+}
+
+/* Dentro del Home ocupa todo el <main>: sin scroll, los paneles lo hacen por dentro. */
+.app-main:has(> .avatar-studio) {
+  padding: 16px 20px;
+}
+
+.app-main > .avatar-studio {
+  height: 100%;
+  min-height: 560px;
+}
+
+:root[data-theme='meadow'] .avatar-studio {
+  --av-sky: linear-gradient(180deg, #8ccdf7 0%, #bfe4fb 48%, #f3e3f7 100%);
+  --av-frame: #ffffff;
+  --av-panel-bg: linear-gradient(180deg, #f6dfb3 0%, #ecca93 100%);
+  --av-panel-grain: repeating-linear-gradient(90deg, rgba(122, 74, 36, 0.06) 0 2px, transparent 2px 15px);
+  --av-panel-border: #7d9ac0;
+  --av-panel-ring: #f8e7c6;
+  --av-plaque-bg: linear-gradient(180deg, #7f9fc6, #5f7ea6);
+  --av-label: #4a2c17;
+  --av-muted: #7a5333;
+  --av-tile-bg: #f8e6c4;
+  --av-tile-border: #d8b47f;
+  --av-tile-hover: #fbeed4;
+  --av-tab-bg: rgba(122, 74, 36, 0.1);
+  --av-tab-active-bg: #fff5e2;
+  --av-tab-active-text: #4a2c17;
+}
+
+:root[data-theme='fantasy'] .avatar-studio {
+  --av-sky: radial-gradient(ellipse at 50% 120%, #4b2f86 0%, transparent 60%), linear-gradient(180deg, #120e33 0%, #231a55 55%, #3a2466 100%);
+  --av-cloud: rgba(180, 160, 255, 0.22);
+  --av-stars: 1;
+  --av-frame: #b8730f;
+  --av-frame-shadow: 0 0 0 3px rgba(255, 200, 61, 0.35), 0 26px 60px -24px rgba(4, 2, 20, 0.8);
+  --av-panel-bg: linear-gradient(180deg, #6b4220 0%, #4a2a12 100%);
+  --av-panel-grain: repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.12) 0 2px, transparent 2px 16px);
+  --av-panel-border: #ffc83d;
+  --av-panel-ring: rgba(255, 229, 138, 0.35);
+  --av-plaque-bg: linear-gradient(180deg, #4a4166, #2b2545);
+  --av-plaque-text: #ffe58a;
+  --av-label: #fbf3dd;
+  --av-muted: #e7d4b0;
+  --av-tile-bg: rgba(39, 33, 72, 0.85);
+  --av-tile-border: rgba(255, 214, 140, 0.35);
+  --av-tile-hover: rgba(70, 60, 112, 0.9);
+  --av-tile-active: #ffc83d;
+  --av-tab-bg: rgba(0, 0, 0, 0.25);
+  --av-tab-active-bg: rgba(255, 200, 61, 0.2);
+  --av-tab-active-text: #ffe58a;
+  --av-sign-bg: linear-gradient(180deg, #7a4a24 0%, #5a3518 60%, #3f230e 100%);
+  --av-sign-border: #ffc83d;
+  --av-grass-top: #4fbf7a;
+  --av-grass: #2f8a55;
+  --av-dirt: #5a3a26;
+  --av-dirt-dark: #2e1c12;
+  --av-pill-bg: linear-gradient(180deg, #5a3518, #3f230e);
+  --av-pill-border: #ffc83d;
+  --av-pill-text: #ffe58a;
+}
+
+:root[data-theme='dark'] .avatar-studio {
+  --av-sky: linear-gradient(180deg, #0d1230 0%, #18193a 55%, #241a3b 100%);
+  --av-cloud: rgba(166, 133, 245, 0.16);
+  --av-stars: 0.8;
+  --av-frame: #2b2b38;
+  --av-frame-shadow: 0 26px 60px -24px rgba(0, 0, 0, 0.7);
+  --av-panel-bg: rgba(22, 22, 31, 0.94);
+  --av-panel-border: #3a3a4c;
+  --av-panel-ring: rgba(166, 133, 245, 0.25);
+  --av-tile-bg: #1e1e2a;
+  --av-tile-border: #2f2f3e;
+  --av-tile-hover: #272736;
+  --av-tile-active: #a685f5;
+  --av-tab-bg: rgba(255, 255, 255, 0.05);
+  --av-tab-active-bg: #272736;
+  --av-sign-bg: linear-gradient(135deg, #7b5cff, #ff6ba3);
+  --av-sign-border: rgba(255, 255, 255, 0.25);
+  --av-grass-top: #4aa36a;
+  --av-grass: #2f7d4a;
+  --av-dirt: #4a3427;
+  --av-dirt-dark: #2a1d16;
+  --av-pill-bg: linear-gradient(180deg, #272736, #1e1e2a);
+  --av-pill-border: #3a3a4c;
+  --av-pill-text: #f1f0f8;
+}
+
+:root[data-theme='kids'] .avatar-studio {
+  --av-sky: linear-gradient(180deg, #a9e2ff 0%, #d9f3ff 50%, #fff8e7 100%);
+  --av-frame: #ffffff;
+  --av-panel-bg: #ffffff;
+  --av-panel-border: #ffb36b;
+  --av-panel-ring: #fff1d6;
+  --av-plaque-bg: linear-gradient(180deg, #ff9a3d, #ff7a1a);
+  --av-tile-bg: #fff6e3;
+  --av-tile-border: #ffe0a3;
+  --av-tile-hover: #ffefcc;
+  --av-tile-active: #06b6d4;
+  --av-tab-active-text: #ff7a1a;
+  --av-sign-bg: linear-gradient(180deg, #ff9a3d, #ff6f61);
+  --av-sign-border: #e2553f;
+  --av-pill-bg: linear-gradient(180deg, #fff3d6, #ffe0a3);
+  --av-pill-border: #ffb36b;
+  --av-pill-text: #7a4a10;
+}
+
+/* ---------------------------------------------------------------- marco */
+
+.avatar-board {
+  position: relative;
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(220px, 290px) minmax(0, 1fr) minmax(250px, 340px);
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'style stage closet'
+    'status turn buttons';
+  gap: 18px 22px;
+  min-height: 0;
+  padding: 74px 22px 20px;
+  border: 6px solid var(--av-frame);
+  border-radius: 34px;
+  background: var(--av-sky);
+  box-shadow: var(--av-frame-shadow);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.avatar-board::before {
+  /* Estrellas: solo se ven en los temas de noche (--av-stars). */
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: var(--av-stars);
+  background-image:
+    radial-gradient(1.6px 1.6px at 12% 18%, #fff 50%, transparent 51%),
+    radial-gradient(1.4px 1.4px at 28% 42%, #fff 50%, transparent 51%),
+    radial-gradient(2px 2px at 47% 12%, #ffe58a 50%, transparent 51%),
+    radial-gradient(1.4px 1.4px at 63% 30%, #fff 50%, transparent 51%),
+    radial-gradient(1.8px 1.8px at 78% 16%, #fff 50%, transparent 51%),
+    radial-gradient(1.4px 1.4px at 88% 46%, #ffe58a 50%, transparent 51%),
+    radial-gradient(1.2px 1.2px at 36% 70%, #fff 50%, transparent 51%),
+    radial-gradient(1.6px 1.6px at 70% 64%, #fff 50%, transparent 51%),
+    radial-gradient(1.2px 1.2px at 8% 60%, #fff 50%, transparent 51%),
+    radial-gradient(1.4px 1.4px at 94% 80%, #fff 50%, transparent 51%);
+  animation: avatar-twinkle 5s ease-in-out infinite alternate;
+}
+
+@keyframes avatar-twinkle {
+  from { filter: brightness(0.75); }
+  to { filter: brightness(1.25); }
+}
+
+.avatar-cloud {
+  position: absolute;
+  z-index: -1;
+  height: 46px;
+  border-radius: 999px;
+  background: var(--av-cloud);
+  filter: blur(0.3px);
+  animation: avatar-cloud-drift 38s ease-in-out infinite alternate;
+}
+
+.avatar-cloud::before,
+.avatar-cloud::after {
+  content: '';
+  position: absolute;
+  bottom: 40%;
+  border-radius: 50%;
+  background: inherit;
+}
+
+.avatar-cloud::before { left: 16%; width: 46%; aspect-ratio: 1; }
+.avatar-cloud::after { right: 14%; width: 34%; aspect-ratio: 1; }
+
+.avatar-cloud-1 { top: 16%; left: 6%; width: 150px; }
+.avatar-cloud-2 { top: 9%; right: 8%; width: 190px; animation-duration: 46s; }
+.avatar-cloud-3 { top: 44%; left: 30%; width: 120px; opacity: 0.7; animation-duration: 52s; }
+.avatar-cloud-4 { top: 38%; right: 26%; width: 140px; opacity: 0.8; animation-duration: 42s; }
+
+@keyframes avatar-cloud-drift {
+  from { transform: translateX(-18px); }
+  to { transform: translateX(22px); }
+}
+
+/* Letrero de madera colgado sobre el borde de arriba. */
+.avatar-sign {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  z-index: 3;
+  transform: translateX(-50%);
+  min-width: min(380px, 70%);
+  padding: 10px 34px 8px;
+  border: 3px solid var(--av-sign-border);
+  border-top: 0;
+  border-radius: 0 0 22px 22px;
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.07) 0 2px, transparent 2px 13px),
+    var(--av-sign-bg);
+  box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.18), 0 10px 22px -10px rgba(0, 0, 0, 0.5);
+  text-align: center;
+  font-family: var(--av-font);
+  line-height: 0.95;
+  color: var(--av-sign-text);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.28);
+}
+
+.avatar-sign h1 {
+  /* Todo explícito: la capa base de index.css le da a h1 su color y tamaño de título. */
+  margin: 0;
+  font-family: var(--av-font);
+  font-size: clamp(20px, 2.6vw, 30px);
+  font-weight: 800;
+  line-height: 0.95;
+  letter-spacing: 0.04em;
+  color: var(--av-sign-text);
+}
+
+.avatar-sign h1 span {
+  display: block;
+  color: var(--av-sign-highlight);
+}
+
+.avatar-back {
+  position: absolute;
+  top: 14px;
+  left: 16px;
+  z-index: 3;
+}
+
+.avatar-chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 2px solid var(--av-pill-border);
+  border-radius: 999px;
+  background: var(--av-pill-bg);
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--av-pill-text);
+  cursor: pointer;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.15);
+}
+
+.avatar-chip-btn:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.avatar-area-style { grid-area: style; }
+.avatar-area-stage { grid-area: stage; }
+.avatar-area-closet { grid-area: closet; }
+.avatar-area-status {
+  grid-area: status;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.avatar-area-turn { grid-area: turn; justify-self: center; }
+.avatar-area-buttons { grid-area: buttons; }
+
+/* ---------------------------------------------------------------- paneles */
+
+.avatar-panel {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  border: 4px solid var(--av-panel-border);
+  border-radius: 26px;
+  background: var(--av-panel-grain), var(--av-panel-bg);
+  box-shadow: inset 0 0 0 3px var(--av-panel-ring), 0 18px 34px -24px rgba(0, 0, 0, 0.55);
+}
+
+.avatar-panel-plaque {
+  align-self: center;
+  margin-top: -18px;
+  padding: 4px 26px 2px;
+  border-radius: 14px;
+  background: var(--av-plaque-bg);
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.18), 0 8px 18px -10px rgba(0, 0, 0, 0.5);
+  font-family: var(--av-font);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--av-plaque-text);
+  text-transform: uppercase;
+}
+
+.avatar-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 14px 16px;
+  scrollbar-width: thin;
+}
+
+.avatar-section + .avatar-section {
+  margin-top: 14px;
+}
+
+.avatar-section-title {
+  margin: 0 0 8px;
+  font-family: var(--av-font);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--av-label);
+}
+
+.avatar-section-hint {
+  margin: -6px 0 8px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--av-muted);
+}
+
+.avatar-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 8px;
+}
+
+.avatar-tile {
+  position: relative;
+  display: flex;
+  aspect-ratio: 1;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 3px solid var(--av-tile-border);
+  border-radius: 16px;
+  background: var(--av-tile-bg);
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.avatar-tile:hover {
+  transform: translateY(-2px);
+  background: var(--av-tile-hover);
+}
+
+.avatar-tile:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.avatar-tile[aria-pressed='true'] {
+  border-color: var(--av-tile-active);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--av-tile-active) 35%, transparent), 0 8px 16px -10px rgba(0, 0, 0, 0.45);
+}
+
+.avatar-tile img {
+  width: 86%;
+  height: 86%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.avatar-tile-none {
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+  color: var(--av-muted);
+}
+
+.avatar-tile-portrait {
+  border-radius: 50%;
+}
+
+.avatar-tile-portrait img,
+.avatar-tile-portrait > span {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-swatches {
+  display: flex;
+  gap: 10px;
+}
+
+.avatar-swatch {
+  width: 52px;
+  height: 52px;
+  border: 3px solid var(--av-tile-border);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: inset 0 -6px 10px rgba(0, 0, 0, 0.18), inset 0 6px 10px rgba(255, 255, 255, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.avatar-swatch:hover {
+  transform: scale(1.06);
+}
+
+.avatar-swatch[aria-pressed='true'] {
+  border-color: var(--av-tile-active);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--av-tile-active) 40%, transparent), inset 0 -6px 10px rgba(0, 0, 0, 0.18);
+}
+
+.avatar-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding: 12px 12px 0;
+}
+
+.avatar-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 6px 6px;
+  white-space: nowrap;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--av-tab-bg);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--av-muted);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.avatar-tab[aria-selected='true'] {
+  border-color: var(--av-tile-active);
+  background: var(--av-tab-active-bg);
+  color: var(--av-tab-active-text);
+}
+
+/* ---------------------------------------------------------------- escenario */
+
+.avatar-stage {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 26px;
+}
+
+.avatar-island {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: min(330px, 78%);
+  height: 92px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.avatar-island::before {
+  /* Tierra bajo el pasto. */
+  content: '';
+  position: absolute;
+  top: 26px;
+  left: 4%;
+  right: 4%;
+  height: 64px;
+  border-radius: 0 0 48% 48% / 0 0 100% 100%;
+  background: linear-gradient(180deg, var(--av-dirt) 0%, var(--av-dirt-dark) 100%);
+  box-shadow: inset 0 -8px 14px rgba(0, 0, 0, 0.22);
+}
+
+.avatar-island::after {
+  /* Pasto, con unas florecitas. */
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 54px;
+  border-radius: 50%;
+  background:
+    radial-gradient(5px 5px at 18% 42%, #fff 60%, transparent 62%),
+    radial-gradient(3px 3px at 18% 42%, #ffd84a 60%, transparent 62%),
+    radial-gradient(5px 5px at 80% 50%, #fff 60%, transparent 62%),
+    radial-gradient(3px 3px at 80% 50%, #ffd84a 60%, transparent 62%),
+    radial-gradient(4px 4px at 66% 70%, #fff 60%, transparent 62%),
+    radial-gradient(4px 4px at 30% 72%, #fff 60%, transparent 62%),
+    radial-gradient(ellipse at 50% 35%, var(--av-grass-top) 0%, var(--av-grass) 75%);
+  box-shadow: inset 0 -6px 0 rgba(0, 0, 0, 0.12);
+}
+
+.avatar-shadow {
+  position: absolute;
+  bottom: 52px;
+  left: 50%;
+  width: 150px;
+  height: 22px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(0, 0, 0, 0.28), transparent 70%);
+  pointer-events: none;
+}
+
+.avatar-stage-figure {
+  position: relative;
+  z-index: 1;
+  height: min(100%, 560px);
+  margin-bottom: 22px;
+  perspective: 900px;
+}
+
+.avatar-stage-figure > div {
+  height: 100%;
+  width: auto;
+  filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.18));
+}
+
+.avatar-stage-figure.is-spinning-left > div { animation: avatar-spin-left 0.9s cubic-bezier(0.5, 0, 0.25, 1); }
+.avatar-stage-figure.is-spinning-right > div { animation: avatar-spin-right 0.9s cubic-bezier(0.5, 0, 0.25, 1); }
+
+@keyframes avatar-spin-left {
+  from { transform: rotateY(0deg); }
+  to { transform: rotateY(-360deg); }
+}
+
+@keyframes avatar-spin-right {
+  from { transform: rotateY(0deg); }
+  to { transform: rotateY(360deg); }
+}
+
+.avatar-stage-figure.is-new > div {
+  animation: avatar-pop 0.32s ease-out;
+}
+
+@keyframes avatar-pop {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.03) translateY(-6px); }
+  100% { transform: scale(1); }
+}
+
+/* ---------------------------------------------------------------- acciones */
+
+.avatar-turn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.avatar-turn-arrow {
+  display: inline-flex;
+  width: 42px;
+  height: 42px;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid var(--av-pill-border);
+  border-radius: 50%;
+  background: var(--av-pill-bg);
+  color: var(--av-pill-text);
+  cursor: pointer;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.18);
+  transition: transform 0.12s ease;
+}
+
+.avatar-turn-arrow:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(0, 0, 0, 0.18); }
+
+.avatar-pill {
+  padding: 7px 30px 5px;
+  border: 3px solid var(--av-pill-border);
+  border-radius: 999px;
+  background: var(--av-pill-bg);
+  box-shadow: 0 5px 0 rgba(0, 0, 0, 0.18);
+  font-family: var(--av-font);
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--av-pill-text);
+}
+
+.avatar-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.avatar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 18px 7px;
+  border: 0;
+  border-radius: 999px;
+  font-family: var(--av-font);
+  font-size: 18px;
+  white-space: nowrap;
+  font-weight: 800;
+  color: #fff;
+  cursor: pointer;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+  transition: transform 0.12s ease, filter 0.12s ease, box-shadow 0.12s ease;
+}
+
+.avatar-btn:not(:disabled):hover { filter: brightness(1.06); transform: translateY(-1px); }
+.avatar-btn:not(:disabled):active { transform: translateY(2px); }
+.avatar-btn:disabled { cursor: not-allowed; opacity: 0.55; }
+.avatar-btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
+.avatar-btn-undo {
+  background: linear-gradient(180deg, #5aa7ff, #2f7fe0);
+  box-shadow: 0 5px 0 #1f5fb0, 0 12px 20px -12px rgba(31, 95, 176, 0.8);
+}
+
+.avatar-btn-random {
+  padding: 8px 16px 6px;
+  font-size: 16px;
+  background: linear-gradient(180deg, #9b7bff, #6b4fe0);
+  box-shadow: 0 5px 0 #4b33b0, 0 12px 20px -12px rgba(75, 51, 176, 0.8);
+}
+
+.avatar-btn-save {
+  padding-inline: 22px;
+  background: linear-gradient(90deg, #ff4f9a, #ff8a3d);
+  box-shadow: 0 5px 0 #d23a6c, 0 12px 22px -12px rgba(210, 58, 108, 0.9);
+}
+
+.avatar-status {
+  margin: 0;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--av-panel-ring);
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--av-label);
+}
+
+/* ---------------------------------------------------------------- fotos redondas */
+
+.avatar-portrait-bg {
+  background: radial-gradient(circle at 50% 30%, #e9f6ff 0%, #bfe1fb 70%, #9fd0f5 100%);
+}
+
+:root[data-theme='fantasy'] .avatar-portrait-bg,
+:root[data-theme='dark'] .avatar-portrait-bg {
+  background: radial-gradient(circle at 50% 30%, #4b3c86 0%, #2b2259 70%, #1d1742 100%);
+}
+
+/*
+ * Pradera: el <main> ya es el gran marco blanco del diseño de referencia; el
+ * tablero lo llena por dentro en vez de dibujar un segundo marco.
+ */
+[data-theme='meadow'] .app-main:has(> .avatar-studio) {
+  padding: 0;
+}
+
+[data-theme='meadow'] .app-main > .avatar-studio .avatar-board {
+  border: 0;
+  border-radius: 30px;
+  box-shadow: none;
+}
+
+/* ---------------------------------------------------------------- pantallas angostas */
+
+@media (max-width: 1100px) {
+  .avatar-studio,
+  .app-main > .avatar-studio {
+    height: auto;
+  }
+
+  .avatar-board {
+    flex: none;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto auto auto auto;
+    grid-template-areas:
+      'stage stage'
+      'turn turn'
+      'style closet'
+      'status buttons';
+  }
+
+  .avatar-stage {
+    height: 440px;
+  }
+
+  .avatar-panel {
+    max-height: 520px;
+  }
+}
+
+@media (max-width: 720px) {
+  .avatar-board {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'stage'
+      'turn'
+      'closet'
+      'style'
+      'status'
+      'buttons';
+    padding: 70px 12px 14px;
+    border-width: 4px;
+    border-radius: 24px;
+  }
+
+  .avatar-stage {
+    height: 380px;
+  }
+
+  .avatar-panel {
+    max-height: none;
+  }
+
+  .avatar-panel-body {
+    max-height: 340px;
+  }
+
+  .avatar-area-status {
+    justify-content: center;
+  }
+
+  .avatar-area-buttons {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    justify-content: center;
+    padding: 8px 0 2px;
+  }
+
+  .avatar-btn {
+    font-size: 17px;
+    padding: 9px 16px 7px;
+  }
+
+  .avatar-sign {
+    min-width: 0;
+    width: max-content;
+    max-width: 78%;
+    padding-inline: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .avatar-cloud,
+  .avatar-board::before,
+  .avatar-stage-figure > div {
+    animation: none !important;
+  }
+}

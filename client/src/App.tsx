@@ -34,6 +34,7 @@ import { MazeCollectorPlayPage } from './components/home/games/MazeCollectorPlay
 import { GuessWhoRoomPage } from './components/home/games/GuessWhoRoomPage'
 import { TournamentRoomPage } from './components/home/games/TournamentRoomPage'
 import { RoleSelectionPage } from './components/RoleSelectionPage'
+import { AvatarEditorPage } from './components/avatar/AvatarEditorPage'
 import { PublicHomePage } from './components/legal/PublicHomePage'
 import { PrivacyPolicyPage } from './components/legal/PrivacyPolicyPage'
 import { TermsOfServicePage } from './components/legal/TermsOfServicePage'
@@ -186,6 +187,7 @@ function App() {
         <Route path="organizacion" element={<OrganizationDashboardPage />} />
         <Route path="organizaciones/:id" element={<InstitutionView />} />
         <Route path="mis-metricas" element={<MyMetricsPage />} />
+        <Route path="avatar" element={<AvatarEditorPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
