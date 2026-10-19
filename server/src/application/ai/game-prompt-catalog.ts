@@ -49,6 +49,13 @@ export interface GamePromptSpec {
   /** Carpeta de Cloudinary donde subir las imágenes de contenido (mismas que usa la subida manual). */
   contentImageFolder?: string;
   /**
+   * Tipos sin `imageRequirement` cuyas imágenes son opcionales (Opuestos):
+   * después de generar el contenido, se completan solas con
+   * `ContentImageFiller` (issue #75) a partir del `imageQuery`, `emoji` y
+   * `color` que propone el modelo para cada lado.
+   */
+  fillsMissingImages?: boolean;
+  /**
    * Solo relevante cuando `imageRequirement` no es `null`: instrucciones
    * alternativas para cuando el usuario no subió NINGUNA imagen (ni suelta
    * ni incrustada en un PDF/Word) pero sí escribió un tema en `message` o
@@ -308,22 +315,28 @@ NO incluyas "imageIndex" ni "imageUrl" en ningún elemento.`,
 
 const MEMORY_MATCH_OPPOSITES_SPEC: GamePromptSpec = {
   instructions: `Genera el contenido de un juego de memoria de conceptos OPUESTOS a partir del texto
-fuente (sin imágenes: el modo Opuestos no las necesita para jugarse — el profesor puede agregarlas
-después a mano si quiere, es opcional). Extrae entre 4 y 10 parejas de conceptos contrapuestos del
-texto (ej. ácido/base, antes/después de un evento, causa/efecto). Cada pareja necesita "posTitle" y
-"negTitle" (máximo 120 caracteres cada uno) y "posDescription"/"negDescription" (máximo 500
-caracteres cada uno) explicando brevemente cada lado. Incluye siempre "posImageUrl": null y
-"negImageUrl": null (literalmente null, nunca un texto ni una URL inventada).`,
+fuente. Extrae entre 4 y 10 parejas de conceptos contrapuestos del texto (ej. ácido/base,
+antes/después de un evento, causa/efecto). Cada pareja necesita "posTitle" y "negTitle" (máximo 120
+caracteres cada uno) y "posDescription"/"negDescription" (máximo 500 caracteres cada uno)
+explicando brevemente cada lado. Incluye siempre "posImageUrl": null y "negImageUrl": null
+(literalmente null, nunca un texto ni una URL inventada): las imágenes se consiguen después.
+Para eso, en cada lado agrega "posImageQuery"/"negImageQuery" (búsqueda corta EN INGLÉS de una foto
+que represente ese concepto, ej. "lemon acid"), "posEmoji"/"negEmoji" (UN emoji que lo represente) y
+"posColor"/"negColor" (color de fondo claro en hexadecimal, ej. "#fde68a").`,
   jsonShapeExample: `{
   "config": { "mode": "OPPOSITES", "perZone": 8, "timePerZoneSeconds": 90, "previewSeconds": 5 },
   "content": [
     {
       "posTitle": "Ácido", "posDescription": "pH menor a 7...", "posImageUrl": null,
-      "negTitle": "Base", "negDescription": "pH mayor a 7...", "negImageUrl": null
+      "posImageQuery": "lemon acid", "posEmoji": "🍋", "posColor": "#fef08a",
+      "negTitle": "Base", "negDescription": "pH mayor a 7...", "negImageUrl": null,
+      "negImageQuery": "soap base alkaline", "negEmoji": "🧼", "negColor": "#bae6fd"
     }
   ]
 }`,
   imageRequirement: null,
+  contentImageFolder: 'memory-cards',
+  fillsMissingImages: true,
 };
 
 const DUAL_QUEST_SPEC: GamePromptSpec = {

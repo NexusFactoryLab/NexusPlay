@@ -245,7 +245,7 @@ describe('GenerateGameDraftUseCase — tipos sin imagen obligatoria', () => {
     );
   });
 
-  it('MEMORY_MATCH modo OPPOSITES normaliza posImageUrl/negImageUrl ausentes a null', async () => {
+  it('MEMORY_MATCH modo OPPOSITES completa solas las imágenes de los dos lados (issue #75)', async () => {
     const assistant = fakeAssistant({
       config: { mode: 'OPPOSITES' },
       content: [
@@ -262,9 +262,11 @@ describe('GenerateGameDraftUseCase — tipos sin imagen obligatoria', () => {
 
     expect(result.content).toHaveLength(2);
     for (const pair of result.content as Array<Record<string, unknown>>) {
-      expect(pair.posImageUrl).toBeNull();
-      expect(pair.negImageUrl).toBeNull();
+      expect(typeof pair.posImageUrl).toBe('string');
+      expect(typeof pair.negImageUrl).toBe('string');
+      expect(pair.posImageUrl).not.toBe(pair.negImageUrl);
     }
+    expect(result.notice).toBeTruthy();
   });
 
   it('suma el mensaje del usuario a las instrucciones que recibe la IA, sin reemplazarlas', async () => {

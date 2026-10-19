@@ -177,14 +177,7 @@ export class DeterministicGameAdapter {
         `Este tipo necesita al menos ${target.min} conceptos y el original aporta ${used.length}: agrega ${plural(target.min - used.length, 'más', 'más')} a mano antes de guardar.`,
       );
     }
-    if (target.usesImages) {
-      const withoutImage = used.filter((concept) => !concept.imageUrl).length;
-      if (withoutImage > 0) {
-        notices.push(
-          `${plural(withoutImage, 'tarjeta no tiene', 'tarjetas no tienen')} imagen: súbelas antes de guardar.`,
-        );
-      }
-    }
+    // Las imágenes que falten las completa AdaptGameUseCase (issue #75) y avisa cuántas.
     if (!target.usesInfo && used.some((concept) => concept.info)) {
       notices.push('Los datos y descripciones del original no se usan en este tipo de juego.');
     }
