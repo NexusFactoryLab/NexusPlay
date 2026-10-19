@@ -10,12 +10,8 @@ import type { UseCase } from '../ports/use-case.port.js';
 import { ContentValidatorRegistry } from '../content-validators/content-validator.registry.js';
 import { resolveGamePromptSpec, type GamePromptSpec } from '../ai/game-prompt-catalog.js';
 import { normalizeDraft } from '../ai/draft-normalizers.js';
-import { sanitizeEmoji } from '../ai/element-illustration.js';
-import {
-  ContentImageResolver,
-  describeImageResolution,
-  type ImageNeed,
-} from '../services/content-image-resolver.service.js';
+import { ContentImageResolver, describeImageResolution } from '../services/content-image-resolver.service.js';
+import { ContentImageFiller } from '../services/content-image-filler.service.js';
 import {
   FileTextExtractor,
   type ImageDescription,
@@ -138,8 +134,39 @@ export class GenerateGameDraftUseCase
     @Inject(IMAGE_STORAGE) private readonly imageStorage: ImageStorage,
     private readonly fileTextExtractor: FileTextExtractor,
     private readonly contentValidators: ContentValidatorRegistry,
-    private readonly contentImageResolver: ContentImageResolver,
-  ) {}
+    contentImageResolver: ContentImageResolver,
+  ) {
+    this.imageFiller = new ContentImageFiller(contentImageResolver);
+  }
+
+  private readonly imageFiller: ContentImageFiller;
+
+  /**
+   * Completa las imágenes vacías de un borrador ya validado (issue #75): foto
+   * libre de Wikimedia o ilustración básica. Las que ya están no se tocan.
+   * Si el resultado no pasa la validación, devuelve el borrador tal cual.
+   * `hints` es el contenido antes de validar (con `imageQuery`, `emoji`…).
+   */
+  async fillMissingImages(
+    gameTypeName: GameTypeName,
+    mode: string | undefined,
+    draft: { config: Record<string, unknown>; content: unknown[] },
+    hints?: unknown,
+  ): Promise<{ draft: { config: Record<string, unknown>; content: unknown[] }; notice: string | null }> {
+    const folder = resolveGamePromptSpec(gameTypeName, mode)?.contentImageFolder ?? 'ai-game-content';
+    const filled = await this.imageFiller.fill(draft.content, folder, Array.isArray(hints) ? hints : undefined);
+    if (filled.total === 0) return { draft, notice: null };
+    try {
+      return {
+        draft: this.validate(gameTypeName, draft.config, filled.content),
+        notice: describeImageResolution(filled.counts, filled.total),
+      };
+    } catch (error) {
+      // Las imágenes nunca deben tumbar un borrador ya válido.
+      this.logger.warn(`El borrador con imágenes no pasó la validación; se entrega sin imágenes: ${errorText(error)}`);
+      return { draft, notice: 'La IA armó el contenido, pero no pudo agregar las imágenes — agrega la imagen de cada elemento a mano.' };
+    }
+  }
 
   async execute(input: GenerateGameDraftInput): Promise<GenerateGameDraftOutput> {
     if (input.files.length > MAX_FILES) {
@@ -198,10 +225,11 @@ export class GenerateGameDraftUseCase
       prepare: (raw) => normalizeDraft({ gameType: gameTypeName, mode, dedupe: true }, raw.config, raw.content),
     });
 
-    return withNotice(generation.draft, [
-      unreadableNotice(extraction.unreadable),
-      truncatedNotice(generation.sourceTruncated),
-    ]);
+    const notices = [unreadableNotice(extraction.unreadable), truncatedNotice(generation.sourceTruncated)];
+    if (!spec.fillsMissingImages) return withNotice(generation.draft, notices);
+    // Opuestos: las imágenes son opcionales, pero se completan solas (issue #75).
+    const images = await this.fillMissingImages(gameTypeName, mode, generation.draft, generation.prepared.content);
+    return withNotice(images.draft, [...notices, images.notice]);
   }
 
   /** Tipos con imagen por elemento (Quién Es, Parejas). */
@@ -342,27 +370,8 @@ export class GenerateGameDraftUseCase
     const { draft, prepared } = generation;
     if (draft.content.length === 0) return withNotice(draft, notices);
 
-    const needs = extractImageNeeds(prepared.content);
-    const resolution = await this.contentImageResolver.resolve(needs, spec.contentImageFolder ?? 'ai-game-content');
-    const imageNotice = describeImageResolution(resolution.counts, needs.length);
-
-    const contentWithImages = draft.content.map((item, index) =>
-      typeof item === 'object' && item !== null
-        ? { ...item, imageUrl: resolution.images[index]?.url ?? null }
-        : item,
-    );
-
-    try {
-      const withImages = this.validate(gameTypeName, draft.config, contentWithImages);
-      return withNotice(withImages, [...notices, imageNotice]);
-    } catch (error) {
-      // Las imágenes nunca deben tumbar un borrador ya válido.
-      this.logger.warn(`El borrador con imágenes no pasó la validación; se entrega sin imágenes: ${errorText(error)}`);
-      return withNotice(draft, [
-        ...notices,
-        'La IA armó el contenido, pero no pudo agregar las imágenes — agrega la imagen de cada elemento a mano.',
-      ]);
-    }
+    const images = await this.fillMissingImages(gameTypeName, mode, draft, prepared.content);
+    return withNotice(images.draft, [...notices, images.notice]);
   }
 
   private async extractText(files: SourceFile[], extraSourceText?: string): Promise<TextExtraction> {
@@ -552,22 +561,3 @@ function withoutImageUrls(content: unknown): unknown {
   });
 }
 
-/**
- * Qué necesita cada elemento para conseguirle una imagen, en el mismo orden
- * que `content`: la búsqueda que propuso el modelo (o el `label` si no mandó
- * ninguna), y el emoji y color para la ilustración de respaldo.
- */
-function extractImageNeeds(content: unknown): ImageNeed[] {
-  if (!Array.isArray(content)) return [];
-  return content.map((item) => {
-    const raw = (typeof item === 'object' && item !== null ? item : {}) as Record<string, unknown>;
-    const label = typeof raw.label === 'string' ? raw.label.trim() : '';
-    const query = typeof raw.imageQuery === 'string' && raw.imageQuery.trim() ? raw.imageQuery.trim() : label;
-    return {
-      label,
-      query: query ? query.slice(0, 200) : null,
-      emoji: sanitizeEmoji(raw.emoji),
-      color: typeof raw.color === 'string' ? raw.color : null,
-    };
-  });
-}

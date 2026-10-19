@@ -108,13 +108,13 @@ describe('DeterministicGameAdapter', () => {
     expect(notices).toContain('no se usan');
   });
 
-  it('Dominó → Parejas avisa las imágenes que faltan y deja imageUrl en null', () => {
+  it('Dominó → Parejas deja imageUrl en null para que AdaptGameUseCase la complete (issue #75)', () => {
     const draft = adapter.adapt(dominoGame(), 'MEMORY_MATCH', 'PAIRS');
 
     expect(draft.content).toHaveLength(8);
     expect(draft.content[0]).toMatchObject({ label: 'Mercurio', imageUrl: null });
     expect(draft.config).toMatchObject({ mode: 'PAIRS' });
-    expect(draft.notices.join(' ')).toContain('8 tarjetas no tienen imagen');
+    expect(draft.notices.join(' ')).not.toContain('imagen');
   });
 
   it('Parejas → Quién Es conserva las imágenes del origen', () => {
