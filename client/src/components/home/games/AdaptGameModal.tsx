@@ -157,8 +157,8 @@ function buildGroups(game: GameDetail): TargetGroup[] {
 }
 
 /**
- * Convierte el tema de un juego a otro tipo de juego (issues #8 y #50). Tres
- * caminos: rápida sin IA (algoritmo), con IA, o formulario vacío a mano. El
+ * Convierte el tema de un juego a otro tipo de juego (issues #8 y #50). Dos
+ * caminos: rápida sin IA (algoritmo) o con IA. El
  * borrador viaja por `location.state` al formulario del tipo elegido, que lo
  * aplica con las mismas funciones del asistente de IA. Nada se guarda hasta
  * que el usuario crea el juego nuevo desde ese formulario.
