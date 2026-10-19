@@ -238,6 +238,7 @@ describe('AdaptGameUseCase — motor de adaptación (issue #50)', () => {
     await expect(useCase.listOptions({ gameId: 'game-1', requestingUserId: 'u' })).resolves.toEqual({
       aiAvailable: false,
       algorithmTargets: ['DOMINO', 'MEMORY_MATCH:PAIRS'],
+      sourceHasConcepts: true,
     });
   });
 });

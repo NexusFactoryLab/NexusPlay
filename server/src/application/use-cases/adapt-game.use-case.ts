@@ -50,6 +50,12 @@ export interface AdaptationOptionsOutput {
   aiAvailable: boolean;
   /** Destinos disponibles sin IA para este juego: `DOMINO`, `MEMORY_MATCH:PAIRS`… */
   algorithmTargets: string[];
+  /**
+   * `false` cuando el juego origen es de preguntas (Escaleras y Serpientes,
+   * Dúo Lógico, V/F…): no tiene conceptos que reacomodar, así que NINGÚN
+   * destino admite la opción sin IA. Permite a la UI explicar el motivo.
+   */
+  sourceHasConcepts: boolean;
 }
 
 /**
@@ -79,9 +85,11 @@ export class AdaptGameUseCase implements UseCase<AdaptGameInput, AdaptGameOutput
   /** Qué motores puede usar quien pide para adaptar este juego; la UI los muestra o los oculta. */
   async listOptions(input: { gameId: string; requestingUserId: string }): Promise<AdaptationOptionsOutput> {
     const game = await this.loadAdaptableGame(input.gameId, input.requestingUserId);
+    const algorithmTargets = this.deterministicAdapter.supportedTargetKeys(game);
     return {
       aiAvailable: await this.aiUsagePolicy.canUseAi(input.requestingUserId),
-      algorithmTargets: this.deterministicAdapter.supportedTargetKeys(game),
+      algorithmTargets,
+      sourceHasConcepts: algorithmTargets.length > 0,
     };
   }
 

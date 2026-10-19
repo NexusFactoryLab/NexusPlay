@@ -6,6 +6,7 @@ import {
   Dices,
   Flame,
   Ghost,
+  Info,
   Layers,
   Loader2,
   PencilLine,
@@ -195,7 +196,7 @@ export function AdaptGameModal({ game, onClose }: AdaptGameModalProps) {
         if (!cancelled) setOptions(result)
       })
       .catch(() => {
-        if (!cancelled) setOptions({ aiAvailable: true, algorithmTargets: [] })
+        if (!cancelled) setOptions({ aiAvailable: true, algorithmTargets: [], sourceHasConcepts: true })
       })
     return () => {
       cancelled = true
@@ -310,6 +311,12 @@ export function AdaptGameModal({ game, onClose }: AdaptGameModalProps) {
               )
             })}
           </div>
+          {groups.some(isGroupUnavailable) && (
+            <p className="mt-3 flex items-start gap-2 text-[12px] leading-snug text-text">
+              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" strokeWidth={2.2} />
+              Los tipos marcados como «Inactivo» están desactivados por el momento y no se pueden elegir.
+            </p>
+          )}
         </div>
       ) : (
         <div key="engines" className="adapt-step">
@@ -406,7 +413,25 @@ export function AdaptGameModal({ game, onClose }: AdaptGameModalProps) {
                 onClick: () => selected && handleManual(selected),
               },
             ]
+
+            // Por qué algo está deshabilitado, dicho con claridad: un botón
+            // apagado sin explicación deja al usuario sin saber qué hacer.
+            let notice: string | null = null
+            if (needsVariant) {
+              notice = `Elige ${availableVariants.map((variant) => variant.variantLabel ?? variant.title).join(' u ')} para continuar.`
+            } else if (!loading && !algorithmAvailable) {
+              const name = selected?.variantLabel ? `${group.title}: ${selected.variantLabel}` : group.title
+              notice =
+                options?.sourceHasConcepts === false
+                  ? 'La opción Rápida no está disponible: este juego es de preguntas y no tiene conceptos que reacomodar. Usa «Con IA» o «A mano».'
+                  : `La opción Rápida no está disponible para «${name}»: necesita contenido nuevo (como el opuesto de cada concepto o preguntas redactadas). Usa «Con IA» o «A mano».`
+            }
+            if (!loading && options?.aiAvailable === false) {
+              notice = `${notice ? `${notice} ` : ''}La IA no está disponible en tu plan.`
+            }
+
             return (
+              <>
               <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
                 {cards.map((card, index) => (
                   <button
@@ -434,6 +459,17 @@ export function AdaptGameModal({ game, onClose }: AdaptGameModalProps) {
                   </button>
                 ))}
               </div>
+              {notice && (
+                <p
+                  role="status"
+                  className="adapt-option mt-3 flex items-start gap-2 rounded-xl border border-accent/30 bg-accent/5 px-3 py-2.5 text-[12.5px] leading-snug text-text-h"
+                  style={{ '--adapt-i': 3 } as React.CSSProperties}
+                >
+                  <Info className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={2.2} />
+                  <span>{notice}</span>
+                </p>
+              )}
+              </>
             )
           })()}
         </div>

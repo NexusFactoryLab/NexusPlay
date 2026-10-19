@@ -23,6 +23,8 @@ export type AdaptationOptions = {
   aiAvailable: boolean
   /** Destinos que admiten la opción sin IA: `DOMINO`, `MEMORY_MATCH:PAIRS`… */
   algorithmTargets: string[]
+  /** `false` si el juego origen es de preguntas: ningún destino admite la opción sin IA. */
+  sourceHasConcepts: boolean
 }
 
 /** GET /games/:id/adaptation-options — qué motores se pueden usar para este juego. */
