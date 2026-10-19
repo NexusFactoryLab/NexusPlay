@@ -15,6 +15,23 @@ export type AdaptedGameDraft = GameDraft & {
   theme: GameTheme
 }
 
+/** `ALGORITHM` = sin IA (gratis, menos preciso); `AI` = con IA (más preciso, consume cuota). */
+export type AdaptationEngine = 'ALGORITHM' | 'AI'
+
+export type AdaptationOptions = {
+  /** Si el usuario puede usar la IA (hoy siempre; luego, según su plan). */
+  aiAvailable: boolean
+  /** Destinos que admiten la opción sin IA: `DOMINO`, `MEMORY_MATCH:PAIRS`… */
+  algorithmTargets: string[]
+  /** `false` si el juego origen es de preguntas: ningún destino admite la opción sin IA. */
+  sourceHasConcepts: boolean
+}
+
+/** GET /games/:id/adaptation-options — qué motores se pueden usar para este juego. */
+export function getAdaptationOptions(token: string, gameId: string): Promise<AdaptationOptions> {
+  return request<AdaptationOptions>(`/games/${gameId}/adaptation-options`, { token })
+}
+
 /**
  * POST /games/:id/adapt — arma un borrador del juego en otro tipo. No crea
  * ni guarda nada: el usuario lo revisa en el formulario y lo crea como un
@@ -23,7 +40,7 @@ export type AdaptedGameDraft = GameDraft & {
 export function adaptGame(
   token: string,
   gameId: string,
-  input: { targetType: string; mode?: string },
+  input: { engine: AdaptationEngine; targetType: string; mode?: string },
 ): Promise<AdaptedGameDraft> {
   return request<AdaptedGameDraft>(`/games/${gameId}/adapt`, {
     method: 'POST',

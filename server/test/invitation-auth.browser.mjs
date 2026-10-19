@@ -1,7 +1,7 @@
 ﻿// Prueba integrada: gateway Nest/Socket.IO real con repositorios de prueba.
 // Primero: npm run build --workspace=server
 // Iniciar Vite en :5181 con VITE_API_URL=http://127.0.0.1:3109.
-// PLAYWRIGHT_MODULE permite usar una instalaciÃ³n de Playwright fuera del proyecto.
+// PLAYWRIGHT_MODULE permite usar una instalación de Playwright fuera del proyecto.
 import 'reflect-metadata';
 import { Module } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';

@@ -6,6 +6,15 @@ import { SaveVisibilityModal } from './SaveVisibilityModal'
 import { ImageUploadField } from './ImageUploadField'
 import { AiGameAssistantPanel } from './AiGameAssistantPanel'
 import { useReportCreateSummary } from './aiDraftContext'
+import { useCreationDraftId } from './useCreationDraftId'
+import {
+  asSavedState,
+  clampIndex,
+  savedList,
+  savedNullableString,
+  savedNumber,
+  savedString,
+} from './creationDraftSupport'
 import { GameFormShell } from './GameFormShell'
 import { WizardPhaseNav } from './WizardPhaseNav'
 import { FormSection, PhaseLabel } from './create/FormSection'
@@ -115,6 +124,23 @@ export function OppositesGameForm({
       })
   }, [token])
 
+  // Issue #69: estado completo del formulario para el borrador automático.
+  const { draftId, resuming } = useCreationDraftId()
+  const draftState = { title, description, coverImageUrl, pairs, categoryId, organizationId, phase, selectedPair }
+
+  function restoreDraft(saved: Record<string, unknown>) {
+    const state = asSavedState(saved)
+    setTitle(savedString(state, 'title', ''))
+    setDescription(savedString(state, 'description', ''))
+    setCoverImageUrl(savedNullableString(state, 'coverImageUrl'))
+    const savedPairs = savedList<PairDraft>(state, 'pairs')
+    if (savedPairs) setPairs(savedPairs)
+    setCategoryId(savedString(state, 'categoryId', ''))
+    setOrganizationId(savedString(state, 'organizationId', ''))
+    setPhase(clampIndex(savedNumber(state, 'phase', 0), TOTAL_PHASES))
+    setSelectedPair(clampIndex(savedNumber(state, 'selectedPair', 0), (savedPairs ?? pairs).length))
+  }
+
   useApplyAdaptation(adaptation, (adapted) => {
     setTitle(adapted.title)
     setDescription(adapted.description)
@@ -157,7 +183,7 @@ export function OppositesGameForm({
     setSelectedPair((current) => Math.max(0, Math.min(current, pairs.length - 2)))
   }
 
-  /** Valida solo los campos de la fase 1 (Identidad): título, descripción, Ã¡rea. */
+  /** Valida solo los campos de la fase 1 (Identidad): título, descripción, área. */
   function validateIdentityPhase(): string | null {
     if (!title.trim() || title.trim().length < 3) {
       return 'El título debe tener al menos 3 caracteres.'
@@ -166,7 +192,7 @@ export function OppositesGameForm({
       return 'La descripción debe tener al menos 10 caracteres.'
     }
     if (!categoryId) {
-      return 'Elige un Ã¡rea para el juego.'
+      return 'Elige un área para el juego.'
     }
     return null
   }
@@ -227,6 +253,7 @@ export function OppositesGameForm({
         title: title.trim(),
         description: description.trim(),
         gameType: 'MEMORY_MATCH',
+        creationDraftId: draftId,
         sourceGameId: adaptation?.sourceGameId ?? undefined,
         categoryId,
         organizationId: organizationId || undefined,
@@ -274,7 +301,12 @@ export function OppositesGameForm({
     <GameFormShell
       backLabel="Cambiar modo"
       onBack={onBack}
-      title="MatchMente: conceptos opuestos"
+      draftId={draftId}
+      resumingDraft={resuming}
+      draftState={draftState}
+      onRestoreDraft={restoreDraft}
+      adaptation={adaptation}
+       title="MatchMente: conceptos opuestos"
       description="Cada pareja tiene un aspecto positivo y su contraparte negativa."
       aiPanel={
         <AiGameAssistantPanel gameType="MEMORY_MATCH" mode="OPPOSITES" disabled={submitting} onDraftReady={applyAiDraft} />

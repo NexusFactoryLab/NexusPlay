@@ -18,9 +18,9 @@ export interface CreateRootSubjectInput {
 }
 
 /**
- * Ãrea raíz (parentSubjectId null): solo un ADMIN global puede crearla —
+ * Área raíz (parentSubjectId null): solo un ADMIN global puede crearla —
  * es el esqueleto fijo del catálogo, no contenido que cualquier profesor
- * agregue al vuelo (eso es lo que sí puede hacer con una sub-Ã¡rea, ver
+ * agregue al vuelo (eso es lo que sí puede hacer con una sub-área, ver
  * `CreateSubSubjectUseCase`).
  */
 @Injectable()
@@ -34,7 +34,7 @@ export class CreateRootSubjectUseCase implements UseCase<CreateRootSubjectInput,
   async execute(input: CreateRootSubjectInput): Promise<SubjectDto> {
     const isAdmin = await this.requesterAdminResolver.resolve(input.requestingUserId);
     if (!isAdmin) {
-      throw new ForbiddenActionError('crear un Ã¡rea raíz del catálogo');
+      throw new ForbiddenActionError('crear un área raíz del catálogo');
     }
 
     const id = this.idGenerator.generate();

@@ -11,6 +11,8 @@ export interface UploadImageInput {
   size: number;
   /** Subcarpeta lógica en el storage, ej. "game-covers" o "memory-cards". */
   folder: string;
+  /** Etiquetas del recurso en el almacenamiento (ej. `draft-<id>` durante la creación, issue #69). */
+  tags?: string[];
 }
 
 export interface UploadImageOutput {
@@ -29,7 +31,7 @@ export class UploadImageUseCase {
       throw new InvalidImageError('La imagen no puede pesar más de 5 MB.');
     }
 
-    const uploaded = await this.imageStorage.upload(input.buffer, input.folder);
+    const uploaded = await this.imageStorage.upload(input.buffer, input.folder, input.tags);
     return { url: uploaded.url };
   }
 }

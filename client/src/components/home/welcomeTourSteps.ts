@@ -25,10 +25,10 @@ export function getWelcomeSteps(role: string, isKids: boolean, options: WelcomeO
     target: 'profile', icon: 'profile', action: 'Abrir mi perfil',
   }
   if (isKids) return [
-    { title: 'Elige tu mundo', text: 'Toca un Ã¡rea y descubre sus juegos. Si aún no hay mundos, pídele a tu profe que publique un juego.', target: 'worlds', icon: 'explore' },
+    { title: 'Elige tu mundo', text: 'Toca un área y descubre sus juegos. Si aún no hay mundos, pídele a tu profe que publique un juego.', target: 'worlds', icon: 'explore' },
     { title: '¡A jugar con tu equipo!', text: 'Elige la portada de un juego. Si tu profe te dio un código de sala, escríbelo en ese juego y toca Unirme. Para jugar por tu cuenta, toca Jugar.', target: 'worlds', icon: 'play', action: 'Explorar juegos' },
     ...(options.canGoBackToWorlds ? [{
-      title: 'Descubre otro mundo', text: 'Toca Volver para regresar a las Ã¡reas y elegir otra aventura.',
+      title: 'Descubre otro mundo', text: 'Toca Volver para regresar a las áreas y elegir otra aventura.',
       target: 'worlds-back', icon: 'explore' as const, action: 'Volver a los mundos',
     }] : []),
     profile,
@@ -44,13 +44,13 @@ export function getWelcomeSteps(role: string, isKids: boolean, options: WelcomeO
     text: role === 'TEACHER'
       ? 'Mis clases reúne tus grupos. Mis actividades guarda tus creaciones y Comunidad te permite descubrir juegos compartidos.'
       : role === 'ADMIN'
-        ? 'Explora Ãreas y Comunidad. En Usuarios y Organización administras la plataforma; Temas te permite probar su apariencia.'
-        : 'Explora Ãreas y Comunidad para encontrar juegos. Tus juegos privados están en el menú.',
+        ? 'Explora Áreas y Comunidad. En Usuarios y Organización administras la plataforma; Temas te permite probar su apariencia.'
+        : 'Explora Áreas y Comunidad para encontrar juegos. Tus juegos privados están en el menú.',
     target: 'navigation', icon: 'explore',
   })
   steps.push(
     { title: 'Vuelve al inicio', text: 'Inicio te lleva al panel principal para volver a explorar los juegos.', target: 'nav-home', icon: 'explore', action: 'Ir al inicio' },
-    { title: 'Explora por Ã¡rea', text: 'En Ãreas encuentras los juegos organizados por lo que quieres aprender o enseñar.', target: 'nav-subjects', icon: 'explore', action: 'Ver Ã¡reas' },
+    { title: 'Explora por área', text: 'En Áreas encuentras los juegos organizados por lo que quieres aprender o enseñar.', target: 'nav-subjects', icon: 'explore', action: 'Ver áreas' },
   )
   if (role === 'TEACHER') steps.push({
     title: 'Tus grupos, en Mis clases', text: 'Organiza tus grupos y abre una clase para consultar o agregar sus actividades.', target: 'nav-classes', icon: 'explore', action: 'Ver mis clases',

@@ -28,7 +28,7 @@ const THEME_OPTIONS: ThemeOption[] = [
   {
     value: 'fantasy',
     label: 'Fantasía',
-    description: 'Nuevo y el tema por defecto: cielo nocturno, piedra, madera y pergamino, como un mundo de aventura.',
+    description: 'Nuevo: cielo nocturno, piedra, madera y pergamino, como un mundo de aventura.',
     icon: Wand2,
     previewImage: previewFantasy,
     isNew: true,

@@ -14,20 +14,20 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
-/** Color de respaldo para un Ã¡rea que no calza con ninguna regla: azul grisáceo neutro (profesional, no compite con ningún grupo). */
+/** Color de respaldo para un área que no calza con ninguna regla: azul grisáceo neutro (profesional, no compite con ningún grupo). */
 export const DEFAULT_CATEGORY_COLOR = '#64748b'
 
 /**
  * Palabras clave -> ícono y color representativos, elegidos por psicología
- * del color (no por índice/orden de creación): cada Ã¡rea transmite algo
- * consistente sin importar cuántas Ã¡reas existan o en qué orden se
+ * del color (no por índice/orden de creación): cada área transmite algo
+ * consistente sin importar cuántas áreas existan o en qué orden se
  * crearon. Las categorías son texto libre creado por usuarios, así que esto
  * es una heurística por nombre, con Sparkles + DEFAULT_CATEGORY_COLOR de
  * respaldo cuando ninguna palabra clave calza.
  *
  * Único punto de esta heurística en el cliente — la usan tanto el Home de
  * adulto (GamesSection.tsx) como el Modo Kids (components/home/kids/*), así
- * que un juego/Ã¡rea se ve con el mismo color/ícono sin importar qué
+ * que un juego/área se ve con el mismo color/ícono sin importar qué
  * pantalla lo muestre.
  */
 const CATEGORY_RULES: Array<{ keywords: string[]; icon: LucideIcon; color: string }> = [
@@ -71,7 +71,7 @@ export function iconForCategory(name: string): LucideIcon {
   return matchCategoryRule(name)?.icon ?? Sparkles
 }
 
-/** Color por psicología del color según el Ã¡rea (ver CATEGORY_RULES); mismo criterio para el badge del Ã¡rea y para cada tarjeta de juego que pertenece a ella. */
+/** Color por psicología del color según el área (ver CATEGORY_RULES); mismo criterio para el badge del área y para cada tarjeta de juego que pertenece a ella. */
 export function colorForCategory(name: string): string {
   return matchCategoryRule(name)?.color ?? DEFAULT_CATEGORY_COLOR
 }

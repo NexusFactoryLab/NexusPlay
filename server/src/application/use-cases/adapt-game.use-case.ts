@@ -10,17 +10,25 @@ import {
 import { ForbiddenActionError } from '../../domain/errors/authorization.errors.js';
 import { InvalidGameContentError } from '../../domain/errors/game.errors.js';
 import { GameType } from '../../domain/value-objects/game-type.vo.js';
+import type { Game } from '../../domain/entities/game.entity.js';
 import { GameNotFoundError } from '../errors/application.errors.js';
 import { resolveGamePromptSpec } from '../ai/game-prompt-catalog.js';
 import { buildGameSourceText } from '../ai/game-content-source-text.js';
+import { DeterministicGameAdapter } from '../adaptation/deterministic-game-adapter.js';
+import { sourceModeOf } from '../adaptation/game-concepts.js';
 import type { UseCase } from '../ports/use-case.port.js';
+import { AiUsagePolicy } from '../services/ai-usage-policy.service.js';
 import { GameAuthorizationService } from '../services/game-authorization.service.js';
 import { RequesterAdminResolver } from '../services/requester-admin-resolver.service.js';
 import { GenerateGameDraftUseCase } from './generate-game-draft.use-case.js';
 
+/** Motor de la adaptación: `ALGORITHM` (sin IA, gratis, menos preciso) o `AI` (más preciso, consume cuota). */
+export type AdaptationEngine = 'ALGORITHM' | 'AI';
+
 export interface AdaptGameInput {
   gameId: string;
   requestingUserId: string;
+  engine: AdaptationEngine;
   targetType: string;
   /** Solo relevante para MEMORY_MATCH: 'PAIRS' u 'OPPOSITES'. */
   mode?: string;
@@ -35,6 +43,19 @@ export interface AdaptGameOutput {
   config: Record<string, unknown>;
   content: unknown[];
   notice?: string;
+}
+
+export interface AdaptationOptionsOutput {
+  /** Si quien pide puede usar la IA (ver `AiUsagePolicy`). */
+  aiAvailable: boolean;
+  /** Destinos disponibles sin IA para este juego: `DOMINO`, `MEMORY_MATCH:PAIRS`… */
+  algorithmTargets: string[];
+  /**
+   * `false` cuando el juego origen es de preguntas (Escaleras y Serpientes,
+   * Dúo Lógico, V/F…): no tiene conceptos que reacomodar, así que NINGÚN
+   * destino admite la opción sin IA. Permite a la UI explicar el motivo.
+   */
+  sourceHasConcepts: boolean;
 }
 
 /**
@@ -57,40 +78,28 @@ export class AdaptGameUseCase implements UseCase<AdaptGameInput, AdaptGameOutput
     private readonly gameAuthorization: GameAuthorizationService,
     private readonly requesterAdminResolver: RequesterAdminResolver,
     private readonly generateGameDraft: GenerateGameDraftUseCase,
+    private readonly deterministicAdapter: DeterministicGameAdapter,
+    private readonly aiUsagePolicy: AiUsagePolicy,
   ) {}
 
+  /** Qué motores puede usar quien pide para adaptar este juego; la UI los muestra o los oculta. */
+  async listOptions(input: { gameId: string; requestingUserId: string }): Promise<AdaptationOptionsOutput> {
+    const game = await this.loadAdaptableGame(input.gameId, input.requestingUserId);
+    const algorithmTargets = this.deterministicAdapter.supportedTargetKeys(game);
+    return {
+      aiAvailable: await this.aiUsagePolicy.canUseAi(input.requestingUserId),
+      algorithmTargets,
+      sourceHasConcepts: algorithmTargets.length > 0,
+    };
+  }
+
   async execute(input: AdaptGameInput): Promise<AdaptGameOutput> {
-    const game = await this.gameRepository.findById(input.gameId);
-    if (!game) {
-      throw new GameNotFoundError(input.gameId);
-    }
-
-    const isAdmin = await this.requesterAdminResolver.resolve(input.requestingUserId);
-
-    // Mismo criterio que GetGameById: un tipo archivado no se filtra a un no-ADMIN.
-    if (!isAdmin) {
-      const sourceSetting = await this.gameTypeSettingRepository.findByGameType(
-        game.gameType.getName(),
-      );
-      if (sourceSetting?.isArchived()) {
-        throw new GameNotFoundError(input.gameId);
-      }
-    }
-
-    if (!game.status.isPublished()) {
-      const canManage = await this.gameAuthorization.canManage(game, input.requestingUserId);
-      if (!canManage) {
-        throw new ForbiddenActionError('adaptar este juego');
-      }
-    }
+    const game = await this.loadAdaptableGame(input.gameId, input.requestingUserId);
 
     const targetType = GameType.create(input.targetType);
     const targetName = targetType.getName();
 
-    const sourceMode =
-      game.gameType.getName() === 'MEMORY_MATCH' && typeof game.config.mode === 'string'
-        ? game.config.mode
-        : undefined;
+    const sourceMode = sourceModeOf(game);
     const sameType = targetName === game.gameType.getName();
     if (sameType && (targetName !== 'MEMORY_MATCH' || input.mode === sourceMode)) {
       throw new InvalidGameContentError('elige un tipo de juego distinto al del juego original.');
@@ -99,6 +108,42 @@ export class AdaptGameUseCase implements UseCase<AdaptGameInput, AdaptGameOutput
     const targetSetting = await this.gameTypeSettingRepository.findByGameType(targetName);
     if (targetSetting?.isArchived()) {
       throw new InvalidGameContentError('ese tipo de juego no está disponible por ahora.');
+    }
+
+    const adaptedNotice = `Adaptado de «${game.title}» — revisa el contenido antes de guardarlo.`;
+    const base = {
+      sourceGameId: game.id,
+      title: game.title,
+      description: game.description,
+      categoryId: game.categoryId,
+      theme: game.theme,
+    };
+
+    if (input.engine === 'ALGORITHM') {
+      // Sin paso automático a IA: si el par no tiene adaptador, se rechaza y
+      // el usuario decide si quiere gastar IA.
+      if (!this.deterministicAdapter.supports(game, targetName, input.mode)) {
+        throw new InvalidGameContentError(
+          'este par de juegos no se puede adaptar sin IA; elige la opción con IA.',
+        );
+      }
+      const draft = this.deterministicAdapter.adapt(game, targetName, input.mode);
+      // Es un juego NUEVO: no se heredan título, descripción ni portada del
+      // original (solo materia, color y los conceptos). `sourceGameId` queda
+      // únicamente como trazabilidad.
+      return {
+        ...base,
+        title: '',
+        description: '',
+        theme: { primaryColor: game.theme.primaryColor, coverImageUrl: null },
+        config: draft.config,
+        content: draft.content,
+        notice: [adaptedNotice, ...draft.notices].join(' '),
+      };
+    }
+
+    if (!(await this.aiUsagePolicy.canUseAi(input.requestingUserId))) {
+      throw new ForbiddenActionError('usar la IA');
     }
 
     if (!resolveGamePromptSpec(targetName, input.mode)) {
@@ -115,17 +160,40 @@ export class AdaptGameUseCase implements UseCase<AdaptGameInput, AdaptGameOutput
       sourceText: buildGameSourceText(game),
     });
 
-    const adaptedNotice = `Adaptado de «${game.title}» — revisa el contenido antes de guardarlo.`;
-
     return {
-      sourceGameId: game.id,
-      title: game.title,
-      description: game.description,
-      categoryId: game.categoryId,
-      theme: game.theme,
+      ...base,
       config: draft.config,
       content: draft.content,
       notice: draft.notice ? `${adaptedNotice} ${draft.notice}` : adaptedNotice,
     };
+  }
+
+  /** Carga el juego origen aplicando las reglas de acceso de la adaptación (publicado, o gestionable por quien pide). */
+  private async loadAdaptableGame(gameId: string, requestingUserId: string): Promise<Game> {
+    const game = await this.gameRepository.findById(gameId);
+    if (!game) {
+      throw new GameNotFoundError(gameId);
+    }
+
+    const isAdmin = await this.requesterAdminResolver.resolve(requestingUserId);
+
+    // Mismo criterio que GetGameById: un tipo archivado no se filtra a un no-ADMIN.
+    if (!isAdmin) {
+      const sourceSetting = await this.gameTypeSettingRepository.findByGameType(
+        game.gameType.getName(),
+      );
+      if (sourceSetting?.isArchived()) {
+        throw new GameNotFoundError(gameId);
+      }
+    }
+
+    if (!game.status.isPublished()) {
+      const canManage = await this.gameAuthorization.canManage(game, requestingUserId);
+      if (!canManage) {
+        throw new ForbiddenActionError('adaptar este juego');
+      }
+    }
+
+    return game;
   }
 }

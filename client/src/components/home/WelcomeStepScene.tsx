@@ -9,7 +9,7 @@ type NavItem = { target: string; label: string; icon: typeof Gamepad2 }
 /** Los mismos ítems, íconos y nombres del menú real (Sidebar.tsx). */
 const NAV: NavItem[] = [
   { target: 'nav-home', label: 'Inicio', icon: Gamepad2 },
-  { target: 'nav-subjects', label: 'Ãreas', icon: BookOpen },
+  { target: 'nav-subjects', label: 'Áreas', icon: BookOpen },
   { target: 'nav-classes', label: 'Mis clases', icon: Users2 },
   { target: 'nav-community', label: 'Comunidad', icon: Users2 },
   { target: 'nav-own-games', label: 'Mis juegos', icon: Lock },
@@ -271,7 +271,7 @@ function GameRow({ filtering }: { filtering: boolean }) {
 /** Títulos de cada sección, como los encabezados reales de cada página. */
 const SECTION_TITLES: Record<string, string> = {
   'nav-home': 'Inicio',
-  'nav-subjects': 'Ãreas',
+  'nav-subjects': 'Áreas',
   'nav-classes': 'Mis clases',
   'nav-community': 'Comunidad',
   'nav-own-games': 'Mis juegos privados',
@@ -453,7 +453,7 @@ function TypedText({ text, delayed }: { text: string; delayed?: boolean }) {
   )
 }
 
-/** Mundos del modo Kids, como KidsHomeShell: Ã¡reas grandes que rebotan, o la flecha de Volver. */
+/** Mundos del modo Kids, como KidsHomeShell: áreas grandes que rebotan, o la flecha de Volver. */
 function WorldsScene({ back }: { back: boolean }) {
   const worlds = [['🔢', 'Mate'], ['🌎', 'Sociales'], ['🔬', 'Ciencias'], ['🎨', 'Arte']]
   return (

@@ -5,6 +5,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Logger,
   Param,
   Patch,
   Post,
@@ -21,6 +22,7 @@ import { PublishGameUseCase } from '../../../application/use-cases/publish-game.
 import { UnpublishGameUseCase } from '../../../application/use-cases/unpublish-game.use-case.js';
 import { DeleteGameUseCase } from '../../../application/use-cases/delete-game.use-case.js';
 import { DonateGameToOrganizationUseCase } from '../../../application/use-cases/donate-game-to-organization.use-case.js';
+import { GameCreationDraftService } from '../../../application/services/game-creation-draft.service.js';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard.js';
 import { CurrentUserId } from '../decorators/current-user-id.decorator.js';
 import { CreateGameDto } from '../dtos/create-game.dto.js';
@@ -43,12 +45,28 @@ export class GameController {
     private readonly deleteGameUseCase: DeleteGameUseCase,
     private readonly donateGameUseCase: DonateGameToOrganizationUseCase,
     private readonly adaptGameUseCase: AdaptGameUseCase,
+    private readonly creationDrafts: GameCreationDraftService,
   ) {}
+
+  private readonly logger = new Logger(GameController.name);
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  create(@CurrentUserId() creatorUserId: string, @Body() dto: CreateGameDto) {
-    return this.createGameUseCase.execute({ creatorUserId, ...dto });
+  async create(@CurrentUserId() creatorUserId: string, @Body() dto: CreateGameDto) {
+    const { creationDraftId, ...gameInput } = dto;
+    const game = await this.createGameUseCase.execute({ creatorUserId, ...gameInput });
+    if (creationDraftId) {
+      // Issue #69: el juego ya existe; sus imágenes dejan de ser del borrador.
+      // Un fallo aquí no debe tumbar la creación (ya hecha); se registra.
+      try {
+        await this.creationDrafts.complete(creatorUserId, creationDraftId);
+      } catch (error) {
+        this.logger.error(
+          `No se pudo cerrar el borrador ${creationDraftId}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+    return game;
   }
 
   @Get()
@@ -112,9 +130,16 @@ export class GameController {
     return this.adaptGameUseCase.execute({
       gameId,
       requestingUserId,
+      engine: dto.engine,
       targetType: dto.targetType,
       mode: dto.mode,
     });
+  }
+
+  /** Motores disponibles para adaptar este juego (issue #50): qué destinos admiten la opción sin IA y si hay IA. */
+  @Get(':id/adaptation-options')
+  adaptationOptions(@CurrentUserId() requestingUserId: string, @Param('id') gameId: string) {
+    return this.adaptGameUseCase.listOptions({ gameId, requestingUserId });
   }
 
   /** Dona un juego personal a una organización. `creatorUserId` no cambia. */

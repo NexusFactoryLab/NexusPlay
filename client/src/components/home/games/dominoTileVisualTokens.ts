@@ -45,12 +45,12 @@ function linearChannel(channel: number) {
 
 function luminance(hex: string) {
   const normalized = hex.replace('#', '')
-  if (!/^[0-9a-f]{6}$/i.test(normalized)) throw new Error(`Color hexadecimal invÃ¡lido: ${hex}`)
+  if (!/^[0-9a-f]{6}$/i.test(normalized)) throw new Error(`Color hexadecimal inválido: ${hex}`)
   const [red, green, blue] = normalized.match(/.{2}/g)!.map((channel) => linearChannel(Number.parseInt(channel, 16)))
   return 0.2126 * red + 0.7152 * green + 0.0722 * blue
 }
 
-/** RelaciÃ³n de contraste WCAG entre dos colores hexadecimales. */
+/** Relación de contraste WCAG entre dos colores hexadecimales. */
 export function dominoTileContrast(first: string, second: string) {
   const [light, dark] = [luminance(first), luminance(second)].sort((a, b) => b - a)
   return (light + 0.05) / (dark + 0.05)

@@ -5,7 +5,9 @@ import { useAuth } from '../../../hooks/useAuth'
 import { useToast } from '../../../hooks/useToast'
 import { generateGameDraft, type GameDraft } from '../../../services/ai-game-assistant.service'
 import { ApiError } from '../../../utils/http'
+import { createStoredFile, materializeFiles } from './creationDraftSupport'
 import {
+  useAiDraftPersist,
   useAiFillStep,
   useMarkAiDraftApplied,
   useSetAiGenerating,
@@ -127,6 +129,7 @@ export function AiGameAssistantPanel({
   const markAiDraftApplied = useMarkAiDraftApplied()
   const setShellGenerating = useSetAiGenerating()
   const fillStep = useAiFillStep()
+  const persist = useAiDraftPersist()
   const unmountedRef = useRef(false)
   useEffect(() => {
     unmountedRef.current = false
@@ -153,6 +156,18 @@ export function AiGameAssistantPanel({
     )
     return () => window.clearInterval(timer)
   }, [generating])
+
+  // Issue #69: al retomar un borrador se recuperan el mensaje y los archivos
+  // que se enviaron a la IA (ya viven en Cloudinary; aquí solo se listan). El
+  // formulario lo restaura el shell por su cuenta: no se llama a la IA.
+  const restore = persist?.restore ?? null
+  const restoredNonce = useRef(0)
+  useEffect(() => {
+    if (!restore || restoredNonce.current === restore.nonce) return
+    restoredNonce.current = restore.nonce
+    setMessage(restore.message)
+    setFiles(restore.files.map(createStoredFile))
+  }, [restore])
 
   function cancelGeneration() {
     abortRef.current?.abort()
@@ -224,7 +239,17 @@ export function AiGameAssistantPanel({
     const controller = new AbortController()
     abortRef.current = controller
     try {
-      const draft = await generateGameDraft(token, gameType, files, mode, message, controller.signal)
+      // Resultado ya guardado para esta misma solicitud: no se vuelve a gastar cuota.
+      const cached = persist?.findCached(message, files) ?? null
+      let draft: GameDraft
+      if (cached) {
+        draft = cached
+      } else {
+        // Los archivos recuperados del borrador se descargan de Cloudinary solo si hay que reenviarlos.
+        const realFiles = await materializeFiles(files)
+        draft = await generateGameDraft(token, gameType, realFiles, mode, message, controller.signal)
+        persist?.save(draft, message, realFiles)
+      }
       // El servidor manda el borrador completo de una vez: se aplica por pasos
       // (ajustes primero, luego un elemento a la vez) y el shell lleva la vista
       // a cada campo que se llena, para que el llenado se vea y se entienda.

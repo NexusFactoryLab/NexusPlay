@@ -23,7 +23,7 @@ export function TermsOfServicePage() {
       <p>
         Los juegos, materiales y diseños de NexusPlay son propiedad de sus creadores. El contenido
         que profesores u organizaciones creen dentro de la plataforma (juegos personalizados,
-        Ã¡reas, clases) permanece bajo su responsabilidad y pueden gestionarlo o eliminarlo en
+        áreas, clases) permanece bajo su responsabilidad y pueden gestionarlo o eliminarlo en
         cualquier momento.
       </p>
 

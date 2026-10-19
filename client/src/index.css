@@ -490,6 +490,47 @@ code {
   }
 }
 
+/* Adaptación de un juego (AdaptGameModal.tsx): cada paso entra deslizándose
+ * desde la derecha y sus opciones aparecen en cascada (`--adapt-i` es el
+ * índice de cada opción), para que cambiar de paso no sea un salto brusco. */
+@keyframes adapt-step-in {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes adapt-option-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.adapt-step {
+  animation: adapt-step-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.adapt-option {
+  animation: adapt-option-in 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--adapt-i, 0) * 45ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .adapt-step,
+  .adapt-option {
+    animation: none;
+  }
+}
+
 /* Usadas por GuessWhoRoom.tsx (modo "¿Quién Es?"): dar peso físico a
  * descartar/voltear una tarjeta y a la revelación del resultado, en vez de
  * los cambios instantáneos de opacidad/render que tenía antes. */

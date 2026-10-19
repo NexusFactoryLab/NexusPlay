@@ -2,7 +2,7 @@ import { CloudSun, Moon, Sparkles, Sun } from 'lucide-react'
 import { useTheme } from '../hooks/useTheme'
 import type { Theme } from '../hooks/useTheme'
 
-/** Selector de las páginas públicas (login, registro): Fantasía es el predeterminado, Pradera su versión de día y Claro/Oscuro las minimalistas (issue #47). */
+/** Selector de las páginas públicas (login, registro): Claro es el predeterminado; Fantasía, Pradera y Oscuro son las alternativas (issue #47). */
 const OPTIONS: Array<{ value: Theme; label: string; icon: typeof Sun }> = [
   { value: 'fantasy', label: 'Tema fantasía', icon: Sparkles },
   { value: 'meadow', label: 'Tema pradera', icon: CloudSun },

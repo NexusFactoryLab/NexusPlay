@@ -71,14 +71,14 @@ function gamesLabel(count: number): string {
 }
 
 /**
- * Etiqueta de un Ã¡rea raíz: sus juegos publicados —los asignados directo
- * a ella más los de sus sub-Ã¡reas— y, si tiene, cuántas sub-Ã¡reas.
+ * Etiqueta de un área raíz: sus juegos publicados —los asignados directo
+ * a ella más los de sus sub-áreas— y, si tiene, cuántas sub-áreas.
  */
 function rootCountLabel(root: CategoryWithGameCount, subCategories: CategoryWithGameCount[]): string {
   const children = subCategories.filter((sub) => sub.parentSubjectId === root.id)
   const total = children.reduce((sum, sub) => sum + sub.gameCount, root.gameCount)
   if (children.length === 0) return gamesLabel(total)
-  return `${gamesLabel(total)} · ${children.length} ${children.length === 1 ? 'sub-Ã¡rea' : 'sub-Ã¡reas'}`
+  return `${gamesLabel(total)} · ${children.length} ${children.length === 1 ? 'sub-área' : 'sub-áreas'}`
 }
 
 function sortByGameCount(categories: CategoryWithGameCount[]): CategoryWithGameCount[] {
@@ -206,12 +206,12 @@ export function GamesSection({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchNonce])
 
-  // En modo "categories" (Ãreas) no hay lista de juegos hasta elegir una
-  // Ã¡rea — la grilla de Ã¡reas se muestra sola, y solo entonces se
+  // En modo "categories" (Áreas) no hay lista de juegos hasta elegir una
+  // área — la grilla de áreas se muestra sola, y solo entonces se
   // carga el catálogo filtrado por esa categoría (dentro del pop-up). Una
-  // Ã¡rea raíz abierta no carga juegos: primero muestra sus sub-Ã¡reas
-  // (ver el modal de categorías más abajo) — solo al entrar a una sub-Ã¡rea
-  // (o a los "juegos sin sub-Ã¡rea" de la raíz) se listan juegos de verdad.
+  // área raíz abierta no carga juegos: primero muestra sus sub-áreas
+  // (ver el modal de categorías más abajo) — solo al entrar a una sub-área
+  // (o a los "juegos sin sub-área" de la raíz) se listan juegos de verdad.
   const activeCategory = categories.find((c) => c.id === activeCategoryId) ?? null
   const isActiveCategoryRoot = activeCategory !== null && activeCategory.parentSubjectId === null
   const shouldLoadGames = mode !== 'categories' || (activeCategoryId !== null && !isActiveCategoryRoot)
@@ -252,9 +252,9 @@ export function GamesSection({
     reload()
   }, [reload])
 
-  // Al entrar a un Ã¡rea raíz se muestran sus sub-Ã¡reas, no un catálogo
+  // Al entrar a un área raíz se muestran sus sub-áreas, no un catálogo
   // de juegos — pero la raíz puede tener juegos asignados directo a ella
-  // (categoryId = id de la raíz, sin pasar por ninguna sub-Ã¡rea), y esos
+  // (categoryId = id de la raíz, sin pasar por ninguna sub-área), y esos
   // deben verse igual dentro de la vista, en su propia sección.
   useEffect(() => {
     if (!token || !isActiveCategoryRoot || !activeCategoryId) {
@@ -270,7 +270,7 @@ export function GamesSection({
 
   // Se carga siempre (no solo en mode 'categories'): el color por psicología
   // del color de cada tarjeta de juego (colorForGame) necesita el nombre de
-  // el Ã¡rea sin importar la sección activa (Home, Comunidad, Mis juegos).
+  // el área sin importar la sección activa (Home, Comunidad, Mis juegos).
   useEffect(() => {
     if (!token) return
     listCategories(token)
@@ -374,10 +374,10 @@ export function GamesSection({
   const multiFilterCount = games.length - soloFilterCount
 
   /**
-   * Color de un juego por psicología del color según su Ã¡rea (ver
+   * Color de un juego por psicología del color según su área (ver
    * CATEGORY_RULES), en vez del color que haya elegido quien lo creó — así
    * el color transmite consistentemente de qué trata el juego, sin importar
-   * quién lo hizo. Si el Ã¡rea todavía no cargó, cae al color neutro.
+   * quién lo hizo. Si el área todavía no cargó, cae al color neutro.
    */
   function colorForGame(game: GameSummary): string {
     const category = categories.find((c) => c.id === game.categoryId)
@@ -435,7 +435,7 @@ export function GamesSection({
       if (activeCategoryId === pendingDeleteCategory.id) setActiveCategoryId(null)
       setPendingDeleteCategory(null)
     } catch (err) {
-      setCategoryError(err instanceof ApiError ? err.message : 'No se pudo eliminar el Ã¡rea.')
+      setCategoryError(err instanceof ApiError ? err.message : 'No se pudo eliminar el área.')
     } finally {
       setDeletingCategory(false)
     }
@@ -453,9 +453,9 @@ export function GamesSection({
       .catch(() => {})
   }
 
-  // Ãreas raíz (parentSubjectId null): son el esqueleto fijo del catálogo,
-  // solo un admin las crea. Toda Ã¡rea nueva de un usuario normal nace como
-  // sub-Ã¡rea de una de estas — de ahí el selector obligatorio de abajo.
+  // Áreas raíz (parentSubjectId null): son el esqueleto fijo del catálogo,
+  // solo un admin las crea. Toda área nueva de un usuario normal nace como
+  // sub-área de una de estas — de ahí el selector obligatorio de abajo.
   const rootCategories = categories.filter((c) => c.parentSubjectId === null)
   const subCategories = categories.filter((c) => c.parentSubjectId !== null)
 
@@ -494,7 +494,7 @@ export function GamesSection({
       setPublishingCategory(null)
       refreshCategories()
     } catch (err) {
-      setPublishError(err instanceof ApiError ? err.message : 'No se pudo publicar el Ã¡rea.')
+      setPublishError(err instanceof ApiError ? err.message : 'No se pudo publicar el área.')
     } finally {
       setPublishing(false)
     }
@@ -511,7 +511,7 @@ export function GamesSection({
       setCreatingCategory(false)
       refreshCategories()
     } catch (err) {
-      setCategoryError(err instanceof ApiError ? err.message : 'No se pudo crear el Ã¡rea.')
+      setCategoryError(err instanceof ApiError ? err.message : 'No se pudo crear el área.')
     } finally {
       setSavingCategory(false)
     }
@@ -539,7 +539,7 @@ export function GamesSection({
 
   /**
    * Overlays de detalle/juego compartidos entre las dos ramas de render
-   * (grilla de Ãreas y el resto de secciones): antes este bloque estaba
+   * (grilla de Áreas y el resto de secciones): antes este bloque estaba
    * duplicado literalmente entre ambas.
    */
   function renderGameOverlays() {
@@ -581,15 +581,15 @@ export function GamesSection({
     return renderGameOverlays()
   }
 
-  // La grilla de "Ãreas" es una pantalla propia: mientras no se elige una
-  // Ã¡rea, no se carga ni se muestra el catálogo de juegos general.
+  // La grilla de "Áreas" es una pantalla propia: mientras no se elige una
+  // área, no se carga ni se muestra el catálogo de juegos general.
   if (mode === 'categories') {
     return (
       <section className="flex flex-col gap-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="mb-1 text-[22px] tracking-tight text-text-h">Ãreas</h2>
-            <p className="text-[14px] text-text">Elige un Ã¡rea para ver sus juegos publicados.</p>
+            <h2 className="mb-1 text-[22px] tracking-tight text-text-h">Áreas</h2>
+            <p className="text-[14px] text-text">Elige un área para ver sus juegos publicados.</p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
             <button
@@ -607,7 +607,7 @@ export function GamesSection({
               onClick={() => setCreatingCategory(true)}
             >
               <PlusCircle className="h-5 w-5" strokeWidth={2.25} />
-              Crear Ã¡rea
+              Crear área
             </button>
           </div>
         </div>
@@ -621,14 +621,14 @@ export function GamesSection({
             >
               <Sparkles className="h-6 w-6" strokeWidth={2} />
             </span>
-            <p className="text-[15px] font-medium text-text-h">Aún no hay Ã¡reas creadas.</p>
+            <p className="text-[15px] font-medium text-text-h">Aún no hay áreas creadas.</p>
             <p className="mt-1 max-w-[320px] text-[13px] text-text">Crea la primera para organizar los juegos.</p>
           </div>
         ) : (
           <>
             {rootCategories.length > 0 && (
               <div>
-                <h3 className="mb-3 text-[13px] font-semibold uppercase tracking-wide text-text/70">Ãreas raíz</h3>
+                <h3 className="mb-3 text-[13px] font-semibold uppercase tracking-wide text-text/70">Áreas raíz</h3>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                   {rootCategories.map((category) => (
                     <CategoryCard
@@ -648,7 +648,7 @@ export function GamesSection({
 
             {subCategories.length > 0 && (
               <div>
-                <h3 className="mb-3 text-[13px] font-semibold uppercase tracking-wide text-text/70">Sub-Ã¡reas</h3>
+                <h3 className="mb-3 text-[13px] font-semibold uppercase tracking-wide text-text/70">Sub-áreas</h3>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                   {subCategories.map((category) => (
                     <CategoryCard
@@ -670,18 +670,18 @@ export function GamesSection({
 
         {creatingCategory && (
           <Modal onClose={() => (savingCategory ? null : setCreatingCategory(false))} maxWidthClassName="max-w-[400px]">
-            <h2 className="mb-1 text-[18px] tracking-tight text-text-h">Nueva Ã¡rea</h2>
+            <h2 className="mb-1 text-[18px] tracking-tight text-text-h">Nueva área</h2>
             <p className="mb-4 text-[13px] text-text">
-              Se crea como sub-Ã¡rea privada: solo tú la ves hasta que decidas publicarla.
+              Se crea como sub-área privada: solo tú la ves hasta que decidas publicarla.
             </p>
-            <label className="mb-1 block text-[12.5px] font-medium text-text-h">Ãrea principal</label>
+            <label className="mb-1 block text-[12.5px] font-medium text-text-h">Área principal</label>
             <select
               value={newCategoryParentId}
               disabled={savingCategory}
               onChange={(event) => setNewCategoryParentId(event.target.value)}
               className="mb-3 w-full rounded-lg border border-border bg-bg px-[13px] py-2.5 text-[13px] text-text-h outline-none focus:border-accent"
             >
-              <option value="">Elige un Ã¡rea principal…</option>
+              <option value="">Elige un área principal…</option>
               {rootCategories.map((root) => (
                 <option key={root.id} value={root.id}>
                   {root.name}
@@ -732,7 +732,7 @@ export function GamesSection({
             onClose={() => (deletingCategory ? null : setPendingDeleteCategory(null))}
             maxWidthClassName="max-w-[420px]"
           >
-            <h2 className="mb-2 text-[18px] tracking-tight text-text-h">Eliminar Ã¡rea</h2>
+            <h2 className="mb-2 text-[18px] tracking-tight text-text-h">Eliminar área</h2>
             <p className="mb-6 text-[14px] leading-relaxed text-text">
               ¿Eliminar "{pendingDeleteCategory.name}"? Esta acción no se puede deshacer.
             </p>
@@ -775,7 +775,7 @@ export function GamesSection({
               <div>
                 <p className="text-[14px] font-semibold text-danger">Esta acción no se puede deshacer</p>
                 <p className="mt-1 text-[13px] leading-relaxed text-text">
-                  Al publicar "{publishingCategory.name}", otros usuarios podrán ver y usar esta Ã¡rea. No podrás
+                  Al publicar "{publishingCategory.name}", otros usuarios podrán ver y usar esta área. No podrás
                   volver a hacerla privada ni eliminarla.
                 </p>
               </div>
@@ -803,7 +803,7 @@ export function GamesSection({
                 </ul>
               </div>
             ) : (
-              <p className="mb-4 text-[13px] text-text">Esta Ã¡rea no tiene juegos en borrador todavía.</p>
+              <p className="mb-4 text-[13px] text-text">Esta área no tiene juegos en borrador todavía.</p>
             )}
 
             {publishError && (
@@ -819,7 +819,7 @@ export function GamesSection({
                 onClick={confirmPublishCategory}
                 disabled={publishing || loadingPublishPreview}
               >
-                {publishing ? 'Publicando…' : 'Sí, publicar Ã¡rea'}
+                {publishing ? 'Publicando…' : 'Sí, publicar área'}
               </button>
               <button
                 type="button"
@@ -839,13 +839,13 @@ export function GamesSection({
 
             {isActiveCategoryRoot ? (
               <>
-                <p className="mb-6 text-[14px] text-text">Elige una sub-Ã¡rea para ver sus juegos.</p>
+                <p className="mb-6 text-[14px] text-text">Elige una sub-área para ver sus juegos.</p>
 
                 {subCategories.filter((s) => s.parentSubjectId === activeCategoryId).length === 0 &&
                 rootUnclassifiedGames.length === 0 &&
                 !loadingRootUnclassified ? (
                   <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-16 text-center">
-                    <p className="text-[15px] font-medium text-text-h">Esta Ã¡rea todavía no tiene sub-Ã¡reas.</p>
+                    <p className="text-[15px] font-medium text-text-h">Esta área todavía no tiene sub-áreas.</p>
                   </div>
                 ) : (
                   <>
@@ -871,7 +871,7 @@ export function GamesSection({
                     {(loadingRootUnclassified || rootUnclassifiedGames.length > 0) && (
                       <div>
                         <h3 className="mb-3 text-[13px] font-semibold uppercase tracking-wide text-text/70">
-                          Juegos sin sub-Ã¡rea
+                          Juegos sin sub-área
                         </h3>
                         {loadingRootUnclassified ? (
                           <p className="py-4 text-center text-[14px] text-text">Cargando…</p>
@@ -895,7 +895,7 @@ export function GamesSection({
               </>
             ) : (
               <>
-                <p className="mb-6 text-[14px] text-text">Juegos publicados en esta Ã¡rea.</p>
+                <p className="mb-6 text-[14px] text-text">Juegos publicados en esta área.</p>
 
                 {error && (
                   <p
@@ -910,7 +910,7 @@ export function GamesSection({
                   <p className="py-8 text-center text-[14px] text-text">Cargando juegos…</p>
                 ) : games.length === 0 ? (
                   <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-16 text-center">
-                    <p className="text-[15px] font-medium text-text-h">Aún no hay juegos en esta Ã¡rea.</p>
+                    <p className="text-[15px] font-medium text-text-h">Aún no hay juegos en esta área.</p>
                   </div>
                 ) : (
                   <div className="scroll-fade grid max-h-[60vh] grid-cols-1 gap-4 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
@@ -1009,7 +1009,7 @@ export function GamesSection({
             <div className="home-hero-copy min-w-0 max-w-[560px]">
               <p className="home-hero-eyebrow mb-3 flex items-center gap-2 text-[12px] font-semibold tracking-wide text-accent uppercase">
                 <Sparkles className="h-3.5 w-3.5" strokeWidth={2.5} />
-                Modo creación · Cualquier Ã¡rea
+                Modo creación · Cualquier área
               </p>
               <h2 className="home-hero-title text-[30px] leading-[1.1] font-bold tracking-tight text-text-h">
                 {/* El salto de línea solo se usa en Fantasía, para partir el título como en la referencia. */}
@@ -1319,8 +1319,8 @@ function CategoryCard({
       {canDelete && (
         <button
           type="button"
-          aria-label={`Eliminar Ã¡rea ${category.name}`}
-          title="Eliminar Ã¡rea"
+          aria-label={`Eliminar área ${category.name}`}
+          title="Eliminar área"
           className="absolute top-3 right-3 rounded-lg p-1 text-text/50 opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger"
           onClick={onDelete}
         >
