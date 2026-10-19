@@ -130,9 +130,16 @@ export class GameController {
     return this.adaptGameUseCase.execute({
       gameId,
       requestingUserId,
+      engine: dto.engine,
       targetType: dto.targetType,
       mode: dto.mode,
     });
+  }
+
+  /** Motores disponibles para adaptar este juego (issue #50): qué destinos admiten la opción sin IA y si hay IA. */
+  @Get(':id/adaptation-options')
+  adaptationOptions(@CurrentUserId() requestingUserId: string, @Param('id') gameId: string) {
+    return this.adaptGameUseCase.listOptions({ gameId, requestingUserId });
   }
 
   /** Dona un juego personal a una organización. `creatorUserId` no cambia. */

@@ -40,6 +40,8 @@ import { ListGameTypeSettingsUseCase } from '../application/use-cases/list-game-
 import { ArchiveGameTypeUseCase } from '../application/use-cases/archive-game-type.use-case.js';
 import { UnarchiveGameTypeUseCase } from '../application/use-cases/unarchive-game-type.use-case.js';
 import { UpdateGameTypeSettingUseCase } from '../application/use-cases/update-game-type-setting.use-case.js';
+import { DeterministicGameAdapter } from '../application/adaptation/deterministic-game-adapter.js';
+import { AiUsagePolicy } from '../application/services/ai-usage-policy.service.js';
 import { AdaptGameUseCase } from '../application/use-cases/adapt-game.use-case.js';
 import { ContentImageResolver } from '../application/services/content-image-resolver.service.js';
 import { GenerateGameDraftUseCase } from '../application/use-cases/generate-game-draft.use-case.js';
@@ -152,6 +154,8 @@ const DEFAULT_AI_PROVIDER_ORDER = ['groq'];
     FileTextExtractor,
     ContentImageResolver,
     GenerateGameDraftUseCase,
+    DeterministicGameAdapter,
+    AiUsagePolicy,
     AdaptGameUseCase,
     ListAiProviderAttemptsUseCase,
   ],
