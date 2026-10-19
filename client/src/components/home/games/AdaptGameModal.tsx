@@ -9,7 +9,6 @@ import {
   Info,
   Layers,
   Loader2,
-  PencilLine,
   Puzzle,
   UserRoundSearch,
   Zap,
@@ -133,7 +132,7 @@ function isSameTarget(game: GameDetail, target: AdaptTarget): boolean {
 const ACCENT_GRADIENT = 'linear-gradient(135deg, var(--accent), var(--accent-2))'
 
 const INFO_TEXT =
-  'Crea un juego nuevo con el mismo tema en otro tipo de juego. Elige cómo armarlo: rápido sin IA (gratis, menos preciso), con IA (más preciso, consume cuota) o a mano. Lo revisas antes de guardar y el original no cambia.'
+  'Crea un juego nuevo con el mismo tema en otro tipo de juego. Elige cómo armarlo: rápido sin IA (gratis, menos preciso) o con IA (más preciso, consume cuota). Lo revisas antes de guardar y el original no cambia.'
 
 /** Agrupa los destinos por juego: Memoria (parejas/opuestos) es UN solo juego con dos modos. */
 function buildGroups(game: GameDetail): TargetGroup[] {
@@ -223,11 +222,6 @@ export function AdaptGameModal({ game, onClose }: AdaptGameModalProps) {
     setError(null)
     setGroup(null)
     setVariantKey(null)
-  }
-
-  /** Formulario vacío del tipo elegido: sin IA ni algoritmo, la persona lo llena a mano. */
-  function handleManual(target: AdaptTarget) {
-    navigate(target.route)
   }
 
   async function handleAdapt(target: AdaptTarget, engine: AdaptationEngine) {
@@ -404,14 +398,6 @@ export function AdaptGameModal({ game, onClose }: AdaptGameModalProps) {
                 accent: true,
                 onClick: () => selected && void handleAdapt(selected, 'AI'),
               },
-              {
-                id: 'MANUAL',
-                label: 'A mano',
-                hint: 'Formulario vacío',
-                icon: <PencilLine className="h-5 w-5" strokeWidth={2.2} />,
-                disabled: busy || needsVariant,
-                onClick: () => selected && handleManual(selected),
-              },
             ]
 
             // Por qué algo está deshabilitado, dicho con claridad: un botón
@@ -423,8 +409,8 @@ export function AdaptGameModal({ game, onClose }: AdaptGameModalProps) {
               const name = selected?.variantLabel ? `${group.title}: ${selected.variantLabel}` : group.title
               notice =
                 options?.sourceHasConcepts === false
-                  ? 'La opción Rápida no está disponible: este juego es de preguntas y no tiene conceptos que reacomodar. Usa «Con IA» o «A mano».'
-                  : `La opción Rápida no está disponible para «${name}»: necesita contenido nuevo (como el opuesto de cada concepto o preguntas redactadas). Usa «Con IA» o «A mano».`
+                  ? 'La opción Rápida no está disponible: este juego es de preguntas y no tiene conceptos que reacomodar. Usa «Con IA».'
+                  : `La opción Rápida no está disponible para «${name}»: necesita contenido nuevo (como el opuesto de cada concepto o preguntas redactadas). Usa «Con IA».`
             }
             if (!loading && options?.aiAvailable === false) {
               notice = `${notice ? `${notice} ` : ''}La IA no está disponible en tu plan.`
@@ -432,7 +418,7 @@ export function AdaptGameModal({ game, onClose }: AdaptGameModalProps) {
 
             return (
               <>
-              <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+              <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                 {cards.map((card, index) => (
                   <button
                     key={card.id}
