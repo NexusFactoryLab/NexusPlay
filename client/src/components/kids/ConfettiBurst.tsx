@@ -1,4 +1,6 @@
+import { useAuth } from '../../hooks/useAuth'
 import { useTheme } from '../../hooks/useTheme'
+import { isKidsMode } from '../../utils/kidsMode'
 
 const COLORS = ['#ff7a1a', '#06b6d4', '#ffcc4d', '#ff4d6d', '#22c55e', '#a78bfa']
 const PIECE_COUNT = 18
@@ -16,7 +18,8 @@ const PIECE_COUNT = 18
  */
 export function ConfettiBurst({ trigger }: { trigger: number | string }) {
   const { theme } = useTheme()
-  if (theme !== 'kids') return null
+  const { user } = useAuth()
+  if (theme !== 'kids' && !isKidsMode(user)) return null
 
   return (
     <div

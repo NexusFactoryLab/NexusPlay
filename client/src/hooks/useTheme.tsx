@@ -4,23 +4,27 @@ import { useAuth } from './useAuth'
 import { isKidsMode } from '../utils/kidsMode'
 
 /**
- * 'fantasy' es el predeterminado (issue #47): cielo nocturno, piedra, madera y
+ * 'light' es el predeterminado. 'fantasy' (issue #47): cielo nocturno, piedra, madera y
  * pergamino. 'meadow' (Pradera) es su versión de día: cielo claro, nubes y
  * madera clara. 'light' y 'dark' quedan como las versiones minimalistas.
  */
 export type Theme = 'fantasy' | 'meadow' | 'light' | 'dark' | 'kids'
 
-export const DEFAULT_THEME: Theme = 'fantasy'
+export const DEFAULT_THEME: Theme = 'light'
 
 /** Temas con fondo oscuro: deciden, por ejemplo, el botón de Google o el cielo de MatchMente. */
 export function isDarkTheme(theme: Theme): boolean {
   return theme === 'dark' || theme === 'fantasy'
 }
 
-const STORAGE_KEY = 'nexusplay-theme'
+/** Tema predeterminado del Modo Kids: el tema Kids. */
+export const KIDS_DEFAULT_THEME: Theme = 'kids'
 
-function readStoredTheme(): Theme | null {
-  const stored = localStorage.getItem(STORAGE_KEY)
+const STORAGE_KEY = 'nexusplay-theme'
+const KIDS_STORAGE_KEY = 'nexusplay-theme-kids'
+
+function readStoredTheme(key: string): Theme | null {
+  const stored = localStorage.getItem(key)
   return stored === 'fantasy' || stored === 'meadow' || stored === 'light' || stored === 'dark' || stored === 'kids' ? stored : null
 }
 
@@ -49,28 +53,39 @@ const ThemeContext = createContext<ThemeContextValue | null>(null)
  * verdad.
  */
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  // El Modo Kids ya no es una elección manual: todo STUDENT menor de 10 años
-  // (ver isKidsMode) lo ve siempre, sin importar lo que haya guardado en
-  // localStorage de una sesión anterior (por ejemplo, si el dispositivo lo
-  // usó antes un profesor en modo oscuro). `useAuth` es seguro acá porque
-  // `ThemeProvider` solo se monta dentro del árbol de <AuthProvider> (ver
-  // main.tsx).
+  // La interfaz del Modo Kids (ver isKidsMode) se decide por edad/rol, pero el
+  // TEMA visual sí es elegible: antes se forzaba 'kids' y los selectores de
+  // tema no hacían nada (la pantalla parecía congelada). Una cuenta kids tiene
+  // su propia preferencia, separada de la del dispositivo (para no heredar el
+  // modo oscuro de un profesor), y su predeterminado es Kids.
+  // `useAuth` es seguro acá porque `ThemeProvider` solo se monta dentro del
+  // árbol de <AuthProvider> (ver main.tsx).
   const { user } = useAuth()
-  const [theme, setThemeState] = useState<Theme>(() => readStoredTheme() ?? DEFAULT_THEME)
-  const effectiveTheme: Theme = isKidsMode(user) ? 'kids' : theme
+  const kidsAccount = isKidsMode(user)
+  const [theme, setThemeState] = useState<Theme>(() => readStoredTheme(STORAGE_KEY) ?? DEFAULT_THEME)
+  const [kidsTheme, setKidsThemeState] = useState<Theme>(() => readStoredTheme(KIDS_STORAGE_KEY) ?? KIDS_DEFAULT_THEME)
+  const effectiveTheme: Theme = kidsAccount ? kidsTheme : theme
 
   useEffect(() => {
     applyTheme(effectiveTheme)
   }, [effectiveTheme])
 
-  const setTheme = useCallback((next: Theme) => {
-    localStorage.setItem(STORAGE_KEY, next)
-    setThemeState(next)
-  }, [])
+  const setTheme = useCallback(
+    (next: Theme) => {
+      if (kidsAccount) {
+        localStorage.setItem(KIDS_STORAGE_KEY, next)
+        setKidsThemeState(next)
+      } else {
+        localStorage.setItem(STORAGE_KEY, next)
+        setThemeState(next)
+      }
+    },
+    [kidsAccount],
+  )
 
   const toggleTheme = useCallback(() => {
-    setTheme(theme === 'dark' ? 'light' : 'dark')
-  }, [theme, setTheme])
+    setTheme(effectiveTheme === 'dark' ? 'light' : 'dark')
+  }, [effectiveTheme, setTheme])
 
   return (
     <ThemeContext.Provider value={{ theme: effectiveTheme, setTheme, toggleTheme }}>

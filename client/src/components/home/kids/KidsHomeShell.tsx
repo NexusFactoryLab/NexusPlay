@@ -4,6 +4,8 @@ import { Building2 } from 'lucide-react'
 import kidsBackground from '../../../assets/kids/kids-bg.svg'
 import type { AuthUser } from '../../../services/auth.service'
 import { useAuth } from '../../../hooks/useAuth'
+import { useTheme } from '../../../hooks/useTheme'
+import { MeadowScenery } from '../FantasyDecor'
 import {
   listSubjects as listCategories,
   type SubjectWithGameCount as CategoryWithGameCount,
@@ -40,6 +42,7 @@ type KidsHomeShellProps = {
  */
 export function KidsHomeShell({ user, onSignOut }: KidsHomeShellProps) {
   const { token } = useAuth()
+  const { theme } = useTheme()
   const navigate = useNavigate()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [categories, setCategories] = useState<CategoryWithGameCount[]>([])
@@ -72,9 +75,12 @@ export function KidsHomeShell({ user, onSignOut }: KidsHomeShellProps) {
     <div
       className="fixed inset-0 flex flex-col overflow-y-auto"
       style={{
-        background: `var(--bg) url(${kidsBackground}) center / cover no-repeat fixed`,
+        // El fondo ilustrado es del tema Kids; con los demás (Pradera por
+        // defecto) se usa el fondo propio del tema, como en el Home de adulto.
+        background: theme === 'kids' ? `var(--bg) url(${kidsBackground}) center / cover no-repeat fixed` : undefined,
       }}
     >
+      {theme === 'meadow' && <MeadowScenery />}
       <header className="flex shrink-0 flex-wrap items-center justify-between gap-4 px-5 py-4 sm:px-8">
         <div>
           <p className="text-[20px] font-extrabold text-text-h sm:text-[24px]">
