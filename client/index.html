@@ -10,11 +10,9 @@
         try {
           var stored = localStorage.getItem('nexusplay-theme')
           var theme =
-            stored === 'light' || stored === 'dark'
+            stored === 'fantasy' || stored === 'meadow' || stored === 'light' || stored === 'dark' || stored === 'kids'
               ? stored
-              : window.matchMedia('(prefers-color-scheme: dark)').matches
-                ? 'dark'
-                : 'light'
+              : 'light'
           document.documentElement.setAttribute('data-theme', theme)
         } catch (e) {}
       })()
