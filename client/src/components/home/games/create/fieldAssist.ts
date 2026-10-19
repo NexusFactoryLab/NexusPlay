@@ -39,27 +39,27 @@ const GENERIC_EXAMPLE: ExampleSet = {
 
 /** Ejemplos editables por tipo de juego (clave = título que muestra el formulario). */
 const EXAMPLES: Record<string, ExampleSet> = {
-  Pares: {
+  'MatchMente: parejas': {
     title: 'Animales y sus hábitats',
     description: 'Une cada animal con el lugar donde vive para repasar los ecosistemas.',
   },
-  'Conceptos opuestos': {
+  'MatchMente: conceptos opuestos': {
     title: 'Hábitos que cuidan el planeta',
     description: 'Une cada buena práctica ambiental con su contraparte que daña el entorno.',
   },
-  '¿Quién Es?': {
+  'Identidad Oculta': {
     title: 'Adivina el país',
     description: 'Haz preguntas de sí o no para descubrir qué país escogió tu rival.',
   },
-  Dominó: {
+  Dominexo: {
     title: 'Dominó de la tabla periódica',
     description: 'Encadena cada elemento con su símbolo y gana quien se quede sin fichas.',
   },
-  'Recolector de laberinto': {
+  'Laberinto recolector': {
     title: 'Recicla en el laberinto',
     description: 'Recoge los residuos correctos y esquiva a los enemigos antes de que acabe el tiempo.',
   },
-  'Escaleras y Serpientes': {
+  'Escaleras y serpientes': {
     title: 'Escaleras de las matemáticas',
     description: 'Responde cada reto para avanzar por el tablero y llegar primero a la meta.',
   },

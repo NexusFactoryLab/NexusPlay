@@ -96,7 +96,7 @@ function SnakesLaddersRoomPageSession() {
         <header className="mb-5 flex items-center justify-between gap-3">
           <div>
             <p className="text-[12px] font-semibold uppercase tracking-wide text-accent">
-              {room?.gameTitle ?? 'Escaleras y Serpientes'}
+              {room?.gameTitle ?? 'Escaleras y serpientes'}
             </p>
             <h1 className="text-[20px] tracking-tight text-text-h">Sala en vivo</h1>
           </div>

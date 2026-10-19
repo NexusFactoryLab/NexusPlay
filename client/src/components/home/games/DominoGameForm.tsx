@@ -310,7 +310,7 @@ export function DominoGameForm({
     <GameFormShell
       backLabel="Cambiar tipo de juego"
       onBack={onBack}
-      title="Dominó"
+      title="Dominexo"
       description={
         <>
           Cada mitad de una ficha es un concepto tuyo en vez de un número. Con {concepts.length}{' '}

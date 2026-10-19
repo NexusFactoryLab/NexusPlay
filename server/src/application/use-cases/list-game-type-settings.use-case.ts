@@ -3,7 +3,7 @@ import {
   GAME_TYPE_SETTING_REPOSITORY,
   type GameTypeSettingRepository,
 } from '../../domain/ports/game-type-setting.repository.port.js';
-import { VALID_GAME_TYPES } from '../../domain/value-objects/game-type.vo.js';
+import { publicGameTypeName, VALID_GAME_TYPES } from '../../domain/value-objects/game-type.vo.js';
 import { toGameTypeSettingDto, type GameTypeSettingDto } from '../dtos/game-type-setting-response.dto.js';
 import type { UseCase } from '../ports/use-case.port.js';
 import { RequesterAdminResolver } from '../services/requester-admin-resolver.service.js';
@@ -71,7 +71,7 @@ export class ListGameTypeSettingsUseCase
 
       return {
         gameType,
-        displayName: gameType,
+        displayName: publicGameTypeName(gameType),
         description: null,
         status: 'ACTIVE',
         isArchived: false,

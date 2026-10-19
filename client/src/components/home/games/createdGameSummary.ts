@@ -24,12 +24,12 @@ export type CreatedGameKind =
  *   DUAL_QUEST (no DUAL_QUEST_PIXI, que es el motor de demo aparte).
  */
 const CREATED_GAME_KINDS: Record<CreatedGameKind, { label: string; gameType: string; instructionKind: CreationInstructionKind }> = {
-  PAIRS: { label: 'Pares', gameType: 'MEMORY_MATCH', instructionKind: 'PAIRS' },
-  OPPOSITES: { label: 'Conceptos opuestos', gameType: 'MEMORY_MATCH', instructionKind: 'OPPOSITES' },
-  GUESS_WHO: { label: '¿Quién Es?', gameType: 'GUESS_WHO', instructionKind: 'GUESS_WHO' },
-  DOMINO: { label: 'Dominó', gameType: 'DOMINO', instructionKind: 'DOMINO' },
-  MAZE_COLLECTOR: { label: 'Recolector de laberinto', gameType: 'MAZE_COLLECTOR', instructionKind: 'MAZE_COLLECTOR' },
-  SNAKES_LADDERS: { label: 'Escaleras y Serpientes', gameType: 'SNAKES_LADDERS', instructionKind: 'SNAKES_LADDERS' },
+  PAIRS: { label: 'MatchMente: parejas', gameType: 'MEMORY_MATCH', instructionKind: 'PAIRS' },
+  OPPOSITES: { label: 'MatchMente: conceptos opuestos', gameType: 'MEMORY_MATCH', instructionKind: 'OPPOSITES' },
+  GUESS_WHO: { label: 'Identidad Oculta', gameType: 'GUESS_WHO', instructionKind: 'GUESS_WHO' },
+  DOMINO: { label: 'Dominexo', gameType: 'DOMINO', instructionKind: 'DOMINO' },
+  MAZE_COLLECTOR: { label: 'Laberinto recolector', gameType: 'MAZE_COLLECTOR', instructionKind: 'MAZE_COLLECTOR' },
+  SNAKES_LADDERS: { label: 'Escaleras y serpientes', gameType: 'SNAKES_LADDERS', instructionKind: 'SNAKES_LADDERS' },
   DUAL_QUEST: { label: 'Dúo Lógico', gameType: 'DUAL_QUEST', instructionKind: 'DUAL_QUEST' },
   TRUE_FALSE_MAZE: {
     label: 'Laberinto Verdadero o Falso',
