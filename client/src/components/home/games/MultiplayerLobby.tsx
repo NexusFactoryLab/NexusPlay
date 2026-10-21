@@ -252,6 +252,8 @@ export function MultiplayerLobby({
             </div>
           </div>
 
+          {/* Turno y ajustes extra (ej. descarte automático) lado a lado para que el modal no necesite scroll (issue #80). */}
+          <div className={settings ? 'grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 [&>*]:h-full' : 'contents'}>
           {turnDurationSeconds === undefined ? (
             <div className="rounded-[22px] border border-border bg-surface p-4 shadow-[var(--shadow)]">
               <p className="text-[13px] font-medium text-text-h">
@@ -293,8 +295,8 @@ export function MultiplayerLobby({
                 }}
               />
               <p className="mt-1 text-[11.5px] text-text">
-                Si nadie actúa a tiempo, el turno pasa automático. Entre{' '}
-                {minTurn} y {maxTurn} segundos.
+                Entre {minTurn} y {maxTurn} s. Si nadie actúa, el turno pasa
+                solo.
               </p>
             </div>
           ) : (
@@ -308,6 +310,7 @@ export function MultiplayerLobby({
           )}
 
           {settings}
+          </div>
 
           <LobbyReadyControl
             players={room.players}

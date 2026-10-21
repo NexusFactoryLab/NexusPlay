@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { CircleHelp, Clock3, SkipForward, Sparkles, Volume2 } from 'lucide-react'
+import { CircleHelp, Clock3, Hourglass, SkipForward, Sparkles, Volume2 } from 'lucide-react'
 import { MIN_DISCARDS_TO_ACCUSE, type GuessWhoCard, type RoomPlayerView } from './guessWhoTypes'
 import { CardInfoBubble } from './CardInfoBubble'
 import { playGuessWhoCardToggle, playGuessWhoCountdownTick, playGuessWhoTurnCue } from '../../../utils/gameFeedback'
@@ -320,6 +320,73 @@ type MatchBoardProps = {
 }
 
 /**
+ * Franja fija arriba del tablero (issue #80): de quién es el turno tiene que
+ * leerse de un vistazo. En tu turno es una barra sólida del color de acento;
+ * en el del rival, una barra apagada y punteada con reloj de arena.
+ */
+function TurnStatusStrip({
+  isMyTurn,
+  opponentName,
+  remainingMs,
+  turnDurationSeconds,
+}: {
+  isMyTurn: boolean
+  opponentName: string
+  remainingMs: number
+  turnDurationSeconds: number
+}) {
+  const secondsLeft = Math.ceil(remainingMs / 1000)
+  const urgent = secondsLeft <= 5
+  const progress = Math.max(0, Math.min(1, remainingMs / (turnDurationSeconds * 1000)))
+
+  useEffect(() => {
+    if (secondsLeft > 0 && secondsLeft <= 5) playGuessWhoCountdownTick(secondsLeft)
+  }, [secondsLeft])
+
+  return (
+    <div
+      role="status"
+      data-turn={isMyTurn ? 'mine' : 'rival'}
+      className={`relative overflow-hidden rounded-2xl border-2 px-4 py-3 transition-colors duration-300 ${
+        isMyTurn ? 'border-transparent text-white shadow-[0_12px_28px_-14px_var(--accent)]' : 'border-dashed border-border bg-surface text-text-h'
+      }`}
+      style={isMyTurn ? { background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' } : undefined}
+    >
+      <div className="flex items-center gap-3">
+        <span
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${isMyTurn ? 'bg-white/25' : 'bg-border/60 text-text'}`}
+          aria-hidden="true"
+        >
+          {isMyTurn ? <Sparkles className="h-6 w-6" strokeWidth={2.25} /> : <Hourglass className="h-5 w-5 motion-safe:animate-pulse" strokeWidth={2} />}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className={`truncate font-extrabold tracking-tight uppercase ${isMyTurn ? 'text-[22px]' : 'text-[17px]'}`}>
+            {isMyTurn ? '¡Tu turno!' : `Turno de ${opponentName}`}
+          </p>
+          <p className={`truncate text-[12px] font-medium ${isMyTurn ? 'text-white/85' : 'text-text'}`}>
+            {isMyTurn ? 'Pregunta, descarta o adivina.' : 'Espera: tu rival está jugando.'}
+          </p>
+        </div>
+        <span
+          className={`shrink-0 rounded-xl px-3 py-1.5 text-[20px] font-extrabold tabular-nums ${
+            urgent ? 'bg-danger text-white' : isMyTurn ? 'bg-white/20' : 'bg-border/60'
+          }`}
+          aria-label={`${secondsLeft} segundos restantes`}
+        >
+          {secondsLeft}s
+        </span>
+      </div>
+      <div className={`absolute inset-x-0 bottom-0 h-1 ${isMyTurn ? 'bg-white/20' : 'bg-border/50'}`} aria-hidden="true">
+        <div
+          className={`h-full transition-[width] duration-200 ease-linear ${urgent ? 'bg-danger' : isMyTurn ? 'bg-white' : 'bg-text/40'}`}
+          style={{ width: `${progress * 100}%` }}
+        />
+      </div>
+    </div>
+  )
+}
+
+/**
  * Tablero de una partida 1v1 de "¿Quién Es?" en curso (fase PLAYING):
  * banner de turno, tarjeta secreta propia, grilla de descarte, botón de
  * pasar turno y bloque de acusación. Compartido entre la sala 1v1 suelta
@@ -362,7 +429,18 @@ export function MatchBoard({
         accusationMessage={accusationMessage}
       />
 
-      <div className="guess-who-board-columns flex flex-col gap-4 sm:flex-row sm:items-start">
+      <TurnStatusStrip
+        isMyTurn={isMyTurn}
+        opponentName={opponent.displayName}
+        remainingMs={turnRemainingMs}
+        turnDurationSeconds={turnDurationSeconds}
+      />
+
+      <div
+        className={`guess-who-board-columns flex flex-col gap-4 rounded-2xl p-2 transition-[box-shadow,opacity] duration-300 sm:flex-row sm:items-start ${
+          isMyTurn ? 'ring-2 ring-accent/70 shadow-[0_0_0_6px_color-mix(in_srgb,var(--accent)_14%,transparent)]' : 'opacity-85 ring-1 ring-border'
+        }`}
+      >
         <div className="guess-who-board-actions flex shrink-0 flex-col gap-3 sm:w-[210px]">
           <div
             key={self.secretCardId}
@@ -419,13 +497,6 @@ export function MatchBoard({
           </div>
 
           <div className="flex flex-col gap-2">
-            <TurnBanner
-              variant="inline"
-              isMyTurn={isMyTurn}
-              remainingMs={turnRemainingMs}
-              turnDurationSeconds={turnDurationSeconds}
-            />
-
             {isMyTurn && (
               <button
                 type="button"
