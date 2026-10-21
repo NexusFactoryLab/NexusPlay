@@ -29,6 +29,12 @@ export class InvalidRoleError extends DomainError {
   }
 }
 
+export class InvalidAvatarError extends DomainError {
+  constructor(reason: string) {
+    super(`Avatar inválido: ${reason}`);
+  }
+}
+
 export class InvalidUserStateError extends DomainError {
   constructor(reason: string) {
     super(`Operación inválida sobre el usuario: ${reason}`);

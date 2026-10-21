@@ -27,7 +27,7 @@ export function GuessWhoRoom({ gameId, onExit }: GuessWhoRoomProps) {
     <Modal onClose={onExit} maxWidthClassName="max-w-[440px]">
       <div className="space-y-5">
         <div className="rounded-2xl bg-gradient-to-r from-accent/12 via-accent/5 to-transparent p-4">
-          <p className="text-[11px] font-semibold tracking-[0.18em] text-accent uppercase">¿Quién Es?</p>
+          <p className="text-[11px] font-semibold tracking-[0.18em] text-accent uppercase">Identidad Oculta</p>
           <h2 className="mt-2 text-[24px] font-bold tracking-tight text-text-h">
             {choosingBot ? 'Elige la dificultad' : 'Elige tu formato'}
           </h2>

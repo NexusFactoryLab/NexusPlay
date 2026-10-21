@@ -374,7 +374,7 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
       draftState={draftState}
       onRestoreDraft={restoreDraft}
       adaptation={adaptation}
-      title="Recolector de laberinto"
+       title="Laberinto recolector"
       description="Recolecta objetos temáticos en un laberinto y esquiva enemigos."
       descriptionDetail="Puedes cambiar la narrativa: por ejemplo, un camión de reciclaje esquivando nubes de contaminación, o cualquier otra idea."
       aiPanel={<AiGameAssistantPanel gameType="MAZE_COLLECTOR" disabled={submitting} onDraftReady={applyAiDraft} />}

@@ -35,7 +35,7 @@ function DualQuestPixiPlaySession() {
       .then((game) => {
         if (cancelled) return
         if (game.gameType !== 'DUAL_QUEST_PIXI') {
-          setState({ status: 'error', message: `"${game.title}" no es un juego de Dúo Lógico (motor PixiJS).` })
+          setState({ status: 'error', message: `"${game.title}" no es un juego de Dúo Lógico Pixi.` })
           return
         }
         const level = adaptGameDetailToLevel(game)
@@ -63,7 +63,7 @@ function DualQuestPixiPlaySession() {
     <div className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-slate-950">
       <div className="flex shrink-0 items-center justify-between gap-3 p-4">
         <div>
-          <h1 className="text-xl font-bold text-white">{state.status === 'ready' ? state.game.title : 'Dúo Lógico'}</h1>
+          <h1 className="text-xl font-bold text-white">{state.status === 'ready' ? state.game.title : 'Dúo Lógico Pixi'}</h1>
           <p className="text-sm text-slate-400">
             Lumen: A/D moverse, W saltar o nadar, S bucear. Gota: flechas izquierda/derecha, arriba saltar o nadar,
             abajo bucear.

@@ -36,6 +36,8 @@ import { ChangeUserRoleUseCase } from '../application/use-cases/change-user-role
 import { ChangeOwnRoleUseCase } from '../application/use-cases/change-own-role.use-case.js';
 import { ResetUserPasswordUseCase } from '../application/use-cases/reset-user-password.use-case.js';
 import { UpdateUserProfileByAdminUseCase } from '../application/use-cases/update-user-profile-by-admin.use-case.js';
+import { UpdateUserAvatarUseCase } from '../application/use-cases/update-user-avatar.use-case.js';
+import { GetUsersAvatarsUseCase } from '../application/use-cases/get-users-avatars.use-case.js';
 import { RolesGuard } from './http/guards/roles.guard.js';
 import { UserController } from './http/controllers/user.controller.js';
 import { AuthController } from './http/controllers/auth.controller.js';
@@ -87,6 +89,8 @@ import { AuthController } from './http/controllers/auth.controller.js';
     ChangeOwnRoleUseCase,
     ResetUserPasswordUseCase,
     UpdateUserProfileByAdminUseCase,
+    UpdateUserAvatarUseCase,
+    GetUsersAvatarsUseCase,
   ],
   exports: [JwtModule, USER_REPOSITORY, ID_GENERATOR],
 })

@@ -4,7 +4,7 @@ import {
   type GameTypeSettingRepository,
 } from '../../domain/ports/game-type-setting.repository.port.js';
 import { GameTypeSetting } from '../../domain/entities/game-type-setting.entity.js';
-import { GameType } from '../../domain/value-objects/game-type.vo.js';
+import { GameType, publicGameTypeName } from '../../domain/value-objects/game-type.vo.js';
 import { ForbiddenActionError } from '../../domain/errors/authorization.errors.js';
 import { ID_GENERATOR, type IdGenerator } from '../../domain/ports/id-generator.port.js';
 import { toGameTypeSettingDto, type GameTypeSettingDto } from '../dtos/game-type-setting-response.dto.js';
@@ -43,7 +43,7 @@ export class UpdateGameTypeSettingUseCase
       GameTypeSetting.create({
         id: this.idGenerator.generate(),
         gameType,
-        displayName: gameType.getName(),
+        displayName: publicGameTypeName(gameType.getName()),
       });
 
     setting.rename(input.displayName, input.description);

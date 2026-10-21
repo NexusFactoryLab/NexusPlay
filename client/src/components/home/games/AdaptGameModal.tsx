@@ -54,7 +54,7 @@ type TargetGroup = {
 const TARGETS: AdaptTarget[] = [
   {
     key: 'DOMINO',
-    title: 'Dominó',
+    title: 'Dominexo',
     description: 'Cada mitad de ficha es un concepto del tema.',
     targetType: 'DOMINO',
     route: '/juegos/crear/domino',
@@ -62,7 +62,7 @@ const TARGETS: AdaptTarget[] = [
   },
   {
     key: 'MAZE_COLLECTOR',
-    title: 'Recolector de laberinto',
+    title: 'Laberinto recolector',
     description: 'Recolecta los conceptos del tema esquivando enemigos.',
     targetType: 'MAZE_COLLECTOR',
     route: '/juegos/crear/laberinto',
@@ -70,7 +70,7 @@ const TARGETS: AdaptTarget[] = [
   },
   {
     key: 'SNAKES_LADDERS',
-    title: 'Escaleras y Serpientes',
+    title: 'Escaleras y serpientes',
     description: 'El avance depende de responder preguntas del tema.',
     targetType: 'SNAKES_LADDERS',
     route: '/juegos/crear/escaleras-serpientes',
@@ -78,7 +78,7 @@ const TARGETS: AdaptTarget[] = [
   },
   {
     key: 'GUESS_WHO',
-    title: '¿Quién Es?',
+    title: 'Identidad Oculta',
     description: 'Adivina la tarjeta secreta del otro jugador.',
     targetType: 'GUESS_WHO',
     route: '/juegos/crear/quien-es',
@@ -86,7 +86,7 @@ const TARGETS: AdaptTarget[] = [
   },
   {
     key: 'PAIRS',
-    title: 'Memoria: parejas',
+    title: 'MatchMente: parejas',
     description: 'Une cada imagen con su concepto.',
     targetType: 'MEMORY_MATCH',
     mode: 'PAIRS',
@@ -98,7 +98,7 @@ const TARGETS: AdaptTarget[] = [
   },
   {
     key: 'OPPOSITES',
-    title: 'Memoria: opuestos',
+    title: 'MatchMente: conceptos opuestos',
     description: 'Une cada concepto con su opuesto.',
     targetType: 'MEMORY_MATCH',
     mode: 'OPPOSITES',

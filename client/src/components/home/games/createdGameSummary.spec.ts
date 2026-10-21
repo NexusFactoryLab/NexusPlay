@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { summarizeCreatedGame, type CreatedGameKind } from './createdGameSummary'
 
 const EXPECTED: Record<CreatedGameKind, { typeLabel: string; isMultiplayer: boolean }> = {
-  PAIRS: { typeLabel: 'Pares', isMultiplayer: false },
-  OPPOSITES: { typeLabel: 'Conceptos opuestos', isMultiplayer: false },
-  GUESS_WHO: { typeLabel: '¿Quién Es?', isMultiplayer: true },
-  DOMINO: { typeLabel: 'Dominó', isMultiplayer: true },
-  MAZE_COLLECTOR: { typeLabel: 'Recolector de laberinto', isMultiplayer: false },
-  SNAKES_LADDERS: { typeLabel: 'Escaleras y Serpientes', isMultiplayer: true },
+  PAIRS: { typeLabel: 'MatchMente: parejas', isMultiplayer: false },
+  OPPOSITES: { typeLabel: 'MatchMente: conceptos opuestos', isMultiplayer: false },
+  GUESS_WHO: { typeLabel: 'Identidad Oculta', isMultiplayer: true },
+  DOMINO: { typeLabel: 'Dominexo', isMultiplayer: true },
+  MAZE_COLLECTOR: { typeLabel: 'Laberinto recolector', isMultiplayer: false },
+  SNAKES_LADDERS: { typeLabel: 'Escaleras y serpientes', isMultiplayer: true },
   DUAL_QUEST: { typeLabel: 'Dúo Lógico', isMultiplayer: true },
   TRUE_FALSE_MAZE: { typeLabel: 'Laberinto Verdadero o Falso', isMultiplayer: false },
 }

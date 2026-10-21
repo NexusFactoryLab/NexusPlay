@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Outlet, useNavigate } from 'react-router-dom'
+import { Outlet, useMatch, useNavigate } from 'react-router-dom'
 import { Building2 } from 'lucide-react'
 import kidsBackground from '../../../assets/kids/kids-bg.svg'
 import type { AuthUser } from '../../../services/auth.service'
@@ -44,6 +44,8 @@ export function KidsHomeShell({ user, onSignOut }: KidsHomeShellProps) {
   const { token } = useAuth()
   const { theme } = useTheme()
   const navigate = useNavigate()
+  // "Configurar avatar" (issue #77) es una página entera: en vez de los mundos.
+  const onAvatarPage = useMatch('/avatar') !== null
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [categories, setCategories] = useState<CategoryWithGameCount[]>([])
   const [selectedCategory, setSelectedCategory] = useState<CategoryWithGameCount | null>(null)
@@ -104,7 +106,7 @@ export function KidsHomeShell({ user, onSignOut }: KidsHomeShellProps) {
       </header>
 
       <main data-tour="worlds" className="flex flex-1 flex-col px-5 pb-10 sm:px-8">
-        {selectedCategory ? (
+        {onAvatarPage ? null : selectedCategory ? (
           token && (
             <KidsGameGrid
               token={token}

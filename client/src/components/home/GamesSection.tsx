@@ -35,6 +35,7 @@ import { resolveRoomCode, LIVE_ROOM_ROUTES, type ResolvedRoom } from './games/re
 import { GuessWhoRoom } from './games/GuessWhoRoom'
 import { GameFiltersPanel, type GameTypeFilterOption } from './games/GameFiltersPanel'
 import { modeFilterForGameType, type GameModeFilter } from './games/gameModeVisuals'
+import { resolveGameTypeDisplayName } from './games/gameTypePublicNames'
 
 export type GamesSectionMode = 'all' | 'categories' | 'community' | 'my-games' | 'game-type'
 
@@ -298,7 +299,10 @@ export function GamesSection({
     if (!token) return
     listAllGameTypeSettings(token)
       .then((settings) => {
-        setGameTypeDisplayNames(new Map(settings.map((s) => [s.gameType, s.displayName])))
+        setGameTypeDisplayNames(new Map(settings.map((s) => [
+          s.gameType,
+          resolveGameTypeDisplayName(s.gameType, s.displayName),
+        ])))
       })
       .catch(() => {})
   }, [token])
@@ -362,7 +366,7 @@ export function GamesSection({
     .map(([gameType, count]) => ({
       gameType,
       count,
-      label: gameTypeDisplayNames.get(gameType) ?? gameType,
+      label: resolveGameTypeDisplayName(gameType, gameTypeDisplayNames.get(gameType)),
     }))
     .sort((a, b) => a.label.localeCompare(b.label))
 

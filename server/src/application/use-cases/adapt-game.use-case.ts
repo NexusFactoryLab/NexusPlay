@@ -130,7 +130,10 @@ export class AdaptGameUseCase implements UseCase<AdaptGameInput, AdaptGameOutput
           'este par de juegos no se puede adaptar sin IA; elige la opción con IA.',
         );
       }
-      const draft = this.deterministicAdapter.adapt(game, targetName, input.mode);
+      const adapted = this.deterministicAdapter.adapt(game, targetName, input.mode);
+      // Si el original no tenía imágenes (Dominó, V/F…), se consiguen solas (issue #75).
+      const images = await this.generateGameDraft.fillMissingImages(targetName, input.mode, adapted);
+      const draft = { ...images.draft, notices: images.notice ? [...adapted.notices, images.notice] : adapted.notices };
       // Es un juego NUEVO: no se heredan título, descripción ni portada del
       // original (solo materia, color y los conceptos). `sourceGameId` queda
       // únicamente como trazabilidad.

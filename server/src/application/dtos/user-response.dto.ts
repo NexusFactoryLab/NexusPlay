@@ -1,4 +1,5 @@
 import { User } from '../../domain/entities/user.entity.js';
+import type { AvatarConfigProps } from '../../domain/value-objects/avatar-config.vo.js';
 
 export interface UserResponseDto {
   id: string;
@@ -10,6 +11,8 @@ export interface UserResponseDto {
   role: string;
   hasChosenRole: boolean;
   avatarUrl: string | null;
+  /** Avatar armado por piezas (issue #77); null si la cuenta aún no lo configuró. */
+  avatarConfig: AvatarConfigProps | null;
   birthDate: Date | null;
   locale: string;
   isActive: boolean;
@@ -30,6 +33,7 @@ export function toUserResponseDto(user: User): UserResponseDto {
     role: user.role.getName(),
     hasChosenRole: user.hasChosenRole,
     avatarUrl: user.avatarUrl,
+    avatarConfig: user.avatarConfig?.toJSON() ?? null,
     birthDate: user.birthDate,
     locale: user.locale,
     isActive: user.isActive,

@@ -52,6 +52,10 @@ function build(
 ) {
   const game = options.game === undefined ? buildGame() : options.game;
   const generate = vi.fn().mockResolvedValue({ config: { boardSize: 30 }, content: [{ cellNumber: 4 }] });
+  const fillMissingImages = vi.fn().mockImplementation(async (_type: string, _mode: string | undefined, draft: { config: Record<string, unknown>; content: unknown[] }) => ({
+    draft: { ...draft, content: draft.content.map((item) => ({ ...(item as object), imageUrl: 'https://img.test/1.svg' })) },
+    notice: 'La IA creó 1 ilustración.',
+  }));
   const adapt = vi.fn().mockReturnValue({
     config: { handSize: 7 },
     content: [{ label: 'Marte' }],
@@ -68,7 +72,7 @@ function build(
     } as never,
     { canManage: vi.fn().mockResolvedValue(options.canManage ?? false) } as unknown as GameAuthorizationService,
     { resolve: vi.fn().mockResolvedValue(options.isAdmin ?? false) } as unknown as RequesterAdminResolver,
-    { execute: generate } as unknown as GenerateGameDraftUseCase,
+    { execute: generate, fillMissingImages } as unknown as GenerateGameDraftUseCase,
     {
       supports: vi.fn().mockReturnValue(options.algorithmSupported ?? true),
       supportedTargetKeys: vi.fn().mockReturnValue(['DOMINO', 'MEMORY_MATCH:PAIRS']),
@@ -76,7 +80,7 @@ function build(
     } as unknown as DeterministicGameAdapter,
     { canUseAi, isConfigured } as unknown as AiUsagePolicy,
   );
-  return { useCase, generate, adapt, canUseAi };
+  return { useCase, generate, adapt, canUseAi, fillMissingImages };
 }
 
 describe('AdaptGameUseCase', () => {
@@ -182,7 +186,7 @@ describe('AdaptGameUseCase', () => {
 
 describe('AdaptGameUseCase — motor de adaptación (issue #50)', () => {
   it('ALGORITHM adapta sin llamar a la IA ni consultar canUseAi, y junta los avisos', async () => {
-    const { useCase, generate, adapt, canUseAi } = build();
+    const { useCase, generate, adapt, canUseAi, fillMissingImages } = build();
 
     const result = await useCase.execute({
       gameId: 'game-1',
@@ -201,10 +205,13 @@ describe('AdaptGameUseCase — motor de adaptación (issue #50)', () => {
       description: '',
       categoryId: 'cat-1',
       theme: { primaryColor: '#112233', coverImageUrl: null },
-      content: [{ label: 'Marte' }],
+      content: [{ label: 'Marte', imageUrl: 'https://img.test/1.svg' }],
     });
+    // Las imágenes que faltan se completan solas (issue #75).
+    expect(fillMissingImages).toHaveBeenCalledOnce();
     expect(result.notice).toContain('Adaptado de');
     expect(result.notice).toContain('Faltan imágenes.');
+    expect(result.notice).toContain('La IA creó 1 ilustración.');
   });
 
   it('ALGORITHM sobre un par sin adaptador se rechaza y NUNCA cae a la IA', async () => {

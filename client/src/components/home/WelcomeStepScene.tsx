@@ -23,8 +23,8 @@ const ADMIN_TARGETS = ['nav-users', 'nav-ai-providers', 'nav-organization']
 
 const GAMES = [
   { emoji: '🧠', name: 'MatchMente', color: '#a78bfa' },
-  { emoji: '🏃', name: 'Laberinto', color: '#06b6d4' },
-  { emoji: '🁢', name: 'Dominó', color: '#ff7a1a' },
+  { emoji: '🏃', name: 'Laberinto recolector', color: '#06b6d4' },
+  { emoji: '🁢', name: 'Dominexo', color: '#ff7a1a' },
 ]
 
 /** Dónde toca el dedo en la miniatura (% del ancho y px del alto). */
