@@ -6761,3 +6761,12 @@ code {
     max-width: none;
   }
 }
+
+/* Despertador de «Segundos por turno» (issue #80): se balancea como si sonara. */
+@keyframes clock-wiggle {
+  0%, 70%, 100% { transform: rotate(0); }
+  75% { transform: rotate(-9deg); }
+  80% { transform: rotate(8deg); }
+  85% { transform: rotate(-6deg); }
+  90% { transform: rotate(4deg); }
+}

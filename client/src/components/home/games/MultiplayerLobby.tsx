@@ -1,7 +1,8 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Clock3, Copy, Link, LogOut, MessageCircle } from 'lucide-react'
+import { Copy, Link, LogOut, MessageCircle } from 'lucide-react'
 import { Modal } from './Modal'
+import { CartoonClock } from './CartoonClock'
 import { LobbyReadyControl } from './LobbyReadyControl'
 import { ChatPanel } from './ChatPanel'
 import type { GuessWhoChatMessage } from './guessWhoTypes'
@@ -247,9 +248,7 @@ export function MultiplayerLobby({
                 className="mb-2 flex items-center gap-2 text-[13px] font-semibold text-text-h"
                 htmlFor={durationId}
               >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent/15 text-accent" aria-hidden="true">
-                  <Clock3 className="h-5 w-5" strokeWidth={2.25} />
-                </span>
+                <CartoonClock className="h-12 w-12 shrink-0" />
                 Segundos por turno
               </label>
               <input
@@ -282,9 +281,7 @@ export function MultiplayerLobby({
           ) : (
             <div className="rounded-[22px] border border-border bg-surface p-4 shadow-[var(--shadow)]">
               <p className="flex items-center gap-2 text-[12.5px] text-text">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent/15 text-accent" aria-hidden="true">
-                  <Clock3 className="h-5 w-5" strokeWidth={2.25} />
-                </span>
+                <CartoonClock className="h-12 w-12 shrink-0" />
                 <span>Segundos por turno:{' '}
                 <strong className="text-text-h">{turnDurationText}</strong> (lo
                 define quien creó la sala).</span>
