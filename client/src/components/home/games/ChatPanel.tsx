@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { MessageCircle, Send, X } from 'lucide-react'
+import { Bot, MessageCircle, Send, X } from 'lucide-react'
 import type { GuessWhoChatMessage, GuessWhoCard, GuidedQuestion, PendingQuestion } from './guessWhoTypes'
 
 export type GuidedChatControls = {
@@ -34,7 +34,6 @@ export function ChatPanel({
   inline = false,
   guided,
   error,
-  notice,
   answerHint,
 }: {
   messages: GuessWhoChatMessage[]
@@ -46,8 +45,6 @@ export function ChatPanel({
   inline?: boolean
   guided?: GuidedChatControls
   error?: string | null
-  /** Aviso fijo sobre el chat (ej. que el rival es el bot y no lee mensajes). */
-  notice?: string
   /** Aviso al responder algo que no coincide con tu tarjeta: se muestra junto a Sí/No, no como error. */
   answerHint?: string | null
 }) {
@@ -62,14 +59,19 @@ export function ChatPanel({
   // (issue #64): antes Enter lo mandaba como mensaje y el bot no lo veía.
   const canAskFree = Boolean(guided?.onAskFree && guided.isMyTurn && !guided.pending)
   const looksLikeQuestion = /[¿?]/.test(text)
+  // En el turno del bot no se escribe: el bot no lee mensajes sueltos (issue #80).
+  const botTurn = Boolean(guided?.opponentIsBot && !guided.isMyTurn)
+  const inputLocked = disconnected || botTurn
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
-    if (!text.trim() || disconnected) return
+    if (!text.trim() || inputLocked) return
     if (canAskFree && looksLikeQuestion) guided!.onAskFree!(text.trim())
     else onSend(text)
     setText('')
   }
+
+  const filteredQuestions = guided ? guided.questions.filter(q => normalize(q.text).includes(normalize(text.trim()))) : []
 
   // La última respuesta del rival a una pregunta, destacada para que no se pierda en el chat.
   const lastAnswer = [...messages].reverse().find((m) => m.userId !== selfUserId && /^(Sí|No)\./.test(m.text))
@@ -107,7 +109,6 @@ export function ChatPanel({
       </div>
 
       {inline && error && <p role="alert" className="mx-3 mt-2 rounded-lg border border-danger/40 bg-surface/90 p-2 text-[12px] text-danger">{error}</p>}
-      {notice && <p className="mx-3 mt-2 rounded-lg border border-accent/30 bg-accent/5 p-2 text-[12px] text-text-h">{notice}</p>}
       <div
         role="log"
         aria-live="polite"
@@ -123,6 +124,25 @@ export function ChatPanel({
         ) : (
           messages.map((message, index) => {
             const isSelf = message.userId === selfUserId
+            // Las respuestas Sí/No a preguntas se destacan; lo demás es charla y va más discreto.
+            const answer = guided && !isSelf ? /^(Sí|No)\.\s*/.exec(message.text) : null
+            if (answer) {
+              const yes = answer[1] === 'Sí'
+              return (
+                <div key={`${message.sentAt}-${index}`} className="flex flex-col items-start">
+                  <span className="mb-0.5 px-1 text-[10.5px] font-semibold text-text">{message.displayName} respondió</span>
+                  <span
+                    data-answer={yes ? 'yes' : 'no'}
+                    className={`flex max-w-[90%] items-start gap-2 rounded-xl border-2 px-3 py-2 text-[13px] leading-snug break-words text-text-h ${
+                      yes ? 'border-emerald-500/70 bg-emerald-500/10' : 'border-danger/60 bg-danger/10'
+                    }`}
+                  >
+                    <strong className={`shrink-0 text-[15px] font-extrabold ${yes ? 'text-emerald-600 dark:text-emerald-400' : 'text-danger'}`}>{answer[1]}</strong>
+                    <span>{message.text.slice(answer[0].length)}</span>
+                  </span>
+                </div>
+              )
+            }
             return (
               <div
                 key={`${message.sentAt}-${index}`}
@@ -134,9 +154,9 @@ export function ChatPanel({
                   </span>
                 )}
                 <span
-                  className={`max-w-[85%] rounded-lg px-3 py-1.5 text-[13px] leading-snug break-words ${
-                    isSelf ? 'text-white' : 'border border-border text-text-h'
-                  }`}
+                  className={`max-w-[85%] rounded-lg px-3 py-1.5 leading-snug break-words ${
+                    guided ? 'text-[12px]' : 'text-[13px]'
+                  } ${isSelf ? 'text-white' : `border border-border ${guided ? 'text-text' : 'text-text-h'}`}`}
                   style={
                     isSelf
                       ? {
@@ -154,7 +174,7 @@ export function ChatPanel({
         )}
       </div>
 
-      {guided && <div className="max-h-[45%] shrink-0 overflow-y-auto border-t border-accent/20 bg-accent/5 px-3 py-3">
+      {guided && <div className={`flex max-h-[55%] min-h-0 shrink-0 flex-col border-t border-accent/20 bg-accent/5 px-3 py-3 ${guided.pending || answerIsFresh ? 'overflow-y-auto' : ''}`}>
         {guided.pending ? <>
           <p className="text-[12px] font-bold text-accent">{guided.pending.askerId === selfUserId ? (guided.pending.free && guided.opponentIsBot ? 'El bot está pensando la respuesta con IA…' : 'Esperando a tu rival…') : guided.pending.free ? 'Tu rival hace su propia pregunta' : 'Tu rival pregunta'}</p>
           <p className="mt-1 text-[13px] font-semibold text-text-h">{guided.pending.text}</p>
@@ -170,35 +190,36 @@ export function ChatPanel({
             <p className="text-[11px] text-text">{lastAnswer.text.replace(/^(Sí|No)\.\s*/, '')}</p>
             <button type="button" onClick={() => setDismissedAnswerAt(lastAnswer.sentAt)} className="mt-2 rounded-lg border border-accent/40 px-3 py-1.5 text-[12px] font-semibold text-accent focus-visible:outline-2 focus-visible:outline-accent">Entendido</button>
           </div> : <>
-          {lastAnswer && <p className="mb-2 rounded-lg border border-accent/40 bg-surface px-2.5 py-1.5 text-[12.5px] text-text-h">
-            <span className="font-semibold">{lastAnswer.displayName} respondió: </span>
-            <strong className="text-accent">{lastAnswer.text.startsWith('Sí') ? 'Sí' : 'No'}</strong>
-          </p>}
-          <p className="text-[12px] font-bold text-accent">Preguntas Sí/No · {guided.autoDiscard === false ? 'descartas tú' : 'descarte automático'}</p>
-          {!guided.isMyTurn ? <p className="mt-1 text-[12px] text-text">Podrás preguntar en tu turno. Puedes escribir mensajes mientras esperas.</p> : <div className="mt-2 space-y-2">
-            {guided.questions.filter(q => normalize(q.text).includes(normalize(text.trim()))).map(q => <div key={q.id}>
-              <button type="button" disabled={disconnected} onClick={() => { guided.onAsk(q.id); setText('') }} className="w-full rounded-xl border border-accent/30 bg-surface/70 px-3 py-2 text-left text-[12px] font-medium text-text-h hover:border-accent focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50" aria-label={`Preguntar: ${q.text}`}>{q.category && <span className="mr-1.5 inline-block rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold text-accent">{q.category}</span>}{q.text}</button>
-            </div>)}
-            {guided.questions.filter(q => normalize(q.text).includes(normalize(text.trim()))).length === 0 && <p className="text-[12px] text-text">{guided.questions.length ? 'Sin sugerencias para ese texto.' : 'No quedan preguntas sugeridas que separen las tarjetas.'}</p>}
+          <p className="shrink-0 text-[12px] font-bold text-accent">Preguntas Sí/No · {guided.autoDiscard === false ? 'descartas tú' : 'descarte automático'}</p>
+          {!guided.isMyTurn ? <p className="mt-1 shrink-0 text-[12px] text-text">{botTurn ? 'Podrás preguntar cuando sea tu turno.' : 'Podrás preguntar en tu turno. Puedes escribir mensajes mientras esperas.'}</p> : <>
+            {/* La lista tiene su propio scroll con margen arriba y abajo: así ninguna pregunta queda cortada contra el borde. */}
+            <div role="list" aria-label="Preguntas sugeridas" className="mt-2 flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto overscroll-contain scroll-py-2 py-1 pr-1">
+              {filteredQuestions.map(q => <button key={q.id} role="listitem" type="button" disabled={disconnected} onClick={() => { guided.onAsk(q.id); setText('') }} className="flex w-full shrink-0 items-center gap-1.5 rounded-xl border border-accent/30 bg-surface px-3 py-2 text-left text-[12px] font-medium leading-snug text-text-h hover:border-accent focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent disabled:opacity-50" aria-label={`Preguntar: ${q.text}`}>{q.category && <span className="shrink-0 rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold text-accent">{q.category}</span>}<span className="min-w-0">{q.text}</span></button>)}
+              {filteredQuestions.length === 0 && <p className="text-[12px] text-text">{guided.questions.length ? 'Sin sugerencias para ese texto.' : 'No quedan preguntas sugeridas que separen las tarjetas.'}</p>}
+            </div>
             {guided.onAskFree && (text.trim()
-              ? <button type="button" disabled={disconnected} onClick={() => { guided.onAskFree!(text.trim()); setText('') }} className="w-full rounded-xl bg-accent px-3 py-2 text-left text-[12px] font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50">Hacer esta pregunta (Sí/No): «{text.trim()}»</button>
-              : <p className="text-[11.5px] text-text">¿Quieres preguntar otra cosa? Escríbela abajo con «?» y pulsa Enter{guided.opponentIsBot ? ' (el bot la responde con IA)' : ''}.</p>)}
-          </div>}
+              ? <button type="button" disabled={disconnected} onClick={() => { guided.onAskFree!(text.trim()); setText('') }} className="mt-2 w-full shrink-0 rounded-xl bg-accent px-3 py-2 text-left text-[12px] font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50">Hacer esta pregunta (Sí/No): «{text.trim()}»</button>
+              : <p className="mt-2 shrink-0 text-[11px] text-text">O escribe la tuya con «?»{guided.opponentIsBot ? ' (el bot responde con IA)' : ''}.</p>)}
+          </>}
           </>}
         </>}
       </div>}
 
+      {botTurn && <p role="status" className="flex items-center gap-1.5 border-t border-border bg-bg/60 px-3 pt-2.5 text-[12px] font-semibold text-text-h">
+        <Bot className="h-4 w-4 shrink-0 text-accent" strokeWidth={2} aria-hidden="true" />
+        Turno del bot: el chat se abre cuando vuelva tu turno.
+      </p>}
       <form
-        className="flex gap-2 border-t border-border p-3"
+        className={`flex gap-2 p-3 ${botTurn ? 'bg-bg/60' : 'border-t border-border'}`}
         onSubmit={handleSubmit}
       >
         <input
           type="text"
-          className="min-w-0 flex-1 rounded-lg border border-border bg-bg px-3 py-2 text-[13px] text-text-h outline-none focus:border-accent"
+          className="min-w-0 flex-1 rounded-lg border border-border bg-bg px-3 py-2 text-[13px] text-text-h outline-none focus:border-accent disabled:cursor-not-allowed disabled:opacity-60"
           aria-label="Mensaje"
           autoFocus={!inline}
-          disabled={disconnected}
-          placeholder={canAskFree ? 'Escribe una pregunta de Sí/No o un mensaje…' : 'Escribe un mensaje…'}
+          disabled={inputLocked}
+          placeholder={botTurn ? 'Turno del bot…' : canAskFree ? 'Escribe una pregunta de Sí/No o un mensaje…' : 'Escribe un mensaje…'}
           maxLength={500}
           value={text}
           onChange={(event) => setText(event.target.value)}
@@ -210,13 +231,12 @@ export function ChatPanel({
             background:
               'linear-gradient(135deg, var(--accent), var(--accent-2))',
           }}
-          disabled={!text.trim() || disconnected}
+          disabled={!text.trim() || inputLocked}
           aria-label={canAskFree && looksLikeQuestion ? 'Hacer la pregunta' : 'Enviar mensaje'}
         >
           <Send className="h-4 w-4" strokeWidth={2} />
         </button>
       </form>
-      {guided && <p className="px-3 pb-2 text-[10px] text-text">Los mensajes libres no descartan tarjetas automáticamente.</p>}
     </div>
   )
 }

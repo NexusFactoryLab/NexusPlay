@@ -1,12 +1,12 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Copy, Link, LogOut, MessageCircle, Users } from 'lucide-react'
+import { Copy, Link, LogOut, MessageCircle } from 'lucide-react'
 import { Modal } from './Modal'
+import { CartoonClock } from './CartoonClock'
 import { LobbyReadyControl } from './LobbyReadyControl'
 import { ChatPanel } from './ChatPanel'
 import type { GuessWhoChatMessage } from './guessWhoTypes'
 import { QRCodeSVG } from 'qrcode.react'
-import { AvatarCircle } from '../../avatar/AvatarCircle'
 import { usePlayersAvatars } from '../../avatar/usePlayersAvatars'
 
 type LobbyPlayer = {
@@ -135,11 +135,13 @@ export function MultiplayerLobby({
       <Modal
         onClose={chatOpen ? closeChat : onExit}
         maxWidthClassName="max-w-[840px]"
+        maxHeightClassName="max-h-[94dvh]"
+        fitContent
         ariaLabel="Sala de espera"
         ariaModal={!chatOpen}
       >
         {children}
-        <div className="mb-5 rounded-[24px] border border-border/80 bg-gradient-to-r from-accent/8 via-surface to-bg p-4 shadow-[var(--shadow)]">
+        <div className="mb-3 rounded-[24px] border border-border/80 bg-gradient-to-r from-accent/8 via-surface to-bg p-3.5 shadow-[var(--shadow)]">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-[11px] font-semibold tracking-[0.18em] text-accent uppercase">
@@ -213,7 +215,7 @@ export function MultiplayerLobby({
               </div>
             </div>
             <figure className="flex shrink-0 flex-col items-center gap-1 rounded-xl border border-accent/30 bg-surface p-1.5" aria-label="Invitación por código QR">
-              <QRCodeSVG value={invitationUrl} size={104} level="M" marginSize={2} bgColor="#ffffff" fgColor="#000000" role="img" title={`Escanea para unirte a la sala ${room.code}`} />
+              <QRCodeSVG value={invitationUrl} size={84} level="M" marginSize={2} bgColor="#ffffff" fgColor="#000000" role="img" title={`Escanea para unirte a la sala ${room.code}`} />
               <figcaption className="text-center text-[10px] font-semibold text-accent">Escanea para unirte</figcaption>
             </figure>
           </div>}
@@ -227,31 +229,9 @@ export function MultiplayerLobby({
             {error}
           </p>
         )}
-        <div className="flex flex-col gap-4">
-          <div className="rounded-[24px] border border-border bg-gradient-to-br from-bg to-surface p-4 shadow-[var(--shadow)]">
-            <p className="flex items-center gap-2 text-[13px] font-semibold text-text-h">
-              <Users className="h-4 w-4 text-accent" strokeWidth={2} />
-              Jugadores en la sala ({room.players.length}/{maxPlayers})
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {room.players.map((player) => (
-                <span
-                  key={player.userId}
-                  className="inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent/5 py-1 pr-3 pl-1 text-[12.5px] font-medium text-text-h"
-                >
-                  <AvatarCircle config={avatars[player.userId]} name={player.displayName} className="h-10 w-10 text-[13px]" />
-                  {player.role === 'FIRE'
-                    ? '🔥 '
-                    : player.role === 'WATER'
-                      ? '💧 '
-                      : ''}
-                  {player.displayName}
-                  {player.isSelf ? ' (tú)' : ''}
-                </span>
-              ))}
-            </div>
-          </div>
-
+        <div className="flex flex-col gap-3">
+          {/* Turno y ajustes extra (ej. descarte automático) lado a lado para que el modal no necesite scroll (issue #80). */}
+          <div className={settings ? 'grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 [&>*]:h-full' : 'contents'}>
           {turnDurationSeconds === undefined ? (
             <div className="rounded-[22px] border border-border bg-surface p-4 shadow-[var(--shadow)]">
               <p className="text-[13px] font-medium text-text-h">
@@ -265,9 +245,10 @@ export function MultiplayerLobby({
           ) : isHost ? (
             <div className="rounded-[22px] border border-border bg-surface p-4 shadow-[var(--shadow)]">
               <label
-                className="mb-1.5 block text-[13px] font-medium text-text-h"
+                className="mb-2 flex items-center gap-2 text-[13px] font-semibold text-text-h"
                 htmlFor={durationId}
               >
+                <CartoonClock className="h-12 w-12 shrink-0" />
                 Segundos por turno
               </label>
               <input
@@ -275,7 +256,7 @@ export function MultiplayerLobby({
                 type="number"
                 min={minTurn}
                 max={maxTurn}
-                className="w-full rounded-xl border border-border bg-bg px-[13px] py-2.5 text-[14px] text-text-h outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/10"
+                className="w-full rounded-xl border border-border bg-bg px-[13px] py-2 text-[18px] font-bold tabular-nums text-text-h outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/10"
                 disabled={connecting}
                 value={turnDurationText}
                 onChange={(event) => {
@@ -293,24 +274,28 @@ export function MultiplayerLobby({
                 }}
               />
               <p className="mt-1 text-[11.5px] text-text">
-                Si nadie actúa a tiempo, el turno pasa automático. Entre{' '}
-                {minTurn} y {maxTurn} segundos.
+                Entre {minTurn} y {maxTurn} s. Si nadie actúa, el turno pasa
+                solo.
               </p>
             </div>
           ) : (
             <div className="rounded-[22px] border border-border bg-surface p-4 shadow-[var(--shadow)]">
-              <p className="text-[12.5px] text-text">
-                Segundos por turno:{' '}
+              <p className="flex items-center gap-2 text-[12.5px] text-text">
+                <CartoonClock className="h-12 w-12 shrink-0" />
+                <span>Segundos por turno:{' '}
                 <strong className="text-text-h">{turnDurationText}</strong> (lo
-                define quien creó la sala).
+                define quien creó la sala).</span>
               </p>
             </div>
           )}
 
           {settings}
+          </div>
 
           <LobbyReadyControl
             players={room.players}
+            maxPlayers={maxPlayers}
+            avatars={avatars}
             onReady={onReady}
             disconnected={connecting}
             requireEven={requireEven}

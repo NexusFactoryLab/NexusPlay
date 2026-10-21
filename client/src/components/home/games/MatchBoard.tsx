@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { CircleHelp, Clock3, SkipForward, Sparkles, Volume2 } from 'lucide-react'
+import { CircleHelp, Clock3, Hourglass, SkipForward, Sparkles, Volume2 } from 'lucide-react'
 import { MIN_DISCARDS_TO_ACCUSE, type GuessWhoCard, type RoomPlayerView } from './guessWhoTypes'
 import { CardInfoBubble } from './CardInfoBubble'
 import { playGuessWhoCardToggle, playGuessWhoCountdownTick, playGuessWhoTurnCue } from '../../../utils/gameFeedback'
@@ -317,6 +317,82 @@ type MatchBoardProps = {
   onDiscard: (cardId: string) => void
   onAccuse: (cardId: string) => void
   onPassTurn: () => void
+  /**
+   * La sala 1v1 pone el turno en su barra superior y el tablero ocupa el alto
+   * disponible sin scroll: las tarjetas se encogen para caber (issue #80).
+   */
+  fitHeight?: boolean
+}
+
+/**
+ * Indicador de turno siempre visible (issue #80): de quién es el turno tiene
+ * que leerse de un vistazo. En tu turno es una barra sólida del color de
+ * acento; en el del rival, una barra apagada y punteada con reloj de arena.
+ * `compact` es la versión de una línea para la barra superior de la sala.
+ */
+export function TurnStatusStrip({
+  isMyTurn,
+  opponentName,
+  turnDeadline,
+  turnDurationSeconds,
+  compact = false,
+}: {
+  isMyTurn: boolean
+  opponentName: string
+  turnDeadline: number | null
+  turnDurationSeconds: number
+  compact?: boolean
+}) {
+  const remainingMs = useCountdown(turnDeadline)
+  const secondsLeft = Math.ceil(remainingMs / 1000)
+  const urgent = secondsLeft <= 5
+  const progress = Math.max(0, Math.min(1, remainingMs / (turnDurationSeconds * 1000)))
+
+  useEffect(() => {
+    if (secondsLeft > 0 && secondsLeft <= 5) playGuessWhoCountdownTick(secondsLeft)
+  }, [secondsLeft])
+
+  return (
+    <div
+      role="status"
+      data-turn={isMyTurn ? 'mine' : 'rival'}
+      className={`relative min-w-0 overflow-hidden rounded-2xl border-2 transition-colors duration-300 ${compact ? 'px-3 py-1.5' : 'px-4 py-3'} ${
+        isMyTurn ? 'border-transparent text-white shadow-[0_12px_28px_-14px_var(--accent)]' : 'border-dashed border-border bg-surface text-text-h'
+      }`}
+      style={isMyTurn ? { background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' } : undefined}
+    >
+      <div className={`flex items-center ${compact ? 'gap-2.5' : 'gap-3'}`}>
+        <span
+          className={`flex shrink-0 items-center justify-center rounded-full ${compact ? 'h-8 w-8' : 'h-11 w-11'} ${isMyTurn ? 'bg-white/25' : 'bg-border/60 text-text'}`}
+          aria-hidden="true"
+        >
+          {isMyTurn ? <Sparkles className={compact ? 'h-5 w-5' : 'h-6 w-6'} strokeWidth={2.25} /> : <Hourglass className="h-4.5 w-4.5 motion-safe:animate-pulse" strokeWidth={2} />}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className={`truncate font-extrabold tracking-tight uppercase ${compact ? (isMyTurn ? 'text-[18px]' : 'text-[15px]') : isMyTurn ? 'text-[22px]' : 'text-[17px]'}`}>
+            {isMyTurn ? '¡Tu turno!' : `Turno de ${opponentName}`}
+          </p>
+          <p className={`truncate font-medium ${compact ? 'text-[11px]' : 'text-[12px]'} ${isMyTurn ? 'text-white/85' : 'text-text'}`}>
+            {isMyTurn ? 'Pregunta, descarta o adivina.' : 'Espera: tu rival está jugando.'}
+          </p>
+        </div>
+        <span
+          className={`shrink-0 rounded-xl font-extrabold tabular-nums ${compact ? 'px-2.5 py-1 text-[17px]' : 'px-3 py-1.5 text-[20px]'} ${
+            urgent ? 'bg-danger text-white' : isMyTurn ? 'bg-white/20' : 'bg-border/60'
+          }`}
+          aria-label={`${secondsLeft} segundos restantes`}
+        >
+          {secondsLeft}s
+        </span>
+      </div>
+      <div className={`absolute inset-x-0 bottom-0 h-1 ${isMyTurn ? 'bg-white/20' : 'bg-border/50'}`} aria-hidden="true">
+        <div
+          className={`h-full transition-[width] duration-200 ease-linear ${urgent ? 'bg-danger' : isMyTurn ? 'bg-white' : 'bg-text/40'}`}
+          style={{ width: `${progress * 100}%` }}
+        />
+      </div>
+    </div>
+  )
 }
 
 /**
@@ -338,10 +414,10 @@ export function MatchBoard({
   onDiscard,
   onAccuse,
   onPassTurn,
+  fitHeight = false,
 }: MatchBoardProps) {
   const [accusing, setAccusing] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
-  const turnRemainingMs = useCountdown(turnDeadline)
   const secretCard = cards.find((card) => card.cardId === self.secretCardId)
   const discardsMissing = Math.max(0, MIN_DISCARDS_TO_ACCUSE - self.discardedCardIds.length)
   const guessAvailable = canAccuse && isMyTurn && discardsMissing === 0
@@ -355,14 +431,25 @@ export function MatchBoard({
   }, [showHelp])
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className={fitHeight ? 'guess-who-board-fit flex h-full min-h-0 flex-col' : 'flex flex-col gap-5'}>
       <TurnPopBanner
         isMyTurn={isMyTurn}
         opponentName={opponent.displayName}
         accusationMessage={accusationMessage}
       />
 
-      <div className="guess-who-board-columns flex flex-col gap-4 sm:flex-row sm:items-start">
+      {!fitHeight && <TurnStatusStrip
+        isMyTurn={isMyTurn}
+        opponentName={opponent.displayName}
+        turnDeadline={turnDeadline}
+        turnDurationSeconds={turnDurationSeconds}
+      />}
+
+      <div
+        className={`guess-who-board-columns flex flex-col gap-4 rounded-2xl p-2 transition-[box-shadow,opacity] duration-300 sm:flex-row sm:items-start ${
+          isMyTurn ? 'ring-2 ring-accent/70 shadow-[0_0_0_6px_color-mix(in_srgb,var(--accent)_14%,transparent)]' : 'opacity-85 ring-1 ring-border'
+        }`}
+      >
         <div className="guess-who-board-actions flex shrink-0 flex-col gap-3 sm:w-[210px]">
           <div
             key={self.secretCardId}
@@ -419,13 +506,6 @@ export function MatchBoard({
           </div>
 
           <div className="flex flex-col gap-2">
-            <TurnBanner
-              variant="inline"
-              isMyTurn={isMyTurn}
-              remainingMs={turnRemainingMs}
-              turnDurationSeconds={turnDurationSeconds}
-            />
-
             {isMyTurn && (
               <button
                 type="button"
