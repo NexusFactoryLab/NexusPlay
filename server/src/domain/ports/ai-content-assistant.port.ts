@@ -37,12 +37,19 @@ export interface GenerateGameDraftOutput {
 /**
  * Puerto hacia el proveedor de IA que arma el borrador de un juego a partir
  * de los archivos que sube el usuario. Ningún caso de uso ni controller
- * conoce el proveedor real (hoy Groq, ver `infrastructure/ai/`) — cambiarlo
- * es escribir un adaptador nuevo y una línea en el módulo, nada más.
+ * conoce el proveedor real: se configura desde el panel de administración
+ * (ver `AiAssistantFactory`) — agregar uno nuevo es escribir un adaptador y
+ * registrarlo en la fábrica, nada más.
  */
 export interface AiContentAssistant {
   /** Describe/extrae en texto legible el contenido de una imagen (usa visión del modelo). */
   describeImage(input: DescribeImageInput): Promise<string>;
   /** Genera `config`/`content` para un `gameType` a partir del texto fuente ya extraído. */
   generateGameDraft(input: GenerateGameDraftInput): Promise<GenerateGameDraftOutput>;
+  /**
+   * Llamada mínima para verificar credenciales y modelo ("Probar conexión"
+   * del panel de administración). Lanza si el proveedor no responde bien.
+   * Opcional: la cadena de fallback (`AiProviderOrchestrator`) no la expone.
+   */
+  ping?(): Promise<void>;
 }

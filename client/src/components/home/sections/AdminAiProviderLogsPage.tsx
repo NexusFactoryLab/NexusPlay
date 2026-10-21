@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../../../hooks/useAuth'
-import { AdminAiProviderLogsSection } from '../AdminAiProviderLogsSection'
+import { AdminAiHub } from '../ai/AdminAiHub'
 import { useHomeSearch } from '../homeSearchContext'
 
 export function AdminAiProviderLogsPage() {
@@ -15,5 +15,5 @@ export function AdminAiProviderLogsPage() {
 
   if (user?.role !== 'ADMIN') return <Navigate to="/" replace />
 
-  return <AdminAiProviderLogsSection />
+  return <AdminAiHub />
 }

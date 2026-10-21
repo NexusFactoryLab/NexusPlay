@@ -5,6 +5,7 @@ import { GameVersionConflictError, GameTypeArchivedError } from '../../../domain
 import { ForbiddenActionError } from '../../../domain/errors/authorization.errors.js';
 import { PublicEmailProviderDomainError } from '../../../domain/errors/organization.errors.js';
 import {
+  AiNotConfiguredError,
   ApplicationError,
   CannotChangeOwnOrganizationRoleError,
   CategoryNotFoundError,
@@ -30,6 +31,7 @@ import {
 } from '../../../application/errors/application.errors.js';
 
 const STATUS_BY_ERROR = new Map<Function, HttpStatus>([
+  [AiNotConfiguredError, HttpStatus.SERVICE_UNAVAILABLE],
   [EmailAlreadyRegisteredError, HttpStatus.CONFLICT],
   [InvalidCredentialsError, HttpStatus.UNAUTHORIZED],
   [UserInactiveError, HttpStatus.FORBIDDEN],

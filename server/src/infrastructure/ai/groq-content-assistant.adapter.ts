@@ -73,6 +73,22 @@ interface ChatResult {
 /** La petición superó el límite de tokens de la cuenta: se puede reintentar con menos texto. */
 class GroqRequestTooLargeError extends Error {}
 
+/**
+ * Datos de una configuración guardada desde el panel de administración. Todo
+ * es opcional: sin opciones, el adaptador se comporta como siempre (lee
+ * `GROQ_*` del entorno), que es el respaldo cuando no hay nada en base de datos.
+ */
+export interface OpenAiCompatibleOptions {
+  /** Nombre que ve el usuario en los mensajes de error (ej. "Groq", "OpenAI"). */
+  label?: string;
+  apiKey?: string;
+  /** URL completa de `/chat/completions`. */
+  apiUrl?: string;
+  textModel?: string;
+  visionModel?: string;
+  maxRpm?: number;
+}
+
 function positiveIntFromEnv(name: string, fallback: number): number {
   const parsed = Number(process.env[name]);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
@@ -94,7 +110,8 @@ function positiveIntFromEnv(name: string, fallback: number): number {
 @Injectable()
 export class GroqContentAssistant implements AiContentAssistant {
   private readonly logger = new Logger(GroqContentAssistant.name);
-  private readonly rateLimiter = new RateLimiter('GROQ_MAX_RPM', DEFAULT_MAX_REQUESTS_PER_MINUTE);
+  private readonly rateLimiter: RateLimiter;
+  private readonly label: string;
   /**
    * Hasta cuándo esperar antes de volver a llamar a cada modelo, tras un 429.
    * Es compartido entre llamadas simultáneas (p. ej. leer varias imágenes a la
@@ -103,22 +120,40 @@ export class GroqContentAssistant implements AiContentAssistant {
    */
   private readonly cooldownUntil = new Map<string, number>();
 
+  constructor(private readonly options: OpenAiCompatibleOptions = {}) {
+    this.label = options.label ?? 'Groq';
+    this.rateLimiter = new RateLimiter(
+      options.maxRpm ? null : 'GROQ_MAX_RPM',
+      options.maxRpm ?? DEFAULT_MAX_REQUESTS_PER_MINUTE,
+    );
+  }
+
   private getApiKey(): string {
-    const apiKey = process.env.GROQ_API_KEY;
+    const apiKey = this.options.apiKey ?? process.env.GROQ_API_KEY;
     if (!apiKey) {
       throw new ServiceUnavailableException(
-        'El asistente de IA (Groq) no está configurado todavía: falta GROQ_API_KEY en el servidor.',
+        `El asistente de IA (${this.label}) no está configurado todavía: falta la API key.`,
       );
     }
     return apiKey;
   }
 
   private getTextModel(): string {
-    return process.env.GROQ_MODEL?.trim() || DEFAULT_TEXT_MODEL;
+    return this.options.textModel ?? (process.env.GROQ_MODEL?.trim() || DEFAULT_TEXT_MODEL);
   }
 
   private getVisionModel(): string {
-    return process.env.GROQ_VISION_MODEL?.trim() || DEFAULT_VISION_MODEL;
+    return this.options.visionModel ?? this.options.textModel ?? (process.env.GROQ_VISION_MODEL?.trim() || DEFAULT_VISION_MODEL);
+  }
+
+  /** Prueba barata de credenciales + modelo para el botón "Probar conexión" del panel. */
+  async ping(): Promise<void> {
+    await this.chatCompletion({
+      model: this.getTextModel(),
+      maxTokens: 64,
+      temperature: 0,
+      messages: [{ role: 'user', content: 'Responde únicamente con la palabra OK.' }],
+    });
   }
 
   /** Separado para poder acelerar los tests sin esperar de verdad. */
@@ -156,7 +191,7 @@ export class GroqContentAssistant implements AiContentAssistant {
 
       let response: Response;
       try {
-        response = await fetch(GROQ_API_URL, {
+        response = await fetch(this.options.apiUrl ?? GROQ_API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
           body,
@@ -204,7 +239,7 @@ export class GroqContentAssistant implements AiContentAssistant {
         continue;
       }
 
-      throw this.wrapProviderError(friendlyMessage(failure, request.model), `HTTP ${failure.status}: ${failure.message}`);
+      throw this.wrapProviderError(friendlyMessage(failure, request.model, this.label), `HTTP ${failure.status}: ${failure.message}`);
     }
   }
 
@@ -388,12 +423,12 @@ async function readFailure(response: Response): Promise<GroqFailure> {
   };
 }
 
-function friendlyMessage(failure: GroqFailure, model: string): string {
+function friendlyMessage(failure: GroqFailure, model: string, label: string): string {
   if (failure.status === 401 || failure.status === 403) {
-    return 'la clave de Groq (GROQ_API_KEY) no es válida o no tiene permiso.';
+    return `la API key de ${label} no es válida o no tiene permiso.`;
   }
   if (failure.status === 404) {
-    return `el modelo de IA "${model}" no está disponible en la cuenta de Groq (revisa GROQ_MODEL / GROQ_VISION_MODEL).`;
+    return `el modelo de IA "${model}" no está disponible en la cuenta de ${label}.`;
   }
   if (failure.status === 429) {
     return failure.daily

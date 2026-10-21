@@ -214,3 +214,37 @@ export class TargetUserNotMemberOfOrganizationError extends ApplicationError {
     super(`El usuario no es miembro de la organización "${organizationId}".`);
   }
 }
+
+/** Se intentó usar la IA sin ningún proveedor utilizable: se avisa ANTES de procesar archivos o gastar cuota. */
+export class AiNotConfiguredError extends ApplicationError {
+  constructor() {
+    super('La IA no está configurada todavía. Un administrador debe registrar un proveedor en el panel de IA.');
+  }
+}
+
+export class AiProviderConfigNotFoundError extends ApplicationError {
+  constructor() {
+    super('No se encontró el proveedor de IA indicado.');
+  }
+}
+
+export class AiProviderConfigNameTakenError extends ApplicationError {
+  constructor(name: string) {
+    super(`Ya existe un proveedor de IA llamado "${name}".`);
+  }
+}
+
+export class InvalidAiProviderConfigError extends ApplicationError {
+  constructor(reason: string) {
+    super(`Configuración de IA inválida: ${reason}`);
+  }
+}
+
+/** Falta la clave maestra (`AI_CONFIG_ENCRYPTION_KEY`) con la que se cifran las API keys. */
+export class SecretCipherNotConfiguredError extends ApplicationError {
+  constructor() {
+    super(
+      'El servidor no tiene configurada AI_CONFIG_ENCRYPTION_KEY (32 bytes en base64 o 64 caracteres hex); sin ella no se pueden guardar API keys de forma segura.',
+    );
+  }
+}

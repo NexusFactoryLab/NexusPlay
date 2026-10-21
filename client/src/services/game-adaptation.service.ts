@@ -21,6 +21,8 @@ export type AdaptationEngine = 'ALGORITHM' | 'AI'
 export type AdaptationOptions = {
   /** Si el usuario puede usar la IA (hoy siempre; luego, según su plan). */
   aiAvailable: boolean
+  /** `false` si la plataforma no tiene ningún proveedor de IA configurado. */
+  aiConfigured: boolean
   /** Destinos que admiten la opción sin IA: `DOMINO`, `MEMORY_MATCH:PAIRS`… */
   algorithmTargets: string[]
   /** `false` si el juego origen es de preguntas: ningún destino admite la opción sin IA. */

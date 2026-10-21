@@ -262,6 +262,34 @@ model AiProviderAttemptModel {
   @@map("ai_provider_attempts")
 }
 
+/// Proveedores de IA configurables desde el panel de administración (la
+/// plataforma no depende de un proveedor fijo). `kind` es `String` a
+/// propósito (igual que `AiProviderAttemptModel.provider`): sumar un tipo de
+/// proveedor nuevo no requiere migración. La API key NUNCA se guarda en
+/// claro: `encryptedApiKey` es AES-256-GCM (ver `AesGcmSecretCipher`) y
+/// `apiKeyHint` solo conserva los últimos caracteres para mostrar en la UI.
+model AiProviderConfigModel {
+  id               String    @id @default(uuid())
+  name             String    @unique
+  kind             String
+  baseUrl          String?   @map("base_url")
+  textModel        String    @map("text_model")
+  visionModel      String?   @map("vision_model")
+  maxRpm           Int?      @map("max_rpm")
+  encryptedApiKey  String    @map("encrypted_api_key")
+  apiKeyHint       String    @map("api_key_hint")
+  enabled          Boolean   @default(true)
+  priority         Int       @default(0)
+  lastTestAt       DateTime? @map("last_test_at")
+  lastTestOk       Boolean?  @map("last_test_ok")
+  lastTestMessage  String?   @map("last_test_message")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@index([enabled, priority])
+  @@map("ai_provider_configs")
+}
+
 /// Gobernanza transversal por `GameType` (issue #156): archivar un tipo es
 /// una capa de visibilidad EN TIEMPO DE LECTURA que cruza `gameType` contra
 /// esta tabla — nunca se itera ni se modifica el `GameStatus` individual de

@@ -11,13 +11,14 @@ export class RateLimiter {
   private timestamps: number[] = [];
 
   constructor(
-    private readonly envVarName: string,
+    /** `null` = límite fijo, sin leer del entorno (configuración guardada en base de datos). */
+    private readonly envVarName: string | null,
     private readonly defaultLimit: number,
     private readonly windowMs = DEFAULT_WINDOW_MS,
   ) {}
 
   async throttle(): Promise<void> {
-    const limitRaw = Number(process.env[this.envVarName]);
+    const limitRaw = this.envVarName ? Number(process.env[this.envVarName]) : Number.NaN;
     const limit = Number.isInteger(limitRaw) && limitRaw > 0 ? limitRaw : this.defaultLimit;
 
     for (;;) {

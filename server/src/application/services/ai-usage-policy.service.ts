@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
+import { AI_AVAILABILITY, type AiAvailability } from '../../domain/ports/ai-availability.port.js';
 
 /**
  * Único punto que decide si un usuario puede gastar IA (issue #50). Hoy
@@ -9,6 +10,13 @@ import { Injectable } from '@nestjs/common';
  */
 @Injectable()
 export class AiUsagePolicy {
+  constructor(@Optional() @Inject(AI_AVAILABILITY) private readonly availability?: AiAvailability) {}
+
+  /** Si la plataforma tiene algún proveedor de IA utilizable (distinto de "puede gastarla este usuario"). */
+  async isConfigured(): Promise<boolean> {
+    return this.availability ? this.availability.isConfigured() : true;
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async canUseAi(_userId: string): Promise<boolean> {
     return true;

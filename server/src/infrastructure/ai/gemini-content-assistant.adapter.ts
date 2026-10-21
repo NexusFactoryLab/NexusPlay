@@ -12,7 +12,14 @@ import { RateLimiter } from './rate-limiter.js';
 // gemini-2.5-flash dejó de estar disponible para keys nuevas (Google
 // responde 404 "no longer available to new users" y recomienda este
 // modelo en su lugar).
-const TEXT_MODEL = 'gemini-3.6-flash';
+const DEFAULT_TEXT_MODEL = 'gemini-3.6-flash';
+
+/** Datos de una configuración guardada desde el panel; sin opciones lee el entorno como siempre. */
+export interface GeminiOptions {
+  apiKey?: string;
+  textModel?: string;
+  maxRpm?: number;
+}
 
 // El plan gratuito de Google AI Studio limita a pocas llamadas por minuto
 // (5 para este modelo al momento de escribir esto). Configurable por si el
@@ -29,10 +36,35 @@ const DEFAULT_MAX_REQUESTS_PER_MINUTE = 5;
 @Injectable()
 export class GeminiContentAssistant implements AiContentAssistant {
   private client: GoogleGenAI | null = null;
-  private readonly rateLimiter = new RateLimiter('GOOGLE_IA_STUDIO_MAX_RPM', DEFAULT_MAX_REQUESTS_PER_MINUTE);
+  private readonly rateLimiter: RateLimiter;
+
+  constructor(private readonly options: GeminiOptions = {}) {
+    this.rateLimiter = new RateLimiter(
+      options.maxRpm ? null : 'GOOGLE_IA_STUDIO_MAX_RPM',
+      options.maxRpm ?? DEFAULT_MAX_REQUESTS_PER_MINUTE,
+    );
+  }
+
+  private get textModel(): string {
+    return this.options.textModel ?? DEFAULT_TEXT_MODEL;
+  }
+
+  /** Prueba barata de credenciales + modelo para el botón "Probar conexión" del panel. */
+  async ping(): Promise<void> {
+    const client = this.getClient();
+    await this.throttle();
+    try {
+      await client.models.generateContent({
+        model: this.textModel,
+        contents: [{ role: 'user', parts: [{ text: 'Responde únicamente con la palabra OK.' }] }],
+      });
+    } catch (error) {
+      throw this.wrapProviderError(error);
+    }
+  }
 
   private getClient(): GoogleGenAI {
-    const apiKey = process.env.GOOGLE_IA_STUDIO_API_KEY;
+    const apiKey = this.options.apiKey ?? process.env.GOOGLE_IA_STUDIO_API_KEY;
     if (!apiKey) {
       throw new ServiceUnavailableException(
         'El asistente de IA no está configurado todavía.',
@@ -63,7 +95,7 @@ export class GeminiContentAssistant implements AiContentAssistant {
     let response;
     try {
       response = await client.models.generateContent({
-        model: TEXT_MODEL,
+        model: this.textModel,
         contents: [
           {
             role: 'user',
@@ -111,7 +143,7 @@ ${sourceText.slice(0, 200_000)}
     let response;
     try {
       response = await client.models.generateContent({
-        model: TEXT_MODEL,
+        model: this.textModel,
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         config: { responseMimeType: 'application/json' },
       });

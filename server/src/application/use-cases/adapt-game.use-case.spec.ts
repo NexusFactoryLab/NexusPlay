@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Game } from '../../domain/entities/game.entity.js';
+import { AiNotConfiguredError } from '../errors/application.errors.js';
 import { ForbiddenActionError } from '../../domain/errors/authorization.errors.js';
 import { InvalidGameContentError } from '../../domain/errors/game.errors.js';
 import { GameSlug } from '../../domain/value-objects/game-slug.vo.js';
@@ -45,6 +46,7 @@ function build(
     isAdmin?: boolean;
     archivedTypes?: string[];
     canUseAi?: boolean;
+    aiConfigured?: boolean;
     algorithmSupported?: boolean;
   } = {},
 ) {
@@ -56,6 +58,7 @@ function build(
     notices: ['Faltan imágenes.'],
   });
   const canUseAi = vi.fn().mockResolvedValue(options.canUseAi ?? true);
+  const isConfigured = vi.fn().mockResolvedValue(options.aiConfigured ?? true);
   const useCase = new AdaptGameUseCase(
     { findById: vi.fn().mockResolvedValue(game) } as never,
     {
@@ -71,7 +74,7 @@ function build(
       supportedTargetKeys: vi.fn().mockReturnValue(['DOMINO', 'MEMORY_MATCH:PAIRS']),
       adapt,
     } as unknown as DeterministicGameAdapter,
-    { canUseAi } as unknown as AiUsagePolicy,
+    { canUseAi, isConfigured } as unknown as AiUsagePolicy,
   );
   return { useCase, generate, adapt, canUseAi };
 }
@@ -223,6 +226,18 @@ describe('AdaptGameUseCase — motor de adaptación (issue #50)', () => {
     expect(generate).not.toHaveBeenCalled();
   });
 
+  it('AI avisa que no hay proveedor configurado antes de gastar IA, y las opciones lo reportan', async () => {
+    const { useCase, generate } = build({ aiConfigured: false });
+
+    await expect(
+      useCase.execute({ gameId: 'game-1', requestingUserId: 'u', engine: 'AI', targetType: 'MAZE_COLLECTOR' }),
+    ).rejects.toBeInstanceOf(AiNotConfiguredError);
+    expect(generate).not.toHaveBeenCalled();
+    expect(await useCase.listOptions({ gameId: 'game-1', requestingUserId: 'u' })).toMatchObject({
+      aiConfigured: false,
+    });
+  });
+
   it('ALGORITHM respeta el permiso de acceso al origen (borrador ajeno)', async () => {
     const { useCase, adapt } = build({ game: buildGame({ status: 'draft' }), canManage: false });
 
@@ -237,6 +252,7 @@ describe('AdaptGameUseCase — motor de adaptación (issue #50)', () => {
 
     await expect(useCase.listOptions({ gameId: 'game-1', requestingUserId: 'u' })).resolves.toEqual({
       aiAvailable: false,
+      aiConfigured: true,
       algorithmTargets: ['DOMINO', 'MEMORY_MATCH:PAIRS'],
       sourceHasConcepts: true,
     });
