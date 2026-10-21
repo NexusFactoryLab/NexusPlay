@@ -1,56 +1,76 @@
 import { InvalidAvatarError } from '../errors/user.errors.js';
 
-/** Tonos de piel del cuerpo base del avatar (issue #77). */
-export const AVATAR_SKINS = ['light', 'medium', 'dark'] as const;
-export type AvatarSkin = (typeof AVATAR_SKINS)[number];
-
 /**
- * Ranuras del avatar y el prefijo de sus piezas. `portrait` es la "foto
- * rápida": una cara lista que reemplaza al avatar en las fotos redondas.
- *
- * El catálogo (qué piezas existen y dónde se dibujan) vive en el cliente
- * (`client/src/components/avatar/avatarCatalog.ts`); aquí solo se exige el
- * formato `<prefijo>-NN`, para que una pieza no termine en la ranura de otra.
+ * Avatar (issue #77) con el estilo Voxel Art de DiceBear: el cliente lo
+ * dibuja a partir de estas opciones. Aquí solo se aceptan las variantes que
+ * existen en ese estilo y colores en hexadecimal de 6 dígitos (sin "#"); las
+ * mismas listas están en `client/src/components/avatar/avatarConfig.ts`.
  */
-const PIECE_PREFIXES = {
-  hair: 'hair',
-  hat: 'hat',
-  top: 'top',
-  outer: 'outer',
-  bottom: 'bottom',
-  dress: 'dress',
-  shoes: 'shoes',
-  portrait: 'face',
-} as const;
+const TOPS = [
+  'short', 'spiky', 'bowl', 'sideSwept', 'curly', 'mohawk', 'halfShaved', 'afro', 'buns', 'ponytail', 'bob',
+  'shoulderLength', 'longStraight', 'longWavy', 'partedLong', 'braids', 'twinTails', 'cap', 'beanie', 'animalEars',
+  'bunnyEars',
+] as const;
+const OUTFITS = ['plain', 'stripes', 'checker', 'hoodie', 'jacket', 'coat', 'dress', 'overalls', 'suit', 'tie'] as const;
+const EYES = ['open', 'soft', 'happy', 'wide', 'side', 'sleepy', 'closed', 'star'] as const;
+const EYEBROWS = ['flat', 'soft', 'raised', 'angry'] as const;
+const MOUTHS = ['smile', 'bigSmile', 'wideSmile', 'grin', 'laugh', 'smirk', 'tongue', 'ooh', 'flat', 'frown'] as const;
+const NOSES = ['small', 'block', 'wide', 'tall'] as const;
+const CHEEKS = ['blush', 'freckles', 'pixel'] as const;
+const GLASSES = ['round', 'square', 'cat', 'shades', 'visor'] as const;
+const BEARDS = ['stubble', 'mustache', 'goatee', 'full'] as const;
 
-export type AvatarPieceSlot = keyof typeof PIECE_PREFIXES;
-export const AVATAR_PIECE_SLOTS = Object.keys(PIECE_PREFIXES) as AvatarPieceSlot[];
+const REQUIRED_VARIANTS = { outfit: OUTFITS, eyes: EYES, mouth: MOUTHS, nose: NOSES } as const;
+const OPTIONAL_VARIANTS = { top: TOPS, eyebrows: EYEBROWS, cheeks: CHEEKS, glasses: GLASSES, beard: BEARDS } as const;
+export const AVATAR_COLOR_FIELDS = [
+  'hairColor', 'hatColor', 'skinColor', 'shirtColor', 'jacketColor', 'pantsColor', 'shoesColor',
+] as const;
 
-export type AvatarConfigProps = { skin: AvatarSkin } & Record<AvatarPieceSlot, string | null>;
+const HEX = /^[0-9a-f]{6}$/;
 
-export type AvatarConfigInput = { skin: unknown } & Partial<Record<AvatarPieceSlot, unknown>>;
+type RequiredField = keyof typeof REQUIRED_VARIANTS;
+type OptionalField = keyof typeof OPTIONAL_VARIANTS;
+type ColorField = (typeof AVATAR_COLOR_FIELDS)[number];
+
+export type AvatarConfigProps = Record<RequiredField | ColorField, string> & Record<OptionalField, string | null>;
+
+export type AvatarConfigInput = Partial<Record<keyof AvatarConfigProps, unknown>>;
 
 export class AvatarConfig {
   private constructor(private readonly props: AvatarConfigProps) {}
 
   static create(input: AvatarConfigInput): AvatarConfig {
-    if (!AVATAR_SKINS.includes(input.skin as AvatarSkin)) {
-      throw new InvalidAvatarError(`el tono de piel "${String(input.skin)}" no existe.`);
+    const props = {} as AvatarConfigProps;
+    for (const [field, allowed] of Object.entries(REQUIRED_VARIANTS) as [RequiredField, readonly string[]][]) {
+      const value = input[field];
+      if (typeof value !== 'string' || !allowed.includes(value)) {
+        throw new InvalidAvatarError(`"${String(value)}" no es una opción válida para "${field}".`);
+      }
+      props[field] = value;
     }
-    const pieces = {} as Record<AvatarPieceSlot, string | null>;
-    for (const slot of AVATAR_PIECE_SLOTS) {
-      pieces[slot] = AvatarConfig.validatePiece(slot, input[slot]);
+    for (const [field, allowed] of Object.entries(OPTIONAL_VARIANTS) as [OptionalField, readonly string[]][]) {
+      const value = input[field];
+      if (value === undefined || value === null || value === '') {
+        props[field] = null;
+      } else if (typeof value === 'string' && allowed.includes(value)) {
+        props[field] = value;
+      } else {
+        throw new InvalidAvatarError(`"${String(value)}" no es una opción válida para "${field}".`);
+      }
     }
-    // Un vestido ocupa el lugar de la parte de arriba y la de abajo a la vez.
-    if (pieces.dress && (pieces.top || pieces.bottom)) {
-      throw new InvalidAvatarError('un vestido reemplaza la parte de arriba y la de abajo.');
+    for (const field of AVATAR_COLOR_FIELDS) {
+      const value = input[field];
+      if (typeof value !== 'string' || !HEX.test(value)) {
+        throw new InvalidAvatarError(`"${String(value)}" no es un color válido para "${field}".`);
+      }
+      props[field] = value;
     }
-    return new AvatarConfig({ skin: input.skin as AvatarSkin, ...pieces });
+    return new AvatarConfig(props);
   }
 
   /**
-   * Reconstruye lo guardado en la base de datos. Si alguien lo dejó con un
-   * formato que ya no es válido, el usuario simplemente queda sin avatar en
+   * Reconstruye lo guardado en la base de datos. Si ya no es válido (por
+   * ejemplo, un avatar del formato anterior), la cuenta queda sin avatar en
    * vez de romper la carga de su perfil.
    */
   static restore(value: unknown): AvatarConfig | null {
@@ -63,21 +83,8 @@ export class AvatarConfig {
     }
   }
 
-  private static validatePiece(slot: AvatarPieceSlot, value: unknown): string | null {
-    if (value === undefined || value === null || value === '') return null;
-    const pattern = new RegExp(`^${PIECE_PREFIXES[slot]}-[0-9]{2}$`);
-    if (typeof value !== 'string' || !pattern.test(value)) {
-      throw new InvalidAvatarError(`la pieza "${String(value)}" no corresponde a "${slot}".`);
-    }
-    return value;
-  }
-
-  get skin(): AvatarSkin {
-    return this.props.skin;
-  }
-
-  piece(slot: AvatarPieceSlot): string | null {
-    return this.props[slot];
+  get(field: keyof AvatarConfigProps): string | null {
+    return this.props[field];
   }
 
   toJSON(): AvatarConfigProps {

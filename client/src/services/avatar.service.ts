@@ -1,16 +1,29 @@
 import { request } from '../utils/http'
 import type { AuthUser } from './auth.service'
 
-export type AvatarSkin = 'light' | 'medium' | 'dark'
-
-/** Ranuras de piezas del avatar; `portrait` es la "foto rápida" (una cara lista). */
-export type AvatarPieceSlot = 'hair' | 'hat' | 'top' | 'outer' | 'bottom' | 'dress' | 'shoes' | 'portrait'
-
 /**
- * Avatar armado por piezas (issue #77). Cada ranura guarda el id de una pieza
- * del catálogo (`components/avatar/avatarCatalog.generated.ts`) o null.
+ * Avatar (issue #77) con el estilo Voxel Art de DiceBear: variantes por
+ * nombre y colores en hexadecimal sin "#". Las opciones válidas viven en
+ * `components/avatar/avatarConfig.ts` y el servidor valida lo mismo.
  */
-export type AvatarConfig = { skin: AvatarSkin } & Record<AvatarPieceSlot, string | null>
+export type AvatarConfig = {
+  top: string | null
+  hairColor: string
+  hatColor: string
+  skinColor: string
+  outfit: string
+  shirtColor: string
+  jacketColor: string
+  pantsColor: string
+  shoesColor: string
+  eyes: string
+  eyebrows: string | null
+  mouth: string
+  nose: string
+  cheeks: string | null
+  glasses: string | null
+  beard: string | null
+}
 
 export type UserAvatar = {
   userId: string

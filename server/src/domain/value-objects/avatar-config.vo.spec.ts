@@ -2,47 +2,52 @@ import { describe, expect, it } from 'vitest';
 import { AvatarConfig } from './avatar-config.vo.js';
 import { InvalidAvatarError } from '../errors/user.errors.js';
 
-describe('AvatarConfig (issue #77)', () => {
-  it('crea un avatar con sus piezas y deja en null las ranuras vacías', () => {
-    const avatar = AvatarConfig.create({ skin: 'medium', hair: 'hair-03', top: 'top-01', bottom: 'bottom-02' });
+const VALID_AVATAR = {
+  top: 'short',
+  hairColor: '5a3825',
+  hatColor: 'e64980',
+  skinColor: 'eab890',
+  outfit: 'jacket',
+  shirtColor: 'f2f2f2',
+  jacketColor: '6b4f3a',
+  pantsColor: '3b5b8c',
+  shoesColor: 'e03131',
+  eyes: 'open',
+  eyebrows: 'soft',
+  mouth: 'smile',
+  nose: 'small',
+  cheeks: 'blush',
+  glasses: null,
+  beard: null,
+};
 
-    expect(avatar.toJSON()).toEqual({
-      skin: 'medium',
-      hair: 'hair-03',
-      hat: null,
-      top: 'top-01',
-      outer: null,
-      bottom: 'bottom-02',
-      dress: null,
-      shoes: null,
-      portrait: null,
-    });
+describe('AvatarConfig (issue #77, Voxel Art)', () => {
+  it('acepta un avatar válido y devuelve todas sus opciones', () => {
+    expect(AvatarConfig.create(VALID_AVATAR).toJSON()).toEqual(VALID_AVATAR);
   });
 
-  it('rechaza un tono de piel que no existe', () => {
-    expect(() => AvatarConfig.create({ skin: 'green' })).toThrow(InvalidAvatarError);
+  it('las opciones opcionales vacías quedan en null', () => {
+    const avatar = AvatarConfig.create({ ...VALID_AVATAR, top: '', eyebrows: undefined, cheeks: null });
+    expect(avatar.get('top')).toBeNull();
+    expect(avatar.get('eyebrows')).toBeNull();
+    expect(avatar.get('cheeks')).toBeNull();
   });
 
-  it('rechaza una pieza en la ranura equivocada o con otro formato', () => {
-    expect(() => AvatarConfig.create({ skin: 'light', hair: 'hat-01' })).toThrow(InvalidAvatarError);
-    expect(() => AvatarConfig.create({ skin: 'light', shoes: 'shoes-1' })).toThrow(InvalidAvatarError);
-    expect(() => AvatarConfig.create({ skin: 'light', top: 42 })).toThrow(InvalidAvatarError);
+  it('rechaza variantes que no existen en el estilo', () => {
+    expect(() => AvatarConfig.create({ ...VALID_AVATAR, outfit: 'cape' })).toThrow(InvalidAvatarError);
+    expect(() => AvatarConfig.create({ ...VALID_AVATAR, top: 'crown' })).toThrow(InvalidAvatarError);
+    expect(() => AvatarConfig.create({ ...VALID_AVATAR, eyes: undefined })).toThrow(InvalidAvatarError);
   });
 
-  it('la foto rápida usa las caras listas (face-NN)', () => {
-    expect(AvatarConfig.create({ skin: 'dark', portrait: 'face-12' }).piece('portrait')).toBe('face-12');
-    expect(() => AvatarConfig.create({ skin: 'dark', portrait: 'hair-12' })).toThrow(InvalidAvatarError);
+  it('rechaza colores que no son hexadecimales de 6 dígitos sin "#"', () => {
+    expect(() => AvatarConfig.create({ ...VALID_AVATAR, skinColor: '#eab890' })).toThrow(InvalidAvatarError);
+    expect(() => AvatarConfig.create({ ...VALID_AVATAR, shirtColor: 'red' })).toThrow(InvalidAvatarError);
+    expect(() => AvatarConfig.create({ ...VALID_AVATAR, pantsColor: 'ABCDEF' })).toThrow(InvalidAvatarError);
   });
 
-  it('un vestido no se combina con parte de arriba ni de abajo', () => {
-    expect(() => AvatarConfig.create({ skin: 'light', dress: 'dress-01', top: 'top-02' })).toThrow(InvalidAvatarError);
-    expect(() => AvatarConfig.create({ skin: 'light', dress: 'dress-01', bottom: 'bottom-02' })).toThrow(InvalidAvatarError);
-    expect(AvatarConfig.create({ skin: 'light', dress: 'dress-01', outer: 'outer-03' }).piece('dress')).toBe('dress-01');
-  });
-
-  it('restore devuelve null ante datos guardados que ya no son válidos', () => {
+  it('restore devuelve null ante datos guardados que ya no son válidos (formato anterior)', () => {
     expect(AvatarConfig.restore(null)).toBeNull();
-    expect(AvatarConfig.restore({ skin: 'azul' })).toBeNull();
-    expect(AvatarConfig.restore({ skin: 'light', hat: 'hat-07' })?.piece('hat')).toBe('hat-07');
+    expect(AvatarConfig.restore({ skin: 'light', hair: 'hair-01' })).toBeNull();
+    expect(AvatarConfig.restore(VALID_AVATAR)?.get('outfit')).toBe('jacket');
   });
 });

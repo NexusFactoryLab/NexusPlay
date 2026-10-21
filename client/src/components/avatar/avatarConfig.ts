@@ -1,91 +1,193 @@
-import type { AvatarConfig, AvatarPieceSlot, AvatarSkin } from '../../services/avatar.service'
-import {
-  AVATAR_BODY_BOX,
-  AVATAR_CANVAS,
-  AVATAR_FACE_IDS,
-  AVATAR_HAT_CLIP_INSET,
-  AVATAR_PIECES,
-  AVATAR_SKINS,
-} from './avatarCatalog.generated'
-import type { AvatarBox, AvatarLayerSlot, AvatarPieceDef } from './avatarTypes'
+import { Avatar, Style } from '@dicebear/core'
+import voxelArt from '@dicebear/styles/voxel-art.json'
+import type { AvatarConfig } from '../../services/avatar.service'
 
 /**
- * Reglas del avatar (issue #77), sin React: qué combinaciones valen y en qué
- * orden se apilan las capas. AvatarFigure solo pinta lo que sale de aquí.
+ * Reglas del avatar (issue #77) con el estilo Voxel Art de DiceBear (CC0):
+ * qué opciones existen, cómo se valida un avatar guardado y cómo se dibuja.
+ * Las mismas listas están en el servidor (AvatarConfig del dominio).
  */
 
-export const AVATAR_SLOTS: AvatarPieceSlot[] = ['hair', 'hat', 'top', 'outer', 'bottom', 'dress', 'shoes', 'portrait']
+export type Option = { id: string; label: string }
 
-const PIECES_BY_ID = new Map(AVATAR_PIECES.map((piece) => [piece.id, piece]))
-const SKIN_IDS = new Set<string>(AVATAR_SKINS.map((skin) => skin.id))
-const FACE_IDS = new Set<string>(AVATAR_FACE_IDS)
+export const TOPS: Option[] = [
+  { id: 'short', label: 'Corto' },
+  { id: 'spiky', label: 'En puntas' },
+  { id: 'bowl', label: 'Taza' },
+  { id: 'sideSwept', label: 'De lado' },
+  { id: 'curly', label: 'Rizado' },
+  { id: 'mohawk', label: 'Mohicano' },
+  { id: 'halfShaved', label: 'Medio rapado' },
+  { id: 'afro', label: 'Afro' },
+  { id: 'buns', label: 'Moños' },
+  { id: 'ponytail', label: 'Cola de caballo' },
+  { id: 'bob', label: 'Melena corta' },
+  { id: 'shoulderLength', label: 'A los hombros' },
+  { id: 'longStraight', label: 'Largo liso' },
+  { id: 'longWavy', label: 'Largo ondulado' },
+  { id: 'partedLong', label: 'Largo con raya' },
+  { id: 'braids', label: 'Trenzas' },
+  { id: 'twinTails', label: 'Dos colitas' },
+]
 
-export function piecesFor(slot: AvatarLayerSlot): AvatarPieceDef[] {
-  return AVATAR_PIECES.filter((piece) => piece.slot === slot)
-}
+/** Gorros y orejas: van en la misma ranura que el pelo (`top`) en Voxel Art. */
+export const HATS: Option[] = [
+  { id: 'cap', label: 'Gorra' },
+  { id: 'beanie', label: 'Gorro de lana' },
+  { id: 'animalEars', label: 'Orejas de gato' },
+  { id: 'bunnyEars', label: 'Orejas de conejo' },
+]
 
-export function findPiece(id: string | null | undefined): AvatarPieceDef | undefined {
-  return id ? PIECES_BY_ID.get(id) : undefined
-}
+export const OUTFITS: Option[] = [
+  { id: 'plain', label: 'Camiseta' },
+  { id: 'stripes', label: 'A rayas' },
+  { id: 'checker', label: 'A cuadros' },
+  { id: 'hoodie', label: 'Hoodie' },
+  { id: 'jacket', label: 'Chaqueta' },
+  { id: 'coat', label: 'Abrigo' },
+  { id: 'dress', label: 'Vestido' },
+  { id: 'overalls', label: 'Overol' },
+  { id: 'suit', label: 'Traje' },
+  { id: 'tie', label: 'Corbata' },
+]
 
-/** El look del diseño de referencia: pelo castaño, chaqueta café con camiseta, jean y tenis rojos. */
+export const EYES: Option[] = [
+  { id: 'open', label: 'Abiertos' },
+  { id: 'soft', label: 'Tiernos' },
+  { id: 'happy', label: 'Felices' },
+  { id: 'wide', label: 'Grandes' },
+  { id: 'side', label: 'De lado' },
+  { id: 'sleepy', label: 'Dormilones' },
+  { id: 'closed', label: 'Cerrados' },
+  { id: 'star', label: 'Estrellas' },
+]
+
+export const EYEBROWS: Option[] = [
+  { id: 'flat', label: 'Rectas' },
+  { id: 'soft', label: 'Suaves' },
+  { id: 'raised', label: 'Arriba' },
+  { id: 'angry', label: 'Bravas' },
+]
+
+export const MOUTHS: Option[] = [
+  { id: 'smile', label: 'Sonrisa' },
+  { id: 'bigSmile', label: 'Gran sonrisa' },
+  { id: 'wideSmile', label: 'Sonrisa ancha' },
+  { id: 'grin', label: 'Dientes' },
+  { id: 'laugh', label: 'Risa' },
+  { id: 'smirk', label: 'Pícara' },
+  { id: 'tongue', label: 'Lengua' },
+  { id: 'ooh', label: '¡Oh!' },
+  { id: 'flat', label: 'Seria' },
+  { id: 'frown', label: 'Triste' },
+]
+
+export const NOSES: Option[] = [
+  { id: 'small', label: 'Pequeña' },
+  { id: 'block', label: 'Cuadrada' },
+  { id: 'wide', label: 'Ancha' },
+  { id: 'tall', label: 'Larga' },
+]
+
+export const CHEEKS: Option[] = [
+  { id: 'blush', label: 'Rubor' },
+  { id: 'freckles', label: 'Pecas' },
+  { id: 'pixel', label: 'Pixel' },
+]
+
+export const GLASSES: Option[] = [
+  { id: 'round', label: 'Redondas' },
+  { id: 'square', label: 'Cuadradas' },
+  { id: 'cat', label: 'De gato' },
+  { id: 'shades', label: 'De sol' },
+  { id: 'visor', label: 'Visor' },
+]
+
+export const BEARDS: Option[] = [
+  { id: 'stubble', label: 'Sombra' },
+  { id: 'mustache', label: 'Bigote' },
+  { id: 'goatee', label: 'Candado' },
+  { id: 'full', label: 'Completa' },
+]
+
+/** Paletas (las del propio estilo, más algunos tonos para dar opciones). */
+export const PALETTES = {
+  skinColor: ['f5d0b0', 'eab890', 'dda878', 'c99062', 'b07347', '95562f', '7d4a26', '6a3d1f'],
+  hairColor: ['2c222b', '3b2f2f', '5a3825', '7b4a2d', 'a56b46', 'c98850', 'd9b380', 'e8d4a8', 'b55239', 'd6455d', '6d5acf', '3fb27f'],
+  hatColor: ['e64980', 'f76707', 'fab005', '40c057', '228be6', '7950f2', 'f2f2f2', '343a40'],
+  shirtColor: ['e64980', 'f76707', 'fab005', '40c057', '12b886', '228be6', '4c6ef5', '7950f2', 'f2f2f2', '495057'],
+  jacketColor: ['f8f9fa', '343a40', '3b5b8c', '6b4f3a', 'b55239', '5ba8a0', 'e64980', '7950f2', 'fab005', '40c057'],
+  pantsColor: ['3b5b8c', '2f4160', '4a4e69', '6b4f3a', '495057', '7a86a8', 'c92a2a', '2b8a3e'],
+  shoesColor: ['f1f3f5', '343a40', 'd6336c', '1971c2', 'f08c00', '6741d9', '2f9e44', 'e03131'],
+} as const
+
+export type ColorField = keyof typeof PALETTES
+
+const HEX = /^[0-9a-f]{6}$/
+
 export const DEFAULT_AVATAR: AvatarConfig = {
-  skin: 'light',
-  hair: 'hair-01',
-  hat: null,
-  top: null,
-  outer: 'outer-13',
-  bottom: 'bottom-07',
-  dress: null,
-  shoes: 'shoes-02',
-  portrait: null,
+  top: 'short',
+  hairColor: '5a3825',
+  hatColor: 'e64980',
+  skinColor: 'eab890',
+  outfit: 'jacket',
+  shirtColor: 'f2f2f2',
+  jacketColor: '6b4f3a',
+  pantsColor: '3b5b8c',
+  shoesColor: 'e03131',
+  eyes: 'open',
+  eyebrows: 'soft',
+  mouth: 'smile',
+  nose: 'small',
+  cheeks: 'blush',
+  glasses: null,
+  beard: null,
 }
+
+const ids = (options: Option[]) => new Set(options.map((option) => option.id))
+const TOP_IDS = new Set([...ids(TOPS), ...ids(HATS)])
+const REQUIRED: { field: keyof AvatarConfig; allowed: Set<string> }[] = [
+  { field: 'outfit', allowed: ids(OUTFITS) },
+  { field: 'eyes', allowed: ids(EYES) },
+  { field: 'mouth', allowed: ids(MOUTHS) },
+  { field: 'nose', allowed: ids(NOSES) },
+]
+const OPTIONAL: { field: keyof AvatarConfig; allowed: Set<string> }[] = [
+  { field: 'top', allowed: TOP_IDS },
+  { field: 'eyebrows', allowed: ids(EYEBROWS) },
+  { field: 'cheeks', allowed: ids(CHEEKS) },
+  { field: 'glasses', allowed: ids(GLASSES) },
+  { field: 'beard', allowed: ids(BEARDS) },
+]
+
+export const isHat = (top: string | null) => top !== null && ids(HATS).has(top)
 
 /**
- * Deja un avatar guardado en algo que se pueda dibujar: tono conocido y solo
- * piezas que existen en el catálogo y en su ranura. Lo demás queda vacío (por
- * ejemplo, una pieza que se quitó del catálogo después de guardarla).
+ * Deja un avatar guardado en algo que se pueda dibujar: lo desconocido toma
+ * el valor por defecto (o queda vacío si es opcional). Null si no hay avatar.
  */
 export function normalizeAvatar(raw: unknown): AvatarConfig | null {
   if (!raw || typeof raw !== 'object') return null
   const source = raw as Record<string, unknown>
-  const skin = typeof source.skin === 'string' && SKIN_IDS.has(source.skin) ? (source.skin as AvatarSkin) : 'light'
-  const config: AvatarConfig = { skin, hair: null, hat: null, top: null, outer: null, bottom: null, dress: null, shoes: null, portrait: null }
-  for (const slot of AVATAR_SLOTS) {
-    const value = source[slot]
-    if (typeof value !== 'string') continue
-    if (slot === 'portrait') {
-      config.portrait = FACE_IDS.has(value) ? value : null
-    } else if (PIECES_BY_ID.get(value)?.slot === slot) {
-      config[slot] = value
-    }
+  const config: AvatarConfig = { ...DEFAULT_AVATAR }
+  for (const { field, allowed } of REQUIRED) {
+    const value = source[field]
+    if (typeof value === 'string' && allowed.has(value)) (config[field] as string) = value
   }
-  if (config.dress) {
-    config.top = null
-    config.bottom = null
+  for (const { field, allowed } of OPTIONAL) {
+    const value = source[field]
+    ;(config[field] as string | null) = typeof value === 'string' && allowed.has(value) ? value : null
+  }
+  for (const field of Object.keys(PALETTES) as ColorField[]) {
+    const value = source[field]
+    if (typeof value === 'string' && HEX.test(value)) config[field] = value
   }
   return config
 }
 
-/**
- * Pone (o quita, si ya la tenía) una pieza. Un vestido ocupa el lugar de la
- * parte de arriba y la de abajo, y al revés.
- */
-export function wearPiece(config: AvatarConfig, slot: AvatarPieceSlot, id: string | null): AvatarConfig {
-  const next: AvatarConfig = { ...config, [slot]: config[slot] === id ? null : id }
-  if (next[slot]) {
-    if (slot === 'dress') {
-      next.top = null
-      next.bottom = null
-    } else if (slot === 'top' || slot === 'bottom') {
-      next.dress = null
-    }
-  }
-  return next
-}
-
-export function changeSkin(config: AvatarConfig, skin: AvatarSkin): AvatarConfig {
-  return { ...config, skin }
+export function sameAvatar(a: AvatarConfig | null, b: AvatarConfig | null): boolean {
+  if (!a || !b) return a === b
+  return (Object.keys(DEFAULT_AVATAR) as (keyof AvatarConfig)[]).every((field) => a[field] === b[field])
 }
 
 /** Iniciales del nombre (máximo dos), p. ej. "Camilo Pardo" → "CP": la foto mientras no haya avatar. */
@@ -95,81 +197,85 @@ export function initialsOf(displayName: string): string {
   return initials || '?'
 }
 
-export function sameAvatar(a: AvatarConfig | null, b: AvatarConfig | null): boolean {
-  if (!a || !b) return a === b
-  return a.skin === b.skin && AVATAR_SLOTS.every((slot) => a[slot] === b[slot])
-}
-
-/** Un atuendo al azar ("Sorpréndeme"); conserva la foto rápida elegida. */
-export function randomAvatar(current: AvatarConfig, random: () => number = Math.random): AvatarConfig {
-  const pick = <T,>(items: T[]): T => items[Math.min(items.length - 1, Math.floor(random() * items.length))]
-  const withDress = random() < 0.2
-  const config: AvatarConfig = {
-    skin: pick(AVATAR_SKINS).id,
-    hair: random() < 0.92 ? pick(piecesFor('hair')).id : null,
-    hat: random() < 0.35 ? pick(piecesFor('hat')).id : null,
-    top: withDress ? null : pick(piecesFor('top')).id,
-    outer: random() < (withDress ? 0.25 : 0.4) ? pick(piecesFor('outer')).id : null,
-    bottom: withDress ? null : pick(piecesFor('bottom')).id,
-    dress: withDress ? pick(piecesFor('dress')).id : null,
-    shoes: pick(piecesFor('shoes')).id,
-    portrait: current.portrait,
+/** "Sorpréndeme": todo al azar dentro de las opciones válidas. */
+export function randomAvatar(random: () => number = Math.random): AvatarConfig {
+  const pick = <T,>(items: readonly T[]): T => items[Math.min(items.length - 1, Math.floor(random() * items.length))]
+  const maybe = <T,>(chance: number, items: readonly T[]): T | null => (random() < chance ? pick(items) : null)
+  return {
+    top: random() < 0.15 ? pick(HATS).id : pick(TOPS).id,
+    hairColor: pick(PALETTES.hairColor),
+    hatColor: pick(PALETTES.hatColor),
+    skinColor: pick(PALETTES.skinColor),
+    outfit: pick(OUTFITS).id,
+    shirtColor: pick(PALETTES.shirtColor),
+    jacketColor: pick(PALETTES.jacketColor),
+    pantsColor: pick(PALETTES.pantsColor),
+    shoesColor: pick(PALETTES.shoesColor),
+    eyes: pick(EYES).id,
+    eyebrows: maybe(0.85, EYEBROWS)?.id ?? null,
+    mouth: pick(MOUTHS).id,
+    nose: pick(NOSES).id,
+    cheeks: maybe(0.5, CHEEKS)?.id ?? null,
+    glasses: maybe(0.15, GLASSES)?.id ?? null,
+    beard: maybe(0.08, BEARDS)?.id ?? null,
   }
-  return config
 }
 
-// ---------------------------------------------------------------- capas
+// ---------------------------------------------------------------- dibujo
 
-export type AvatarLayer =
-  | { key: string; kind: 'body' | 'head'; skin: AvatarSkin; box: AvatarBox; clipPath?: string }
-  | { key: string; kind: 'piece'; id: string; label: string; box: AvatarBox; clipPath?: string }
+const style = new Style(voxelArt)
 
-/** Orden de atrás hacia adelante. La cabeza va después de la ropa para tapar el interior del cuello. */
-const LAYER_ORDER: (AvatarLayerSlot | 'head')[] = ['shoes', 'bottom', 'top', 'dress', 'outer', 'head', 'hair', 'hat']
-
-const BODY_BOX: AvatarBox = { x: AVATAR_BODY_BOX.x, y: AVATAR_BODY_BOX.y, w: AVATAR_BODY_BOX.w, h: AVATAR_BODY_BOX.h }
-const HEAD_BOX: AvatarBox = { ...BODY_BOX, h: AVATAR_BODY_BOX.headH }
-
-const percent = (value: number) => `${Math.min(100, Math.max(0, value)).toFixed(2)}%`
-
-/**
- * Con sombrero se oculta el pelo que asomaría por encima de él: solo por
- * encima de `hairClipY` y dentro del ancho del sombrero (lo de los lados, como
- * un afro debajo de un gorro, sigue viéndose). Es un polígono en "U" porque
- * clip-path no admite huecos.
- */
-function hairClipPath(hair: AvatarBox, hat: AvatarPieceDef): string | undefined {
-  if (!hat.clipHair || hat.hairClipY === undefined) return undefined
-  const margin = hat.box.w * AVATAR_HAT_CLIP_INSET
-  const left = percent(((hat.box.x + margin - hair.x) / hair.w) * 100)
-  const right = percent(((hat.box.x + hat.box.w - margin - hair.x) / hair.w) * 100)
-  const cut = percent(((hat.hairClipY - hair.y) / hair.h) * 100)
-  return `polygon(0% 0%, ${left} 0%, ${left} ${cut}, ${right} ${cut}, ${right} 0%, 100% 0%, 100% 100%, 0% 100%)`
-}
-
-export function avatarLayers(config: AvatarConfig): AvatarLayer[] {
-  const shoes = findPiece(config.shoes)
-  const hat = findPiece(config.hat)
-  // Con zapatos, el cuerpo se corta a la altura del tobillo para que no asomen los pies.
-  const bodyClip =
-    shoes?.feetCutY !== undefined
-      ? `inset(0 0 ${percent(((BODY_BOX.y + BODY_BOX.h - shoes.feetCutY) / BODY_BOX.h) * 100)} 0)`
-      : undefined
-  const layers: AvatarLayer[] = [{ key: 'body', kind: 'body', skin: config.skin, box: BODY_BOX, clipPath: bodyClip }]
-  for (const slot of LAYER_ORDER) {
-    if (slot === 'head') {
-      layers.push({ key: 'head', kind: 'head', skin: config.skin, box: HEAD_BOX })
-      continue
-    }
-    const piece = findPiece(config[slot])
-    if (!piece || piece.slot !== slot) continue
-    const clipPath = slot === 'hair' && hat ? hairClipPath(piece.box, hat) : undefined
-    layers.push({ key: piece.id, kind: 'piece', id: piece.id, label: piece.label, box: piece.box, clipPath })
+/** Opciones de DiceBear: todo explícito (probabilidades 0/100) para que la semilla no decida nada. */
+export function toDiceBearOptions(config: AvatarConfig): Record<string, unknown> {
+  // Sin variante se omite la clave: DiceBear rechaza un valor undefined.
+  const variant = (value: string | null) => (value ? { variant: [value], probability: 100 } : { probability: 0 })
+  const top = variant(config.top)
+  const eyebrows = variant(config.eyebrows)
+  const cheeks = variant(config.cheeks)
+  const glasses = variant(config.glasses)
+  const beard = variant(config.beard)
+  const options: Record<string, unknown> = {
+    seed: 'nexusplay',
+    // Sin fondo: el escenario y los círculos ponen el suyo según el tema.
+    backgroundColor: [],
+    topVariant: top.variant,
+    topProbability: top.probability,
+    eyebrowsVariant: eyebrows.variant,
+    eyebrowsProbability: eyebrows.probability,
+    cheeksVariant: cheeks.variant,
+    cheeksProbability: cheeks.probability,
+    glassesVariant: glasses.variant,
+    glassesProbability: glasses.probability,
+    beardVariant: beard.variant,
+    beardProbability: beard.probability,
+    outfitVariant: [config.outfit],
+    eyesVariant: [config.eyes],
+    mouthVariant: [config.mouth],
+    noseVariant: [config.nose],
+    animationVariant: ['none'],
+    hairColor: [config.hairColor],
+    hatColor: [config.hatColor],
+    skinColor: [config.skinColor],
+    shirtColor: [config.shirtColor],
+    jacketColor: [config.jacketColor],
+    pantsColor: [config.pantsColor],
+    shoesColor: [config.shoesColor],
   }
-  return layers
+  for (const key of Object.keys(options)) if (options[key] === undefined) delete options[key]
+  return options
 }
 
-/** Caja para las fotos redondas (cabeza y hombros), en unidades del lienzo. */
-export const AVATAR_PORTRAIT_BOX = { x: 169, y: 150, size: 560 } as const
+const cache = new Map<string, string>()
 
-export { AVATAR_CANVAS }
+/** SVG del avatar como data URI (con caché: el mismo avatar se pinta en varios lugares). */
+export function avatarDataUri(config: AvatarConfig): string {
+  const key = JSON.stringify(config)
+  let uri = cache.get(key)
+  if (!uri) {
+    const svg = new Avatar(style, toDiceBearOptions(config) as never).toString()
+    uri = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+    if (cache.size > 300) cache.clear()
+    cache.set(key, uri)
+  }
+  return uri
+}

@@ -1,53 +1,51 @@
 import { useMemo, useState } from 'react'
-import type { KeyboardEvent } from 'react'
+import type { KeyboardEvent, ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Check, Dices, Plus, RotateCcw, RotateCw, Undo2 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
-import type { AvatarConfig, AvatarPieceSlot } from '../../services/avatar.service'
-import { AVATAR_FACE_IDS, AVATAR_SKINS } from './avatarCatalog.generated'
+import type { AvatarConfig } from '../../services/avatar.service'
 import {
+  BEARDS,
+  CHEEKS,
   DEFAULT_AVATAR,
-  changeSkin,
-  findPiece,
+  EYEBROWS,
+  EYES,
+  GLASSES,
+  HATS,
+  MOUTHS,
+  NOSES,
+  OUTFITS,
+  PALETTES,
+  TOPS,
+  isHat,
   normalizeAvatar,
-  piecesFor,
   randomAvatar,
   sameAvatar,
-  wearPiece,
+  type ColorField,
+  type Option,
 } from './avatarConfig'
-import { faceUrl, preloadPiece, thumbUrl } from './avatarAssets'
-import type { AvatarLayerSlot } from './avatarTypes'
 import { AvatarFigure } from './AvatarFigure'
 import { AvatarPortrait } from './AvatarPortrait'
 import './avatar.css'
 
-type ClosetSlot = Exclude<AvatarLayerSlot, 'hair'>
+type ClosetTab = 'outfit' | 'shoes' | 'hats'
 
-const CLOSET_TABS: { slot: ClosetSlot; label: string; emoji: string; none: string }[] = [
-  { slot: 'top', label: 'Arriba', emoji: '👕', none: 'Sin camiseta' },
-  { slot: 'outer', label: 'Abrigos', emoji: '🧥', none: 'Sin abrigo' },
-  { slot: 'bottom', label: 'Abajo', emoji: '👖', none: 'Sin pantalón' },
-  { slot: 'dress', label: 'Vestidos', emoji: '👗', none: 'Sin vestido' },
-  { slot: 'shoes', label: 'Calzado', emoji: '👟', none: 'Descalzo' },
-  { slot: 'hat', label: 'Gorros', emoji: '🧢', none: 'Sin gorro' },
+const CLOSET_TABS: { id: ClosetTab; label: string; emoji: string }[] = [
+  { id: 'outfit', label: 'Ropa', emoji: '👕' },
+  { id: 'shoes', label: 'Calzado', emoji: '👟' },
+  { id: 'hats', label: 'Gorros', emoji: '🧢' },
 ]
 
 const HISTORY_LIMIT = 50
 
-/** Descripción para lectores de pantalla: tono y prendas puestas. */
-function describe(config: AvatarConfig): string {
-  const skin = AVATAR_SKINS.find((item) => item.id === config.skin)?.label.toLowerCase() ?? ''
-  const pieces = (['hair', 'hat', 'top', 'outer', 'dress', 'bottom', 'shoes'] as const)
-    .map((slot) => findPiece(config[slot])?.label)
-    .filter(Boolean)
-  return [`piel ${skin}`, ...pieces].join(', ')
-}
+/** Los atuendos que usan el color de la chaqueta (el vestido también lo usa). */
+const USES_JACKET = new Set(['jacket', 'coat', 'suit', 'dress', 'hoodie'])
 
 /**
- * "Personaliza tu avatar" (issue #77): panel Estilo (cabello, tono y foto de
- * perfil), el avatar sobre su isla y el Armario por pestañas. Se abre desde
- * Configuración → "Configurar avatar" y desde el menú de la cuenta. Los
+ * "Personaliza tu avatar" (issue #77) con el estilo Voxel Art de DiceBear:
+ * panel Estilo (cabello, piel y cara), el avatar sobre su isla y el Armario
+ * por pestañas. Cada opción se muestra con el avatar actual ya cambiado. Los
  * cambios son un borrador hasta tocar Guardar; Deshacer recorre el historial.
  */
 export function AvatarEditorPage() {
@@ -57,7 +55,7 @@ export function AvatarEditorPage() {
   const saved = useMemo(() => normalizeAvatar(user?.avatarConfig), [user?.avatarConfig])
   const [draft, setDraft] = useState<AvatarConfig>(() => saved ?? DEFAULT_AVATAR)
   const [history, setHistory] = useState<AvatarConfig[]>([])
-  const [closetTab, setClosetTab] = useState<ClosetSlot>('top')
+  const [closetTab, setClosetTab] = useState<ClosetTab>('outfit')
   const [spin, setSpin] = useState<'left' | 'right' | null>(null)
   const [saving, setSaving] = useState(false)
   const dirty = !sameAvatar(draft, saved)
@@ -70,8 +68,8 @@ export function AvatarEditorPage() {
     setDraft(next)
   }
 
-  function wear(slot: AvatarPieceSlot, id: string | null) {
-    update(wearPiece(draft, slot, id))
+  function set<K extends keyof AvatarConfig>(field: K, value: AvatarConfig[K]) {
+    update({ ...draft, [field]: value })
   }
 
   function undo() {
@@ -104,14 +102,61 @@ export function AvatarEditorPage() {
   function handleTabKeys(event: KeyboardEvent<HTMLDivElement>) {
     if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return
     event.preventDefault()
-    const index = CLOSET_TABS.findIndex((tab) => tab.slot === closetTab)
+    const index = CLOSET_TABS.findIndex((tab) => tab.id === closetTab)
     const step = event.key === 'ArrowRight' ? 1 : -1
     const next = CLOSET_TABS[(index + step + CLOSET_TABS.length) % CLOSET_TABS.length]
-    setClosetTab(next.slot)
-    document.getElementById(`avatar-tab-${next.slot}`)?.focus()
+    setClosetTab(next.id)
+    document.getElementById(`avatar-tab-${next.id}`)?.focus()
   }
 
-  const activeTab = CLOSET_TABS.find((tab) => tab.slot === closetTab) ?? CLOSET_TABS[0]
+  /** Grilla de opciones: cada miniatura es el avatar actual con esa opción puesta. */
+  function options(field: keyof AvatarConfig, list: Option[], view: 'portrait' | 'full', none?: string) {
+    return (
+      <div className="avatar-grid">
+        {none && <NoneTile label={none} pressed={draft[field] === null} onClick={() => set(field, null as never)} />}
+        {list.map((option) => {
+          const preview = { ...draft, [field]: option.id }
+          return (
+            <button
+              key={option.id}
+              type="button"
+              className={`avatar-tile ${view === 'portrait' ? 'avatar-tile-portrait avatar-portrait-bg' : ''}`}
+              aria-pressed={draft[field] === option.id}
+              aria-label={option.label}
+              title={option.label}
+              onClick={() => set(field, option.id as never)}
+            >
+              {view === 'portrait' ? <AvatarPortrait config={preview} /> : <AvatarFigure config={preview} className="avatar-tile-figure" />}
+            </button>
+          )
+        })}
+      </div>
+    )
+  }
+
+  function colors(field: ColorField, label: string) {
+    return (
+      <div className="avatar-color-row">
+        <span className="avatar-color-label">{label}</span>
+        <div className="avatar-swatches" role="group" aria-label={label}>
+          {PALETTES[field].map((hex) => (
+            <button
+              key={hex}
+              type="button"
+              className="avatar-swatch"
+              style={{ background: `#${hex}` }}
+              aria-pressed={draft[field] === hex}
+              aria-label={`${label}: #${hex}`}
+              onClick={() => set(field, hex)}
+            />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  const hairOptions = TOPS
+  const wearingHat = isHat(draft.top)
   const status = !dirty ? 'Guardado' : saved ? 'Cambios sin guardar' : 'Aún no guardas tu avatar'
 
   return (
@@ -137,79 +182,26 @@ export function AvatarEditorPage() {
             Estilo
           </h2>
           <div className="avatar-panel-body">
-            <section className="avatar-section" aria-labelledby="avatar-hair-title">
-              <h3 id="avatar-hair-title" className="avatar-section-title">
-                Cabello
-              </h3>
-              <div className="avatar-grid">
-                <NoneTile label="Sin cabello" pressed={!draft.hair} onClick={() => wear('hair', null)} />
-                {piecesFor('hair').map((piece) => (
-                  <PieceTile key={piece.id} id={piece.id} label={piece.label} pressed={draft.hair === piece.id} onClick={() => wear('hair', piece.id)} />
-                ))}
-              </div>
-            </section>
-
-            <section className="avatar-section" aria-labelledby="avatar-skin-title">
-              <h3 id="avatar-skin-title" className="avatar-section-title">
-                Tono
-              </h3>
-              <div className="avatar-swatches">
-                {AVATAR_SKINS.map((skin) => (
-                  <button
-                    key={skin.id}
-                    type="button"
-                    className="avatar-swatch"
-                    style={{ background: skin.swatch }}
-                    aria-pressed={draft.skin === skin.id}
-                    aria-label={`Tono ${skin.label.toLowerCase()}`}
-                    title={skin.label}
-                    onClick={() => update(changeSkin(draft, skin.id))}
-                  />
-                ))}
-              </div>
-            </section>
-
-            <section className="avatar-section" aria-labelledby="avatar-photo-title">
-              <h3 id="avatar-photo-title" className="avatar-section-title">
-                Foto de perfil
-              </h3>
-              <p className="avatar-section-hint">Así te ven en el menú y en las salas de juego: tu avatar o una cara lista.</p>
-              <div className="avatar-grid">
-                <button
-                  type="button"
-                  className="avatar-tile avatar-tile-portrait avatar-portrait-bg"
-                  aria-pressed={!draft.portrait}
-                  aria-label="Usar mi avatar como foto"
-                  title="Mi avatar"
-                  onClick={() => update({ ...draft, portrait: null })}
-                >
-                  <AvatarPortrait config={{ ...draft, portrait: null }} />
-                </button>
-                {AVATAR_FACE_IDS.map((face, index) => (
-                  <button
-                    key={face}
-                    type="button"
-                    className="avatar-tile avatar-tile-portrait avatar-portrait-bg"
-                    aria-pressed={draft.portrait === face}
-                    aria-label={`Cara lista ${index + 1}`}
-                    onClick={() => update({ ...draft, portrait: face })}
-                  >
-                    <img src={faceUrl(face)} alt="" loading="lazy" />
-                  </button>
-                ))}
-              </div>
-            </section>
+            <Section title="Cabello">
+              {wearingHat && <p className="avatar-section-hint">Tienes un gorro puesto: al elegir un peinado se quita.</p>}
+              {options('top', hairOptions, 'portrait', 'Sin cabello')}
+              {colors('hairColor', 'Color')}
+            </Section>
+            <Section title="Piel">{colors('skinColor', 'Tono')}</Section>
+            <Section title="Ojos">{options('eyes', EYES, 'portrait')}</Section>
+            <Section title="Cejas">{options('eyebrows', EYEBROWS, 'portrait', 'Sin cejas')}</Section>
+            <Section title="Boca">{options('mouth', MOUTHS, 'portrait')}</Section>
+            <Section title="Nariz">{options('nose', NOSES, 'portrait')}</Section>
+            <Section title="Mejillas">{options('cheeks', CHEEKS, 'portrait', 'Nada')}</Section>
+            <Section title="Lentes">{options('glasses', GLASSES, 'portrait', 'Sin lentes')}</Section>
+            <Section title="Barba">{options('beard', BEARDS, 'portrait', 'Sin barba')}</Section>
           </div>
         </aside>
 
         <div className="avatar-stage avatar-area-stage">
           <span className="avatar-island" aria-hidden="true" />
-          <span className="avatar-shadow" aria-hidden="true" />
-          <div
-            className={`avatar-stage-figure ${spin ? `is-spinning-${spin}` : ''}`}
-            onAnimationEnd={() => setSpin(null)}
-          >
-            <AvatarFigure config={draft} label={`Tu avatar: ${describe(draft)}`} />
+          <div className={`avatar-stage-figure ${spin ? `is-spinning-${spin}` : ''}`} onAnimationEnd={() => setSpin(null)}>
+            <AvatarFigure config={draft} label="Tu avatar" />
           </div>
         </div>
 
@@ -220,47 +212,45 @@ export function AvatarEditorPage() {
           <div className="avatar-tabs" role="tablist" aria-label="Partes del armario" onKeyDown={handleTabKeys}>
             {CLOSET_TABS.map((tab) => (
               <button
-                key={tab.slot}
-                id={`avatar-tab-${tab.slot}`}
+                key={tab.id}
+                id={`avatar-tab-${tab.id}`}
                 type="button"
                 role="tab"
                 className="avatar-tab"
-                aria-selected={closetTab === tab.slot}
+                aria-selected={closetTab === tab.id}
                 aria-controls="avatar-closet-panel"
-                tabIndex={closetTab === tab.slot ? 0 : -1}
-                onClick={() => setClosetTab(tab.slot)}
+                tabIndex={closetTab === tab.id ? 0 : -1}
+                onClick={() => setClosetTab(tab.id)}
               >
                 <span aria-hidden="true">{tab.emoji}</span>
                 {tab.label}
               </button>
             ))}
           </div>
-          <div
-            id="avatar-closet-panel"
-            className="avatar-panel-body"
-            role="tabpanel"
-            aria-labelledby={`avatar-tab-${activeTab.slot}`}
-          >
-            {activeTab.slot === 'dress' && (
-              <p className="avatar-section-hint mt-1">Un vestido reemplaza la parte de arriba y la de abajo.</p>
+          <div id="avatar-closet-panel" className="avatar-panel-body" role="tabpanel" aria-labelledby={`avatar-tab-${closetTab}`}>
+            {closetTab === 'outfit' && (
+              <>
+                <Section title="Atuendo">{options('outfit', OUTFITS, 'full')}</Section>
+                <Section title="Colores">
+                  {colors('shirtColor', 'Camiseta')}
+                  {USES_JACKET.has(draft.outfit) && colors('jacketColor', draft.outfit === 'dress' ? 'Vestido' : 'Chaqueta')}
+                  {colors('pantsColor', 'Pantalón')}
+                </Section>
+              </>
             )}
-            <div className="avatar-grid">
-              <NoneTile label={activeTab.none} pressed={!draft[activeTab.slot]} onClick={() => wear(activeTab.slot, null)} />
-              {piecesFor(activeTab.slot).map((piece) => (
-                <PieceTile
-                  key={piece.id}
-                  id={piece.id}
-                  label={piece.label}
-                  pressed={draft[activeTab.slot] === piece.id}
-                  onClick={() => wear(activeTab.slot, piece.id)}
-                />
-              ))}
-            </div>
+            {closetTab === 'shoes' && <Section title="Zapatos">{colors('shoesColor', 'Color')}</Section>}
+            {closetTab === 'hats' && (
+              <Section title="Gorros">
+                <p className="avatar-section-hint">El gorro reemplaza al peinado.</p>
+                {options('top', HATS, 'portrait')}
+                {colors('hatColor', 'Color')}
+              </Section>
+            )}
           </div>
         </aside>
 
         <div className="avatar-area-status">
-          <button type="button" className="avatar-btn avatar-btn-random" onClick={() => update(randomAvatar(draft))}>
+          <button type="button" className="avatar-btn avatar-btn-random" onClick={() => update(randomAvatar())}>
             <Dices className="h-5 w-5" strokeWidth={2.5} />
             Sorpréndeme
           </button>
@@ -271,23 +261,11 @@ export function AvatarEditorPage() {
         </div>
 
         <div className="avatar-turn avatar-area-turn">
-          <button
-            type="button"
-            className="avatar-turn-arrow"
-            aria-label="Girar a la izquierda"
-            title="Girar"
-            onClick={() => setSpin((current) => current ?? 'left')}
-          >
+          <button type="button" className="avatar-turn-arrow" aria-label="Girar a la izquierda" title="Girar" onClick={() => setSpin((current) => current ?? 'left')}>
             <RotateCcw className="h-5 w-5" strokeWidth={2.75} />
           </button>
           <span className="avatar-pill">Mi Avatar</span>
-          <button
-            type="button"
-            className="avatar-turn-arrow"
-            aria-label="Girar a la derecha"
-            title="Girar"
-            onClick={() => setSpin((current) => current ?? 'right')}
-          >
+          <button type="button" className="avatar-turn-arrow" aria-label="Girar a la derecha" title="Girar" onClick={() => setSpin((current) => current ?? 'right')}>
             <RotateCw className="h-5 w-5" strokeWidth={2.75} />
           </button>
         </div>
@@ -307,20 +285,12 @@ export function AvatarEditorPage() {
   )
 }
 
-function PieceTile({ id, label, pressed, onClick }: { id: string; label: string; pressed: boolean; onClick: () => void }) {
+function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <button
-      type="button"
-      className="avatar-tile"
-      aria-pressed={pressed}
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-      onPointerEnter={() => preloadPiece(id)}
-      onFocus={() => preloadPiece(id)}
-    >
-      <img src={thumbUrl(id)} alt="" loading="lazy" draggable={false} />
-    </button>
+    <section className="avatar-section">
+      <h3 className="avatar-section-title">{title}</h3>
+      {children}
+    </section>
   )
 }
 

@@ -9,6 +9,12 @@ import { InvalidAvatarError } from '../../domain/errors/user.errors.js';
 import { UserNotFoundError } from '../errors/application.errors.js';
 import { UpdateUserAvatarUseCase } from './update-user-avatar.use-case.js';
 
+const AVATAR = {
+  top: 'short', hairColor: '5a3825', hatColor: 'e64980', skinColor: 'eab890', outfit: 'jacket',
+  shirtColor: 'f2f2f2', jacketColor: '6b4f3a', pantsColor: '3b5b8c', shoesColor: 'e03131',
+  eyes: 'open', eyebrows: 'soft', mouth: 'smile', nose: 'small', cheeks: null, glasses: null, beard: null,
+};
+
 function student() {
   return User.create({
     id: 'user-1',
@@ -38,19 +44,19 @@ describe('UpdateUserAvatarUseCase (issue #77)', () => {
 
     const result = await useCase.execute({
       userId: 'user-1',
-      avatar: { skin: 'dark', hair: 'hair-02', top: 'top-05', bottom: 'bottom-01', shoes: 'shoes-03' },
+      avatar: { ...AVATAR, top: 'braids', skinColor: '7d4a26', outfit: 'dress' },
     });
 
     expect(userRepository.save).toHaveBeenCalledWith(user);
-    expect(result.avatarConfig).toMatchObject({ skin: 'dark', hair: 'hair-02', shoes: 'shoes-03', dress: null });
-    expect(user.avatarConfig?.piece('top')).toBe('top-05');
+    expect(result.avatarConfig).toMatchObject({ top: 'braids', skinColor: '7d4a26', outfit: 'dress', glasses: null });
+    expect(user.avatarConfig?.get('outfit')).toBe('dress');
   });
 
   it('no guarda nada si el avatar no es válido', async () => {
     const { useCase, userRepository } = setup(student());
 
     await expect(
-      useCase.execute({ userId: 'user-1', avatar: { skin: 'light', dress: 'dress-01', top: 'top-01' } }),
+      useCase.execute({ userId: 'user-1', avatar: { ...AVATAR, outfit: 'cape' } }),
     ).rejects.toThrow(InvalidAvatarError);
     expect(userRepository.save).not.toHaveBeenCalled();
   });
@@ -58,7 +64,7 @@ describe('UpdateUserAvatarUseCase (issue #77)', () => {
   it('lanza UserNotFoundError si la cuenta no existe', async () => {
     const { useCase } = setup(null);
 
-    await expect(useCase.execute({ userId: 'nadie', avatar: { skin: 'light' } })).rejects.toThrow(UserNotFoundError);
+    await expect(useCase.execute({ userId: 'nadie', avatar: AVATAR })).rejects.toThrow(UserNotFoundError);
   });
 
   it('cualquier rol puede tener avatar (no depende de Role)', async () => {
@@ -66,8 +72,8 @@ describe('UpdateUserAvatarUseCase (issue #77)', () => {
     teacher.changeRole(Role.create('TEACHER'));
     const { useCase } = setup(teacher);
 
-    const result = await useCase.execute({ userId: 'user-1', avatar: { skin: 'medium', hat: 'hat-04' } });
+    const result = await useCase.execute({ userId: 'user-1', avatar: { ...AVATAR, top: 'cap' } });
 
-    expect(result.avatarConfig?.hat).toBe('hat-04');
+    expect(result.avatarConfig?.top).toBe('cap');
   });
 });

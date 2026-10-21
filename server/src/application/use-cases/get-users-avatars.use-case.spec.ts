@@ -7,6 +7,12 @@ import { PersonName } from '../../domain/value-objects/person-name.vo.js';
 import { AvatarConfig } from '../../domain/value-objects/avatar-config.vo.js';
 import { GetUsersAvatarsUseCase, MAX_AVATAR_IDS } from './get-users-avatars.use-case.js';
 
+const AVATAR = {
+  top: 'short', hairColor: '5a3825', hatColor: 'e64980', skinColor: 'eab890', outfit: 'jacket',
+  shirtColor: 'f2f2f2', jacketColor: '6b4f3a', pantsColor: '3b5b8c', shoesColor: 'e03131',
+  eyes: 'open', eyebrows: 'soft', mouth: 'smile', nose: 'small', cheeks: null, glasses: null, beard: null,
+};
+
 function user(id: string, avatar: AvatarConfig | null) {
   const created = User.create({
     id,
@@ -27,14 +33,14 @@ function setup(users: User[]) {
 describe('GetUsersAvatarsUseCase (issue #77)', () => {
   it('devuelve solo el avatar de cada jugador encontrado (los bots no aparecen)', async () => {
     const { useCase } = setup([
-      user('u1', AvatarConfig.create({ skin: 'light', hair: 'hair-01' })),
+      user('u1', AvatarConfig.create({ ...AVATAR, top: 'afro' })),
       user('u2', null),
     ]);
 
     const result = await useCase.execute({ userIds: ['u1', 'u2', 'bot-facil'] });
 
     expect(result.items).toEqual([
-      { userId: 'u1', avatarConfig: expect.objectContaining({ skin: 'light', hair: 'hair-01' }) },
+      { userId: 'u1', avatarConfig: expect.objectContaining({ top: 'afro', outfit: 'jacket' }) },
       { userId: 'u2', avatarConfig: null },
     ]);
     expect(Object.keys(result.items[0])).toEqual(['userId', 'avatarConfig']);
