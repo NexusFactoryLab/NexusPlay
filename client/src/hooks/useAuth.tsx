@@ -8,6 +8,7 @@ import type {
   UpdateProfileInput,
 } from '../services/auth.service'
 import { setRefreshHandler, setUnauthorizedHandler } from '../utils/http'
+import { saveMyAvatar, type AvatarConfig } from '../services/avatar.service'
 
 /** `checking` mientras se intenta renovar la sesión al arrancar la app. */
 type AuthStatus = 'checking' | 'authenticated' | 'anonymous'
@@ -24,6 +25,8 @@ type AuthContextValue = {
   signUp: (input: RegisterInput) => Promise<void>
   signOut: () => void
   updateProfile: (input: UpdateProfileInput) => Promise<void>
+  /** Guarda el avatar propio (issue #77) y refresca el usuario en toda la app. */
+  saveAvatar: (avatar: AvatarConfig) => Promise<void>
   chooseRole: (role: 'STUDENT' | 'TEACHER') => Promise<void>
   deleteAccount: (currentPlainPassword: string) => Promise<void>
 }
@@ -150,6 +153,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(profile)
   }, [])
 
+  const saveAvatar = useCallback(async (avatar: AvatarConfig) => {
+    if (!tokenRef.current) throw new Error('No hay una sesión activa.')
+    const profile = await saveMyAvatar(tokenRef.current, avatar)
+    setUser(profile)
+  }, [])
+
   const chooseRole = useCallback(async (role: 'STUDENT' | 'TEACHER') => {
     if (!tokenRef.current) throw new Error('No hay una sesión activa.')
     const profile = await authService.chooseOwnRole(tokenRef.current, role)
@@ -184,6 +193,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signUp,
         signOut,
         updateProfile,
+        saveAvatar,
         chooseRole,
         deleteAccount,
       }}
@@ -199,4 +209,13 @@ export function useAuth(): AuthContextValue {
     throw new Error('useAuth debe usarse dentro de <AuthProvider>.')
   }
   return context
+}
+
+/**
+ * Como useAuth, pero devuelve null fuera de <AuthProvider>: para piezas que
+ * también se montan solas (p. ej. la sala de espera en sus pruebas de
+ * navegador) y pueden vivir sin sesión.
+ */
+export function useOptionalAuth(): AuthContextValue | null {
+  return useContext(AuthContext)
 }

@@ -1,4 +1,5 @@
 import { request } from '../utils/http'
+import type { AvatarConfig } from './avatar.service'
 
 export type LoginCredentials = {
   email: string
@@ -34,6 +35,8 @@ export type AuthUser = {
   role: string
   hasChosenRole: boolean
   avatarUrl: string | null
+  /** Avatar armado por piezas (issue #77); null mientras no lo configure. */
+  avatarConfig?: AvatarConfig | null
   birthDate: string | null
   isActive: boolean
   isEmailVerified: boolean

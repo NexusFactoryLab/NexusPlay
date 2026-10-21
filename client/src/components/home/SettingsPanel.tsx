@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { ArrowLeft, ChevronRight, Palette, User, X } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { ArrowLeft, ChevronRight, Palette, Shirt, User, X } from 'lucide-react'
 import { AccountSettingsSection } from './AccountSettingsSection'
 import { ThemesSection } from './ThemesSection'
 import { Modal } from './games/Modal'
@@ -10,8 +11,20 @@ type SettingsPanelProps = {
 
 type SettingsView = 'menu' | 'profile' | 'themes'
 
-const SECTIONS: { value: Exclude<SettingsView, 'menu'>; label: string; description: string; icon: typeof User; badge?: string }[] = [
+type SettingsSection = {
+  value: Exclude<SettingsView, 'menu'> | 'avatar'
+  label: string
+  description: string
+  icon: typeof User
+  badge?: string
+  /** Secciones que son una página propia (no una pantalla del recuadro). */
+  to?: string
+}
+
+const SECTIONS: SettingsSection[] = [
   { value: 'profile', label: 'Configuración del perfil', description: 'Tus datos de cuenta', icon: User },
+  // Issue #77: el avatar tiene su propia página (necesita la pantalla completa).
+  { value: 'avatar', label: 'Configurar avatar', description: 'Tu personaje: peinado, ropa y más', icon: Shirt, badge: '✨ Nuevo', to: '/avatar' },
   // La guía de bienvenida anuncia el tema Fantasía aquí (issue #47).
   { value: 'themes', label: 'Temas', description: 'Apariencia de la página', icon: Palette, badge: '✨ Nuevos temas' },
 ]
@@ -25,6 +38,7 @@ const SECTIONS: { value: Exclude<SettingsView, 'menu'>; label: string; descripti
  * opción, y cada pantalla se cierra con "Atrás" en vez de acordeón.
  */
 export function SettingsPanel({ onClose }: SettingsPanelProps) {
+  const navigate = useNavigate()
   const [view, setView] = useState<SettingsView>('menu')
   const section = SECTIONS.find((item) => item.value === view)
 
@@ -76,7 +90,14 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
               <button
                 key={item.value}
                 type="button"
-                onClick={() => setView(item.value)}
+                onClick={() => {
+                  if (item.to) {
+                    onClose()
+                    navigate(item.to)
+                  } else if (item.value !== 'avatar') {
+                    setView(item.value)
+                  }
+                }}
                 className="settings-menu-item group flex w-full items-center gap-3.5 rounded-2xl border-[2.5px] border-transparent p-4 text-left transition-transform hover:-translate-y-0.5"
                 style={{
                   background:
