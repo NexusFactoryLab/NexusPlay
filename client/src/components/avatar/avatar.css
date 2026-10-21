@@ -159,11 +159,11 @@
   position: relative;
   flex: 1;
   display: grid;
-  grid-template-columns: minmax(220px, 290px) minmax(0, 1fr) minmax(250px, 340px);
+  grid-template-columns: 104px minmax(300px, 400px) minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr) auto;
   grid-template-areas:
-    'style stage closet'
-    'status turn buttons';
+    'rail panel stage'
+    'status status buttons';
   gap: 18px 22px;
   min-height: 0;
   padding: 74px 22px 20px;
@@ -299,9 +299,9 @@
   outline-offset: 2px;
 }
 
-.avatar-area-style { grid-area: style; }
+.avatar-area-rail { grid-area: rail; }
+.avatar-area-panel { grid-area: panel; }
 .avatar-area-stage { grid-area: stage; }
-.avatar-area-closet { grid-area: closet; }
 .avatar-area-status {
   grid-area: status;
   display: flex;
@@ -309,7 +309,6 @@
   align-items: center;
   gap: 10px;
 }
-.avatar-area-turn { grid-area: turn; justify-self: center; }
 .avatar-area-buttons { grid-area: buttons; }
 
 /* ---------------------------------------------------------------- paneles */
@@ -471,8 +470,8 @@
 }
 
 .avatar-tabs {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   padding: 12px 12px 0;
 }
@@ -503,13 +502,97 @@
 
 /* ---------------------------------------------------------------- escenario */
 
+/* Columna del avatar: la escena arriba y los controles de giro debajo. */
+.avatar-stage-col {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
 .avatar-stage {
   position: relative;
   display: flex;
+  width: 100%;
+  flex: 1;
   min-height: 0;
   align-items: flex-end;
   justify-content: center;
   padding-bottom: 26px;
+}
+
+/* ---------------------------------------------------------------- categorías (estilo Roblox) */
+
+.avatar-rail {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  padding: 10px 8px;
+  border: 4px solid var(--av-panel-border);
+  border-radius: 26px;
+  background: var(--av-panel-grain), var(--av-panel-bg);
+  box-shadow: inset 0 0 0 3px var(--av-panel-ring), 0 18px 34px -24px rgba(0, 0, 0, 0.55);
+  scrollbar-width: none;
+}
+
+.avatar-rail-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 74px;
+  padding: 8px 4px 6px;
+  border: 3px solid var(--av-tile-border);
+  border-radius: 18px;
+  background: var(--av-tile-bg);
+  font-size: 11.5px;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--av-muted);
+  cursor: pointer;
+  transition: transform 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.avatar-rail-btn .avatar-rail-icon {
+  font-size: 26px;
+  line-height: 1;
+}
+
+.avatar-rail-btn:hover {
+  transform: translateY(-1px);
+  background: var(--av-tile-hover);
+}
+
+.avatar-rail-btn:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.avatar-rail-btn[aria-current='true'] {
+  border-color: var(--av-tile-active);
+  background: var(--av-tab-active-bg);
+  color: var(--av-tab-active-text);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--av-tile-active) 30%, transparent);
+}
+
+.avatar-rail-sep {
+  height: 2px;
+  flex-shrink: 0;
+  border-radius: 2px;
+  background: var(--av-tile-border);
+}
+
+.avatar-rail-btn-action {
+  border-style: dashed;
+}
+
+.avatar-swatches-large .avatar-swatch {
+  width: 40px;
+  height: 40px;
 }
 
 .avatar-island {
@@ -734,17 +817,16 @@
 
   .avatar-board {
     flex: none;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    grid-template-rows: auto auto auto auto;
+    grid-template-columns: 96px minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
     grid-template-areas:
       'stage stage'
-      'turn turn'
-      'style closet'
+      'rail panel'
       'status buttons';
   }
 
-  .avatar-stage {
-    height: 440px;
+  .avatar-stage-col {
+    height: 480px;
   }
 
   .avatar-panel {
@@ -757,9 +839,8 @@
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
       'stage'
-      'turn'
-      'closet'
-      'style'
+      'rail'
+      'panel'
       'status'
       'buttons';
     padding: 70px 12px 14px;
@@ -767,8 +848,26 @@
     border-radius: 24px;
   }
 
-  .avatar-stage {
-    height: 380px;
+  .avatar-stage-col {
+    height: 420px;
+  }
+
+  /* Las categorías pasan a una fila con scroll horizontal. */
+  .avatar-rail {
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 8px;
+  }
+
+  .avatar-rail-btn {
+    min-width: 74px;
+    min-height: 68px;
+  }
+
+  .avatar-rail-sep {
+    width: 2px;
+    height: auto;
   }
 
   .avatar-panel {
