@@ -1,9 +1,17 @@
-import { CheckCircle2, Circle } from 'lucide-react'
+import { CheckCircle2, Circle, Users } from 'lucide-react'
+import type { AvatarConfig } from '../../../services/avatar.service'
+import { AvatarCircle } from '../../avatar/AvatarCircle'
 
-type Participant = { userId: string; displayName: string; isSelf: boolean; ready?: boolean }
+type Participant = { userId: string; displayName: string; isSelf: boolean; ready?: boolean; role?: string }
 
-export function LobbyReadyControl({ players, onReady, disconnected = false, requireEven = false }: {
+/**
+ * Jugadores de la sala y confirmación «Listo para jugar» en un solo bloque
+ * (issue #80): cada jugador sale con su avatar y si ya confirmó.
+ */
+export function LobbyReadyControl({ players, maxPlayers, avatars = {}, onReady, disconnected = false, requireEven = false }: {
   players: Participant[]
+  maxPlayers: number
+  avatars?: Record<string, AvatarConfig | null | undefined>
   onReady: (ready: boolean) => void
   disconnected?: boolean
   requireEven?: boolean
@@ -12,24 +20,38 @@ export function LobbyReadyControl({ players, onReady, disconnected = false, requ
   const readyCount = players.filter((player) => player.ready).length
   const validCount = players.length >= 2 && (!requireEven || players.length % 2 === 0)
   return (
-    <section aria-label="Confirmación de jugadores" className="rounded-2xl border border-accent/30 bg-accent/5 p-4">
-      <div className="mb-3 flex flex-wrap gap-2" aria-live="polite">
+    <section aria-label="Confirmación de jugadores" className="rounded-[22px] border border-accent/30 bg-accent/5 p-3.5">
+      <p className="mb-2.5 flex items-center gap-2 text-[13px] font-semibold text-text-h">
+        <Users className="h-4 w-4 text-accent" strokeWidth={2} aria-hidden="true" />
+        Jugadores en la sala ({players.length}/{maxPlayers})
+      </p>
+      <div className="mb-2.5 flex flex-wrap gap-2" aria-live="polite">
         {players.map((player) => {
           const Icon = player.ready ? CheckCircle2 : Circle
-          return <span key={player.userId} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs text-text-h">
-            <Icon className={`h-4 w-4 ${player.ready ? 'text-accent' : 'text-text'}`} aria-hidden="true" />
-            {player.displayName}{player.isSelf ? ' (tú)' : ''}: {player.ready ? 'Listo' : 'Sin confirmar'}
+          return <span key={player.userId} className={`inline-flex items-center gap-2 rounded-full border bg-surface py-1 pr-3 pl-1 text-[12.5px] font-medium text-text-h ${player.ready ? 'border-accent/60' : 'border-border'}`}>
+            <AvatarCircle config={avatars[player.userId]} name={player.displayName} className="h-9 w-9 text-[12px]" />
+            <span>
+              {player.role === 'FIRE' ? '🔥 ' : player.role === 'WATER' ? '💧 ' : ''}
+              {player.displayName}{player.isSelf ? ' (tú)' : ''}
+              <span className={`flex items-center gap-1 text-[11px] font-semibold ${player.ready ? 'text-accent' : 'text-text'}`}>
+                <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                {player.ready ? 'Listo' : 'Sin confirmar'}
+              </span>
+            </span>
           </span>
         })}
       </div>
-      <p className="mb-3 text-sm text-text" role="status">
+      <p className="mb-2.5 text-[12.5px] text-text" role="status">
         {disconnected ? 'Reconectando con la sala…' : !validCount
           ? requireEven ? 'Se necesitan 2, 4, 6, 8 o 10 jugadores para empezar.' : 'Esperando al segundo jugador…'
-          : `${readyCount} de ${players.length} listos. La partida empieza automáticamente cuando todos confirmen.`}
+          : `${readyCount} de ${players.length} listos. Empieza cuando todos confirmen.`}
       </p>
       <button type="button" aria-pressed={Boolean(self?.ready)} disabled={!self || disconnected}
         onClick={() => onReady(!self?.ready)}
-        className="w-full rounded-xl border border-accent/40 bg-surface px-4 py-3 text-sm font-bold text-text-h transition-colors hover:bg-accent/15 focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50">
+        className={`w-full rounded-xl px-4 py-2.5 text-sm font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 ${
+          self?.ready ? 'border border-accent/40 bg-surface text-text-h hover:bg-accent/15' : 'text-white shadow-[0_10px_22px_-12px_var(--accent)]'
+        }`}
+        style={self?.ready ? undefined : { background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}>
         {self?.ready ? 'Cancelar mi confirmación' : 'Listo para jugar'}
       </button>
     </section>

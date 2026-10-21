@@ -317,24 +317,33 @@ type MatchBoardProps = {
   onDiscard: (cardId: string) => void
   onAccuse: (cardId: string) => void
   onPassTurn: () => void
+  /**
+   * La sala 1v1 pone el turno en su barra superior y el tablero ocupa el alto
+   * disponible sin scroll: las tarjetas se encogen para caber (issue #80).
+   */
+  fitHeight?: boolean
 }
 
 /**
- * Franja fija arriba del tablero (issue #80): de quién es el turno tiene que
- * leerse de un vistazo. En tu turno es una barra sólida del color de acento;
- * en el del rival, una barra apagada y punteada con reloj de arena.
+ * Indicador de turno siempre visible (issue #80): de quién es el turno tiene
+ * que leerse de un vistazo. En tu turno es una barra sólida del color de
+ * acento; en el del rival, una barra apagada y punteada con reloj de arena.
+ * `compact` es la versión de una línea para la barra superior de la sala.
  */
-function TurnStatusStrip({
+export function TurnStatusStrip({
   isMyTurn,
   opponentName,
-  remainingMs,
+  turnDeadline,
   turnDurationSeconds,
+  compact = false,
 }: {
   isMyTurn: boolean
   opponentName: string
-  remainingMs: number
+  turnDeadline: number | null
   turnDurationSeconds: number
+  compact?: boolean
 }) {
+  const remainingMs = useCountdown(turnDeadline)
   const secondsLeft = Math.ceil(remainingMs / 1000)
   const urgent = secondsLeft <= 5
   const progress = Math.max(0, Math.min(1, remainingMs / (turnDurationSeconds * 1000)))
@@ -347,28 +356,28 @@ function TurnStatusStrip({
     <div
       role="status"
       data-turn={isMyTurn ? 'mine' : 'rival'}
-      className={`relative overflow-hidden rounded-2xl border-2 px-4 py-3 transition-colors duration-300 ${
+      className={`relative min-w-0 overflow-hidden rounded-2xl border-2 transition-colors duration-300 ${compact ? 'px-3 py-1.5' : 'px-4 py-3'} ${
         isMyTurn ? 'border-transparent text-white shadow-[0_12px_28px_-14px_var(--accent)]' : 'border-dashed border-border bg-surface text-text-h'
       }`}
       style={isMyTurn ? { background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' } : undefined}
     >
-      <div className="flex items-center gap-3">
+      <div className={`flex items-center ${compact ? 'gap-2.5' : 'gap-3'}`}>
         <span
-          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${isMyTurn ? 'bg-white/25' : 'bg-border/60 text-text'}`}
+          className={`flex shrink-0 items-center justify-center rounded-full ${compact ? 'h-8 w-8' : 'h-11 w-11'} ${isMyTurn ? 'bg-white/25' : 'bg-border/60 text-text'}`}
           aria-hidden="true"
         >
-          {isMyTurn ? <Sparkles className="h-6 w-6" strokeWidth={2.25} /> : <Hourglass className="h-5 w-5 motion-safe:animate-pulse" strokeWidth={2} />}
+          {isMyTurn ? <Sparkles className={compact ? 'h-5 w-5' : 'h-6 w-6'} strokeWidth={2.25} /> : <Hourglass className="h-4.5 w-4.5 motion-safe:animate-pulse" strokeWidth={2} />}
         </span>
         <div className="min-w-0 flex-1">
-          <p className={`truncate font-extrabold tracking-tight uppercase ${isMyTurn ? 'text-[22px]' : 'text-[17px]'}`}>
+          <p className={`truncate font-extrabold tracking-tight uppercase ${compact ? (isMyTurn ? 'text-[18px]' : 'text-[15px]') : isMyTurn ? 'text-[22px]' : 'text-[17px]'}`}>
             {isMyTurn ? '¡Tu turno!' : `Turno de ${opponentName}`}
           </p>
-          <p className={`truncate text-[12px] font-medium ${isMyTurn ? 'text-white/85' : 'text-text'}`}>
+          <p className={`truncate font-medium ${compact ? 'text-[11px]' : 'text-[12px]'} ${isMyTurn ? 'text-white/85' : 'text-text'}`}>
             {isMyTurn ? 'Pregunta, descarta o adivina.' : 'Espera: tu rival está jugando.'}
           </p>
         </div>
         <span
-          className={`shrink-0 rounded-xl px-3 py-1.5 text-[20px] font-extrabold tabular-nums ${
+          className={`shrink-0 rounded-xl font-extrabold tabular-nums ${compact ? 'px-2.5 py-1 text-[17px]' : 'px-3 py-1.5 text-[20px]'} ${
             urgent ? 'bg-danger text-white' : isMyTurn ? 'bg-white/20' : 'bg-border/60'
           }`}
           aria-label={`${secondsLeft} segundos restantes`}
@@ -405,10 +414,10 @@ export function MatchBoard({
   onDiscard,
   onAccuse,
   onPassTurn,
+  fitHeight = false,
 }: MatchBoardProps) {
   const [accusing, setAccusing] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
-  const turnRemainingMs = useCountdown(turnDeadline)
   const secretCard = cards.find((card) => card.cardId === self.secretCardId)
   const discardsMissing = Math.max(0, MIN_DISCARDS_TO_ACCUSE - self.discardedCardIds.length)
   const guessAvailable = canAccuse && isMyTurn && discardsMissing === 0
@@ -422,19 +431,19 @@ export function MatchBoard({
   }, [showHelp])
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className={fitHeight ? 'guess-who-board-fit flex h-full min-h-0 flex-col' : 'flex flex-col gap-5'}>
       <TurnPopBanner
         isMyTurn={isMyTurn}
         opponentName={opponent.displayName}
         accusationMessage={accusationMessage}
       />
 
-      <TurnStatusStrip
+      {!fitHeight && <TurnStatusStrip
         isMyTurn={isMyTurn}
         opponentName={opponent.displayName}
-        remainingMs={turnRemainingMs}
+        turnDeadline={turnDeadline}
         turnDurationSeconds={turnDurationSeconds}
-      />
+      />}
 
       <div
         className={`guess-who-board-columns flex flex-col gap-4 rounded-2xl p-2 transition-[box-shadow,opacity] duration-300 sm:flex-row sm:items-start ${
