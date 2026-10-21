@@ -86,7 +86,10 @@ function build(game: Game, aiDraft: { config: unknown; content: unknown[] } = { 
     { resolve: vi.fn().mockResolvedValue(false) } as unknown as RequesterAdminResolver,
     generator,
     new DeterministicGameAdapter(registry),
-    { canUseAi: vi.fn().mockResolvedValue(true) } as unknown as AiUsagePolicy,
+    {
+      canUseAi: vi.fn().mockResolvedValue(true),
+      isConfigured: vi.fn().mockResolvedValue(true),
+    } as unknown as AiUsagePolicy,
   );
   return { useCase, assistant };
 }
