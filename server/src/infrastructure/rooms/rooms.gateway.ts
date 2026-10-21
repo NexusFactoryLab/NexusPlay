@@ -67,6 +67,13 @@ import {
 import { HeuristicGuessWhoBotPolicy } from '../../application/bots/heuristic-guess-who-bot.policy.js';
 import { GuessWhoBotRunner } from '../bots/guess-who-bot-runner.js';
 
+/**
+ * Segundos por turno con los que arranca una sala de Identidad Oculta (issue #80).
+ * El formulario del juego no los define (el 15 guardado era solo el valor por
+ * defecto anterior): el anfitrión los cambia en la sala de espera.
+ */
+const GUESS_WHO_DEFAULT_TURN_SECONDS = 30;
+
 interface AuthenticatedSocket extends Socket {
   data: {
     userId: string;
@@ -722,7 +729,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       cards: game.content as GuessWhoCard[],
       hostUserId: socket.data.userId,
       maxAccusationCount: (game.config.maxAccusationCount as number | undefined) ?? 6,
-      turnDurationSeconds: (game.config.turnDurationSeconds as number | undefined) ?? 15,
+      turnDurationSeconds: GUESS_WHO_DEFAULT_TURN_SECONDS,
       autoDiscard: false,
       phase: 'WAITING',
       players: [
@@ -782,7 +789,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       cards: game.content as GuessWhoCard[],
       hostUserId: socket.data.userId,
       maxAccusationCount: (game.config.maxAccusationCount as number | undefined) ?? 6,
-      turnDurationSeconds: (game.config.turnDurationSeconds as number | undefined) ?? 15,
+      turnDurationSeconds: GUESS_WHO_DEFAULT_TURN_SECONDS,
       autoDiscard: body?.autoDiscard === true,
       phase: 'WAITING',
       players: [
@@ -1327,7 +1334,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       gameTitle: game.title,
       maxParticipants,
       maxAccusationCount: (game.config.maxAccusationCount as number | undefined) ?? 6,
-      turnDurationSeconds: (game.config.turnDurationSeconds as number | undefined) ?? 15,
+      turnDurationSeconds: GUESS_WHO_DEFAULT_TURN_SECONDS,
       phase: 'WAITING',
       creatorUserId: socket.data.userId,
       currentRound: 0,
