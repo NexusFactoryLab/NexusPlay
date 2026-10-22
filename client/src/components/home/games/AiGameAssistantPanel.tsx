@@ -5,6 +5,7 @@ import { useAuth } from '../../../hooks/useAuth'
 import { useToast } from '../../../hooks/useToast'
 import { generateGameDraft, type GameDraft } from '../../../services/ai-game-assistant.service'
 import { ApiError } from '../../../utils/http'
+import { AiNotConfiguredNotice, useAiConfigured } from '../ai/AiNotConfiguredNotice'
 import { createStoredFile, materializeFiles } from './creationDraftSupport'
 import {
   useAiDraftPersist,
@@ -126,6 +127,7 @@ export function AiGameAssistantPanel({
 }: AiGameAssistantPanelProps) {
   const { token } = useAuth()
   const { showToast } = useToast()
+  const aiConfigured = useAiConfigured()
   const markAiDraftApplied = useMarkAiDraftApplied()
   const setShellGenerating = useSetAiGenerating()
   const fillStep = useAiFillStep()
@@ -188,7 +190,7 @@ export function AiGameAssistantPanel({
   // borrador queda sin imagen, para completarla a mano después).
   const canSendTextOnly = files.length === 0 && message.trim().length > 0
   const canSend =
-    !disabled && !generating && (canSendTextOnly || (files.length > 0 && hasEnoughImages))
+    aiConfigured && !disabled && !generating && (canSendTextOnly || (files.length > 0 && hasEnoughImages))
 
   function addFiles(incoming: File[]) {
     if (incoming.length === 0) return
@@ -305,6 +307,7 @@ export function AiGameAssistantPanel({
 
   const chatBody = (
     <>
+          {!aiConfigured && <AiNotConfiguredNotice />}
           <div className="mb-4 flex items-start justify-between gap-3">
             <div className="flex items-center gap-2.5">
               <span

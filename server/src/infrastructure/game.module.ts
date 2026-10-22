@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { UserModule } from './user.module.js';
+import { AiCoreModule } from './ai-core.module.js';
 import { OrganizationCoreModule } from './organization-core.module.js';
 import { ClassCoreModule } from './class-core.module.js';
 import { GAME_REPOSITORY } from '../domain/ports/game.repository.port.js';
@@ -46,14 +47,23 @@ import { AdaptGameUseCase } from '../application/use-cases/adapt-game.use-case.j
 import { ContentImageResolver } from '../application/services/content-image-resolver.service.js';
 import { GenerateGameDraftUseCase } from '../application/use-cases/generate-game-draft.use-case.js';
 import { ListAiProviderAttemptsUseCase } from '../application/use-cases/list-ai-provider-attempts.use-case.js';
-import { AiProviderAttemptTracker } from '../application/services/ai-provider-attempt-tracker.service.js';
-import { AI_CONTENT_ASSISTANT, type AiContentAssistant } from '../domain/ports/ai-content-assistant.port.js';
-import { AI_PROVIDER_ATTEMPT_REPOSITORY } from '../domain/ports/ai-provider-attempt.repository.port.js';
 import { IMAGE_STORAGE } from '../domain/ports/image-storage.port.js';
-import { GeminiContentAssistant } from './ai/gemini-content-assistant.adapter.js';
-import { GroqContentAssistant } from './ai/groq-content-assistant.adapter.js';
-import { AiProviderOrchestrator } from './ai/ai-provider-orchestrator.js';
-import { PrismaAiProviderAttemptRepository } from './persistence/prisma/ai-provider-attempt.repository.js';
+import { ListAiAgentsUseCase } from '../application/use-cases/list-ai-agents.use-case.js';
+import { UpdateAiAgentUseCase } from '../application/use-cases/update-ai-agent.use-case.js';
+import { ResetAiAgentUseCase } from '../application/use-cases/reset-ai-agent.use-case.js';
+import { TestAiAgentUseCase } from '../application/use-cases/test-ai-agent.use-case.js';
+import { AiAgentsController } from './http/controllers/ai-agents.controller.js';
+import { ListAiProviderConfigsUseCase } from '../application/use-cases/list-ai-provider-configs.use-case.js';
+import { CreateAiProviderConfigUseCase } from '../application/use-cases/create-ai-provider-config.use-case.js';
+import { UpdateAiProviderConfigUseCase } from '../application/use-cases/update-ai-provider-config.use-case.js';
+import { DeleteAiProviderConfigUseCase } from '../application/use-cases/delete-ai-provider-config.use-case.js';
+import { ReorderAiProviderConfigsUseCase } from '../application/use-cases/reorder-ai-provider-configs.use-case.js';
+import { TestAiProviderConfigUseCase } from '../application/use-cases/test-ai-provider-config.use-case.js';
+import { ListAiProviderModelsUseCase } from '../application/use-cases/list-ai-provider-models.use-case.js';
+import { AI_MODEL_CATALOG } from '../domain/ports/ai-model-catalog.port.js';
+import { HttpAiModelCatalog } from './ai/http-ai-model-catalog.js';
+import { AiStatusController } from './http/controllers/ai-status.controller.js';
+import { AiProviderConfigsController } from './http/controllers/ai-provider-configs.controller.js';
 import { CloudinaryImageStorage } from './storage/cloudinary-image.storage.js';
 import { CONTENT_IMAGE_FINDER } from '../domain/ports/content-image-finder.port.js';
 import { WikimediaContentImageFinder } from './ai/wikimedia-content-image-finder.js';
@@ -70,16 +80,8 @@ import { DRAFT_ASSET_STORAGE } from '../domain/ports/draft-asset-storage.port.js
 import { GameTypeSettingController } from './http/controllers/game-type-setting.controller.js';
 import { AiProviderAttemptsController } from './http/controllers/ai-provider-attempts.controller.js';
 
-/**
- * Orden por defecto de la cadena de proveedores de IA: ahora solo Groq.
- * Gemini sigue registrado y se puede reactivar sin tocar código con la
- * variable de entorno `AI_PROVIDER_ORDER` (ej. "groq,gemini"), siempre que
- * el nombre exista en el `registry` de abajo.
- */
-const DEFAULT_AI_PROVIDER_ORDER = ['groq'];
-
 @Module({
-  imports: [UserModule, OrganizationCoreModule, ClassCoreModule],
+  imports: [UserModule, OrganizationCoreModule, ClassCoreModule, AiCoreModule],
   controllers: [
     GameCreationDraftController,
     GameController,
@@ -87,6 +89,9 @@ const DEFAULT_AI_PROVIDER_ORDER = ['groq'];
     GameAiDraftController,
     GameTypeSettingController,
     AiProviderAttemptsController,
+    AiProviderConfigsController,
+    AiAgentsController,
+    AiStatusController,
   ],
   providers: [
     MongoService,
@@ -127,28 +132,20 @@ const DEFAULT_AI_PROVIDER_ORDER = ['groq'];
     ArchiveGameTypeUseCase,
     UnarchiveGameTypeUseCase,
     UpdateGameTypeSettingUseCase,
-    GeminiContentAssistant,
-    GroqContentAssistant,
-    AiProviderAttemptTracker,
-    { provide: AI_PROVIDER_ATTEMPT_REPOSITORY, useClass: PrismaAiProviderAttemptRepository },
-    {
-      provide: AI_CONTENT_ASSISTANT,
-      useFactory: (
-        gemini: GeminiContentAssistant,
-        groq: GroqContentAssistant,
-        tracker: AiProviderAttemptTracker,
-      ) => {
-        const registry: Record<string, AiContentAssistant> = { gemini, groq };
-        const configuredOrder = (process.env.AI_PROVIDER_ORDER ?? '')
-          .split(',')
-          .map((name) => name.trim())
-          .filter((name) => name in registry);
-        const order = configuredOrder.length > 0 ? configuredOrder : DEFAULT_AI_PROVIDER_ORDER;
-        const chain = order.map((name) => ({ name, assistant: registry[name] }));
-        return new AiProviderOrchestrator(chain, tracker);
-      },
-      inject: [GeminiContentAssistant, GroqContentAssistant, AiProviderAttemptTracker],
-    },
+    // IA agnóstica al proveedor: repositorios, cifrado, runtime de agentes y
+    // asistentes viven en `AiCoreModule`; aquí solo la administración.
+    ListAiProviderConfigsUseCase,
+    CreateAiProviderConfigUseCase,
+    UpdateAiProviderConfigUseCase,
+    DeleteAiProviderConfigUseCase,
+    ReorderAiProviderConfigsUseCase,
+    TestAiProviderConfigUseCase,
+    ListAiProviderModelsUseCase,
+    ListAiAgentsUseCase,
+    UpdateAiAgentUseCase,
+    ResetAiAgentUseCase,
+    TestAiAgentUseCase,
+    { provide: AI_MODEL_CATALOG, useClass: HttpAiModelCatalog },
     { provide: IMAGE_STORAGE, useClass: CloudinaryImageStorage },
     { provide: CONTENT_IMAGE_FINDER, useClass: WikimediaContentImageFinder },
     FileTextExtractor,

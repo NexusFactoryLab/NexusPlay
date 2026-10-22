@@ -10,6 +10,7 @@ const PAGE_SIZE = 20
 const OPERATION_LABEL: Record<string, string> = {
   describeImage: 'Describir imagen',
   generateGameDraft: 'Generar borrador de juego',
+  complete: 'Consulta del agente Jugador',
 }
 
 function formatDate(iso: string): string {
@@ -62,10 +63,10 @@ export function AdminAiProviderLogsSection() {
     <section>
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <h2 className="mb-1 text-[22px] tracking-tight text-text-h">Proveedores de IA</h2>
+          <h2 className="mb-1 text-[22px] tracking-tight text-text-h">Historial de llamadas</h2>
           <p className="text-[14px] text-text">
-            Historial de llamadas del asistente de IA. Groq es el proveedor de IA activo; aquí puedes
-            ver si cada llamada tuvo éxito o falló.
+            Historial de llamadas del asistente de IA: qué proveedor respondió cada una, si usó el
+            respaldo y por qué falló cuando falló.
           </p>
         </div>
         <button

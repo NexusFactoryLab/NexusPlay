@@ -68,7 +68,7 @@ describe('GroqContentAssistant', () => {
       await expect(assistant.describeImage({ buffer: Buffer.from(''), mimeType: 'image/png' })).rejects.toBeInstanceOf(
         ServiceUnavailableException,
       );
-      await expect(assistant.generateGameDraft(DRAFT_INPUT)).rejects.toThrow(/GROQ_API_KEY/);
+      await expect(assistant.generateGameDraft(DRAFT_INPUT)).rejects.toThrow(/falta la API key/);
       expect(fetch).not.toHaveBeenCalled();
     });
 
@@ -364,7 +364,7 @@ describe('GroqContentAssistant', () => {
       const { assistant } = instantAssistant();
       vi.mocked(fetch).mockResolvedValue(jsonResponse(errorBody('Invalid API Key'), false, 401));
 
-      await expect(assistant.generateGameDraft(DRAFT_INPUT)).rejects.toThrow(/GROQ_API_KEY/);
+      await expect(assistant.generateGameDraft(DRAFT_INPUT)).rejects.toThrow(/API key de Groq no es válida/);
       expect(fetch).toHaveBeenCalledTimes(1);
     });
 
@@ -388,5 +388,39 @@ describe('GroqContentAssistant', () => {
 
       await expect(assistant.generateGameDraft(DRAFT_INPUT)).rejects.toBeInstanceOf(ServiceUnavailableException);
     });
+  });
+});
+
+describe('GroqContentAssistant con configuración del panel', () => {
+  beforeEach(() => {
+    delete process.env.GROQ_API_KEY;
+    vi.stubGlobal('fetch', vi.fn());
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('usa la URL, la key y el modelo configurados, no los del entorno', async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(completion('OK')));
+    const assistant = new GroqContentAssistant({
+      label: 'OpenAI',
+      apiKey: 'sk-panel',
+      apiUrl: 'https://api.openai.com/v1/chat/completions',
+      textModel: 'gpt-x',
+    });
+
+    await assistant.ping();
+
+    const [url, init] = vi.mocked(fetch).mock.calls[0];
+    expect(url).toBe('https://api.openai.com/v1/chat/completions');
+    expect((init as RequestInit).headers).toMatchObject({ Authorization: 'Bearer sk-panel' });
+    expect(requestBody().model).toBe('gpt-x');
+  });
+
+  it('nombra al proveedor configurado en los errores', async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(errorBody('Invalid'), false, 401));
+    const assistant = new GroqContentAssistant({ label: 'OpenAI', apiKey: 'k', apiUrl: 'https://x/chat/completions' });
+
+    await expect(assistant.ping()).rejects.toThrow(/API key de OpenAI/);
   });
 });

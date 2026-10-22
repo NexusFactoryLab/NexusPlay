@@ -1,8 +1,28 @@
+/** Asistente del agente Configurador: parametriza y adapta juegos. */
 export const AI_CONTENT_ASSISTANT = Symbol('AI_CONTENT_ASSISTANT');
+/** Asistente del agente Jugador: juega con los jugadores (p. ej. el bot de Identidad Oculta). */
+export const AI_GAME_PLAYER_ASSISTANT = Symbol('AI_GAME_PLAYER_ASSISTANT');
 
 export interface DescribeImageInput {
   buffer: Buffer;
   mimeType: string;
+}
+
+export interface CompleteInput {
+  /** Rol/enfoque del agente; va como mensaje de sistema. */
+  system?: string;
+  prompt: string;
+  /** Pide la respuesta como un objeto JSON. */
+  json?: boolean;
+  maxTokens?: number;
+  temperature?: number;
+  /**
+   * Plazo total en milisegundos (espera de cupo + llamada). Con plazo, el
+   * adaptador NO reintenta ni espera cooldowns largos: falla rápido para que
+   * quien llama (p. ej. el bot dentro de un turno) responda otra cosa en vez
+   * de dejar trabajo colgado consumiendo cuota.
+   */
+  deadlineMs?: number;
 }
 
 export interface GenerateGameDraftInput {
@@ -37,12 +57,26 @@ export interface GenerateGameDraftOutput {
 /**
  * Puerto hacia el proveedor de IA que arma el borrador de un juego a partir
  * de los archivos que sube el usuario. Ningún caso de uso ni controller
- * conoce el proveedor real (hoy Groq, ver `infrastructure/ai/`) — cambiarlo
- * es escribir un adaptador nuevo y una línea en el módulo, nada más.
+ * conoce el proveedor real: se configura desde el panel de administración
+ * (ver `AiAssistantFactory`) — agregar uno nuevo es escribir un adaptador y
+ * registrarlo en la fábrica, nada más.
  */
 export interface AiContentAssistant {
   /** Describe/extrae en texto legible el contenido de una imagen (usa visión del modelo). */
   describeImage(input: DescribeImageInput): Promise<string>;
   /** Genera `config`/`content` para un `gameType` a partir del texto fuente ya extraído. */
   generateGameDraft(input: GenerateGameDraftInput): Promise<GenerateGameDraftOutput>;
+  /**
+   * Consulta genérica de texto, independiente de los juegos: es lo que usa
+   * el agente Jugador (p. ej. clasificar una pregunta libre en Identidad
+   * Oculta). Devuelve el texto crudo del modelo.
+   */
+  complete(input: CompleteInput): Promise<string>;
+  /**
+   * Llamada mínima para verificar credenciales y modelo ("Probar conexión"
+   * del panel de administración). Lanza si el proveedor no responde bien.
+   * Opcional: la cadena de fallback (`AiProviderOrchestrator`) no la expone.
+   * Siempre con plazo corto y sin reintentos: es una prueba, no una tarea.
+   */
+  ping?(): Promise<void>;
 }

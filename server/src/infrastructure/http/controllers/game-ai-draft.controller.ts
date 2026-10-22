@@ -10,6 +10,8 @@ import {
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import type { Express } from 'express';
+import { AiUsagePolicy } from '../../../application/services/ai-usage-policy.service.js';
+import { AiNotConfiguredError } from '../../../application/errors/application.errors.js';
 import { GenerateGameDraftUseCase } from '../../../application/use-cases/generate-game-draft.use-case.js';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard.js';
 import { GenerateGameDraftDto } from '../dtos/generate-game-draft.dto.js';
@@ -49,7 +51,10 @@ function isAllowedMimeType(mimeType: string): boolean {
 @Controller('games/ai-draft')
 @UseGuards(JwtAuthGuard)
 export class GameAiDraftController {
-  constructor(private readonly generateGameDraftUseCase: GenerateGameDraftUseCase) {}
+  constructor(
+    private readonly generateGameDraftUseCase: GenerateGameDraftUseCase,
+    private readonly aiUsagePolicy: AiUsagePolicy,
+  ) {}
 
   @Post()
   @UseInterceptors(
@@ -65,6 +70,9 @@ export class GameAiDraftController {
     @UploadedFiles() files: Express.Multer.File[] | undefined,
     @Body() dto: GenerateGameDraftDto,
   ) {
+    // Antes de procesar nada: sin proveedor configurado, avisar de inmediato.
+    if (!(await this.aiUsagePolicy.isConfigured())) throw new AiNotConfiguredError();
+
     const hasFiles = Boolean(files && files.length > 0);
     if (!hasFiles && !dto.message?.trim()) {
       throw new BadRequestException(

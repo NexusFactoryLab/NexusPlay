@@ -4,7 +4,7 @@ import { InvalidGameContentError } from '../../domain/errors/game.errors.js';
 import { FileTextExtractor, type SourceFile } from './file-text-extractor.js';
 
 function assistantWith(describeImage: AiContentAssistant['describeImage']): AiContentAssistant {
-  return { describeImage: vi.fn(describeImage), generateGameDraft: vi.fn() };
+  return { describeImage: vi.fn(describeImage), generateGameDraft: vi.fn(), complete: vi.fn() };
 }
 
 const csv = (name: string, text: string): SourceFile => ({ buffer: Buffer.from(text), mimeType: 'text/csv', filename: name });

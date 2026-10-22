@@ -11,7 +11,7 @@ import { ForbiddenActionError } from '../../domain/errors/authorization.errors.j
 import { InvalidGameContentError } from '../../domain/errors/game.errors.js';
 import { GameType } from '../../domain/value-objects/game-type.vo.js';
 import type { Game } from '../../domain/entities/game.entity.js';
-import { GameNotFoundError } from '../errors/application.errors.js';
+import { AiNotConfiguredError, GameNotFoundError } from '../errors/application.errors.js';
 import { resolveGamePromptSpec } from '../ai/game-prompt-catalog.js';
 import { buildGameSourceText } from '../ai/game-content-source-text.js';
 import { DeterministicGameAdapter } from '../adaptation/deterministic-game-adapter.js';
@@ -48,6 +48,8 @@ export interface AdaptGameOutput {
 export interface AdaptationOptionsOutput {
   /** Si quien pide puede usar la IA (ver `AiUsagePolicy`). */
   aiAvailable: boolean;
+  /** Si hay algún proveedor de IA configurado en la plataforma; `false` = avisar antes de ofrecer la opción. */
+  aiConfigured: boolean;
   /** Destinos disponibles sin IA para este juego: `DOMINO`, `MEMORY_MATCH:PAIRS`… */
   algorithmTargets: string[];
   /**
@@ -88,6 +90,7 @@ export class AdaptGameUseCase implements UseCase<AdaptGameInput, AdaptGameOutput
     const algorithmTargets = this.deterministicAdapter.supportedTargetKeys(game);
     return {
       aiAvailable: await this.aiUsagePolicy.canUseAi(input.requestingUserId),
+      aiConfigured: await this.aiUsagePolicy.isConfigured(),
       algorithmTargets,
       sourceHasConcepts: algorithmTargets.length > 0,
     };
@@ -147,6 +150,9 @@ export class AdaptGameUseCase implements UseCase<AdaptGameInput, AdaptGameOutput
 
     if (!(await this.aiUsagePolicy.canUseAi(input.requestingUserId))) {
       throw new ForbiddenActionError('usar la IA');
+    }
+    if (!(await this.aiUsagePolicy.isConfigured())) {
+      throw new AiNotConfiguredError();
     }
 
     if (!resolveGamePromptSpec(targetName, input.mode)) {

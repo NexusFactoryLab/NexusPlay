@@ -1,5 +1,5 @@
 /** Qué operación del puerto `AiContentAssistant` se intentó. */
-export type AiProviderOperation = 'describeImage' | 'generateGameDraft';
+export type AiProviderOperation = 'describeImage' | 'generateGameDraft' | 'complete';
 
 export interface AiProviderAttemptProps {
   id: string;

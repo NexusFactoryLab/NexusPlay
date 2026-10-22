@@ -195,7 +195,7 @@ export function AdaptGameModal({ game, onClose }: AdaptGameModalProps) {
         if (!cancelled) setOptions(result)
       })
       .catch(() => {
-        if (!cancelled) setOptions({ aiAvailable: true, algorithmTargets: [], sourceHasConcepts: true })
+        if (!cancelled) setOptions({ aiAvailable: true, aiConfigured: true, algorithmTargets: [], sourceHasConcepts: true })
       })
     return () => {
       cancelled = true
@@ -387,14 +387,24 @@ export function AdaptGameModal({ game, onClose }: AdaptGameModalProps) {
               {
                 id: 'AI',
                 label: 'Con IA',
-                hint: options?.aiAvailable === false ? 'No disponible en tu plan' : 'Más precisa',
+                hint:
+                  options?.aiConfigured === false
+                    ? 'Sin proveedor de IA'
+                    : options?.aiAvailable === false
+                      ? 'No disponible en tu plan'
+                      : 'Más precisa',
                 icon:
                   pendingEngine === 'AI' ? (
                     <Loader2 className="h-5 w-5 animate-spin" />
                   ) : (
                     <AiSparklesIcon className="h-5 w-5" />
                   ),
-                disabled: busy || loading || needsVariant || options?.aiAvailable === false,
+                disabled:
+                  busy ||
+                  loading ||
+                  needsVariant ||
+                  options?.aiAvailable === false ||
+                  options?.aiConfigured === false,
                 accent: true,
                 onClick: () => selected && void handleAdapt(selected, 'AI'),
               },
@@ -412,7 +422,9 @@ export function AdaptGameModal({ game, onClose }: AdaptGameModalProps) {
                   ? 'La opción Rápida no está disponible: este juego es de preguntas y no tiene conceptos que reacomodar. Usa «Con IA».'
                   : `La opción Rápida no está disponible para «${name}»: necesita contenido nuevo (como el opuesto de cada concepto o preguntas redactadas). Usa «Con IA».`
             }
-            if (!loading && options?.aiAvailable === false) {
+            if (!loading && options?.aiConfigured === false) {
+              notice = `${notice ? `${notice} ` : ''}La IA no está configurada todavía: un administrador debe registrar un proveedor en el panel de IA.`
+            } else if (!loading && options?.aiAvailable === false) {
               notice = `${notice ? `${notice} ` : ''}La IA no está disponible en tu plan.`
             }
 

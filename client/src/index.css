@@ -4196,6 +4196,10 @@ code {
   background: var(--nx-solid, var(--surface));
   transform: rotate(45deg);
 }
+/* Cuando a la izquierda de la (i) no hay espacio (campos pegados al borde de una tarjeta o ventana),
+ * la nube se abre hacia la derecha en vez de quedar cortada. */
+.nx-info[data-align='start'] .nx-info-cloud { right: auto; left: -6px; transform-origin: top left; }
+.nx-info[data-align='start'] .nx-info-cloud::before { right: auto; left: 14px; }
 .nx-info-text { display: block; font-size: 13px; font-weight: 500; line-height: 1.5; color: var(--text-h); }
 .nx-info-close {
   position: absolute;
@@ -6759,6 +6763,121 @@ code {
     order: 3;
     flex-basis: 100%;
     max-width: none;
+  }
+}
+
+/* Panel de administración de IA (AdminAiHub / AdminAiProvidersSection):
+ * entrada escalonada de tarjetas, indicador deslizante de pestañas, pulso de
+ * "conexión verificada" y shimmer de carga. Todo sutil y sin bloquear la
+ * interacción; se apaga con prefers-reduced-motion. */
+@keyframes ai-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes ai-card-moved {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 14px color-mix(in srgb, var(--accent) 0%, transparent);
+  }
+}
+
+@keyframes ai-dot-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent) 0%, transparent);
+  }
+}
+
+@keyframes ai-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.ai-card {
+  animation: ai-card-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: calc(var(--ai-i, 0) * 70ms);
+  transition:
+    transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.25s ease,
+    border-color 0.25s ease,
+    opacity 0.25s ease;
+}
+
+.ai-card:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  box-shadow: 0 14px 30px -18px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.ai-card.ai-card-moved {
+  animation: ai-card-moved 0.7s ease-out;
+}
+
+.ai-dot-ok {
+  animation: ai-dot-pulse 2.2s ease-out infinite;
+}
+
+/* Ojo: fill-mode `backwards`, NO `both`/`forwards`. Un `transform` que se queda
+ * aplicado tras la animación convierte al elemento en el bloque contenedor de
+ * sus hijos `position: fixed`: los modales (Modal.tsx) dejaban de cubrir la
+ * pantalla y el blur del fondo no se veía. */
+.ai-fade-in {
+  animation: fade-in-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.ai-panel-in {
+  animation: fade-in-up 0.35s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.ai-pop-in {
+  animation: modal-panel-in 0.18s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.ai-tab-indicator {
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ai-shimmer {
+  background: linear-gradient(
+    100deg,
+    var(--code-bg) 30%,
+    color-mix(in srgb, var(--surface) 70%, var(--code-bg)) 50%,
+    var(--code-bg) 70%
+  );
+  background-size: 200% 100%;
+  animation: ai-shimmer 1.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-card,
+  .ai-card.ai-card-moved,
+  .ai-dot-ok,
+  .ai-fade-in,
+  .ai-panel-in,
+  .ai-pop-in,
+  .ai-shimmer {
+    animation: none;
+  }
+
+  .ai-card:hover {
+    transform: none;
+  }
+
+  .ai-tab-indicator {
+    transition: none;
   }
 }
 
