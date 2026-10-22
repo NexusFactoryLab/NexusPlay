@@ -3,7 +3,7 @@ import { AI_AGENT_CATALOG, AiAgentConfig } from '../../domain/entities/ai-agent.
 import type { SecretCipher } from '../../domain/ports/secret-cipher.port.js';
 import { InvalidAiProviderConfigError } from '../errors/application.errors.js';
 import type { RequesterAdminResolver } from '../services/requester-admin-resolver.service.js';
-import { InMemoryAiAgentRepo, InMemoryAiProviderRepo } from './testing/ai-fakes.helper-spec.js';
+import { InMemoryAiAgentRepo, InMemoryAiProviderRepo, makeAuditLogger } from './testing/ai-fakes.helper-spec.js';
 import { ListAiAgentsUseCase } from './list-ai-agents.use-case.js';
 import { MAX_AGENT_INSTRUCTIONS, UpdateAiAgentUseCase } from './update-ai-agent.use-case.js';
 
@@ -20,7 +20,7 @@ describe('instrucciones de fábrica como null', () => {
   beforeEach(() => {
     agents = new InMemoryAiAgentRepo();
     providers = new InMemoryAiProviderRepo();
-    update = new UpdateAiAgentUseCase(agents, providers, admin, cipher);
+    update = new UpdateAiAgentUseCase(agents, providers, admin, cipher, makeAuditLogger().audit);
   });
 
   afterEach(() => {

@@ -2,6 +2,10 @@
 // (`tsconfig.build.json`) sin que vitest los trate como un archivo de pruebas.
 import { AiAgentConfig, type AiAgentKey } from '../../../domain/entities/ai-agent.entity.js';
 import type { AiProviderConfig } from '../../../domain/entities/ai-provider-config.entity.js';
+import type { AiAuditLog } from '../../../domain/entities/ai-audit-log.entity.js';
+import type { AiAuditLogRepository } from '../../../domain/ports/ai-audit-log.repository.port.js';
+import type { UserRepository } from '../../../domain/ports/user.repository.port.js';
+import { AiAuditLogger } from '../../services/ai-audit-logger.service.js';
 import type { AiAgentConfigRepository } from '../../../domain/ports/ai-agent-config.repository.port.js';
 import type { AiProviderConfigRepository } from '../../../domain/ports/ai-provider-config.repository.port.js';
 
@@ -43,6 +47,26 @@ export class InMemoryAiProviderRepo implements AiProviderConfigRepository {
       this.items.set(id, current.with({ lastTestAt: result.at, lastTestOk: result.ok, lastTestMessage: result.message }));
     }
   }
+}
+
+export class InMemoryAiAuditRepo implements AiAuditLogRepository {
+  readonly items: AiAuditLog[] = [];
+  /** Para simular que la base de datos del registro falla. */
+  failOnSave = false;
+  async save(log: AiAuditLog) {
+    if (this.failOnSave) throw new Error('base de datos caída');
+    this.items.unshift(log);
+  }
+  async findRecent({ page, pageSize }: { page: number; pageSize: number }) {
+    return { items: this.items.slice((page - 1) * pageSize, page * pageSize), total: this.items.length };
+  }
+}
+
+/** Un `AiAuditLogger` real contra un repositorio en memoria y un usuario "Ana Admin" para cualquier id. */
+export function makeAuditLogger(): { audit: AiAuditLogger; repo: InMemoryAiAuditRepo } {
+  const repo = new InMemoryAiAuditRepo();
+  const users = { findById: async () => ({ displayName: 'Ana Admin' }) } as unknown as UserRepository;
+  return { audit: new AiAuditLogger(repo, users), repo };
 }
 
 export class InMemoryAiAgentRepo implements AiAgentConfigRepository {

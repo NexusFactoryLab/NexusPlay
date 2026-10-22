@@ -10,6 +10,8 @@ import {
   AiProviderConfigNameTakenError,
   AiProviderConfigNotFoundError,
 } from '../errors/application.errors.js';
+import { AiAuditLogger } from '../services/ai-audit-logger.service.js';
+import { diffProvider } from '../services/ai-audit-details.js';
 import { isStaleVersion, parseExpectedVersion } from '../services/ai-optimistic-lock.js';
 import { toAiProviderConfigDto, type AiProviderConfigDto } from '../dtos/ai-provider-config-response.dto.js';
 import type { UseCase } from '../ports/use-case.port.js';
@@ -39,6 +41,7 @@ export class UpdateAiProviderConfigUseCase implements UseCase<UpdateAiProviderCo
     @Inject(SECRET_CIPHER) private readonly cipher: SecretCipher,
     private readonly requesterAdminResolver: RequesterAdminResolver,
     private readonly notifier: AiProviderConfigChangeNotifier,
+    private readonly audit: AiAuditLogger,
   ) {}
 
   async execute(input: UpdateAiProviderConfigInput): Promise<AiProviderConfigDto> {
@@ -74,6 +77,26 @@ export class UpdateAiProviderConfigUseCase implements UseCase<UpdateAiProviderCo
     // Condicional en la base de datos: si otro admin guardó entre la lectura y este punto, no se pisa.
     if (!(await this.repository.saveIfUnchanged(updated, current.updatedAt))) throw conflict();
     this.notifier.notify();
+
+    const { changedFields, changes } = diffProvider(current, updated);
+    const target = { targetType: 'provider', targetId: updated.id, targetLabel: updated.name } as const;
+    if (changedFields.length > 0) {
+      await this.audit.record({
+        actorUserId: input.requestingUserId,
+        action: 'provider.update',
+        ...target,
+        details: { changedFields, changes },
+      });
+    }
+    if (apiKey) {
+      // Nunca la key: solo que se rotó y sus últimos caracteres.
+      await this.audit.record({
+        actorUserId: input.requestingUserId,
+        action: 'provider.rotate-key',
+        ...target,
+        details: { apiKeyRotated: true, apiKeyHint: updated.apiKeyHint },
+      });
+    }
     return toAiProviderConfigDto(updated);
   }
 }

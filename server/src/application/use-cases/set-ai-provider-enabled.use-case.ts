@@ -8,6 +8,7 @@ import { AiConfigConflictError, AiProviderConfigNotFoundError } from '../errors/
 import { toAiProviderConfigDto, type AiProviderConfigDto } from '../dtos/ai-provider-config-response.dto.js';
 import type { UseCase } from '../ports/use-case.port.js';
 import { RequesterAdminResolver } from '../services/requester-admin-resolver.service.js';
+import { AiAuditLogger } from '../services/ai-audit-logger.service.js';
 import { AiProviderConfigChangeNotifier } from '../services/ai-provider-config-change-notifier.service.js';
 import { isStaleVersion, parseExpectedVersion } from '../services/ai-optimistic-lock.js';
 
@@ -29,6 +30,7 @@ export class SetAiProviderEnabledUseCase implements UseCase<SetAiProviderEnabled
     @Inject(AI_PROVIDER_CONFIG_REPOSITORY) private readonly repository: AiProviderConfigRepository,
     private readonly requesterAdminResolver: RequesterAdminResolver,
     private readonly notifier: AiProviderConfigChangeNotifier,
+    private readonly audit: AiAuditLogger,
   ) {}
 
   async execute(input: SetAiProviderEnabledInput): Promise<AiProviderConfigDto> {
@@ -47,6 +49,13 @@ export class SetAiProviderEnabledUseCase implements UseCase<SetAiProviderEnabled
     if (!(await this.repository.saveIfUnchanged(updated, current.updatedAt))) throw conflict();
 
     this.notifier.notify();
+    await this.audit.record({
+      actorUserId: input.requestingUserId,
+      action: input.enabled ? 'provider.enable' : 'provider.disable',
+      targetType: 'provider',
+      targetId: updated.id,
+      targetLabel: updated.name,
+    });
     return toAiProviderConfigDto(updated);
   }
 }

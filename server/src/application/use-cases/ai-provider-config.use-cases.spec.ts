@@ -8,7 +8,7 @@ import {
 } from '../errors/application.errors.js';
 import { AiProviderConfigChangeNotifier } from '../services/ai-provider-config-change-notifier.service.js';
 import type { RequesterAdminResolver } from '../services/requester-admin-resolver.service.js';
-import { InMemoryAiProviderRepo } from './testing/ai-fakes.helper-spec.js';
+import { InMemoryAiProviderRepo, makeAuditLogger } from './testing/ai-fakes.helper-spec.js';
 import { CreateAiProviderConfigUseCase } from './create-ai-provider-config.use-case.js';
 import { UpdateAiProviderConfigUseCase } from './update-ai-provider-config.use-case.js';
 import { ReorderAiProviderConfigsUseCase } from './reorder-ai-provider-configs.use-case.js';
@@ -38,7 +38,7 @@ describe('casos de uso de proveedores de IA', () => {
   let ids = 0;
   const idGenerator = { generate: () => `id-${++ids}` };
 
-  const makeCreate = () => new CreateAiProviderConfigUseCase(repo, cipher, idGenerator, admin, notifier);
+  const makeCreate = () => new CreateAiProviderConfigUseCase(repo, cipher, idGenerator, admin, notifier, makeAuditLogger().audit);
 
   beforeEach(() => {
     repo = new InMemoryAiProviderRepo();
@@ -87,7 +87,7 @@ describe('casos de uso de proveedores de IA', () => {
 
   it('editar sin apiKey conserva la guardada; con apiKey la rota', async () => {
     const created = await makeCreate().execute(VALID);
-    const update = new UpdateAiProviderConfigUseCase(repo, cipher, admin, notifier);
+    const update = new UpdateAiProviderConfigUseCase(repo, cipher, admin, notifier, makeAuditLogger().audit);
 
     await update.execute({ ...VALID, id: created.id, textModel: 'otro-modelo', apiKey: '' });
     expect((await repo.findById(created.id))?.encryptedApiKey).toBe('enc(gsk_1234567890abcd)');
@@ -102,7 +102,7 @@ describe('casos de uso de proveedores de IA', () => {
     const a = await makeCreate().execute(VALID);
     const b = await makeCreate().execute({ ...VALID, name: 'B' });
     const c = await makeCreate().execute({ ...VALID, name: 'C' });
-    const reorder = new ReorderAiProviderConfigsUseCase(repo, admin, notifier);
+    const reorder = new ReorderAiProviderConfigsUseCase(repo, admin, notifier, makeAuditLogger().audit);
 
     const result = await reorder.execute({ requestingUserId: 'admin-1', orderedIds: [b.id, 'fantasma', b.id, a.id] });
     // C no venía en la lista (p. ej. lo creó otro admin): queda al final.
@@ -127,7 +127,7 @@ describe('casos de uso de proveedores de IA', () => {
 
     it('no pisa lo que otro admin editó mientras la prueba estaba en curso', async () => {
       const created = await makeCreate().execute(VALID);
-      const update = new UpdateAiProviderConfigUseCase(repo, cipher, admin, notifier);
+      const update = new UpdateAiProviderConfigUseCase(repo, cipher, admin, notifier, makeAuditLogger().audit);
       const factory: AiAssistantFactory = {
         create: () =>
           ({

@@ -7,6 +7,7 @@ import { ForbiddenActionError } from '../../domain/errors/authorization.errors.j
 import { toAiProviderConfigDto, type AiProviderConfigDto } from '../dtos/ai-provider-config-response.dto.js';
 import type { UseCase } from '../ports/use-case.port.js';
 import { RequesterAdminResolver } from '../services/requester-admin-resolver.service.js';
+import { AiAuditLogger } from '../services/ai-audit-logger.service.js';
 import { AiProviderConfigChangeNotifier } from '../services/ai-provider-config-change-notifier.service.js';
 
 export interface ReorderAiProviderConfigsInput {
@@ -23,6 +24,7 @@ export class ReorderAiProviderConfigsUseCase
     @Inject(AI_PROVIDER_CONFIG_REPOSITORY) private readonly repository: AiProviderConfigRepository,
     private readonly requesterAdminResolver: RequesterAdminResolver,
     private readonly notifier: AiProviderConfigChangeNotifier,
+    private readonly audit: AiAuditLogger,
   ) {}
 
   async execute({ requestingUserId, orderedIds }: ReorderAiProviderConfigsInput): Promise<AiProviderConfigDto[]> {
@@ -44,6 +46,14 @@ export class ReorderAiProviderConfigsUseCase
 
     const reordered = await this.repository.findAll();
     this.notifier.notify();
+    await this.audit.record({
+      actorUserId: requestingUserId,
+      action: 'provider.reorder',
+      targetType: 'provider',
+      targetId: 'all',
+      targetLabel: 'Orden de proveedores',
+      details: { order: reordered.map((config) => config.name) },
+    });
     return reordered.map(toAiProviderConfigDto);
   }
 }

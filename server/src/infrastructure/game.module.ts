@@ -79,6 +79,11 @@ import { GameCreationDraftExpirationJob } from './game-creation-draft-expiration
 import { GAME_CREATION_DRAFT_REPOSITORY } from '../domain/ports/game-creation-draft.repository.port.js';
 import { DRAFT_ASSET_STORAGE } from '../domain/ports/draft-asset-storage.port.js';
 import { GameTypeSettingController } from './http/controllers/game-type-setting.controller.js';
+import { AI_AUDIT_LOG_REPOSITORY } from '../domain/ports/ai-audit-log.repository.port.js';
+import { PrismaAiAuditLogRepository } from './persistence/prisma/ai-audit-log.repository.js';
+import { AiAuditLogger } from '../application/services/ai-audit-logger.service.js';
+import { ListAiAuditLogsUseCase } from '../application/use-cases/list-ai-audit-logs.use-case.js';
+import { AiAuditController } from './http/controllers/ai-audit.controller.js';
 import { AiProviderAttemptsController } from './http/controllers/ai-provider-attempts.controller.js';
 
 @Module({
@@ -90,6 +95,7 @@ import { AiProviderAttemptsController } from './http/controllers/ai-provider-att
     GameAiDraftController,
     GameTypeSettingController,
     AiProviderAttemptsController,
+    AiAuditController,
     AiProviderConfigsController,
     AiAgentsController,
     AiStatusController,
@@ -157,6 +163,9 @@ import { AiProviderAttemptsController } from './http/controllers/ai-provider-att
     AiUsagePolicy,
     AdaptGameUseCase,
     ListAiProviderAttemptsUseCase,
+    { provide: AI_AUDIT_LOG_REPOSITORY, useClass: PrismaAiAuditLogRepository },
+    AiAuditLogger,
+    ListAiAuditLogsUseCase,
   ],
 })
 export class GameModule {}

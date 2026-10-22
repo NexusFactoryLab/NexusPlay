@@ -5,7 +5,7 @@ import type { SecretCipher } from '../../domain/ports/secret-cipher.port.js';
 import { AiConfigConflictError, InvalidAiProviderConfigError } from '../errors/application.errors.js';
 import { AiProviderConfigChangeNotifier } from '../services/ai-provider-config-change-notifier.service.js';
 import type { RequesterAdminResolver } from '../services/requester-admin-resolver.service.js';
-import { InMemoryAiAgentRepo, InMemoryAiProviderRepo } from './testing/ai-fakes.helper-spec.js';
+import { InMemoryAiAgentRepo, InMemoryAiProviderRepo, makeAuditLogger } from './testing/ai-fakes.helper-spec.js';
 import { UpdateAiProviderConfigUseCase } from './update-ai-provider-config.use-case.js';
 import { SetAiProviderEnabledUseCase } from './set-ai-provider-enabled.use-case.js';
 import { UpdateAiAgentUseCase } from './update-ai-agent.use-case.js';
@@ -63,7 +63,7 @@ describe('edición simultánea entre administradores (bloqueo optimista)', () =>
   describe('proveedor', () => {
     it('guarda si la versión esperada coincide (comparando por milisegundos)', async () => {
       const seeded = seedProvider(providers);
-      const update = new UpdateAiProviderConfigUseCase(providers, cipher, admin, notifier);
+      const update = new UpdateAiProviderConfigUseCase(providers, cipher, admin, notifier, makeAuditLogger().audit);
 
       const dto = await update.execute({
         ...FIELDS,
@@ -78,7 +78,7 @@ describe('edición simultánea entre administradores (bloqueo optimista)', () =>
 
     it('responde conflicto si otro admin ya guardó una versión más nueva', async () => {
       seedProvider(providers);
-      const update = new UpdateAiProviderConfigUseCase(providers, cipher, admin, notifier);
+      const update = new UpdateAiProviderConfigUseCase(providers, cipher, admin, notifier, makeAuditLogger().audit);
 
       await expect(
         update.execute({ ...FIELDS, id: 'p1', expectedUpdatedAt: '2026-01-02T09:00:00.000Z' }),
@@ -88,7 +88,7 @@ describe('edición simultánea entre administradores (bloqueo optimista)', () =>
 
     it('detecta la carrera aunque la versión esperada sea la que se leyó (guardado condicional)', async () => {
       seedProvider(providers);
-      const update = new UpdateAiProviderConfigUseCase(providers, cipher, admin, notifier);
+      const update = new UpdateAiProviderConfigUseCase(providers, cipher, admin, notifier, makeAuditLogger().audit);
       // Otro admin guarda justo entre la lectura y la escritura de este.
       const original = providers.saveIfUnchanged.bind(providers);
       vi.spyOn(providers, 'saveIfUnchanged').mockImplementationOnce(async (config, expected) => {
@@ -102,7 +102,7 @@ describe('edición simultánea entre administradores (bloqueo optimista)', () =>
 
     it('rechaza una fecha esperada inválida', async () => {
       seedProvider(providers);
-      const update = new UpdateAiProviderConfigUseCase(providers, cipher, admin, notifier);
+      const update = new UpdateAiProviderConfigUseCase(providers, cipher, admin, notifier, makeAuditLogger().audit);
       await expect(update.execute({ ...FIELDS, id: 'p1', expectedUpdatedAt: 'ayer' })).rejects.toThrow(
         InvalidAiProviderConfigError,
       );
@@ -110,7 +110,7 @@ describe('edición simultánea entre administradores (bloqueo optimista)', () =>
 
     it('el interruptor cambia SOLO "habilitado" y conserva lo demás', async () => {
       const seeded = seedProvider(providers);
-      const setEnabled = new SetAiProviderEnabledUseCase(providers, admin, notifier);
+      const setEnabled = new SetAiProviderEnabledUseCase(providers, admin, notifier, makeAuditLogger().audit);
       // Otro admin cambió el modelo antes de que este pulsara el interruptor: no se pierde.
       providers.items.set('p1', seeded.with({ textModel: 'modelo-del-otro' }));
       const fresh = providers.items.get('p1')!;
@@ -130,7 +130,7 @@ describe('edición simultánea entre administradores (bloqueo optimista)', () =>
 
     it('el interruptor responde conflicto con una versión vieja', async () => {
       seedProvider(providers);
-      const setEnabled = new SetAiProviderEnabledUseCase(providers, admin, notifier);
+      const setEnabled = new SetAiProviderEnabledUseCase(providers, admin, notifier, makeAuditLogger().audit);
       await expect(
         setEnabled.execute({
           requestingUserId: 'admin-1',
@@ -147,7 +147,7 @@ describe('edición simultánea entre administradores (bloqueo optimista)', () =>
     const input = { requestingUserId: 'admin-1', key: 'GAME_PLAYER', instructions: 'Sé breve.' };
 
     it('un agente sin personalizar acepta expectedUpdatedAt = null', async () => {
-      const update = new UpdateAiAgentUseCase(agents, providers, admin, cipher);
+      const update = new UpdateAiAgentUseCase(agents, providers, admin, cipher, makeAuditLogger().audit);
       const dto = await update.execute({ ...input, expectedUpdatedAt: null });
       expect(dto.updatedAt).not.toBeNull();
       expect(agents.items.get('GAME_PLAYER')?.instructions).toBe('Sé breve.');
@@ -155,7 +155,7 @@ describe('edición simultánea entre administradores (bloqueo optimista)', () =>
 
     it('conflicto si el cliente creía que no estaba personalizado y otro admin ya lo guardó', async () => {
       agents.items.set('GAME_PLAYER', AiAgentConfig.defaults('GAME_PLAYER').with({ instructions: 'del otro' }));
-      const update = new UpdateAiAgentUseCase(agents, providers, admin, cipher);
+      const update = new UpdateAiAgentUseCase(agents, providers, admin, cipher, makeAuditLogger().audit);
       await expect(update.execute({ ...input, expectedUpdatedAt: null })).rejects.toThrow(AiConfigConflictError);
       expect(agents.items.get('GAME_PLAYER')?.instructions).toBe('del otro');
     });
@@ -163,7 +163,7 @@ describe('edición simultánea entre administradores (bloqueo optimista)', () =>
     it('conflicto con una versión distinta y éxito con la vigente', async () => {
       const stored = AiAgentConfig.defaults('GAME_PLAYER').with({ instructions: 'v1' });
       agents.items.set('GAME_PLAYER', stored);
-      const update = new UpdateAiAgentUseCase(agents, providers, admin, cipher);
+      const update = new UpdateAiAgentUseCase(agents, providers, admin, cipher, makeAuditLogger().audit);
 
       await expect(update.execute({ ...input, expectedUpdatedAt: '2020-01-01T00:00:00.000Z' })).rejects.toThrow(
         AiConfigConflictError,
@@ -173,7 +173,7 @@ describe('edición simultánea entre administradores (bloqueo optimista)', () =>
     });
 
     it('detecta la carrera en el guardado condicional', async () => {
-      const update = new UpdateAiAgentUseCase(agents, providers, admin, cipher);
+      const update = new UpdateAiAgentUseCase(agents, providers, admin, cipher, makeAuditLogger().audit);
       const original = agents.saveIfUnchanged.bind(agents);
       vi.spyOn(agents, 'saveIfUnchanged').mockImplementationOnce(async (config, expected) => {
         agents.items.set('GAME_PLAYER', AiAgentConfig.defaults('GAME_PLAYER').with({ instructions: 'del otro' }));

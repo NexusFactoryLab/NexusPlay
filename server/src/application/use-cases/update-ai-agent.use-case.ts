@@ -25,6 +25,8 @@ import { toAiAgentDto, type AiAgentDto } from '../dtos/ai-agent-response.dto.js'
 import type { UseCase } from '../ports/use-case.port.js';
 import { RequesterAdminResolver } from '../services/requester-admin-resolver.service.js';
 import { SECRET_CIPHER, type SecretCipher } from '../../domain/ports/secret-cipher.port.js';
+import { AiAuditLogger } from '../services/ai-audit-logger.service.js';
+import { diffAgent } from '../services/ai-audit-details.js';
 import { providerUsabilityFromCipher } from '../services/ai-agent-provider-plan.js';
 
 export const MAX_AGENT_INSTRUCTIONS = 4_000;
@@ -58,6 +60,7 @@ export class UpdateAiAgentUseCase implements UseCase<UpdateAiAgentInput, AiAgent
     @Inject(AI_PROVIDER_CONFIG_REPOSITORY) private readonly providers: AiProviderConfigRepository,
     private readonly requesterAdminResolver: RequesterAdminResolver,
     @Inject(SECRET_CIPHER) private readonly cipher: SecretCipher,
+    private readonly audit: AiAuditLogger,
   ) {}
 
   async execute(input: UpdateAiAgentInput): Promise<AiAgentDto> {
@@ -96,6 +99,17 @@ export class UpdateAiAgentUseCase implements UseCase<UpdateAiAgentInput, AiAgent
 
     // Condicional en la base de datos: si otro admin guardó entre la lectura y este punto, no se pisa.
     if (!(await this.agents.saveIfUnchanged(updated, current.updatedAt))) throw conflict();
+
+    const { changedFields } = diffAgent(current, updated);
+    await this.audit.record({
+      actorUserId: input.requestingUserId,
+      action: 'agent.update',
+      targetType: 'agent',
+      targetId: updated.key,
+      targetLabel: AI_AGENT_CATALOG[updated.key].name,
+      // Del texto de las instrucciones solo se anota si quedó el de fábrica; el contenido no se copia.
+      details: { changedFields, usingDefaultInstructions: updated.usingDefaultInstructions },
+    });
     return toAiAgentDto(updated, await this.providers.findAll(), providerUsabilityFromCipher(this.cipher));
   }
 }

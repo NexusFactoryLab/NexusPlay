@@ -311,6 +311,26 @@ model AiAgentConfigModel {
   @@map("ai_agent_configs")
 }
 
+/// Registro de cambios del panel de IA (quién cambió qué proveedor/agente y
+/// cuándo). `details` guarda solo nombres de campos y valores no sensibles:
+/// NUNCA una API key, ni en claro ni cifrada (ver `AiAuditLogger`).
+/// `actorName` y `targetLabel` son copias del momento del cambio, para que el
+/// registro siga legible si el usuario o el proveedor ya no existen.
+model AiAuditLogModel {
+  id          String   @id @default(uuid())
+  actorUserId String   @map("actor_user_id")
+  actorName   String   @map("actor_name")
+  action      String
+  targetType  String   @map("target_type")
+  targetId    String   @map("target_id")
+  targetLabel String   @map("target_label")
+  details     Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("ai_audit_logs")
+}
+
 /// Gobernanza transversal por `GameType` (issue #156): archivar un tipo es
 /// una capa de visibilidad EN TIEMPO DE LECTURA que cruza `gameType` contra
 /// esta tabla — nunca se itera ni se modifica el `GameStatus` individual de
