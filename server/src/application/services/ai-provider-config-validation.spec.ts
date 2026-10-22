@@ -1,6 +1,100 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { InvalidAiProviderConfigError } from '../errors/application.errors.js';
-import { normalizeBaseUrl } from './ai-provider-config-validation.js';
+import {
+  apiKeyHint,
+  normalizeBaseUrl,
+  toChatCompletionsUrl,
+  validateAiProviderConfigFields,
+  validateApiKey,
+} from './ai-provider-config-validation.js';
+
+const VALID_FIELDS = {
+  name: 'Groq',
+  kind: 'openai-compatible',
+  baseUrl: 'https://api.groq.com/openai/v1/',
+  textModel: 'modelo',
+};
+
+describe('validateAiProviderConfigFields', () => {
+  it('normaliza una configuración válida (recorta, quita la barra final y completa los opcionales con null)', () => {
+    expect(
+      validateAiProviderConfigFields({ ...VALID_FIELDS, name: '  Groq  ', textModel: ' modelo ', visionModel: '  ' }),
+    ).toEqual({
+      name: 'Groq',
+      kind: 'openai-compatible',
+      baseUrl: 'https://api.groq.com/openai/v1',
+      textModel: 'modelo',
+      visionModel: null,
+      maxRpm: null,
+    });
+  });
+
+  it('rechaza nombres vacíos o de más de 60 caracteres, y acepta 1 y 60', () => {
+    expect(() => validateAiProviderConfigFields({ ...VALID_FIELDS, name: '   ' })).toThrow(/nombre/);
+    expect(() => validateAiProviderConfigFields({ ...VALID_FIELDS, name: undefined as never })).toThrow(/nombre/);
+    expect(() => validateAiProviderConfigFields({ ...VALID_FIELDS, name: 'x'.repeat(61) })).toThrow(/nombre/);
+    expect(validateAiProviderConfigFields({ ...VALID_FIELDS, name: 'x' }).name).toBe('x');
+    expect(validateAiProviderConfigFields({ ...VALID_FIELDS, name: 'x'.repeat(60) }).name).toHaveLength(60);
+  });
+
+  it('rechaza un tipo de proveedor no soportado', () => {
+    expect(() => validateAiProviderConfigFields({ ...VALID_FIELDS, kind: 'anthropic' })).toThrow(/no está soportado/);
+  });
+
+  it('exige el modelo de texto (1 a 120 caracteres)', () => {
+    expect(() => validateAiProviderConfigFields({ ...VALID_FIELDS, textModel: '' })).toThrow(/modelo de texto/);
+    expect(() => validateAiProviderConfigFields({ ...VALID_FIELDS, textModel: 'm'.repeat(121) })).toThrow(/modelo de texto/);
+    expect(validateAiProviderConfigFields({ ...VALID_FIELDS, textModel: 'm'.repeat(120) }).textModel).toHaveLength(120);
+  });
+
+  it('el modelo de visión es opcional pero no puede pasar de 120 caracteres', () => {
+    expect(validateAiProviderConfigFields({ ...VALID_FIELDS, visionModel: ' vision ' }).visionModel).toBe('vision');
+    expect(() => validateAiProviderConfigFields({ ...VALID_FIELDS, visionModel: 'v'.repeat(121) })).toThrow(/visión/);
+  });
+
+  it('openai-compatible exige la URL base; gemini la ignora (queda null)', () => {
+    expect(() => validateAiProviderConfigFields({ ...VALID_FIELDS, baseUrl: '   ' })).toThrow(/URL base/);
+    expect(() => validateAiProviderConfigFields({ ...VALID_FIELDS, baseUrl: null })).toThrow(/URL base/);
+    expect(validateAiProviderConfigFields({ ...VALID_FIELDS, kind: 'gemini', baseUrl: 'https://ignorada.com' }).baseUrl).toBeNull();
+    expect(validateAiProviderConfigFields({ ...VALID_FIELDS, kind: 'gemini', baseUrl: undefined }).baseUrl).toBeNull();
+  });
+
+  it('valida el máximo de llamadas por minuto (entero entre 1 y 10000)', () => {
+    expect(validateAiProviderConfigFields({ ...VALID_FIELDS, maxRpm: 1 }).maxRpm).toBe(1);
+    expect(validateAiProviderConfigFields({ ...VALID_FIELDS, maxRpm: 10_000 }).maxRpm).toBe(10_000);
+    expect(validateAiProviderConfigFields({ ...VALID_FIELDS, maxRpm: null }).maxRpm).toBeNull();
+    for (const maxRpm of [0, -5, 10_001, 2.5, Number.NaN]) {
+      expect(() => validateAiProviderConfigFields({ ...VALID_FIELDS, maxRpm })).toThrow(/llamadas por minuto/);
+    }
+  });
+});
+
+describe('validateApiKey y apiKeyHint', () => {
+  it('recorta y acepta de 8 a 500 caracteres sin espacios', () => {
+    expect(validateApiKey('  gsk_12345678  ')).toBe('gsk_12345678');
+    expect(validateApiKey('a'.repeat(8))).toHaveLength(8);
+    expect(validateApiKey('a'.repeat(500))).toHaveLength(500);
+  });
+
+  it('rechaza keys muy cortas, muy largas, con espacios o ausentes', () => {
+    for (const bad of ['corta', 'a'.repeat(501), 'tiene espacios dentro', '', undefined as never]) {
+      expect(() => validateApiKey(bad)).toThrow(InvalidAiProviderConfigError);
+    }
+  });
+
+  it('el hint muestra solo los últimos 4 caracteres', () => {
+    expect(apiKeyHint('gsk_1234567890abcd')).toBe('••••abcd');
+  });
+});
+
+describe('toChatCompletionsUrl', () => {
+  it('agrega /chat/completions a la URL base y respeta la que ya lo trae', () => {
+    expect(toChatCompletionsUrl('https://api.groq.com/openai/v1')).toBe('https://api.groq.com/openai/v1/chat/completions');
+    expect(toChatCompletionsUrl('https://api.groq.com/openai/v1/chat/completions')).toBe(
+      'https://api.groq.com/openai/v1/chat/completions',
+    );
+  });
+});
 
 describe('normalizeBaseUrl: seguridad de la URL del proveedor', () => {
   const original = {
