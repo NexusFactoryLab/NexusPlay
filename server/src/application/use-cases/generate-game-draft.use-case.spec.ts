@@ -37,6 +37,7 @@ function fakeAssistant(draft: GenerateGameDraftOutput): AiContentAssistant {
   return {
     describeImage: vi.fn().mockResolvedValue('descripción de la imagen'),
     generateGameDraft: vi.fn().mockResolvedValue(draft),
+    complete: vi.fn(),
   };
 }
 

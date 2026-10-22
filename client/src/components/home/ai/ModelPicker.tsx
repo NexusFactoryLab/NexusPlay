@@ -13,6 +13,7 @@ type Props = {
   inputClass: string
   /** Si está en `models`, se muestra primero con la etiqueta "Recomendado". */
   recommended?: string
+  disabled?: boolean
 }
 
 /**
@@ -29,6 +30,7 @@ export function ModelPicker({
   required,
   inputClass,
   recommended,
+  disabled,
 }: Props) {
   const [open, setOpen] = useState(false)
   const [filtering, setFiltering] = useState(false)
@@ -62,6 +64,7 @@ export function ModelPicker({
         className={`${inputClass} ${hasList || loading ? 'pr-10' : ''}`}
         value={value}
         required={required}
+        disabled={disabled}
         maxLength={120}
         placeholder={placeholder}
         autoComplete="off"

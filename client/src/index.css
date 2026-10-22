@@ -4177,6 +4177,10 @@ code {
   background: var(--nx-solid, var(--surface));
   transform: rotate(45deg);
 }
+/* Cuando a la izquierda de la (i) no hay espacio (campos pegados al borde de una tarjeta o ventana),
+ * la nube se abre hacia la derecha en vez de quedar cortada. */
+.nx-info[data-align='start'] .nx-info-cloud { right: auto; left: -6px; transform-origin: top left; }
+.nx-info[data-align='start'] .nx-info-cloud::before { right: auto; left: 14px; }
 .nx-info-text { display: block; font-size: 13px; font-weight: 500; line-height: 1.5; color: var(--text-h); }
 .nx-info-close {
   position: absolute;

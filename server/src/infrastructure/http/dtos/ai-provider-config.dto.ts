@@ -71,6 +71,26 @@ export class ListAiProviderModelsDto {
   configId?: string;
 }
 
+export class UpdateAiAgentDto {
+  @IsString()
+  @MaxLength(4_000)
+  instructions!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  providerId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  modelOverride?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  fallbackToDefault?: boolean;
+}
+
 export class ReorderAiProviderConfigsDto {
   @IsArray()
   @ArrayNotEmpty()

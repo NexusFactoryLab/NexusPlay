@@ -5,6 +5,11 @@ import type { AiAssistantFactory } from '../../domain/ports/ai-assistant.factory
 import { toChatCompletionsUrl } from '../../application/services/ai-provider-config-validation.js';
 import { GeminiContentAssistant } from './gemini-content-assistant.adapter.js';
 import { GroqContentAssistant } from './groq-content-assistant.adapter.js';
+import { sharedRateLimiter } from './rate-limiter.js';
+
+/** Mismos valores por defecto que los adaptadores cuando el admin no fija "llamadas por minuto". */
+const DEFAULT_OPENAI_COMPATIBLE_RPM = 25;
+const DEFAULT_GEMINI_RPM = 5;
 
 /**
  * Único lugar que traduce el `kind` de una configuración en un adaptador
@@ -17,16 +22,25 @@ export class DefaultAiAssistantFactory implements AiAssistantFactory {
     const maxRpm = config.maxRpm ?? undefined;
 
     if (config.kind === 'gemini') {
-      return new GeminiContentAssistant({ apiKey, textModel: config.textModel, maxRpm });
+      return new GeminiContentAssistant({
+        apiKey,
+        textModel: config.textModel,
+        maxRpm,
+        rateLimiter: sharedRateLimiter('gemini', apiKey, maxRpm ?? DEFAULT_GEMINI_RPM),
+      });
     }
 
+    const apiUrl = toChatCompletionsUrl(config.baseUrl ?? '');
     return new GroqContentAssistant({
       label: config.name,
       apiKey,
-      apiUrl: toChatCompletionsUrl(config.baseUrl ?? ''),
+      apiUrl,
       textModel: config.textModel,
       visionModel: config.visionModel ?? undefined,
       maxRpm,
+      // Un solo contador por API key: dos agentes con la misma cuenta (aunque con
+      // distinto modelo) no pueden sumar más llamadas por minuto de las permitidas.
+      rateLimiter: sharedRateLimiter(apiUrl, apiKey, maxRpm ?? DEFAULT_OPENAI_COMPATIBLE_RPM),
     });
   }
 }

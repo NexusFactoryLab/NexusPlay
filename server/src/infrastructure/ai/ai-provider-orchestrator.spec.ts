@@ -7,6 +7,7 @@ function fakeAssistant(overrides: Partial<AiContentAssistant> = {}): AiContentAs
   return {
     describeImage: vi.fn().mockResolvedValue('descripción'),
     generateGameDraft: vi.fn().mockResolvedValue({ config: {}, content: [] }),
+    complete: vi.fn().mockResolvedValue('respuesta'),
     ...overrides,
   };
 }

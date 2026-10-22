@@ -33,6 +33,12 @@ class InMemoryRepo implements AiProviderConfigRepository {
   async delete(id: string) {
     this.items.delete(id);
   }
+  async recordTestResult(id: string, testedVersion: Date, result: { at: Date; ok: boolean; message: string }) {
+    const current = this.items.get(id);
+    if (current && current.updatedAt.getTime() === testedVersion.getTime()) {
+      this.items.set(id, current.with({ lastTestAt: result.at, lastTestOk: result.ok, lastTestMessage: result.message }));
+    }
+  }
 }
 
 const cipher: SecretCipher = {
@@ -145,6 +151,29 @@ describe('casos de uso de proveedores de IA', () => {
       const result = await makeTest(factory).execute({ requestingUserId: 'admin-1', id: created.id });
       expect(result.ok).toBe(true);
       expect((await repo.findById(created.id))?.lastTestOk).toBe(true);
+    });
+
+    it('no pisa lo que otro admin editó mientras la prueba estaba en curso', async () => {
+      const created = await makeCreate().execute(VALID);
+      const update = new UpdateAiProviderConfigUseCase(repo, cipher, admin, notifier);
+      const factory: AiAssistantFactory = {
+        create: () =>
+          ({
+            ping: async () => {
+              // Mientras "la red" responde, otro admin cambia el modelo.
+              await new Promise((resolve) => setTimeout(resolve, 5));
+              await update.execute({ ...VALID, id: created.id, textModel: 'modelo-nuevo', apiKey: '' });
+            },
+          }) as never,
+      };
+
+      const result = await makeTest(factory).execute({ requestingUserId: 'admin-1', id: created.id });
+
+      expect(result.ok).toBe(true);
+      expect(result.config.textModel).toBe('modelo-nuevo');
+      expect((await repo.findById(created.id))?.textModel).toBe('modelo-nuevo');
+      // La prueba fue de la configuración anterior: no se marca como verificada la nueva.
+      expect((await repo.findById(created.id))?.lastTestOk).toBeNull();
     });
 
     it('un fallo del proveedor es un resultado, no una excepción, y redacta la key', async () => {

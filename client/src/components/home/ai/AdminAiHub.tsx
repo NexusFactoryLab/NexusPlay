@@ -1,11 +1,14 @@
 import { useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
-import { Activity, Network } from 'lucide-react'
+import { Activity, Bot, Network } from 'lucide-react'
 import { AdminAiProviderLogsSection } from '../AdminAiProviderLogsSection'
+import { AdminAiAgentsSection } from './AdminAiAgentsSection'
 import { AdminAiProvidersSection } from './AdminAiProvidersSection'
+import { SectionErrorBoundary } from './SectionErrorBoundary'
 
 const TABS = [
   { id: 'providers', label: 'Proveedores', icon: Network },
+  { id: 'agents', label: 'Agentes', icon: Bot },
   { id: 'history', label: 'Historial', icon: Activity },
 ] as const
 
@@ -61,7 +64,11 @@ export function AdminAiHub() {
       </div>
 
       <div key={active} role="tabpanel" id={`ai-panel-${active}`} aria-labelledby={`ai-tab-${active}`} className="ai-panel-in">
-        {active === 'providers' ? <AdminAiProvidersSection /> : <AdminAiProviderLogsSection />}
+        <SectionErrorBoundary>
+          {active === 'providers' && <AdminAiProvidersSection />}
+          {active === 'agents' && <AdminAiAgentsSection />}
+          {active === 'history' && <AdminAiProviderLogsSection />}
+        </SectionErrorBoundary>
       </div>
     </div>
   )

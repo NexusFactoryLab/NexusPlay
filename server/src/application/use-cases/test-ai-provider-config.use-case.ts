@@ -62,9 +62,11 @@ export class TestAiProviderConfigUseCase implements UseCase<TestAiProviderConfig
     }
 
     const latencyMs = Date.now() - startedAt;
-    const tested = config.with({ lastTestAt: new Date(), lastTestOk: ok, lastTestMessage: message });
-    await this.repository.save(tested);
+    const at = new Date();
+    // Solo el resultado de la prueba: la llamada tardó, y el admin pudo editar mientras tanto.
+    await this.repository.recordTestResult(id, config.updatedAt, { at, ok, message });
+    const current = (await this.repository.findById(id)) ?? config;
 
-    return { ok, message, latencyMs, config: toAiProviderConfigDto(tested) };
+    return { ok, message, latencyMs, config: toAiProviderConfigDto(current) };
   }
 }

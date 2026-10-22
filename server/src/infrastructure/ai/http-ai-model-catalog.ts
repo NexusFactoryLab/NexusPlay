@@ -5,6 +5,9 @@ import { normalizeBaseUrl } from '../../application/services/ai-provider-config-
 
 const GEMINI_MODELS_URL = 'https://generativelanguage.googleapis.com/v1beta/models?pageSize=200';
 const TIMEOUT_MS = 15_000;
+/** Ids que por su nombre no son modelos de chat/texto. */
+export const NON_CHAT_MODEL =
+  /embed|whisper|tts|transcribe|moderation|guard|dall-e|gpt-image|image-gen|rerank|speech|audio|realtime/i;
 
 /** Lista modelos con el endpoint estándar de cada tipo: `GET {baseUrl}/models` o el de Google. */
 @Injectable()
@@ -52,7 +55,11 @@ export class HttpAiModelCatalog implements AiModelCatalog {
             .map((model) => String(model.name ?? '').replace(/^models\//, ''))
         : (payload?.data ?? []).map((model) => String(model.id ?? ''));
 
-    const unique = [...new Set(ids.filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    // Los listados mezclan modelos que no sirven para generar texto (embeddings, voz, moderación,
+    // imágenes): elegir uno por error daría un fallo poco claro. Gemini ya viene filtrado por método.
+    const unique = [...new Set(ids.filter(Boolean))]
+      .filter((id) => kind === 'gemini' || !NON_CHAT_MODEL.test(id))
+      .sort((a, b) => a.localeCompare(b));
     if (unique.length === 0) {
       throw new InvalidAiProviderConfigError('el proveedor no devolvió ningún modelo; escribe el nombre a mano.');
     }

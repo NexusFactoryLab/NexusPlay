@@ -2,12 +2,13 @@ import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { InvalidGameContentError } from '../../domain/errors/game.errors.js';
 import type {
   AiContentAssistant,
+  CompleteInput,
   DescribeImageInput,
   GenerateGameDraftInput,
   GenerateGameDraftOutput,
 } from '../../domain/ports/ai-content-assistant.port.js';
 import { cutTextAtBoundary, extractJsonObject } from './json-extraction.js';
-import { RateLimiter } from './rate-limiter.js';
+import { RateLimitWaitExceededError, RateLimiter } from './rate-limiter.js';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
@@ -55,9 +56,11 @@ type GroqContentPart =
   | { type: 'text'; text: string }
   | { type: 'image_url'; image_url: { url: string } };
 
-type GroqChatMessage = { role: 'user'; content: string | GroqContentPart[] };
+type GroqChatMessage = { role: 'system' | 'user'; content: string | GroqContentPart[] };
 
 interface ChatRequest {
+  /** Ver `CompleteInput.deadlineMs`. */
+  deadlineMs?: number;
   model: string;
   messages: GroqChatMessage[];
   maxTokens: number;
@@ -87,6 +90,53 @@ export interface OpenAiCompatibleOptions {
   textModel?: string;
   visionModel?: string;
   maxRpm?: number;
+  /** Contador de llamadas por minuto ya compartido (por API key). Sin él se crea uno propio. */
+  rateLimiter?: RateLimiter;
+}
+
+const PING_DEADLINE_MS = 15_000;
+
+/**
+ * Diferencias de "dialecto" entre proveedores que hablan el formato OpenAI.
+ * Lo que no se reconoce se trata con el dialecto más común (`max_tokens`,
+ * `temperature`), que es lo que aceptan Groq, OpenRouter, Ollama y la mayoría.
+ */
+interface ApiDialect {
+  maxTokensField: 'max_tokens' | 'max_completion_tokens';
+  supportsTemperature: boolean;
+}
+
+function dialectFor(apiUrl: string, model: string): ApiDialect {
+  let host = '';
+  try {
+    host = new URL(apiUrl).hostname;
+  } catch {
+    // URL inválida: se usa el dialecto por defecto y el fetch fallará con su propio error.
+  }
+  if (host === 'api.openai.com') {
+    // Los modelos de razonamiento (serie o, GPT-5) rechazan `max_tokens` y solo admiten la temperatura por defecto.
+    const reasoning = /^(o\d|gpt-5)/i.test(model);
+    return { maxTokensField: 'max_completion_tokens', supportsTemperature: !reasoning };
+  }
+  return { maxTokensField: 'max_tokens', supportsTemperature: true };
+}
+
+/**
+ * Los topes de tokens por petición de abajo (`GROQ_MAX_REQUEST_TOKENS`…) se
+ * calibraron para el plan gratuito de Groq. Un proveedor configurado desde el
+ * panel (OpenAI, OpenRouter…) tiene ventanas de contexto mucho mayores: se
+ * le da un presupuesto holgado en vez de recortar el texto fuente sin motivo.
+ */
+const EXTERNAL_PROVIDER_REQUEST_TOKENS = 60_000;
+const EXTERNAL_PROVIDER_OUTPUT_TOKENS = 6_000;
+
+function isGroqUrl(apiUrl: string | undefined): boolean {
+  if (apiUrl === undefined) return true;
+  try {
+    return /(^|\.)groq\.com$/i.test(new URL(apiUrl).hostname);
+  } catch {
+    return false;
+  }
 }
 
 function positiveIntFromEnv(name: string, fallback: number): number {
@@ -122,10 +172,19 @@ export class GroqContentAssistant implements AiContentAssistant {
 
   constructor(private readonly options: OpenAiCompatibleOptions = {}) {
     this.label = options.label ?? 'Groq';
-    this.rateLimiter = new RateLimiter(
-      options.maxRpm ? null : 'GROQ_MAX_RPM',
-      options.maxRpm ?? DEFAULT_MAX_REQUESTS_PER_MINUTE,
-    );
+    this.rateLimiter =
+      options.rateLimiter ??
+      new RateLimiter(options.maxRpm ? null : 'GROQ_MAX_RPM', options.maxRpm ?? DEFAULT_MAX_REQUESTS_PER_MINUTE);
+  }
+
+  /** Groq (o el entorno, sin configuración del panel) usa los topes del plan gratuito; el resto, uno holgado. */
+  private get tokenBudget(): { request: number; output: number } {
+    return isGroqUrl(this.options.apiUrl)
+      ? {
+          request: positiveIntFromEnv('GROQ_MAX_REQUEST_TOKENS', DEFAULT_MAX_REQUEST_TOKENS),
+          output: positiveIntFromEnv('GROQ_MAX_OUTPUT_TOKENS', DEFAULT_MAX_OUTPUT_TOKENS),
+        }
+      : { request: EXTERNAL_PROVIDER_REQUEST_TOKENS, output: EXTERNAL_PROVIDER_OUTPUT_TOKENS };
   }
 
   private getApiKey(): string {
@@ -146,12 +205,25 @@ export class GroqContentAssistant implements AiContentAssistant {
     return this.options.visionModel ?? this.options.textModel ?? (process.env.GROQ_VISION_MODEL?.trim() || DEFAULT_VISION_MODEL);
   }
 
+  async complete({ system, prompt, json, maxTokens, temperature, deadlineMs }: CompleteInput): Promise<string> {
+    const { content } = await this.chatCompletion({
+      model: this.getTextModel(),
+      maxTokens: maxTokens ?? 1_500,
+      temperature: temperature ?? 0.3,
+      jsonMode: json,
+      deadlineMs,
+      messages: [...(system ? [{ role: 'system' as const, content: system }] : []), { role: 'user', content: prompt }],
+    });
+    return content;
+  }
+
   /** Prueba barata de credenciales + modelo para el botón "Probar conexión" del panel. */
   async ping(): Promise<void> {
     await this.chatCompletion({
       model: this.getTextModel(),
       maxTokens: 64,
       temperature: 0,
+      deadlineMs: PING_DEADLINE_MS,
       messages: [{ role: 'user', content: 'Responde únicamente con la palabra OK.' }],
     });
   }
@@ -168,36 +240,63 @@ export class GroqContentAssistant implements AiContentAssistant {
 
   private async chatCompletion(request: ChatRequest): Promise<ChatResult> {
     const apiKey = this.getApiKey();
-    const body = JSON.stringify({
-      model: request.model,
-      messages: request.messages,
-      max_tokens: request.maxTokens,
-      ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
-      ...(request.jsonMode ? { response_format: { type: 'json_object' } } : {}),
-      // Los modelos gpt-oss razonan antes de responder y ese razonamiento
-      // cuenta contra los tokens por minuto: en "low" alcanza de sobra para
-      // armar un borrador y deja margen para los reintentos.
-      ...(request.model.includes('gpt-oss')
-        ? { reasoning_effort: process.env.GROQ_REASONING_EFFORT?.trim() || 'low' }
-        : {}),
-    });
+    const apiUrl = this.options.apiUrl ?? GROQ_API_URL;
+    const dialect = dialectFor(apiUrl, request.model);
+    // Algunos proveedores/modelos no aceptan `response_format`: si responden 400
+    // por eso, se reintenta una vez sin él (el prompt ya pide JSON y se parsea igual).
+    let sendJsonMode = Boolean(request.jsonMode);
+    const buildBody = () =>
+      JSON.stringify({
+        model: request.model,
+        messages: request.messages,
+        [dialect.maxTokensField]: request.maxTokens,
+        ...(request.temperature !== undefined && dialect.supportsTemperature ? { temperature: request.temperature } : {}),
+        ...(sendJsonMode ? { response_format: { type: 'json_object' } } : {}),
+        // Los modelos gpt-oss razonan antes de responder y ese razonamiento
+        // cuenta contra los tokens por minuto: en "low" alcanza de sobra para
+        // armar un borrador y deja margen para los reintentos.
+        ...(request.model.includes('gpt-oss')
+          ? { reasoning_effort: process.env.GROQ_REASONING_EFFORT?.trim() || 'low' }
+          : {}),
+      });
+
+    // Con plazo (el bot en un turno, las pruebas del panel) no se reintenta ni
+    // se esperan cooldowns: se falla rápido y no queda trabajo colgado.
+    const deadlineAt = request.deadlineMs ? Date.now() + request.deadlineMs : null;
+    const remainingMs = () => (deadlineAt === null ? Number.POSITIVE_INFINITY : deadlineAt - Date.now());
+    const timedOut = (detail: string) =>
+      this.wrapProviderError('la IA tardó más de lo permitido para responder.', detail);
 
     let rateLimitRetries = 0;
     let transientRetries = 0;
 
     for (;;) {
+      if (deadlineAt !== null) {
+        if (remainingMs() <= 0) throw timedOut('plazo agotado');
+        if (remainingMs() < (this.cooldownUntil.get(request.model) ?? 0) - Date.now()) {
+          throw timedOut('el modelo está en enfriamiento por límite de uso');
+        }
+      }
       await this.waitForCooldown(request.model);
-      await this.rateLimiter.throttle();
+      try {
+        await this.rateLimiter.throttle(deadlineAt === null ? undefined : Math.max(0, remainingMs()));
+      } catch (error) {
+        if (error instanceof RateLimitWaitExceededError) throw timedOut(error.message);
+        throw error;
+      }
 
       let response: Response;
       try {
-        response = await fetch(this.options.apiUrl ?? GROQ_API_URL, {
+        response = await fetch(apiUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-          body,
-          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+          body: buildBody(),
+          signal: AbortSignal.timeout(Math.max(1, Math.min(REQUEST_TIMEOUT_MS, remainingMs()))),
         });
       } catch (error) {
+        if (deadlineAt !== null) {
+          throw this.wrapProviderError('No se pudo conectar con el servicio de IA a tiempo.', errorText(error));
+        }
         if (transientRetries < MAX_TRANSIENT_RETRIES) {
           transientRetries += 1;
           this.logger.warn(`Groq no respondió (${errorText(error)}); reintento ${transientRetries}.`);
@@ -215,6 +314,23 @@ export class GroqContentAssistant implements AiContentAssistant {
 
       if (failure.status === 413 || (failure.status === 429 && failure.tooLarge)) {
         throw new GroqRequestTooLargeError(failure.message);
+      }
+
+      if (
+        failure.status === 400 &&
+        sendJsonMode &&
+        /response_format|json_object|json mode|json_validate/i.test(failure.message)
+      ) {
+        sendJsonMode = false;
+        continue;
+      }
+
+      if (deadlineAt !== null) {
+        // Con plazo no se espera ni se reintenta; solo se avisa del enfriamiento a las demás llamadas.
+        if (failure.status === 429 && failure.retryAfterMs !== null) {
+          this.cooldownUntil.set(request.model, Date.now() + failure.retryAfterMs);
+        }
+        throw this.wrapProviderError(friendlyMessage(failure, request.model, this.label), `HTTP ${failure.status}: ${failure.message}`);
       }
 
       if (failure.status === 429 && !failure.daily && rateLimitRetries < MAX_RATE_LIMIT_RETRIES) {
@@ -329,7 +445,7 @@ ${cut.text}
       try {
         result = await this.chatCompletion({
           model: this.getTextModel(),
-          maxTokens: positiveIntFromEnv('GROQ_MAX_OUTPUT_TOKENS', DEFAULT_MAX_OUTPUT_TOKENS),
+          maxTokens: this.tokenBudget.output,
           temperature: 0.5,
           jsonMode: true,
           messages: [{ role: 'user', content: prompt }],
@@ -378,8 +494,7 @@ ${cut.text}
    * las instrucciones fijas de este tipo de juego.
    */
   private sourceBudgetChars(fixedChars: number): number {
-    const requestTokens = positiveIntFromEnv('GROQ_MAX_REQUEST_TOKENS', DEFAULT_MAX_REQUEST_TOKENS);
-    const outputTokens = positiveIntFromEnv('GROQ_MAX_OUTPUT_TOKENS', DEFAULT_MAX_OUTPUT_TOKENS);
+    const { request: requestTokens, output: outputTokens } = this.tokenBudget;
     const availableTokens = requestTokens - outputTokens - Math.ceil(fixedChars / CHARS_PER_TOKEN);
     return Math.max(MIN_SOURCE_CHARS, availableTokens * CHARS_PER_TOKEN);
   }

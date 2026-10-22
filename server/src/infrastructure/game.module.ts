@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { UserModule } from './user.module.js';
+import { AiCoreModule } from './ai-core.module.js';
 import { OrganizationCoreModule } from './organization-core.module.js';
 import { ClassCoreModule } from './class-core.module.js';
 import { GAME_REPOSITORY } from '../domain/ports/game.repository.port.js';
@@ -46,18 +47,12 @@ import { AdaptGameUseCase } from '../application/use-cases/adapt-game.use-case.j
 import { ContentImageResolver } from '../application/services/content-image-resolver.service.js';
 import { GenerateGameDraftUseCase } from '../application/use-cases/generate-game-draft.use-case.js';
 import { ListAiProviderAttemptsUseCase } from '../application/use-cases/list-ai-provider-attempts.use-case.js';
-import { AiProviderAttemptTracker } from '../application/services/ai-provider-attempt-tracker.service.js';
-import { AI_CONTENT_ASSISTANT } from '../domain/ports/ai-content-assistant.port.js';
-import { AI_PROVIDER_ATTEMPT_REPOSITORY } from '../domain/ports/ai-provider-attempt.repository.port.js';
 import { IMAGE_STORAGE } from '../domain/ports/image-storage.port.js';
-import { ConfiguredAiContentAssistant } from './ai/configured-ai-content-assistant.js';
-import { DefaultAiAssistantFactory } from './ai/ai-assistant.factory.js';
-import { AI_ASSISTANT_FACTORY } from '../domain/ports/ai-assistant.factory.port.js';
-import { AI_PROVIDER_CONFIG_REPOSITORY } from '../domain/ports/ai-provider-config.repository.port.js';
-import { SECRET_CIPHER } from '../domain/ports/secret-cipher.port.js';
-import { AesGcmSecretCipher } from './security/aes-gcm-secret-cipher.adapter.js';
-import { PrismaAiProviderConfigRepository } from './persistence/prisma/ai-provider-config.repository.js';
-import { AiProviderConfigChangeNotifier } from '../application/services/ai-provider-config-change-notifier.service.js';
+import { ListAiAgentsUseCase } from '../application/use-cases/list-ai-agents.use-case.js';
+import { UpdateAiAgentUseCase } from '../application/use-cases/update-ai-agent.use-case.js';
+import { ResetAiAgentUseCase } from '../application/use-cases/reset-ai-agent.use-case.js';
+import { TestAiAgentUseCase } from '../application/use-cases/test-ai-agent.use-case.js';
+import { AiAgentsController } from './http/controllers/ai-agents.controller.js';
 import { ListAiProviderConfigsUseCase } from '../application/use-cases/list-ai-provider-configs.use-case.js';
 import { CreateAiProviderConfigUseCase } from '../application/use-cases/create-ai-provider-config.use-case.js';
 import { UpdateAiProviderConfigUseCase } from '../application/use-cases/update-ai-provider-config.use-case.js';
@@ -68,9 +63,7 @@ import { ListAiProviderModelsUseCase } from '../application/use-cases/list-ai-pr
 import { AI_MODEL_CATALOG } from '../domain/ports/ai-model-catalog.port.js';
 import { HttpAiModelCatalog } from './ai/http-ai-model-catalog.js';
 import { AiStatusController } from './http/controllers/ai-status.controller.js';
-import { AI_AVAILABILITY } from '../domain/ports/ai-availability.port.js';
 import { AiProviderConfigsController } from './http/controllers/ai-provider-configs.controller.js';
-import { PrismaAiProviderAttemptRepository } from './persistence/prisma/ai-provider-attempt.repository.js';
 import { CloudinaryImageStorage } from './storage/cloudinary-image.storage.js';
 import { CONTENT_IMAGE_FINDER } from '../domain/ports/content-image-finder.port.js';
 import { WikimediaContentImageFinder } from './ai/wikimedia-content-image-finder.js';
@@ -88,7 +81,7 @@ import { GameTypeSettingController } from './http/controllers/game-type-setting.
 import { AiProviderAttemptsController } from './http/controllers/ai-provider-attempts.controller.js';
 
 @Module({
-  imports: [UserModule, OrganizationCoreModule, ClassCoreModule],
+  imports: [UserModule, OrganizationCoreModule, ClassCoreModule, AiCoreModule],
   controllers: [
     GameCreationDraftController,
     GameController,
@@ -97,6 +90,7 @@ import { AiProviderAttemptsController } from './http/controllers/ai-provider-att
     GameTypeSettingController,
     AiProviderAttemptsController,
     AiProviderConfigsController,
+    AiAgentsController,
     AiStatusController,
   ],
   providers: [
@@ -138,17 +132,8 @@ import { AiProviderAttemptsController } from './http/controllers/ai-provider-att
     ArchiveGameTypeUseCase,
     UnarchiveGameTypeUseCase,
     UpdateGameTypeSettingUseCase,
-    AiProviderAttemptTracker,
-    { provide: AI_PROVIDER_ATTEMPT_REPOSITORY, useClass: PrismaAiProviderAttemptRepository },
-    // IA agnóstica al proveedor: los proveedores, modelos y API keys (cifradas)
-    // se administran desde el panel y viven en base de datos, no en .env.
-    { provide: AI_PROVIDER_CONFIG_REPOSITORY, useClass: PrismaAiProviderConfigRepository },
-    { provide: SECRET_CIPHER, useClass: AesGcmSecretCipher },
-    { provide: AI_ASSISTANT_FACTORY, useClass: DefaultAiAssistantFactory },
-    AiProviderConfigChangeNotifier,
-    ConfiguredAiContentAssistant,
-    { provide: AI_CONTENT_ASSISTANT, useExisting: ConfiguredAiContentAssistant },
-    { provide: AI_AVAILABILITY, useExisting: ConfiguredAiContentAssistant },
+    // IA agnóstica al proveedor: repositorios, cifrado, runtime de agentes y
+    // asistentes viven en `AiCoreModule`; aquí solo la administración.
     ListAiProviderConfigsUseCase,
     CreateAiProviderConfigUseCase,
     UpdateAiProviderConfigUseCase,
@@ -156,6 +141,10 @@ import { AiProviderAttemptsController } from './http/controllers/ai-provider-att
     ReorderAiProviderConfigsUseCase,
     TestAiProviderConfigUseCase,
     ListAiProviderModelsUseCase,
+    ListAiAgentsUseCase,
+    UpdateAiAgentUseCase,
+    ResetAiAgentUseCase,
+    TestAiAgentUseCase,
     { provide: AI_MODEL_CATALOG, useClass: HttpAiModelCatalog },
     { provide: IMAGE_STORAGE, useClass: CloudinaryImageStorage },
     { provide: CONTENT_IMAGE_FINDER, useClass: WikimediaContentImageFinder },

@@ -1,6 +1,7 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import type {
   AiContentAssistant,
+  CompleteInput,
   DescribeImageInput,
   GenerateGameDraftInput,
   GenerateGameDraftOutput,
@@ -48,6 +49,14 @@ export class AiProviderOrchestrator implements AiContentAssistant {
 
   async describeImage(input: DescribeImageInput): Promise<string> {
     return this.runWithFallback('describeImage', (assistant) => assistant.describeImage(input));
+  }
+
+  async complete(input: CompleteInput): Promise<string> {
+    // El plazo es del total: cada proveedor de la cadena recibe lo que queda, no el plazo completo.
+    const deadlineAt = input.deadlineMs ? Date.now() + input.deadlineMs : null;
+    return this.runWithFallback('complete', (assistant) =>
+      assistant.complete(deadlineAt === null ? input : { ...input, deadlineMs: Math.max(1, deadlineAt - Date.now()) }),
+    );
   }
 
   async generateGameDraft(input: GenerateGameDraftInput): Promise<GenerateGameDraftOutput> {

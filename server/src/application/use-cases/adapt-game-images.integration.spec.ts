@@ -61,6 +61,7 @@ function build(game: Game, aiDraft: { config: unknown; content: unknown[] } = { 
   const assistant: AiContentAssistant = {
     describeImage: vi.fn(),
     generateGameDraft: vi.fn().mockResolvedValue(aiDraft),
+    complete: vi.fn(),
   };
   const registry = new ContentValidatorRegistry(
     new MemoryMatchContentValidator(),

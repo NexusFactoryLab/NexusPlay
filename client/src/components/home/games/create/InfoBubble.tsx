@@ -19,8 +19,35 @@ type InfoBubbleProps = {
  * visible). También se cierra con Escape, con la X o al pulsar fuera. Sustituye
  * a los párrafos explicativos fijos para que el formulario se vea limpio.
  */
+/** Ancho de la nube (ver `.nx-info-cloud`): `min(300px, 78vw)`. */
+function cloudWidth(): number {
+  return Math.min(300, window.innerWidth * 0.78)
+}
+
+/**
+ * Borde izquierdo visible del contenedor que recorta (la primera tarjeta o
+ * ventana con overflow distinto de `visible`), o el de la pantalla. Sirve para
+ * saber si la nube, que por defecto se abre hacia la izquierda, quedaría cortada.
+ */
+function clippingLeftEdge(element: HTMLElement): number {
+  for (let node = element.parentElement; node; node = node.parentElement) {
+    const { overflowX } = window.getComputedStyle(node)
+    if (overflowX !== 'visible') return node.getBoundingClientRect().left
+  }
+  return 0
+}
+
+/** `end`: la nube se extiende hacia la izquierda de la (i); `start`: hacia la derecha (cuando a la izquierda no cabe). */
+function pickAlign(root: HTMLElement | null): 'end' | 'start' {
+  if (!root) return 'end'
+  const bubbleRight = root.getBoundingClientRect().right
+  const cloudLeft = bubbleRight + 6 - cloudWidth()
+  return cloudLeft < clippingLeftEdge(root) + 8 ? 'start' : 'end'
+}
+
 export function InfoBubble({ text, label = 'Ver ayuda', placement = 'inline' }: InfoBubbleProps) {
   const [open, setOpen] = useState(false)
+  const [align, setAlign] = useState<'end' | 'start'>('end')
   const rootRef = useRef<HTMLSpanElement>(null)
   const timerRef = useRef<number>(0)
   const id = useId()
@@ -32,6 +59,8 @@ export function InfoBubble({ text, label = 'Ver ayuda', placement = 'inline' }: 
 
   const toggle = useCallback(() => {
     window.clearTimeout(timerRef.current)
+    // Se decide al abrir, con la posición actual de la (i): si a la izquierda no cabe, se abre hacia la derecha.
+    setAlign(pickAlign(rootRef.current))
     setOpen((current) => {
       const next = !current
       if (next) timerRef.current = window.setTimeout(() => setOpen(false), VISIBLE_MS)
@@ -58,7 +87,7 @@ export function InfoBubble({ text, label = 'Ver ayuda', placement = 'inline' }: 
   }, [open, close])
 
   return (
-    <span ref={rootRef} className="nx-info" data-placement={placement} data-open={open}>
+    <span ref={rootRef} className="nx-info" data-placement={placement} data-open={open} data-align={align}>
       <button
         type="button"
         className="nx-info-btn"

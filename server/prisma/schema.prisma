@@ -293,6 +293,23 @@ model AiProviderConfigModel {
   @@map("ai_provider_configs")
 }
 
+/// Configuración de cada agente de IA de la plataforma (Jugador, Configurador
+/// de juegos). Los agentes son un catálogo fijo en código (`AI_AGENT_CATALOG`):
+/// esta tabla solo guarda lo que el administrador personalizó, así que una
+/// fila ausente = valores por defecto. `providerId` no es FK a propósito: si el
+/// proveedor se borra o se deshabilita, el agente cae a la cadena general en
+/// vez de romperse (ver `AiAgentRuntime`).
+model AiAgentConfigModel {
+  agentKey          String   @id @map("agent_key")
+  instructions      String   @default("")
+  providerId        String?  @map("provider_id")
+  modelOverride     String?  @map("model_override")
+  fallbackToDefault Boolean  @default(true) @map("fallback_to_default")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("ai_agent_configs")
+}
+
 /// Gobernanza transversal por `GameType` (issue #156): archivar un tipo es
 /// una capa de visibilidad EN TIEMPO DE LECTURA que cruza `gameType` contra
 /// esta tabla — nunca se itera ni se modifica el `GameStatus` individual de

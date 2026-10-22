@@ -10,6 +10,7 @@ const PAGE_SIZE = 20
 const OPERATION_LABEL: Record<string, string> = {
   describeImage: 'Describir imagen',
   generateGameDraft: 'Generar borrador de juego',
+  complete: 'Consulta del agente Jugador',
 }
 
 function formatDate(iso: string): string {

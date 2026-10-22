@@ -3,11 +3,12 @@ import { GoogleGenAI } from '@google/genai';
 import { InvalidGameContentError } from '../../domain/errors/game.errors.js';
 import type {
   AiContentAssistant,
+  CompleteInput,
   DescribeImageInput,
   GenerateGameDraftInput,
   GenerateGameDraftOutput,
 } from '../../domain/ports/ai-content-assistant.port.js';
-import { RateLimiter } from './rate-limiter.js';
+import { RateLimitWaitExceededError, RateLimiter } from './rate-limiter.js';
 
 // gemini-2.5-flash dejó de estar disponible para keys nuevas (Google
 // responde 404 "no longer available to new users" y recomienda este
@@ -19,7 +20,11 @@ export interface GeminiOptions {
   apiKey?: string;
   textModel?: string;
   maxRpm?: number;
+  /** Contador de llamadas por minuto ya compartido (por API key). Sin él se crea uno propio. */
+  rateLimiter?: RateLimiter;
 }
+
+const PING_DEADLINE_MS = 15_000;
 
 // El plan gratuito de Google AI Studio limita a pocas llamadas por minuto
 // (5 para este modelo al momento de escribir esto). Configurable por si el
@@ -39,24 +44,69 @@ export class GeminiContentAssistant implements AiContentAssistant {
   private readonly rateLimiter: RateLimiter;
 
   constructor(private readonly options: GeminiOptions = {}) {
-    this.rateLimiter = new RateLimiter(
-      options.maxRpm ? null : 'GOOGLE_IA_STUDIO_MAX_RPM',
-      options.maxRpm ?? DEFAULT_MAX_REQUESTS_PER_MINUTE,
-    );
+    this.rateLimiter =
+      options.rateLimiter ??
+      new RateLimiter(
+        options.maxRpm ? null : 'GOOGLE_IA_STUDIO_MAX_RPM',
+        options.maxRpm ?? DEFAULT_MAX_REQUESTS_PER_MINUTE,
+      );
+  }
+
+  /**
+   * Espera cupo de llamadas por minuto; con plazo, falla rápido si el cupo
+   * tardaría más. Devuelve el tiempo que queda (o `undefined` sin plazo).
+   */
+  private async throttleWithin(deadlineMs: number | undefined): Promise<number | undefined> {
+    if (!deadlineMs) {
+      await this.rateLimiter.throttle();
+      return undefined;
+    }
+    const startedAt = Date.now();
+    try {
+      await this.rateLimiter.throttle(deadlineMs);
+    } catch (error) {
+      if (error instanceof RateLimitWaitExceededError) {
+        throw new ServiceUnavailableException(`El asistente de IA no pudo responder a tiempo: ${error.message}.`);
+      }
+      throw error;
+    }
+    return Math.max(1, deadlineMs - (Date.now() - startedAt));
   }
 
   private get textModel(): string {
     return this.options.textModel ?? DEFAULT_TEXT_MODEL;
   }
 
+  async complete({ system, prompt, json, maxTokens, temperature, deadlineMs }: CompleteInput): Promise<string> {
+    const client = this.getClient();
+    const remainingMs = await this.throttleWithin(deadlineMs);
+    try {
+      const response = await client.models.generateContent({
+        model: this.textModel,
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        config: {
+          ...(remainingMs ? { abortSignal: AbortSignal.timeout(remainingMs) } : {}),
+          ...(system ? { systemInstruction: system } : {}),
+          ...(json ? { responseMimeType: 'application/json' } : {}),
+          ...(maxTokens ? { maxOutputTokens: maxTokens } : {}),
+          ...(temperature !== undefined ? { temperature } : {}),
+        },
+      });
+      return response.text?.trim() ?? '';
+    } catch (error) {
+      throw this.wrapProviderError(error);
+    }
+  }
+
   /** Prueba barata de credenciales + modelo para el botón "Probar conexión" del panel. */
   async ping(): Promise<void> {
     const client = this.getClient();
-    await this.throttle();
+    const remainingMs = await this.throttleWithin(PING_DEADLINE_MS);
     try {
       await client.models.generateContent({
         model: this.textModel,
         contents: [{ role: 'user', parts: [{ text: 'Responde únicamente con la palabra OK.' }] }],
+        config: { abortSignal: AbortSignal.timeout(remainingMs ?? PING_DEADLINE_MS) },
       });
     } catch (error) {
       throw this.wrapProviderError(error);
