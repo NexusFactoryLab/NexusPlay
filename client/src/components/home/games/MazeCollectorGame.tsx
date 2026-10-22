@@ -31,7 +31,7 @@ const MAX_CELL_SIZE = 96
  * Tamaño de los sprites respecto a su celda. El camión y las nubes llenan el
  * carril; las botellas van más chicas para que la vista se quede en el camión.
  */
-const TRUCK_SCALE = 1.3
+const TRUCK_SCALE = 2
 const GHOST_SCALE = 1.2
 const PET_SCALE = 0.55
 const POWER_SCALE = 0.9
@@ -300,14 +300,20 @@ function MazeCollectorSession({
           <BookOpen className="h-4 w-4" />
         </button>
         {canFullscreen && (
+          // Con texto y resaltado (no solo un ícono): así se ve aunque el jugador nunca use la tecla F ni el interruptor del inicio.
           <button
             type="button"
             aria-label={fullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
             title={fullscreen ? 'Salir de pantalla completa (F)' : 'Pantalla completa (F)'}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-slate-950/70 text-slate-200 backdrop-blur transition-colors hover:bg-white/10"
+            className={`flex h-10 shrink-0 items-center gap-1.5 rounded-2xl border px-3 text-[13px] font-bold backdrop-blur transition-colors ${
+              fullscreen
+                ? 'border-white/10 bg-slate-950/70 text-slate-200 hover:bg-white/10'
+                : 'border-emerald-300/60 bg-emerald-500/25 text-white shadow-[0_0_20px_-6px_rgba(52,211,153,0.9)] hover:bg-emerald-500/40'
+            }`}
             onClick={toggleFullscreen}
           >
             {fullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+            <span className="max-sm:hidden">{fullscreen ? 'Salir' : 'Pantalla completa'}</span>
           </button>
         )}
 
