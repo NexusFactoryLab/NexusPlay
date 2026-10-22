@@ -1,4 +1,4 @@
-import { ArrayNotEmpty, IsArray, IsBoolean, IsISO8601, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { ArrayNotEmpty, IsArray, IsBoolean, IsISO8601, IsInt, IsOptional, IsString, Max, MaxLength, Min, ValidateIf } from 'class-validator';
 
 /** Campos comunes de alta y edición. La validación semántica (URL, tipo) vive en el caso de uso. */
 class AiProviderConfigBaseDto {
@@ -86,9 +86,11 @@ export class SetAiProviderEnabledDto {
 }
 
 export class UpdateAiAgentDto {
+  /** `null` = usar el texto de fábrica; `''` = sin instrucciones. */
+  @ValidateIf((dto: UpdateAiAgentDto) => dto.instructions !== null)
   @IsString()
   @MaxLength(4_000)
-  instructions!: string;
+  instructions!: string | null;
 
   @IsOptional()
   @IsString()

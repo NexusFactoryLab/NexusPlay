@@ -8,8 +8,11 @@ export interface AiAgentDto {
   description: string;
   usedIn: string[];
   limits: string | null;
+  /** Las que se aplican hoy: las guardadas, o el texto de fábrica vigente. */
   instructions: string;
   defaultInstructions: string;
+  /** `true` = sin texto guardado: usa (y seguirá el) texto de fábrica del catálogo. */
+  usingDefaultInstructions: boolean;
   providerId: string | null;
   modelOverride: string | null;
   fallbackToDefault: boolean;
@@ -53,6 +56,7 @@ export function toAiAgentDto(
     limits: definition.limits,
     instructions: config.instructions,
     defaultInstructions: definition.defaultInstructions,
+    usingDefaultInstructions: config.usingDefaultInstructions,
     providerId: config.providerId,
     modelOverride: config.modelOverride,
     fallbackToDefault: config.fallbackToDefault,

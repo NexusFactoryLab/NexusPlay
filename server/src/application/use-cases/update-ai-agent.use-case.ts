@@ -1,5 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { AI_AGENT_CATALOG, AiAgentConfig, isAiAgentKey, type AiAgentKey } from '../../domain/entities/ai-agent.entity.js';
+import {
+  AI_AGENT_CATALOG,
+  AiAgentConfig,
+  isAiAgentKey,
+  normalizeAgentInstructions,
+  type AiAgentKey,
+} from '../../domain/entities/ai-agent.entity.js';
 import {
   AI_AGENT_CONFIG_REPOSITORY,
   type AiAgentConfigRepository,
@@ -27,7 +33,11 @@ export interface UpdateAiAgentInput {
   requestingUserId: string;
   key: string;
   /** Enfoque del agente: qué hace y en qué se concentra. */
-  instructions: string;
+  /**
+   * `null` o igual al texto de fábrica → se guarda `null` (sigue el texto de
+   * fábrica vigente). `''` = "sin instrucciones", válido.
+   */
+  instructions: string | null;
   /** `null`/omitido = usa la cadena general de proveedores. */
   providerId?: string | null;
   /** Solo con `providerId`. `null`/vacío = el modelo configurado en el proveedor. */
@@ -58,8 +68,8 @@ export class UpdateAiAgentUseCase implements UseCase<UpdateAiAgentInput, AiAgent
       throw new InvalidAiProviderConfigError(`el agente "${input.key}" no existe.`);
     }
 
-    const instructions = (input.instructions ?? '').trim();
-    if (instructions.length > MAX_AGENT_INSTRUCTIONS) {
+    const instructions = normalizeAgentInstructions(input.key, input.instructions ?? null);
+    if ((instructions?.length ?? 0) > MAX_AGENT_INSTRUCTIONS) {
       throw new InvalidAiProviderConfigError(
         `las instrucciones no pueden superar los ${MAX_AGENT_INSTRUCTIONS} caracteres.`,
       );

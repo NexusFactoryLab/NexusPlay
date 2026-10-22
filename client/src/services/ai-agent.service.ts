@@ -13,6 +13,8 @@ export type AiAgent = {
   /** Instrucciones vigentes del agente (qué hace y en qué se concentra). */
   instructions: string
   defaultInstructions: string
+  /** `true` = sin texto guardado: usa (y seguirá) el texto de fábrica del catálogo. */
+  usingDefaultInstructions: boolean
   /** `null` = usa la cadena general de proveedores. */
   providerId: string | null
   modelOverride: string | null
@@ -30,7 +32,8 @@ export type AiAgent = {
 }
 
 export type AiAgentInput = {
-  instructions: string
+  /** `null` = usar el texto de fábrica vigente; `''` = sin instrucciones. */
+  instructions: string | null
   providerId: string | null
   modelOverride: string | null
   fallbackToDefault: boolean

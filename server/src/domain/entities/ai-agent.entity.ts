@@ -56,7 +56,12 @@ export function isAiAgentKey(value: string): value is AiAgentKey {
 
 export interface AiAgentConfigProps {
   key: AiAgentKey;
-  instructions: string;
+  /**
+   * `null` = usa el texto de fábrica VIGENTE del catálogo (si se mejora en el
+   * código, llega solo a los agentes sin personalizar). `''` = el admin
+   * eligió explícitamente "sin instrucciones".
+   */
+  instructions: string | null;
   /** `null` = usa la cadena general de proveedores. */
   providerId: string | null;
   /** Solo con `providerId`: modelo de texto que reemplaza al configurado en el proveedor. */
@@ -67,6 +72,17 @@ export interface AiAgentConfigProps {
   updatedAt: Date | null;
 }
 
+/**
+ * Normaliza el texto que el admin quiere guardar: igual (sin espacios de los
+ * bordes) al de fábrica → `null` ("usa el de fábrica", y lo seguirá usando si
+ * ese texto mejora); `''` se conserva como "sin instrucciones" explícito.
+ */
+export function normalizeAgentInstructions(key: AiAgentKey, requested: string | null): string | null {
+  if (requested === null) return null;
+  const trimmed = requested.trim();
+  return trimmed === AI_AGENT_CATALOG[key].defaultInstructions.trim() ? null : trimmed;
+}
+
 /** Configuración efectiva de un agente: lo guardado, o los valores de fábrica si no hay nada. */
 export class AiAgentConfig {
   private constructor(private readonly props: AiAgentConfigProps) {}
@@ -74,7 +90,7 @@ export class AiAgentConfig {
   static defaults(key: AiAgentKey): AiAgentConfig {
     return new AiAgentConfig({
       key,
-      instructions: AI_AGENT_CATALOG[key].defaultInstructions,
+      instructions: null,
       providerId: null,
       modelOverride: null,
       fallbackToDefault: true,
@@ -95,7 +111,12 @@ export class AiAgentConfig {
   }
 
   get key(): AiAgentKey { return this.props.key; }
-  get instructions(): string { return this.props.instructions; }
+  /** Instrucciones que realmente se aplican: las guardadas, o las de fábrica vigentes si no hay. */
+  get instructions(): string {
+    return this.props.instructions ?? AI_AGENT_CATALOG[this.props.key].defaultInstructions;
+  }
+  /** `true` = no hay texto guardado: se usa (y sigue) el de fábrica. */
+  get usingDefaultInstructions(): boolean { return this.props.instructions === null; }
   get providerId(): string | null { return this.props.providerId; }
   get modelOverride(): string | null { return this.props.modelOverride; }
   get fallbackToDefault(): boolean { return this.props.fallbackToDefault; }

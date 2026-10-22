@@ -94,6 +94,8 @@ function AgentCard({ agent, providers, index, onChanged, onConflict }: CardProps
     setInstructions(agent.instructions)
   }
 
+  const usesFactoryText = instructions.trim() === agent.defaultInstructions.trim()
+
   const dirty =
     providerId !== (agent.providerId ?? '') ||
     (providerId !== '' && modelOverride.trim() !== (agent.modelOverride ?? '')) ||
@@ -138,7 +140,8 @@ function AgentCard({ agent, providers, index, onChanged, onConflict }: CardProps
     setSaved(false)
     try {
       const updated = await updateAiAgent(token, agent.key, {
-        instructions: instructions.trim(),
+        // Igual al texto de fábrica → null: el agente sigue el texto vigente del catálogo, no una copia.
+        instructions: usesFactoryText ? null : instructions.trim(),
         providerId: providerId || null,
         modelOverride: providerId ? modelOverride.trim() || null : null,
         fallbackToDefault: fallback,
@@ -333,17 +336,27 @@ function AgentCard({ agent, providers, index, onChanged, onConflict }: CardProps
           />
         </Field>
         <div className="mt-1.5 flex items-center justify-between text-[12px] text-text">
-          {agent.defaultInstructions !== instructions ? (
-            <button
-              type="button"
-              className="font-medium text-accent hover:underline"
-              onClick={() => setInstructions(agent.defaultInstructions)}
+          <span className="flex items-center gap-2">
+            <span
+              className="rounded-full border border-border px-2 py-0.5 text-[11px] font-medium text-text-h"
+              title={
+                usesFactoryText
+                  ? 'Al guardar, el agente seguirá el texto de fábrica vigente (si se mejora, le llega solo).'
+                  : 'Texto propio: no cambia aunque se mejore el de fábrica.'
+              }
             >
-              {agent.defaultInstructions ? 'Usar el texto de fábrica' : 'Vaciar'}
-            </button>
-          ) : (
-            <span />
-          )}
+              {usesFactoryText ? 'Texto de fábrica' : 'Personalizado'}
+            </span>
+            {!usesFactoryText && (
+              <button
+                type="button"
+                className="font-medium text-accent hover:underline"
+                onClick={() => setInstructions(agent.defaultInstructions)}
+              >
+                {agent.defaultInstructions ? 'Usar el texto de fábrica' : 'Vaciar'}
+              </button>
+            )}
+          </span>
           <span>
             {instructions.length}/{MAX_INSTRUCTIONS}
           </span>

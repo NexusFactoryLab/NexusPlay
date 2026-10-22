@@ -301,7 +301,8 @@ model AiProviderConfigModel {
 /// vez de romperse (ver `AiAgentRuntime`).
 model AiAgentConfigModel {
   agentKey          String   @id @map("agent_key")
-  instructions      String   @default("")
+  /// `null` = usa las instrucciones de fábrica vigentes del catálogo; `""` = "sin instrucciones".
+  instructions      String?
   providerId        String?  @map("provider_id")
   modelOverride     String?  @map("model_override")
   fallbackToDefault Boolean  @default(true) @map("fallback_to_default")
