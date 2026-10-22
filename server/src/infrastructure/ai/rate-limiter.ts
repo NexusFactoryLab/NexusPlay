@@ -1,4 +1,7 @@
 import { createHash } from 'node:crypto';
+import { Logger } from '@nestjs/common';
+import type { RateLimitAcquireResult, RateLimitStore } from '../../domain/ports/rate-limit-store.port.js';
+import { InMemoryRateLimitStore } from './in-memory-rate-limit-store.js';
 
 const DEFAULT_WINDOW_MS = 60_000;
 
@@ -17,14 +20,39 @@ export class RateLimitWaitExceededError extends Error {
  * cada proveedor solo instancia `new RateLimiter('SU_ENV_VAR', limiteDefault)`.
  */
 export class RateLimiter {
-  private timestamps: number[] = [];
+  private readonly store: RateLimitStore;
+  private readonly storeKey: string;
+  /** Respaldo por proceso: si el almacén compartido falla, la cuenta no se detiene (ni la IA con ella). */
+  private readonly localStore = new InMemoryRateLimitStore();
+  private lastStoreWarningAt = 0;
+  private readonly logger = new Logger(RateLimiter.name);
 
   constructor(
     /** `null` = límite fijo, sin leer del entorno (configuración guardada en base de datos). */
     private readonly envVarName: string | null,
     private defaultLimit: number,
     private readonly windowMs = DEFAULT_WINDOW_MS,
-  ) {}
+    /** Dónde llevar la cuenta; por defecto en memoria de este proceso. `key` identifica el contador en un almacén compartido. */
+    options: { store?: RateLimitStore; key?: string } = {},
+  ) {
+    this.store = options.store ?? new InMemoryRateLimitStore();
+    this.storeKey = options.key ?? 'local';
+  }
+
+  /** Pide un cupo al almacén; si el almacén compartido falla, cae a la cuenta local. */
+  private async acquire(limit: number): Promise<RateLimitAcquireResult> {
+    try {
+      return await this.store.tryAcquire(this.storeKey, limit, this.windowMs);
+    } catch (error) {
+      if (Date.now() - this.lastStoreWarningAt > 60_000) {
+        this.lastStoreWarningAt = Date.now();
+        this.logger.warn(
+          `El almacén del límite por minuto falló; se usa la cuenta local: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+      return this.localStore.tryAcquire(this.storeKey, limit, this.windowMs);
+    }
+  }
 
   /** Cambia el límite en caliente (el admin editó "llamadas por minuto"). */
   setLimit(limit: number): void {
@@ -42,13 +70,11 @@ export class RateLimiter {
     const startedAt = Date.now();
 
     for (;;) {
+      const { granted, retryAfterMs } = await this.acquire(limit);
+      if (granted) return;
+
       const now = Date.now();
-      this.timestamps = this.timestamps.filter((timestamp) => now - timestamp < this.windowMs);
-      if (this.timestamps.length < limit) {
-        this.timestamps.push(now);
-        return;
-      }
-      const waitMs = this.windowMs - (now - this.timestamps[0]) + 250;
+      const waitMs = retryAfterMs + 250;
       if (maxWaitMs !== undefined && now - startedAt + waitMs > maxWaitMs) {
         throw new RateLimitWaitExceededError(waitMs);
       }
@@ -66,11 +92,12 @@ const sharedLimiters = new Map<string, RateLimiter>();
  * por minuto de las que el proveedor permite y recibirían 429. La clave se
  * guarda como hash: la key nunca queda en un mapa en claro.
  */
-export function sharedRateLimiter(scope: string, apiKey: string, limit: number): RateLimiter {
+export function sharedRateLimiter(scope: string, apiKey: string, limit: number, store?: RateLimitStore): RateLimiter {
   const id = createHash('sha256').update(`${scope}\n${apiKey}`).digest('hex');
   let limiter = sharedLimiters.get(id);
   if (!limiter) {
-    limiter = new RateLimiter(null, limit);
+    // El `id` (hash) es también la clave en un almacén compartido: la API key nunca sale del proceso.
+    limiter = new RateLimiter(null, limit, DEFAULT_WINDOW_MS, { store, key: id });
     sharedLimiters.set(id, limiter);
   } else {
     limiter.setLimit(limit);

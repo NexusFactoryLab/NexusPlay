@@ -313,6 +313,18 @@ model AiAgentConfigModel {
   @@map("ai_agent_configs")
 }
 
+/// Contador de llamadas por ventana fija, compartido entre instancias del
+/// servidor cuando `AI_RATE_LIMIT_STORE=postgres` (ver `PrismaRateLimitStore`).
+/// `key` es un hash (nunca la API key). Las filas viejas se limpian solas.
+model AiRateLimitHitModel {
+  key         String
+  windowStart BigInt @map("window_start")
+  count       Int    @default(0)
+
+  @@id([key, windowStart])
+  @@map("ai_rate_limit_hits")
+}
+
 /// Registro de cambios del panel de IA (quién cambió qué proveedor/agente y
 /// cuándo). `details` guarda solo nombres de campos y valores no sensibles:
 /// NUNCA una API key, ni en claro ni cifrada (ver `AiAuditLogger`).
