@@ -35,41 +35,51 @@ async function main(){
       const errors=[]; page.on('pageerror',error=>errors.push(error.message))
       await page.route('**/__traits-fixture',route=>route.fulfill({contentType:'text/html',body:fixture}))
       await page.goto(base+'/__traits-fixture')
-      await page.getByText('Responden «Sí»: 7 de 12 tarjetas').waitFor()
-      assert.equal((await page.evaluate(()=>window.state())).error,null)
+      const count=async()=>(await page.evaluate(()=>window.state())).cards.flat().filter(id=>id==='america').length
+      const cell=(q,label)=>page.getByRole('list',{name:'Tarjetas que responden «Sí» a la pregunta '+q}).getByRole('button',{name:label,exact:true})
+      await page.getByRole('textbox',{name:'Pregunta 1',exact:true}).waitFor()
 
-      // Marcar y desmarcar una tarjeta cambia el conteo y el estado accesible.
-      const group=page.getByRole('list',{name:'Tarjetas que responden «Sí» a la pregunta 1'})
-      const japon=group.getByRole('button',{name:'Japón'})
+      // Marcar y desmarcar una ficha cambia el estado accesible y el conteo.
+      const japon=cell(1,'Japón')
       assert.equal(await japon.getAttribute('aria-pressed'),'false')
       await japon.click()
       assert.equal(await japon.getAttribute('aria-pressed'),'true')
-      await page.getByText('Responden «Sí»: 8 de 12 tarjetas').waitFor()
+      assert.equal(await count(),8)
       await japon.click()
 
-      // Una pregunta nueva vacía no deja avanzar hasta tener texto y marcas que separen.
-      await page.getByRole('button',{name:'+ Agregar pregunta'}).click()
+      // «Marcar todas» y «Quitar todas» actúan sobre la pregunta elegida.
+      await page.getByRole('button',{name:'Marcar todas'}).click()
+      assert.equal(await count(),12)
+      await page.getByText('Marca solo algunas tarjetas').waitFor()
+      await page.getByRole('button',{name:'Quitar todas'}).click()
+      assert.equal(await count(),0)
+      for(const label of ['Colombia','Argentina','Brasil']) await cell(1,label).click()
+      await page.getByText('Marca solo algunas tarjetas').waitFor({state:'detached'})
+
+      // Una pregunta nueva queda elegida: se escribe, se categoriza y se marca (el mínimo de 4 lo exige validateTraits).
+      await page.getByRole('button',{name:'Agregar pregunta'}).click()
       const input=page.getByRole('textbox',{name:'Pregunta 2',exact:true})
       await input.waitFor()
-      assert.match((await page.evaluate(()=>window.state())).error,/Escribe el texto de la pregunta 2/)
+      assert.match((await page.evaluate(()=>window.state())).error,/al menos 4 preguntas/)
       await input.fill('es un país de Europa')
-      await page.getByRole('combobox',{name:'Categoría (opcional)'}).nth(1).fill('Geografía')
+      await page.getByRole('button',{name:'Geografía',exact:true}).click()
       assert.equal((await page.evaluate(()=>window.state())).catalog[1].category,'Geografía')
-      assert.match((await page.evaluate(()=>window.state())).error,/no separa/)
-      const europa=page.getByRole('list',{name:'Tarjetas que responden «Sí» a la pregunta 2'})
-      for(const label of ['Francia','Italia','Alemania','España']) await europa.getByRole('button',{name:label}).click()
-      assert.equal((await page.evaluate(()=>window.state())).error,null)
+      for(const label of ['Francia','Italia','Alemania','España']) await cell(2,label).click()
       assert.equal(await page.locator('body').evaluate(el=>el.scrollWidth<=innerWidth),true)
       await page.screenshot({path:'.scratch/guess-who-traits-'+width+'.png',fullPage:true})
 
+      // Volver a la pregunta 1 desde la lista conserva su texto.
+      await page.getByRole('list',{name:'Preguntas',exact:true}).getByRole('button').first().click()
+      assert.equal(await page.getByRole('textbox',{name:'Pregunta 1',exact:true}).inputValue(),'¿Es un país de América?')
+      await page.getByRole('list',{name:'Preguntas',exact:true}).getByRole('button').nth(1).click()
+
       // Quitar la pregunta se lleva sus marcas.
-      const removes=page.getByRole('button',{name:'Quitar'})
-      await removes.nth(1).click()
+      await page.getByRole('button',{name:'Quitar esta pregunta'}).click()
       const state=await page.evaluate(()=>window.state())
       assert.equal(state.catalog.length,1)
       assert.equal(state.cards.flat().includes('pregunta-2'),false)
       assert.deepEqual(errors,[])
-      console.log('PASS '+width+'px: conteo, marcar/desmarcar, pregunta nueva validada, quitar con sus marcas, sin scroll horizontal')
+      console.log('PASS '+width+'px: lista + fichas, marcar todas, pregunta nueva, quitar con sus marcas, sin scroll horizontal')
       await page.close()
     }
   } finally {await browser.close()}
