@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { Info, X } from 'lucide-react'
+import { pickCloudAlign } from './infoBubbleAlign'
 
 /** Segundos que la nube de ayuda queda visible antes de desaparecer sola. */
 const VISIBLE_MS = 10_000
@@ -19,11 +20,6 @@ type InfoBubbleProps = {
  * visible). También se cierra con Escape, con la X o al pulsar fuera. Sustituye
  * a los párrafos explicativos fijos para que el formulario se vea limpio.
  */
-/** Ancho de la nube (ver `.nx-info-cloud`): `min(300px, 78vw)`. */
-function cloudWidth(): number {
-  return Math.min(300, window.innerWidth * 0.78)
-}
-
 /**
  * Borde izquierdo visible del contenedor que recorta (la primera tarjeta o
  * ventana con overflow distinto de `visible`), o el de la pantalla. Sirve para
@@ -40,9 +36,12 @@ function clippingLeftEdge(element: HTMLElement): number {
 /** `end`: la nube se extiende hacia la izquierda de la (i); `start`: hacia la derecha (cuando a la izquierda no cabe). */
 function pickAlign(root: HTMLElement | null): 'end' | 'start' {
   if (!root) return 'end'
-  const bubbleRight = root.getBoundingClientRect().right
-  const cloudLeft = bubbleRight + 6 - cloudWidth()
-  return cloudLeft < clippingLeftEdge(root) + 8 ? 'start' : 'end'
+  // Solo se mide el DOM aquí; la decisión es pura (`pickCloudAlign`).
+  return pickCloudAlign({
+    bubbleRight: root.getBoundingClientRect().right,
+    clippingLeft: clippingLeftEdge(root),
+    viewportWidth: window.innerWidth,
+  })
 }
 
 export function InfoBubble({ text, label = 'Ver ayuda', placement = 'inline' }: InfoBubbleProps) {
