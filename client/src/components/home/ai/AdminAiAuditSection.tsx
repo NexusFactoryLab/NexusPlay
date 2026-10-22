@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { useAuth } from '../../../hooks/useAuth'
 import { listAiAudit } from '../../../services/ai-audit.service'
@@ -21,24 +21,40 @@ export function AdminAiAuditSection() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const reload = useCallback(() => {
+  // Cambia al pulsar "Actualizar" para volver a pedir la misma página.
+  const [refreshTick, setRefreshTick] = useState(0)
+
+  // El estado de "cargando" lo fijan los manejadores de eventos (abajo); el efecto solo sincroniza con el servidor.
+  useEffect(() => {
     if (!token) return
-    setLoading(true)
-    setError(null)
+    let cancelled = false
     listAiAudit(token, { page, pageSize: PAGE_SIZE })
       .then((result) => {
+        if (cancelled) return
         setItems(result.items)
         setTotal(result.total)
+        setError(null)
       })
-      .catch((err: unknown) =>
-        setError(err instanceof ApiError ? err.message : 'No se pudo cargar el registro de actividad.'),
-      )
-      .finally(() => setLoading(false))
-  }, [token, page])
+      .catch((err: unknown) => {
+        if (!cancelled) setError(err instanceof ApiError ? err.message : 'No se pudo cargar el registro de actividad.')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [token, page, refreshTick])
 
-  useEffect(() => {
-    reload()
-  }, [reload])
+  function goToPage(next: number) {
+    setLoading(true)
+    setPage(next)
+  }
+
+  function reload() {
+    setLoading(true)
+    setRefreshTick((current) => current + 1)
+  }
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
@@ -122,7 +138,7 @@ export function AdminAiAuditSection() {
               type="button"
               className="rounded-lg border border-border px-3 py-1.5 font-medium text-text-h disabled:cursor-not-allowed disabled:opacity-50"
               disabled={page <= 1 || loading}
-              onClick={() => setPage((current) => current - 1)}
+              onClick={() => goToPage(page - 1)}
             >
               Anterior
             </button>
@@ -130,7 +146,7 @@ export function AdminAiAuditSection() {
               type="button"
               className="rounded-lg border border-border px-3 py-1.5 font-medium text-text-h disabled:cursor-not-allowed disabled:opacity-50"
               disabled={page >= totalPages || loading}
-              onClick={() => setPage((current) => current + 1)}
+              onClick={() => goToPage(page + 1)}
             >
               Siguiente
             </button>

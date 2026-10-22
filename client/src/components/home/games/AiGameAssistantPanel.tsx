@@ -5,7 +5,8 @@ import { useAuth } from '../../../hooks/useAuth'
 import { useToast } from '../../../hooks/useToast'
 import { generateGameDraft, type GameDraft } from '../../../services/ai-game-assistant.service'
 import { ApiError } from '../../../utils/http'
-import { AiNotConfiguredNotice, useAiConfigured } from '../ai/AiNotConfiguredNotice'
+import { AiNotConfiguredNotice } from '../ai/AiNotConfiguredNotice'
+import { useAiConfigured } from '../ai/useAiConfigured'
 import { createStoredFile, materializeFiles } from './creationDraftSupport'
 import {
   useAiDraftPersist,

@@ -1,4 +1,5 @@
 import { request } from '../utils/http'
+import { invalidatingAiStatus } from './ai-status.cache'
 
 export type AiAgentKey = 'GAME_PLAYER' | 'GAME_CONFIGURATOR'
 
@@ -55,12 +56,12 @@ export function listAiAgents(token: string): Promise<{ items: AiAgent[] }> {
 }
 
 export function updateAiAgent(token: string, key: AiAgentKey, input: AiAgentInput): Promise<AiAgent> {
-  return request<AiAgent>(`${BASE}/${key}`, { method: 'PATCH', token, body: input })
+  return request<AiAgent>(`${BASE}/${key}`, { method: 'PATCH', token, body: input }).then(invalidatingAiStatus)
 }
 
 /** Restaura el agente a su configuración de fábrica. */
 export function resetAiAgent(token: string, key: AiAgentKey): Promise<AiAgent> {
-  return request<AiAgent>(`${BASE}/${key}`, { method: 'DELETE', token })
+  return request<AiAgent>(`${BASE}/${key}`, { method: 'DELETE', token }).then(invalidatingAiStatus)
 }
 
 export function testAiAgent(token: string, key: AiAgentKey): Promise<AiAgentTestResult> {

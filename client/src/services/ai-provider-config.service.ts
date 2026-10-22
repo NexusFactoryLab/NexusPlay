@@ -1,4 +1,5 @@
 import { request } from '../utils/http'
+import { invalidatingAiStatus } from './ai-status.cache'
 
 export type AiProviderKind = 'openai-compatible' | 'gemini'
 
@@ -57,7 +58,7 @@ export function listAiProviderConfigs(token: string): Promise<AiProviderConfigLi
 }
 
 export function createAiProviderConfig(token: string, input: AiProviderConfigInput): Promise<AiProviderConfig> {
-  return request<AiProviderConfig>(BASE, { method: 'POST', token, body: input })
+  return request<AiProviderConfig>(BASE, { method: 'POST', token, body: input }).then(invalidatingAiStatus)
 }
 
 export function updateAiProviderConfig(
@@ -65,7 +66,7 @@ export function updateAiProviderConfig(
   id: string,
   input: AiProviderConfigInput,
 ): Promise<AiProviderConfig> {
-  return request<AiProviderConfig>(`${BASE}/${id}`, { method: 'PATCH', token, body: input })
+  return request<AiProviderConfig>(`${BASE}/${id}`, { method: 'PATCH', token, body: input }).then(invalidatingAiStatus)
 }
 
 /** Cambia SOLO el interruptor (no reenvía el formulario, así no pisa ediciones de otro admin). */
@@ -78,11 +79,11 @@ export function setAiProviderEnabled(
     method: 'PATCH',
     token,
     body: { enabled, expectedUpdatedAt: provider.updatedAt },
-  })
+  }).then(invalidatingAiStatus)
 }
 
 export function deleteAiProviderConfig(token: string, id: string): Promise<void> {
-  return request<void>(`${BASE}/${id}`, { method: 'DELETE', token })
+  return request<void>(`${BASE}/${id}`, { method: 'DELETE', token }).then(invalidatingAiStatus)
 }
 
 /**
