@@ -9,6 +9,7 @@ import { ForbiddenActionError } from '../../domain/errors/authorization.errors.j
 import { AiProviderConfigNotFoundError } from '../errors/application.errors.js';
 import { toAiProviderConfigDto, type AiProviderConfigDto } from '../dtos/ai-provider-config-response.dto.js';
 import type { UseCase } from '../ports/use-case.port.js';
+import { sanitizeProviderMessage } from '../services/ai-error-sanitizer.js';
 import { RequesterAdminResolver } from '../services/requester-admin-resolver.service.js';
 
 export interface TestAiProviderConfigInput {
@@ -58,7 +59,8 @@ export class TestAiProviderConfigUseCase implements UseCase<TestAiProviderConfig
     } catch (error) {
       ok = false;
       const raw = error instanceof Error ? error.message : String(error);
-      message = (apiKey ? raw.split(apiKey).join('••••') : raw).slice(0, 400);
+      // Sin la key, y sin URLs ni IPs: este texto se guarda y se muestra en el panel.
+      message = sanitizeProviderMessage(apiKey ? raw.split(apiKey).join('••••') : raw, 400);
     }
 
     const latencyMs = Date.now() - startedAt;

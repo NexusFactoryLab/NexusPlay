@@ -6,4 +6,9 @@ export interface SecretCipher {
   decrypt(payload: string): string;
   /** `false` si falta la clave maestra: el panel lo avisa en vez de fallar al guardar. */
   isConfigured(): boolean;
+  /**
+   * ¿Este payload está cifrado con un formato o una clave que no es la
+   * vigente? Sirve para re-cifrar tras rotar la clave maestra.
+   */
+  needsReencryption(payload: string): boolean;
 }

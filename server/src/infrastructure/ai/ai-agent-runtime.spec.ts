@@ -12,7 +12,7 @@ import { AgentAiContentAssistant } from './agent-ai-content-assistant.js';
 import { AiAgentRuntime } from './ai-agent-runtime.js';
 import { AiProviderChainResolver } from './ai-provider-chain-resolver.js';
 
-const cipher: SecretCipher = { encrypt: (p) => `enc(${p})`, decrypt: (p) => p.slice(4, -1), isConfigured: () => true };
+const cipher: SecretCipher = { encrypt: (p) => `enc(${p})`, decrypt: (p) => p.slice(4, -1), isConfigured: () => true, needsReencryption: () => false };
 
 function provider(id: string, name: string, priority: number, enabled = true): AiProviderConfig {
   return AiProviderConfig.create({

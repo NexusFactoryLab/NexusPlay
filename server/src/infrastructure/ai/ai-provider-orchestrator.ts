@@ -7,6 +7,7 @@ import type {
   GenerateGameDraftOutput,
 } from '../../domain/ports/ai-content-assistant.port.js';
 import type { AiProviderOperation } from '../../domain/entities/ai-provider-attempt.entity.js';
+import { sanitizeProviderMessage } from '../../application/services/ai-error-sanitizer.js';
 import type { AiProviderAttemptTracker } from '../../application/services/ai-provider-attempt-tracker.service.js';
 
 export interface AiProviderChainEntry {
@@ -99,7 +100,8 @@ export class AiProviderOrchestrator implements AiContentAssistant {
           agent: this.agent,
           succeeded: false,
           usedFallback,
-          errorMessage: reason,
+          // Va al historial del panel: sin URLs ni IPs del proveedor.
+          errorMessage: sanitizeProviderMessage(reason, 400),
           latencyMs: Date.now() - startedAt,
         });
         this.logger.warn(`Proveedor "${name}" falló en "${operation}": ${reason}`);

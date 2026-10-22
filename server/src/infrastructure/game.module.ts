@@ -55,6 +55,7 @@ import { TestAiAgentUseCase } from '../application/use-cases/test-ai-agent.use-c
 import { AiAgentsController } from './http/controllers/ai-agents.controller.js';
 import { ListAiProviderConfigsUseCase } from '../application/use-cases/list-ai-provider-configs.use-case.js';
 import { CreateAiProviderConfigUseCase } from '../application/use-cases/create-ai-provider-config.use-case.js';
+import { ReencryptAiProviderConfigsUseCase } from '../application/use-cases/reencrypt-ai-provider-configs.use-case.js';
 import { SetAiProviderEnabledUseCase } from '../application/use-cases/set-ai-provider-enabled.use-case.js';
 import { UpdateAiProviderConfigUseCase } from '../application/use-cases/update-ai-provider-config.use-case.js';
 import { DeleteAiProviderConfigUseCase } from '../application/use-cases/delete-ai-provider-config.use-case.js';
@@ -145,6 +146,7 @@ import { AiProviderAttemptsController } from './http/controllers/ai-provider-att
     CreateAiProviderConfigUseCase,
     UpdateAiProviderConfigUseCase,
     SetAiProviderEnabledUseCase,
+    ReencryptAiProviderConfigsUseCase,
     DeleteAiProviderConfigUseCase,
     ReorderAiProviderConfigsUseCase,
     TestAiProviderConfigUseCase,

@@ -7,7 +7,7 @@ import { InMemoryAiAgentRepo, InMemoryAiProviderRepo, makeAuditLogger } from './
 import { ListAiAgentsUseCase } from './list-ai-agents.use-case.js';
 import { MAX_AGENT_INSTRUCTIONS, UpdateAiAgentUseCase } from './update-ai-agent.use-case.js';
 
-const cipher: SecretCipher = { encrypt: (p) => p, decrypt: (p) => p, isConfigured: () => true };
+const cipher: SecretCipher = { encrypt: (p) => p, decrypt: (p) => p, isConfigured: () => true, needsReencryption: () => false };
 
 describe('instrucciones de fábrica como null', () => {
   let agents: InMemoryAiAgentRepo;

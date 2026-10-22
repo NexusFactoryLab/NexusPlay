@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Put, UseGu
 import { ListAiProviderConfigsUseCase } from '../../../application/use-cases/list-ai-provider-configs.use-case.js';
 import { CreateAiProviderConfigUseCase } from '../../../application/use-cases/create-ai-provider-config.use-case.js';
 import { UpdateAiProviderConfigUseCase } from '../../../application/use-cases/update-ai-provider-config.use-case.js';
+import { ReencryptAiProviderConfigsUseCase } from '../../../application/use-cases/reencrypt-ai-provider-configs.use-case.js';
 import { SetAiProviderEnabledUseCase } from '../../../application/use-cases/set-ai-provider-enabled.use-case.js';
 import { DeleteAiProviderConfigUseCase } from '../../../application/use-cases/delete-ai-provider-config.use-case.js';
 import { ReorderAiProviderConfigsUseCase } from '../../../application/use-cases/reorder-ai-provider-configs.use-case.js';
@@ -33,6 +34,7 @@ export class AiProviderConfigsController {
     private readonly createUseCase: CreateAiProviderConfigUseCase,
     private readonly updateUseCase: UpdateAiProviderConfigUseCase,
     private readonly setEnabledUseCase: SetAiProviderEnabledUseCase,
+    private readonly reencryptUseCase: ReencryptAiProviderConfigsUseCase,
     private readonly deleteUseCase: DeleteAiProviderConfigUseCase,
     private readonly reorderUseCase: ReorderAiProviderConfigsUseCase,
     private readonly testUseCase: TestAiProviderConfigUseCase,
@@ -53,6 +55,13 @@ export class AiProviderConfigsController {
   @HttpCode(200)
   listModels(@CurrentUserId() requestingUserId: string, @Body() dto: ListAiProviderModelsDto) {
     return this.listModelsUseCase.execute({ requestingUserId, ...dto });
+  }
+
+  /** Re-cifra todas las API keys con la clave maestra vigente (tras rotarla). Devuelve solo contadores. */
+  @Post('reencrypt')
+  @HttpCode(200)
+  reencrypt(@CurrentUserId() requestingUserId: string) {
+    return this.reencryptUseCase.execute({ requestingUserId });
   }
 
   // Antes de `:id` para que "order" no se interprete como un id.

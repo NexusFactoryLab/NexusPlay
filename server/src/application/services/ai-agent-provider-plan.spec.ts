@@ -34,6 +34,7 @@ const cipher: SecretCipher = {
     return payload;
   },
   isConfigured: () => true,
+  needsReencryption: () => false,
 };
 const isUsable = providerUsabilityFromCipher(cipher);
 

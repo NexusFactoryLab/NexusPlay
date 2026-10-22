@@ -18,6 +18,7 @@ const cipher: SecretCipher = {
   encrypt: (plain) => `enc(${plain})`,
   decrypt: (payload) => payload.slice(4, -1),
   isConfigured: () => true,
+  needsReencryption: () => false,
 };
 
 const SECRET = 'gsk_SUPERSECRETA_1234567890';

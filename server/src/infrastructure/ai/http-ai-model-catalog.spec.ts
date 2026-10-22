@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { InvalidAiProviderConfigError } from '../../application/errors/application.errors.js';
 import { HttpAiModelCatalog } from './http-ai-model-catalog.js';
+import { assertPublicHost, PrivateProviderHostError } from './assert-public-host.js';
+
+// La resolución de DNS real no corre en las pruebas; se simula lo que devolvería.
+vi.mock('./assert-public-host.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./assert-public-host.js')>()),
+  assertPublicHost: vi.fn(async () => {}),
+}));
 
 function response(body: unknown, status = 200): Response {
   return { ok: status >= 200 && status < 300, status, json: () => Promise.resolve(body) } as unknown as Response;
@@ -25,6 +32,34 @@ describe('HttpAiModelCatalog', () => {
     const [url, init] = vi.mocked(fetch).mock.calls[0];
     expect(url).toBe('https://api.test/v1/models');
     expect((init as RequestInit).headers).toMatchObject({ Authorization: 'Bearer secreta-123' });
+  });
+
+  it('rechaza una URL que resuelve a una red interna (DNS-rebinding) sin llamarla', async () => {
+    vi.mocked(assertPublicHost).mockRejectedValueOnce(new PrivateProviderHostError());
+
+    await expect(
+      catalog.list({ kind: 'openai-compatible', baseUrl: 'https://parece-publico.example.com/v1', apiKey: 'secreta-123' }),
+    ).rejects.toThrow(/dirección interna o privada/);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('rechaza hosts internos escritos en la URL antes de resolver nada', async () => {
+    for (const baseUrl of ['http://localhost:11434/v1', 'https://169.254.169.254/latest', 'https://srv.internal/v1', 'https://[::1]/v1']) {
+      await expect(catalog.list({ kind: 'openai-compatible', baseUrl, apiKey: 'secreta-123' })).rejects.toThrow(
+        InvalidAiProviderConfigError,
+      );
+    }
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('un fallo de red no filtra la IP ni el texto del error', async () => {
+    vi.mocked(fetch).mockRejectedValue(new Error('connect ECONNREFUSED 10.1.2.3:443'));
+    const error = await catalog
+      .list({ kind: 'openai-compatible', baseUrl: 'https://api.test/v1', apiKey: 'secreta-123' })
+      .catch((caught: Error) => caught);
+    expect(error).toBeInstanceOf(InvalidAiProviderConfigError);
+    expect((error as Error).message).toMatch(/no se pudo conectar/);
+    expect((error as Error).message).not.toMatch(/10\.1\.2\.3/);
   });
 
   it('acepta la URL con /chat/completions al final', async () => {

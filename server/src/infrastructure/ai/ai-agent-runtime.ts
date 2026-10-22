@@ -11,6 +11,7 @@ import {
 import type { AiContentAssistant } from '../../domain/ports/ai-content-assistant.port.js';
 import type { AiAgentProbe, AiAgentProbeResult } from '../../domain/ports/ai-agent-probe.port.js';
 import { AiProviderAttemptTracker } from '../../application/services/ai-provider-attempt-tracker.service.js';
+import { sanitizeProviderMessage } from '../../application/services/ai-error-sanitizer.js';
 import { planAgentProviders } from '../../application/services/ai-agent-provider-plan.js';
 import { AiProviderChainResolver } from './ai-provider-chain-resolver.js';
 import { AiProviderOrchestrator, type AiProviderChainEntry } from './ai-provider-orchestrator.js';
@@ -97,7 +98,7 @@ export class AiAgentRuntime implements AiAgentProbe {
       return { ok: true, providerName, message: 'El agente respondió correctamente.', latencyMs: Date.now() - startedAt };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      return { ok: false, providerName, message: message.slice(0, 400), latencyMs: Date.now() - startedAt };
+      return { ok: false, providerName, message: sanitizeProviderMessage(message, 400), latencyMs: Date.now() - startedAt };
     }
   }
 
