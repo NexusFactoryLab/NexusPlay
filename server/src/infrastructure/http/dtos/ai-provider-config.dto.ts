@@ -1,4 +1,4 @@
-import { ArrayNotEmpty, IsArray, IsBoolean, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { ArrayNotEmpty, IsArray, IsBoolean, IsISO8601, IsInt, IsOptional, IsString, Max, MaxLength, Min, ValidateIf } from 'class-validator';
 
 /** Campos comunes de alta y edición. La validación semántica (URL, tipo) vive en el caso de uso. */
 class AiProviderConfigBaseDto {
@@ -33,6 +33,11 @@ class AiProviderConfigBaseDto {
   @IsOptional()
   @IsBoolean()
   enabled?: boolean;
+
+  /** Versión (`updatedAt`) que el cliente vio; si ya cambió, el servidor responde 409. */
+  @IsOptional()
+  @IsISO8601()
+  expectedUpdatedAt?: string;
 }
 
 export class CreateAiProviderConfigDto extends AiProviderConfigBaseDto {
@@ -71,10 +76,21 @@ export class ListAiProviderModelsDto {
   configId?: string;
 }
 
+export class SetAiProviderEnabledDto {
+  @IsBoolean()
+  enabled!: boolean;
+
+  @IsOptional()
+  @IsISO8601()
+  expectedUpdatedAt?: string;
+}
+
 export class UpdateAiAgentDto {
+  /** `null` = usar el texto de fábrica; `''` = sin instrucciones. */
+  @ValidateIf((dto: UpdateAiAgentDto) => dto.instructions !== null)
   @IsString()
   @MaxLength(4_000)
-  instructions!: string;
+  instructions!: string | null;
 
   @IsOptional()
   @IsString()
@@ -89,6 +105,11 @@ export class UpdateAiAgentDto {
   @IsOptional()
   @IsBoolean()
   fallbackToDefault?: boolean;
+
+  /** Versión (`updatedAt`) que el cliente vio; `null` = el agente aún no estaba personalizado. */
+  @IsOptional()
+  @IsISO8601()
+  expectedUpdatedAt?: string | null;
 }
 
 export class ReorderAiProviderConfigsDto {

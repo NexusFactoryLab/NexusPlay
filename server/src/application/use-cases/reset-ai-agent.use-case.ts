@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { AiAgentConfig, isAiAgentKey } from '../../domain/entities/ai-agent.entity.js';
+import { AI_AGENT_CATALOG, AiAgentConfig, isAiAgentKey } from '../../domain/entities/ai-agent.entity.js';
 import {
   AI_AGENT_CONFIG_REPOSITORY,
   type AiAgentConfigRepository,
@@ -13,6 +13,9 @@ import { InvalidAiProviderConfigError } from '../errors/application.errors.js';
 import { toAiAgentDto, type AiAgentDto } from '../dtos/ai-agent-response.dto.js';
 import type { UseCase } from '../ports/use-case.port.js';
 import { RequesterAdminResolver } from '../services/requester-admin-resolver.service.js';
+import { SECRET_CIPHER, type SecretCipher } from '../../domain/ports/secret-cipher.port.js';
+import { AiAuditLogger } from '../services/ai-audit-logger.service.js';
+import { providerUsabilityFromCipher } from '../services/ai-agent-provider-plan.js';
 
 export interface ResetAiAgentInput {
   requestingUserId: string;
@@ -26,6 +29,8 @@ export class ResetAiAgentUseCase implements UseCase<ResetAiAgentInput, AiAgentDt
     @Inject(AI_AGENT_CONFIG_REPOSITORY) private readonly agents: AiAgentConfigRepository,
     @Inject(AI_PROVIDER_CONFIG_REPOSITORY) private readonly providers: AiProviderConfigRepository,
     private readonly requesterAdminResolver: RequesterAdminResolver,
+    @Inject(SECRET_CIPHER) private readonly cipher: SecretCipher,
+    private readonly audit: AiAuditLogger,
   ) {}
 
   async execute({ requestingUserId, key }: ResetAiAgentInput): Promise<AiAgentDto> {
@@ -35,6 +40,17 @@ export class ResetAiAgentUseCase implements UseCase<ResetAiAgentInput, AiAgentDt
     if (!isAiAgentKey(key)) throw new InvalidAiProviderConfigError(`el agente "${key}" no existe.`);
 
     await this.agents.reset(key);
-    return toAiAgentDto(AiAgentConfig.defaults(key), await this.providers.findAll());
+    await this.audit.record({
+      actorUserId: requestingUserId,
+      action: 'agent.reset',
+      targetType: 'agent',
+      targetId: key,
+      targetLabel: AI_AGENT_CATALOG[key].name,
+    });
+    return toAiAgentDto(
+      AiAgentConfig.defaults(key),
+      await this.providers.findAll(),
+      providerUsabilityFromCipher(this.cipher),
+    );
   }
 }

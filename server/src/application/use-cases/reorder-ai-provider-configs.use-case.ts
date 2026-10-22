@@ -4,15 +4,15 @@ import {
   type AiProviderConfigRepository,
 } from '../../domain/ports/ai-provider-config.repository.port.js';
 import { ForbiddenActionError } from '../../domain/errors/authorization.errors.js';
-import { InvalidAiProviderConfigError } from '../errors/application.errors.js';
 import { toAiProviderConfigDto, type AiProviderConfigDto } from '../dtos/ai-provider-config-response.dto.js';
 import type { UseCase } from '../ports/use-case.port.js';
 import { RequesterAdminResolver } from '../services/requester-admin-resolver.service.js';
+import { AiAuditLogger } from '../services/ai-audit-logger.service.js';
 import { AiProviderConfigChangeNotifier } from '../services/ai-provider-config-change-notifier.service.js';
 
 export interface ReorderAiProviderConfigsInput {
   requestingUserId: string;
-  /** Todos los ids, en el orden deseado de la cadena de fallback (el primero es el principal). */
+  /** Los ids, en el orden deseado de la cadena de fallback (el primero es el principal). */
   orderedIds: string[];
 }
 
@@ -24,6 +24,7 @@ export class ReorderAiProviderConfigsUseCase
     @Inject(AI_PROVIDER_CONFIG_REPOSITORY) private readonly repository: AiProviderConfigRepository,
     private readonly requesterAdminResolver: RequesterAdminResolver,
     private readonly notifier: AiProviderConfigChangeNotifier,
+    private readonly audit: AiAuditLogger,
   ) {}
 
   async execute({ requestingUserId, orderedIds }: ReorderAiProviderConfigsInput): Promise<AiProviderConfigDto[]> {
@@ -33,19 +34,26 @@ export class ReorderAiProviderConfigsUseCase
 
     const configs = await this.repository.findAll();
     const knownIds = new Set(configs.map((config) => config.id));
-    if (
-      orderedIds.length !== configs.length ||
-      new Set(orderedIds).size !== orderedIds.length ||
-      !orderedIds.every((id) => knownIds.has(id))
-    ) {
-      throw new InvalidAiProviderConfigError('el orden debe incluir cada proveedor exactamente una vez.');
-    }
 
-    const byId = new Map(configs.map((config) => [config.id, config]));
-    const reordered = orderedIds.map((id, index) => (byId.get(id) as (typeof configs)[number]).with({ priority: index }));
-    await Promise.all(reordered.map((config) => this.repository.save(config)));
+    // Tolerante a ediciones concurrentes: otro admin pudo crear o borrar un proveedor mientras
+    // este arrastraba. Los ids desconocidos se ignoran y los que el cliente no incluyó (los
+    // recién creados) quedan al final, en el orden que ya tenían.
+    const requested = [...new Set(orderedIds.filter((id) => knownIds.has(id)))];
+    const requestedSet = new Set(requested);
+    const finalOrder = [...requested, ...configs.map((config) => config.id).filter((id) => !requestedSet.has(id))];
 
+    await this.repository.savePriorities(finalOrder);
+
+    const reordered = await this.repository.findAll();
     this.notifier.notify();
+    await this.audit.record({
+      actorUserId: requestingUserId,
+      action: 'provider.reorder',
+      targetType: 'provider',
+      targetId: 'all',
+      targetLabel: 'Orden de proveedores',
+      details: { order: reordered.map((config) => config.name) },
+    });
     return reordered.map(toAiProviderConfigDto);
   }
 }

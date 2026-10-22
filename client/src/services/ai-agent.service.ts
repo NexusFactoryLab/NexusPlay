@@ -1,4 +1,5 @@
 import { request } from '../utils/http'
+import { invalidatingAiStatus } from './ai-status.cache'
 
 export type AiAgentKey = 'GAME_PLAYER' | 'GAME_CONFIGURATOR'
 
@@ -13,6 +14,8 @@ export type AiAgent = {
   /** Instrucciones vigentes del agente (qué hace y en qué se concentra). */
   instructions: string
   defaultInstructions: string
+  /** `true` = sin texto guardado: usa (y seguirá) el texto de fábrica del catálogo. */
+  usingDefaultInstructions: boolean
   /** `null` = usa la cadena general de proveedores. */
   providerId: string | null
   modelOverride: string | null
@@ -30,10 +33,13 @@ export type AiAgent = {
 }
 
 export type AiAgentInput = {
-  instructions: string
+  /** `null` = usar el texto de fábrica vigente; `''` = sin instrucciones. */
+  instructions: string | null
   providerId: string | null
   modelOverride: string | null
   fallbackToDefault: boolean
+  /** Versión (`updatedAt`) del agente que se vio; `null` = aún sin personalizar. */
+  expectedUpdatedAt?: string | null
 }
 
 export type AiAgentTestResult = {
@@ -50,12 +56,12 @@ export function listAiAgents(token: string): Promise<{ items: AiAgent[] }> {
 }
 
 export function updateAiAgent(token: string, key: AiAgentKey, input: AiAgentInput): Promise<AiAgent> {
-  return request<AiAgent>(`${BASE}/${key}`, { method: 'PATCH', token, body: input })
+  return request<AiAgent>(`${BASE}/${key}`, { method: 'PATCH', token, body: input }).then(invalidatingAiStatus)
 }
 
 /** Restaura el agente a su configuración de fábrica. */
 export function resetAiAgent(token: string, key: AiAgentKey): Promise<AiAgent> {
-  return request<AiAgent>(`${BASE}/${key}`, { method: 'DELETE', token })
+  return request<AiAgent>(`${BASE}/${key}`, { method: 'DELETE', token }).then(invalidatingAiStatus)
 }
 
 export function testAiAgent(token: string, key: AiAgentKey): Promise<AiAgentTestResult> {

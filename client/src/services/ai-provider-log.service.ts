@@ -4,6 +4,8 @@ export type AiProviderAttempt = {
   id: string
   provider: string
   operation: string
+  /** Clave del agente que hizo la llamada; `null` en registros anteriores. */
+  agent: string | null
   succeeded: boolean
   usedFallback: boolean
   errorMessage: string | null

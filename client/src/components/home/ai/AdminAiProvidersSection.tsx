@@ -20,7 +20,7 @@ import {
   listAiProviderConfigs,
   reorderAiProviderConfigs,
   testAiProviderConfig,
-  updateAiProviderConfig,
+  setAiProviderEnabled,
 } from '../../../services/ai-provider-config.service'
 import type { AiProviderConfig, AiProviderConfigList } from '../../../services/ai-provider-config.service'
 import { Modal } from '../games/Modal'
@@ -96,18 +96,15 @@ export function AdminAiProvidersSection() {
     setBusyId(provider.id)
     setError(null)
     try {
-      const updated = await updateAiProviderConfig(token, provider.id, {
-        name: provider.name,
-        kind: provider.kind,
-        baseUrl: provider.baseUrl,
-        textModel: provider.textModel,
-        visionModel: provider.visionModel,
-        maxRpm: provider.maxRpm,
-        enabled: !provider.enabled,
-      })
-      replaceItem(updated)
+      replaceItem(await setAiProviderEnabled(token, provider, !provider.enabled))
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'No se pudo cambiar el estado del proveedor.')
+      if (err instanceof ApiError && err.status === 409) {
+        // Otro admin lo cambió: se recarga la lista y se avisa (reload limpia el error, por eso va antes).
+        reload()
+        setError(err.message)
+      } else {
+        setError(err instanceof ApiError ? err.message : 'No se pudo cambiar el estado del proveedor.')
+      }
     } finally {
       setBusyId(null)
     }
@@ -458,6 +455,11 @@ export function AdminAiProvidersSection() {
           provider={form.mode === 'edit' ? form.provider : undefined}
           onClose={() => setForm(null)}
           onSaved={handleSaved}
+          onConflict={(message) => {
+            setForm(null)
+            reload()
+            setError(message)
+          }}
         />
       )}
 

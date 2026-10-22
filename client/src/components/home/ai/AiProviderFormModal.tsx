@@ -25,12 +25,15 @@ import {
 import type { AiProviderConfig, AiProviderKind } from '../../../services/ai-provider-config.service'
 import { AI_PROVIDER_PRESETS, KIND_LABEL } from './aiProviderPresets'
 import type { AiProviderPreset } from './aiProviderPresets'
+import { checkStep, connectionReady, isNextDisabled, modelsAreStale } from './providerWizardRules'
 
 type Props = {
   /** Si viene, se edita ese proveedor; si no, se crea uno nuevo. */
   provider?: AiProviderConfig
   onClose: () => void
   onSaved: (provider: AiProviderConfig) => void
+  /** Otro administrador cambió el proveedor mientras se editaba (409): quien abre recarga y avisa. */
+  onConflict?: (message: string) => void
 }
 
 const STEPS = ['Conexión', 'Modelos', 'Ajustes'] as const
@@ -38,7 +41,6 @@ const STEPS = ['Conexión', 'Modelos', 'Ajustes'] as const
 const inputClass =
   'w-full rounded-lg border border-border bg-bg px-[13px] py-[10px] text-[14.5px] text-text-h outline-none transition-[border-color,box-shadow] duration-200 placeholder:text-text/60 focus:border-accent focus:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_18%,transparent)] disabled:opacity-60'
 
-const URL_PATTERN = /^https?:\/\/(localhost|[^\s/]+\.[^\s/]+)/i
 
 function Field({
   label,
@@ -75,7 +77,7 @@ function Field({
  * ofrece primero el recomendado. La API key solo viaja del formulario al
  * servidor, nunca al revés.
  */
-export function AiProviderFormModal({ provider, onClose, onSaved }: Props) {
+export function AiProviderFormModal({ provider, onClose, onSaved, onConflict }: Props) {
   const { token } = useAuth()
   const uid = useId()
   const isEdit = Boolean(provider)
@@ -105,8 +107,26 @@ export function AiProviderFormModal({ provider, onClose, onSaved }: Props) {
   const requestRef = useRef(0)
 
   const typedKey = apiKey.trim()
-  const connectionReady =
-    (kind === 'gemini' || URL_PATTERN.test(baseUrl.trim())) && (typedKey.length >= 8 || isEdit)
+  const isConnectionReady = connectionReady({ kind, baseUrl, typedKey, isEdit })
+
+  /**
+   * Cambia el tipo o la URL base. Los modelos (la lista consultada y los ya
+   * elegidos) eran de la conexión anterior: si la conexión cambió de verdad, se
+   * limpian para no guardar un modelo que el nuevo proveedor no ofrece.
+   */
+  function changeConnection(next: { kind?: AiProviderKind; baseUrl?: string }) {
+    const target = { kind: next.kind ?? kind, baseUrl: next.baseUrl ?? baseUrl }
+    if (modelsAreStale({ kind, baseUrl }, target)) {
+      requestRef.current += 1 // una consulta de modelos en vuelo ya no corresponde
+      setModels([])
+      setModelsError(null)
+      setModelsLoading(false)
+      setTextModel('')
+      setVisionModel('')
+    }
+    setKind(target.kind)
+    setBaseUrl(target.baseUrl)
+  }
 
   function applyPreset(next: AiProviderPreset) {
     setPresetId(next.id)
@@ -151,19 +171,17 @@ export function AiProviderFormModal({ provider, onClose, onSaved }: Props) {
 
   function goNext() {
     setError(null)
+    const check = checkStep({ step, connectionReady: isConnectionReady, textModel })
+    if (!check.ok) {
+      if (check.error) setError(check.error)
+      return
+    }
     if (step === 0) {
-      if (!connectionReady) return
       setStep(1)
       void loadModels()
       return
     }
-    if (step === 1) {
-      if (!textModel.trim()) {
-        setError('Elige o escribe el modelo de texto.')
-        return
-      }
-      setStep(2)
-    }
+    if (step === 1) setStep(2)
   }
 
   function goBack() {
@@ -201,12 +219,17 @@ export function AiProviderFormModal({ provider, onClose, onSaved }: Props) {
         maxRpm: rpm,
         enabled,
         ...(typedKey ? { apiKey: typedKey } : {}),
+        ...(provider ? { expectedUpdatedAt: provider.updatedAt } : {}),
       }
       const saved = provider
         ? await updateAiProviderConfig(token, provider.id, input)
         : await createAiProviderConfig(token, input)
       onSaved(saved)
     } catch (err) {
+      if (err instanceof ApiError && err.status === 409 && onConflict) {
+        onConflict(err.message)
+        return
+      }
       setError(err instanceof ApiError ? err.message : 'No se pudo guardar el proveedor de IA.')
     } finally {
       setSubmitting(false)
@@ -314,7 +337,7 @@ export function AiProviderFormModal({ provider, onClose, onSaved }: Props) {
                     className={inputClass}
                     value={kind}
                     disabled={isEdit}
-                    onChange={(event) => setKind(event.target.value as AiProviderKind)}
+                    onChange={(event) => changeConnection({ kind: event.target.value as AiProviderKind })}
                   >
                     {(Object.keys(KIND_LABEL) as AiProviderKind[]).map((value) => (
                       <option key={value} value={value}>
@@ -338,7 +361,7 @@ export function AiProviderFormModal({ provider, onClose, onSaved }: Props) {
                     placeholder="https://api.proveedor.com/v1"
                     inputMode="url"
                     autoFocus={!baseUrl}
-                    onChange={(event) => setBaseUrl(event.target.value)}
+                    onChange={(event) => changeConnection({ baseUrl: event.target.value })}
                   />
                 </Field>
               )}
@@ -534,7 +557,7 @@ export function AiProviderFormModal({ provider, onClose, onSaved }: Props) {
             type="submit"
             className="flex items-center gap-2 rounded-lg px-5 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)] transition-[transform,opacity] hover:not-disabled:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
             style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
-            disabled={submitting || (step === 0 && !connectionReady) || (step === 1 && modelsLoading)}
+            disabled={isNextDisabled({ step, submitting, connectionReady: isConnectionReady, modelsLoading })}
           >
             {submitting && <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2.4} />}
             {submitting ? 'Guardando…' : isLast ? (isEdit ? 'Guardar cambios' : 'Agregar proveedor') : 'Siguiente'}

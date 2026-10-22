@@ -13,6 +13,9 @@ import { PrismaAiProviderConfigRepository } from './persistence/prisma/ai-provid
 import { PrismaAiAgentConfigRepository } from './persistence/prisma/ai-agent-config.repository.js';
 import { AesGcmSecretCipher } from './security/aes-gcm-secret-cipher.adapter.js';
 import { DefaultAiAssistantFactory } from './ai/ai-assistant.factory.js';
+import { RATE_LIMIT_STORE, type RateLimitStore } from '../domain/ports/rate-limit-store.port.js';
+import { InMemoryRateLimitStore } from './ai/in-memory-rate-limit-store.js';
+import { PrismaRateLimitStore } from './persistence/prisma/prisma-rate-limit-store.js';
 import { AiProviderChainResolver } from './ai/ai-provider-chain-resolver.js';
 import { AiAgentRuntime } from './ai/ai-agent-runtime.js';
 import { AgentAiContentAssistant } from './ai/agent-ai-content-assistant.js';
@@ -32,6 +35,15 @@ import { AiProviderConfigChangeNotifier } from '../application/services/ai-provi
     { provide: AI_PROVIDER_CONFIG_REPOSITORY, useClass: PrismaAiProviderConfigRepository },
     { provide: AI_AGENT_CONFIG_REPOSITORY, useClass: PrismaAiAgentConfigRepository },
     { provide: SECRET_CIPHER, useClass: AesGcmSecretCipher },
+    {
+      // `AI_RATE_LIMIT_STORE=postgres` comparte el límite por minuto entre instancias; por defecto, en memoria.
+      provide: RATE_LIMIT_STORE,
+      useFactory: (prisma: PrismaService): RateLimitStore =>
+        process.env.AI_RATE_LIMIT_STORE?.trim().toLowerCase() === 'postgres'
+          ? new PrismaRateLimitStore(prisma)
+          : new InMemoryRateLimitStore(),
+      inject: [PrismaService],
+    },
     { provide: AI_ASSISTANT_FACTORY, useClass: DefaultAiAssistantFactory },
     AiProviderAttemptTracker,
     AiProviderConfigChangeNotifier,

@@ -4,6 +4,8 @@ export interface AiProviderAttemptDto {
   id: string;
   provider: string;
   operation: string;
+  /** Clave del agente (`GAME_PLAYER`…); `null` en registros viejos. */
+  agent: string | null;
   succeeded: boolean;
   usedFallback: boolean;
   errorMessage: string | null;
@@ -16,6 +18,7 @@ export function toAiProviderAttemptDto(attempt: AiProviderAttempt): AiProviderAt
     id: attempt.id,
     provider: attempt.provider,
     operation: attempt.operation,
+    agent: attempt.agent,
     succeeded: attempt.succeeded,
     usedFallback: attempt.usedFallback,
     errorMessage: attempt.errorMessage,

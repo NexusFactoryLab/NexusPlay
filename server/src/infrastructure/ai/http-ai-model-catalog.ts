@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { AiModelCatalog, ListAiModelsInput } from '../../domain/ports/ai-model-catalog.port.js';
 import { InvalidAiProviderConfigError } from '../../application/errors/application.errors.js';
 import { normalizeBaseUrl } from '../../application/services/ai-provider-config-validation.js';
+import { assertPublicHost, PrivateProviderHostError } from './assert-public-host.js';
 
 const GEMINI_MODELS_URL = 'https://generativelanguage.googleapis.com/v1beta/models?pageSize=200';
 const TIMEOUT_MS = 15_000;
@@ -21,10 +22,23 @@ export class HttpAiModelCatalog implements AiModelCatalog {
             headers: { Authorization: `Bearer ${apiKey}` },
           };
 
+    if (kind !== 'gemini') {
+      try {
+        // Anti DNS-rebinding: el nombre pudo ser público al guardarlo y apuntar a la red interna ahora.
+        await assertPublicHost(request.url);
+      } catch (error) {
+        if (error instanceof PrivateProviderHostError) {
+          throw new InvalidAiProviderConfigError('la URL base apunta a una dirección interna o privada.');
+        }
+        throw error;
+      }
+    }
+
     let response: Response;
     try {
       response = await fetch(request.url, { headers: request.headers, signal: AbortSignal.timeout(TIMEOUT_MS) });
     } catch {
+      // Sin el texto del error de red: puede traer la IP/puerto consultados.
       throw new InvalidAiProviderConfigError('no se pudo conectar con el proveedor; revisa la URL base.');
     }
 

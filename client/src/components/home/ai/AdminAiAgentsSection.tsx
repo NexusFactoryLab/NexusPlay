@@ -58,9 +58,11 @@ type CardProps = {
   providers: AiProviderConfig[]
   index: number
   onChanged: (agent: AiAgent) => void
+  /** Otro administrador cambió el agente (409): el padre recarga la lista. */
+  onConflict: (message: string) => void
 }
 
-function AgentCard({ agent, providers, index, onChanged }: CardProps) {
+function AgentCard({ agent, providers, index, onChanged, onConflict }: CardProps) {
   const { token } = useAuth()
   const uid = useId()
 
@@ -91,6 +93,8 @@ function AgentCard({ agent, providers, index, onChanged }: CardProps) {
     setFallback(agent.fallbackToDefault)
     setInstructions(agent.instructions)
   }
+
+  const usesFactoryText = instructions.trim() === agent.defaultInstructions.trim()
 
   const dirty =
     providerId !== (agent.providerId ?? '') ||
@@ -136,15 +140,21 @@ function AgentCard({ agent, providers, index, onChanged }: CardProps) {
     setSaved(false)
     try {
       const updated = await updateAiAgent(token, agent.key, {
-        instructions: instructions.trim(),
+        // Igual al texto de fábrica → null: el agente sigue el texto vigente del catálogo, no una copia.
+        instructions: usesFactoryText ? null : instructions.trim(),
         providerId: providerId || null,
         modelOverride: providerId ? modelOverride.trim() || null : null,
         fallbackToDefault: fallback,
+        expectedUpdatedAt: agent.updatedAt,
       })
       onChanged(updated)
       setTestResult(null)
       setSaved(true)
     } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        onConflict(err.message)
+        return
+      }
       setError(err instanceof ApiError ? err.message : 'No se pudo guardar el agente.')
     } finally {
       setSaving(false)
@@ -326,17 +336,27 @@ function AgentCard({ agent, providers, index, onChanged }: CardProps) {
           />
         </Field>
         <div className="mt-1.5 flex items-center justify-between text-[12px] text-text">
-          {agent.defaultInstructions !== instructions ? (
-            <button
-              type="button"
-              className="font-medium text-accent hover:underline"
-              onClick={() => setInstructions(agent.defaultInstructions)}
+          <span className="flex items-center gap-2">
+            <span
+              className="rounded-full border border-border px-2 py-0.5 text-[11px] font-medium text-text-h"
+              title={
+                usesFactoryText
+                  ? 'Al guardar, el agente seguirá el texto de fábrica vigente (si se mejora, le llega solo).'
+                  : 'Texto propio: no cambia aunque se mejore el de fábrica.'
+              }
             >
-              {agent.defaultInstructions ? 'Usar el texto de fábrica' : 'Vaciar'}
-            </button>
-          ) : (
-            <span />
-          )}
+              {usesFactoryText ? 'Texto de fábrica' : 'Personalizado'}
+            </span>
+            {!usesFactoryText && (
+              <button
+                type="button"
+                className="font-medium text-accent hover:underline"
+                onClick={() => setInstructions(agent.defaultInstructions)}
+              >
+                {agent.defaultInstructions ? 'Usar el texto de fábrica' : 'Vaciar'}
+              </button>
+            )}
+          </span>
           <span>
             {instructions.length}/{MAX_INSTRUCTIONS}
           </span>
@@ -468,6 +488,11 @@ export function AdminAiAgentsSection() {
     load()
   }, [load])
 
+  function handleConflict(message: string) {
+    load()
+    setError(message)
+  }
+
   function handleChanged(updated: AiAgent) {
     setAgents((current) => current.map((agent) => (agent.key === updated.key ? updated : agent)))
   }
@@ -497,7 +522,7 @@ export function AdminAiAgentsSection() {
       ) : (
         <ol className="grid gap-5">
           {agents.map((agent, index) => (
-            <AgentCard key={agent.key} agent={agent} providers={providers} index={index} onChanged={handleChanged} />
+            <AgentCard key={agent.key} agent={agent} providers={providers} index={index} onChanged={handleChanged} onConflict={handleConflict} />
           ))}
         </ol>
       )}

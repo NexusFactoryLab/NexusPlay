@@ -7,6 +7,7 @@ import type {
   GenerateGameDraftOutput,
 } from '../../domain/ports/ai-content-assistant.port.js';
 import type { AiProviderOperation } from '../../domain/entities/ai-provider-attempt.entity.js';
+import { sanitizeProviderMessage } from '../../application/services/ai-error-sanitizer.js';
 import type { AiProviderAttemptTracker } from '../../application/services/ai-provider-attempt-tracker.service.js';
 
 export interface AiProviderChainEntry {
@@ -41,6 +42,8 @@ export class AiProviderOrchestrator implements AiContentAssistant {
   constructor(
     private readonly chain: AiProviderChainEntry[],
     private readonly tracker: AiProviderAttemptTracker,
+    /** Agente que hace la llamada (para el historial); `null` si no se sabe. */
+    private readonly agent: string | null = null,
   ) {
     if (chain.length === 0) {
       throw new Error('AiProviderOrchestrator necesita al menos un proveedor en la cadena.');
@@ -79,6 +82,7 @@ export class AiProviderOrchestrator implements AiContentAssistant {
         await this.tracker.record({
           provider: name,
           operation,
+          agent: this.agent,
           succeeded: true,
           usedFallback,
           latencyMs: Date.now() - startedAt,
@@ -93,9 +97,11 @@ export class AiProviderOrchestrator implements AiContentAssistant {
         await this.tracker.record({
           provider: name,
           operation,
+          agent: this.agent,
           succeeded: false,
           usedFallback,
-          errorMessage: reason,
+          // Va al historial del panel: sin URLs ni IPs del proveedor.
+          errorMessage: sanitizeProviderMessage(reason, 400),
           latencyMs: Date.now() - startedAt,
         });
         this.logger.warn(`Proveedor "${name}" falló en "${operation}": ${reason}`);

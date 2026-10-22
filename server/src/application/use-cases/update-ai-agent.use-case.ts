@@ -1,5 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { AiAgentConfig, isAiAgentKey } from '../../domain/entities/ai-agent.entity.js';
+import {
+  AI_AGENT_CATALOG,
+  AiAgentConfig,
+  isAiAgentKey,
+  normalizeAgentInstructions,
+  type AiAgentKey,
+} from '../../domain/entities/ai-agent.entity.js';
 import {
   AI_AGENT_CONFIG_REPOSITORY,
   type AiAgentConfigRepository,
@@ -9,10 +15,19 @@ import {
   type AiProviderConfigRepository,
 } from '../../domain/ports/ai-provider-config.repository.port.js';
 import { ForbiddenActionError } from '../../domain/errors/authorization.errors.js';
-import { AiProviderConfigNotFoundError, InvalidAiProviderConfigError } from '../errors/application.errors.js';
+import {
+  AiConfigConflictError,
+  AiProviderConfigNotFoundError,
+  InvalidAiProviderConfigError,
+} from '../errors/application.errors.js';
+import { isStaleVersion, parseExpectedVersion } from '../services/ai-optimistic-lock.js';
 import { toAiAgentDto, type AiAgentDto } from '../dtos/ai-agent-response.dto.js';
 import type { UseCase } from '../ports/use-case.port.js';
 import { RequesterAdminResolver } from '../services/requester-admin-resolver.service.js';
+import { SECRET_CIPHER, type SecretCipher } from '../../domain/ports/secret-cipher.port.js';
+import { AiAuditLogger } from '../services/ai-audit-logger.service.js';
+import { diffAgent } from '../services/ai-audit-details.js';
+import { providerUsabilityFromCipher } from '../services/ai-agent-provider-plan.js';
 
 export const MAX_AGENT_INSTRUCTIONS = 4_000;
 
@@ -20,12 +35,21 @@ export interface UpdateAiAgentInput {
   requestingUserId: string;
   key: string;
   /** Enfoque del agente: qué hace y en qué se concentra. */
-  instructions: string;
+  /**
+   * `null` o igual al texto de fábrica → se guarda `null` (sigue el texto de
+   * fábrica vigente). `''` = "sin instrucciones", válido.
+   */
+  instructions: string | null;
   /** `null`/omitido = usa la cadena general de proveedores. */
   providerId?: string | null;
   /** Solo con `providerId`. `null`/vacío = el modelo configurado en el proveedor. */
   modelOverride?: string | null;
   fallbackToDefault?: boolean;
+  /**
+   * Versión (`updatedAt`, ISO) que el admin vio; `null` = el agente aún no
+   * estaba personalizado. Si ya cambió, se responde 409.
+   */
+  expectedUpdatedAt?: string | null;
 }
 
 /** Cambia el enfoque y el proveedor/modelo de un agente. Un agente sin proveedor propio usa la cadena general. */
@@ -35,6 +59,8 @@ export class UpdateAiAgentUseCase implements UseCase<UpdateAiAgentInput, AiAgent
     @Inject(AI_AGENT_CONFIG_REPOSITORY) private readonly agents: AiAgentConfigRepository,
     @Inject(AI_PROVIDER_CONFIG_REPOSITORY) private readonly providers: AiProviderConfigRepository,
     private readonly requesterAdminResolver: RequesterAdminResolver,
+    @Inject(SECRET_CIPHER) private readonly cipher: SecretCipher,
+    private readonly audit: AiAuditLogger,
   ) {}
 
   async execute(input: UpdateAiAgentInput): Promise<AiAgentDto> {
@@ -45,8 +71,8 @@ export class UpdateAiAgentUseCase implements UseCase<UpdateAiAgentInput, AiAgent
       throw new InvalidAiProviderConfigError(`el agente "${input.key}" no existe.`);
     }
 
-    const instructions = (input.instructions ?? '').trim();
-    if (instructions.length > MAX_AGENT_INSTRUCTIONS) {
+    const instructions = normalizeAgentInstructions(input.key, input.instructions ?? null);
+    if ((instructions?.length ?? 0) > MAX_AGENT_INSTRUCTIONS) {
       throw new InvalidAiProviderConfigError(
         `las instrucciones no pueden superar los ${MAX_AGENT_INSTRUCTIONS} caracteres.`,
       );
@@ -61,6 +87,9 @@ export class UpdateAiAgentUseCase implements UseCase<UpdateAiAgentInput, AiAgent
     }
 
     const current = (await this.agents.findByKey(input.key)) ?? AiAgentConfig.defaults(input.key);
+    const conflict = () => new AiConfigConflictError(`el agente "${AI_AGENT_CATALOG[input.key as AiAgentKey].name}"`);
+    if (isStaleVersion(current.updatedAt, parseExpectedVersion(input.expectedUpdatedAt))) throw conflict();
+
     const updated = current.with({
       instructions,
       providerId,
@@ -68,7 +97,19 @@ export class UpdateAiAgentUseCase implements UseCase<UpdateAiAgentInput, AiAgent
       fallbackToDefault: input.fallbackToDefault ?? current.fallbackToDefault,
     });
 
-    await this.agents.save(updated);
-    return toAiAgentDto(updated, await this.providers.findAll());
+    // Condicional en la base de datos: si otro admin guardó entre la lectura y este punto, no se pisa.
+    if (!(await this.agents.saveIfUnchanged(updated, current.updatedAt))) throw conflict();
+
+    const { changedFields } = diffAgent(current, updated);
+    await this.audit.record({
+      actorUserId: input.requestingUserId,
+      action: 'agent.update',
+      targetType: 'agent',
+      targetId: updated.key,
+      targetLabel: AI_AGENT_CATALOG[updated.key].name,
+      // Del texto de las instrucciones solo se anota si quedó el de fábrica; el contenido no se copia.
+      details: { changedFields, usingDefaultInstructions: updated.usingDefaultInstructions },
+    });
+    return toAiAgentDto(updated, await this.providers.findAll(), providerUsabilityFromCipher(this.cipher));
   }
 }

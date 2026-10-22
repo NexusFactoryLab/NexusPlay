@@ -1,10 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
+import { RATE_LIMIT_STORE, type RateLimitStore } from '../../domain/ports/rate-limit-store.port.js';
 import type { AiProviderConfig } from '../../domain/entities/ai-provider-config.entity.js';
 import type { AiContentAssistant } from '../../domain/ports/ai-content-assistant.port.js';
 import type { AiAssistantFactory } from '../../domain/ports/ai-assistant.factory.port.js';
 import { toChatCompletionsUrl } from '../../application/services/ai-provider-config-validation.js';
 import { GeminiContentAssistant } from './gemini-content-assistant.adapter.js';
 import { GroqContentAssistant } from './groq-content-assistant.adapter.js';
+import { assertPublicHost } from './assert-public-host.js';
 import { sharedRateLimiter } from './rate-limiter.js';
 
 /** Mismos valores por defecto que los adaptadores cuando el admin no fija "llamadas por minuto". */
@@ -18,6 +20,11 @@ const DEFAULT_GEMINI_RPM = 5;
  */
 @Injectable()
 export class DefaultAiAssistantFactory implements AiAssistantFactory {
+  constructor(
+    /** Dónde se lleva la cuenta de llamadas por minuto (memoria por defecto; Postgres para varias instancias). */
+    @Optional() @Inject(RATE_LIMIT_STORE) private readonly rateLimitStore?: RateLimitStore,
+  ) {}
+
   create(config: AiProviderConfig, apiKey: string): AiContentAssistant {
     const maxRpm = config.maxRpm ?? undefined;
 
@@ -26,7 +33,7 @@ export class DefaultAiAssistantFactory implements AiAssistantFactory {
         apiKey,
         textModel: config.textModel,
         maxRpm,
-        rateLimiter: sharedRateLimiter('gemini', apiKey, maxRpm ?? DEFAULT_GEMINI_RPM),
+        rateLimiter: sharedRateLimiter('gemini', apiKey, maxRpm ?? DEFAULT_GEMINI_RPM, this.rateLimitStore),
       });
     }
 
@@ -38,9 +45,10 @@ export class DefaultAiAssistantFactory implements AiAssistantFactory {
       textModel: config.textModel,
       visionModel: config.visionModel ?? undefined,
       maxRpm,
+      hostGuard: (url) => assertPublicHost(url),
       // Un solo contador por API key: dos agentes con la misma cuenta (aunque con
       // distinto modelo) no pueden sumar más llamadas por minuto de las permitidas.
-      rateLimiter: sharedRateLimiter(apiUrl, apiKey, maxRpm ?? DEFAULT_OPENAI_COMPATIBLE_RPM),
+      rateLimiter: sharedRateLimiter(apiUrl, apiKey, maxRpm ?? DEFAULT_OPENAI_COMPATIBLE_RPM, this.rateLimitStore),
     });
   }
 }

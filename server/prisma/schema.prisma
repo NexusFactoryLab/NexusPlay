@@ -255,6 +255,8 @@ model AiProviderAttemptModel {
   id           String   @id @default(uuid())
   provider     String
   operation    String
+  /// Agente que hizo la llamada (`GAME_PLAYER`…); null en filas anteriores.
+  agent        String?
   succeeded    Boolean
   usedFallback Boolean  @map("used_fallback")
   errorMessage String?  @map("error_message")
@@ -301,13 +303,46 @@ model AiProviderConfigModel {
 /// vez de romperse (ver `AiAgentRuntime`).
 model AiAgentConfigModel {
   agentKey          String   @id @map("agent_key")
-  instructions      String   @default("")
+  /// `null` = usa las instrucciones de fábrica vigentes del catálogo; `""` = "sin instrucciones".
+  instructions      String?
   providerId        String?  @map("provider_id")
   modelOverride     String?  @map("model_override")
   fallbackToDefault Boolean  @default(true) @map("fallback_to_default")
   updatedAt         DateTime @updatedAt @map("updated_at")
 
   @@map("ai_agent_configs")
+}
+
+/// Contador de llamadas por ventana fija, compartido entre instancias del
+/// servidor cuando `AI_RATE_LIMIT_STORE=postgres` (ver `PrismaRateLimitStore`).
+/// `key` es un hash (nunca la API key). Las filas viejas se limpian solas.
+model AiRateLimitHitModel {
+  key         String
+  windowStart BigInt @map("window_start")
+  count       Int    @default(0)
+
+  @@id([key, windowStart])
+  @@map("ai_rate_limit_hits")
+}
+
+/// Registro de cambios del panel de IA (quién cambió qué proveedor/agente y
+/// cuándo). `details` guarda solo nombres de campos y valores no sensibles:
+/// NUNCA una API key, ni en claro ni cifrada (ver `AiAuditLogger`).
+/// `actorName` y `targetLabel` son copias del momento del cambio, para que el
+/// registro siga legible si el usuario o el proveedor ya no existen.
+model AiAuditLogModel {
+  id          String   @id @default(uuid())
+  actorUserId String   @map("actor_user_id")
+  actorName   String   @map("actor_name")
+  action      String
+  targetType  String   @map("target_type")
+  targetId    String   @map("target_id")
+  targetLabel String   @map("target_label")
+  details     Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("ai_audit_logs")
 }
 
 /// Gobernanza transversal por `GameType` (issue #156): archivar un tipo es

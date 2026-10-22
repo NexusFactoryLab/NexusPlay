@@ -7,6 +7,7 @@ export class AiProviderAttemptMapper {
       id: record.id,
       provider: record.provider,
       operation: record.operation as AiProviderOperation,
+      agent: record.agent,
       succeeded: record.succeeded,
       usedFallback: record.usedFallback,
       errorMessage: record.errorMessage,

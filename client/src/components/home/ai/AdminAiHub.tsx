@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
-import { Activity, Bot, Network } from 'lucide-react'
+import { Activity, Bot, ClipboardList, Network } from 'lucide-react'
 import { AdminAiProviderLogsSection } from '../AdminAiProviderLogsSection'
 import { AdminAiAgentsSection } from './AdminAiAgentsSection'
+import { AdminAiAuditSection } from './AdminAiAuditSection'
 import { AdminAiProvidersSection } from './AdminAiProvidersSection'
 import { SectionErrorBoundary } from './SectionErrorBoundary'
 
@@ -10,6 +11,7 @@ const TABS = [
   { id: 'providers', label: 'Proveedores', icon: Network },
   { id: 'agents', label: 'Agentes', icon: Bot },
   { id: 'history', label: 'Historial', icon: Activity },
+  { id: 'audit', label: 'Actividad', icon: ClipboardList },
 ] as const
 
 type TabId = (typeof TABS)[number]['id']
@@ -68,6 +70,7 @@ export function AdminAiHub() {
           {active === 'providers' && <AdminAiProvidersSection />}
           {active === 'agents' && <AdminAiAgentsSection />}
           {active === 'history' && <AdminAiProviderLogsSection />}
+          {active === 'audit' && <AdminAiAuditSection />}
         </SectionErrorBoundary>
       </div>
     </div>

@@ -6,7 +6,7 @@ import type { SecretCipher } from '../../domain/ports/secret-cipher.port.js';
 import { AiProviderConfigChangeNotifier } from '../../application/services/ai-provider-config-change-notifier.service.js';
 import { AiProviderChainResolver } from './ai-provider-chain-resolver.js';
 
-const cipher: SecretCipher = { encrypt: (p) => `enc(${p})`, decrypt: (p) => p.slice(4, -1), isConfigured: () => true };
+const cipher: SecretCipher = { encrypt: (p) => `enc(${p})`, decrypt: (p) => p.slice(4, -1), isConfigured: () => true, needsReencryption: () => false };
 const factory: AiAssistantFactory = { create: () => ({}) as never };
 
 function provider(name: string, extra: { enabled?: boolean; encryptedApiKey?: string } = {}): AiProviderConfig {

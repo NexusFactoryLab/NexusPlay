@@ -2,6 +2,8 @@ import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Put, UseGu
 import { ListAiProviderConfigsUseCase } from '../../../application/use-cases/list-ai-provider-configs.use-case.js';
 import { CreateAiProviderConfigUseCase } from '../../../application/use-cases/create-ai-provider-config.use-case.js';
 import { UpdateAiProviderConfigUseCase } from '../../../application/use-cases/update-ai-provider-config.use-case.js';
+import { ReencryptAiProviderConfigsUseCase } from '../../../application/use-cases/reencrypt-ai-provider-configs.use-case.js';
+import { SetAiProviderEnabledUseCase } from '../../../application/use-cases/set-ai-provider-enabled.use-case.js';
 import { DeleteAiProviderConfigUseCase } from '../../../application/use-cases/delete-ai-provider-config.use-case.js';
 import { ReorderAiProviderConfigsUseCase } from '../../../application/use-cases/reorder-ai-provider-configs.use-case.js';
 import { TestAiProviderConfigUseCase } from '../../../application/use-cases/test-ai-provider-config.use-case.js';
@@ -14,6 +16,7 @@ import {
   CreateAiProviderConfigDto,
   ListAiProviderModelsDto,
   ReorderAiProviderConfigsDto,
+  SetAiProviderEnabledDto,
   UpdateAiProviderConfigDto,
 } from '../dtos/ai-provider-config.dto.js';
 
@@ -30,6 +33,8 @@ export class AiProviderConfigsController {
     private readonly listUseCase: ListAiProviderConfigsUseCase,
     private readonly createUseCase: CreateAiProviderConfigUseCase,
     private readonly updateUseCase: UpdateAiProviderConfigUseCase,
+    private readonly setEnabledUseCase: SetAiProviderEnabledUseCase,
+    private readonly reencryptUseCase: ReencryptAiProviderConfigsUseCase,
     private readonly deleteUseCase: DeleteAiProviderConfigUseCase,
     private readonly reorderUseCase: ReorderAiProviderConfigsUseCase,
     private readonly testUseCase: TestAiProviderConfigUseCase,
@@ -52,6 +57,13 @@ export class AiProviderConfigsController {
     return this.listModelsUseCase.execute({ requestingUserId, ...dto });
   }
 
+  /** Re-cifra todas las API keys con la clave maestra vigente (tras rotarla). Devuelve solo contadores. */
+  @Post('reencrypt')
+  @HttpCode(200)
+  reencrypt(@CurrentUserId() requestingUserId: string) {
+    return this.reencryptUseCase.execute({ requestingUserId });
+  }
+
   // Antes de `:id` para que "order" no se interprete como un id.
   @Put('order')
   reorder(@CurrentUserId() requestingUserId: string, @Body() dto: ReorderAiProviderConfigsDto) {
@@ -65,6 +77,16 @@ export class AiProviderConfigsController {
     @Body() dto: UpdateAiProviderConfigDto,
   ) {
     return this.updateUseCase.execute({ requestingUserId, id, ...dto });
+  }
+
+  /** Cambia SOLO el interruptor, sin reenviar el formulario (evita pisar ediciones de otro admin). */
+  @Patch(':id/enabled')
+  setEnabled(
+    @CurrentUserId() requestingUserId: string,
+    @Param('id') id: string,
+    @Body() dto: SetAiProviderEnabledDto,
+  ) {
+    return this.setEnabledUseCase.execute({ requestingUserId, id, ...dto });
   }
 
   @Delete(':id')

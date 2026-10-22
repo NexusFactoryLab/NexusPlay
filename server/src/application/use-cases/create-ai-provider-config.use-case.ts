@@ -12,6 +12,7 @@ import { toAiProviderConfigDto, type AiProviderConfigDto } from '../dtos/ai-prov
 import type { UseCase } from '../ports/use-case.port.js';
 import { RequesterAdminResolver } from '../services/requester-admin-resolver.service.js';
 import { AiProviderConfigChangeNotifier } from '../services/ai-provider-config-change-notifier.service.js';
+import { AiAuditLogger } from '../services/ai-audit-logger.service.js';
 import {
   apiKeyHint,
   validateAiProviderConfigFields,
@@ -38,6 +39,7 @@ export class CreateAiProviderConfigUseCase implements UseCase<CreateAiProviderCo
     @Inject(ID_GENERATOR) private readonly idGenerator: IdGenerator,
     private readonly requesterAdminResolver: RequesterAdminResolver,
     private readonly notifier: AiProviderConfigChangeNotifier,
+    private readonly audit: AiAuditLogger,
   ) {}
 
   async execute(input: CreateAiProviderConfigInput): Promise<AiProviderConfigDto> {
@@ -66,6 +68,15 @@ export class CreateAiProviderConfigUseCase implements UseCase<CreateAiProviderCo
 
     await this.repository.save(config);
     this.notifier.notify();
+    await this.audit.record({
+      actorUserId: input.requestingUserId,
+      action: 'provider.create',
+      targetType: 'provider',
+      targetId: config.id,
+      targetLabel: config.name,
+      // La key no va al registro: solo su sufijo para reconocerla.
+      details: { kind: config.kind, textModel: config.textModel, enabled: config.enabled, apiKeyHint: config.apiKeyHint },
+    });
     return toAiProviderConfigDto(config);
   }
 }

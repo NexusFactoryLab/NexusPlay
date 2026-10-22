@@ -1,33 +1,6 @@
-import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { PlugZap } from 'lucide-react'
 import { useAuth } from '../../../hooks/useAuth'
-import { getAiStatus } from '../../../services/ai-status.service'
-
-/**
- * `true` cuando hay al menos un proveedor de IA utilizable. Mientras se
- * consulta (o si la consulta falla) se asume `true`: el servidor igual
- * rechaza el uso real, esto solo existe para avisar antes.
- */
-export function useAiConfigured(): boolean {
-  const { token } = useAuth()
-  const [configured, setConfigured] = useState(true)
-
-  useEffect(() => {
-    if (!token) return
-    let cancelled = false
-    getAiStatus(token)
-      .then((status) => {
-        if (!cancelled) setConfigured(status.configured)
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [token])
-
-  return configured
-}
 
 /** Aviso de "la IA no está configurada": a los administradores les da el atajo al panel. */
 export function AiNotConfiguredNotice() {

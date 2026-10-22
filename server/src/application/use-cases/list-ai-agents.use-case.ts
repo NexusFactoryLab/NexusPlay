@@ -12,6 +12,8 @@ import { ForbiddenActionError } from '../../domain/errors/authorization.errors.j
 import { toAiAgentDto, type AiAgentDto } from '../dtos/ai-agent-response.dto.js';
 import type { UseCase } from '../ports/use-case.port.js';
 import { RequesterAdminResolver } from '../services/requester-admin-resolver.service.js';
+import { SECRET_CIPHER, type SecretCipher } from '../../domain/ports/secret-cipher.port.js';
+import { providerUsabilityFromCipher } from '../services/ai-agent-provider-plan.js';
 
 export interface ListAiAgentsInput {
   requestingUserId: string;
@@ -28,6 +30,7 @@ export class ListAiAgentsUseCase implements UseCase<ListAiAgentsInput, ListAiAge
     @Inject(AI_AGENT_CONFIG_REPOSITORY) private readonly agents: AiAgentConfigRepository,
     @Inject(AI_PROVIDER_CONFIG_REPOSITORY) private readonly providers: AiProviderConfigRepository,
     private readonly requesterAdminResolver: RequesterAdminResolver,
+    @Inject(SECRET_CIPHER) private readonly cipher: SecretCipher,
   ) {}
 
   async execute({ requestingUserId }: ListAiAgentsInput): Promise<ListAiAgentsOutput> {
@@ -37,8 +40,12 @@ export class ListAiAgentsUseCase implements UseCase<ListAiAgentsInput, ListAiAge
     const [saved, providers] = await Promise.all([this.agents.findAll(), this.providers.findAll()]);
     const byKey = new Map(saved.map((config) => [config.key, config]));
 
+    const isUsable = providerUsabilityFromCipher(this.cipher);
+
     return {
-      items: AI_AGENT_KEYS.map((key) => toAiAgentDto(byKey.get(key) ?? AiAgentConfig.defaults(key), providers)),
+      items: AI_AGENT_KEYS.map((key) =>
+        toAiAgentDto(byKey.get(key) ?? AiAgentConfig.defaults(key), providers, isUsable),
+      ),
     };
   }
 }

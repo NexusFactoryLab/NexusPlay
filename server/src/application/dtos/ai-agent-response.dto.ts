@@ -1,5 +1,6 @@
 import { AI_AGENT_CATALOG, type AiAgentConfig, type AiAgentKey } from '../../domain/entities/ai-agent.entity.js';
 import type { AiProviderConfig } from '../../domain/entities/ai-provider-config.entity.js';
+import { planAgentProviders, type ProviderUsability } from '../services/ai-agent-provider-plan.js';
 
 export interface AiAgentDto {
   key: AiAgentKey;
@@ -7,8 +8,11 @@ export interface AiAgentDto {
   description: string;
   usedIn: string[];
   limits: string | null;
+  /** Las que se aplican hoy: las guardadas, o el texto de fábrica vigente. */
   instructions: string;
   defaultInstructions: string;
+  /** `true` = sin texto guardado: usa (y seguirá el) texto de fábrica del catálogo. */
+  usingDefaultInstructions: boolean;
   providerId: string | null;
   modelOverride: string | null;
   fallbackToDefault: boolean;
@@ -28,20 +32,21 @@ export interface AiAgentDto {
   };
 }
 
-export function toAiAgentDto(config: AiAgentConfig, providers: AiProviderConfig[]): AiAgentDto {
+/**
+ * El "proveedor efectivo" sale de `planAgentProviders`, la misma regla que usa
+ * el runtime, para que el panel nunca diga algo distinto de lo que ocurre.
+ */
+export function toAiAgentDto(
+  config: AiAgentConfig,
+  providers: AiProviderConfig[],
+  isUsable: ProviderUsability,
+): AiAgentDto {
   const definition = AI_AGENT_CATALOG[config.key];
-  const enabled = providers.filter((provider) => provider.enabled);
-  const defaultChain = enabled.map((provider) => provider.name);
-
-  const assigned = config.providerId ? providers.find((provider) => provider.id === config.providerId) : undefined;
-  const usable = assigned?.enabled ? assigned : undefined;
-
-  let warning: string | null = null;
-  if (config.providerId && !assigned) {
-    warning = 'El proveedor asignado ya no existe: se está usando la cadena general.';
-  } else if (assigned && !assigned.enabled) {
-    warning = `${assigned.name} está deshabilitado: se está usando la cadena general.`;
-  }
+  const plan = planAgentProviders(config, providers, isUsable);
+  const defaultChain = plan.generalChain.map((provider) => provider.name);
+  const usable = plan.own;
+  const warning = plan.warning;
+  const enabled = plan.generalChain;
 
   return {
     key: config.key,
@@ -51,6 +56,7 @@ export function toAiAgentDto(config: AiAgentConfig, providers: AiProviderConfig[
     limits: definition.limits,
     instructions: config.instructions,
     defaultInstructions: definition.defaultInstructions,
+    usingDefaultInstructions: config.usingDefaultInstructions,
     providerId: config.providerId,
     modelOverride: config.modelOverride,
     fallbackToDefault: config.fallbackToDefault,
@@ -60,7 +66,7 @@ export function toAiAgentDto(config: AiAgentConfig, providers: AiProviderConfig[
       ? {
           source: 'PROVIDER',
           providerName: usable.name,
-          model: config.modelOverride ?? usable.textModel,
+          model: plan.model ?? usable.textModel,
           defaultChain,
           warning,
         }

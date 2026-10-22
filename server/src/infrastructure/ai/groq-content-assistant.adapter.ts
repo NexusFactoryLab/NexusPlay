@@ -7,6 +7,7 @@ import type {
   GenerateGameDraftInput,
   GenerateGameDraftOutput,
 } from '../../domain/ports/ai-content-assistant.port.js';
+import { sanitizeProviderMessage } from '../../application/services/ai-error-sanitizer.js';
 import { cutTextAtBoundary, extractJsonObject } from './json-extraction.js';
 import { RateLimitWaitExceededError, RateLimiter } from './rate-limiter.js';
 
@@ -92,6 +93,12 @@ export interface OpenAiCompatibleOptions {
   maxRpm?: number;
   /** Contador de llamadas por minuto ya compartido (por API key). Sin él se crea uno propio. */
   rateLimiter?: RateLimiter;
+  /**
+   * Se ejecuta con la URL justo antes de cada llamada y debe lanzar si no es
+   * seguro llamarla (anti DNS-rebinding, ver `assertPublicHost`). Lo inyecta
+   * la fábrica para proveedores configurados desde el panel.
+   */
+  hostGuard?: (apiUrl: string) => Promise<void>;
 }
 
 const PING_DEADLINE_MS = 15_000;
@@ -283,6 +290,14 @@ export class GroqContentAssistant implements AiContentAssistant {
       } catch (error) {
         if (error instanceof RateLimitWaitExceededError) throw timedOut(error.message);
         throw error;
+      }
+
+      if (this.options.hostGuard) {
+        try {
+          await this.options.hostGuard(apiUrl);
+        } catch {
+          throw this.wrapProviderError('la dirección del proveedor apunta a una red interna y no se permite llamarla.');
+        }
       }
 
       let response: Response;
@@ -501,7 +516,8 @@ ${cut.text}
 
   /** Nunca dejar pasar un error crudo del proveedor: mensaje en español + detalle técnico corto. */
   private wrapProviderError(friendly: string, detail?: string): ServiceUnavailableException {
-    const technical = detail ? ` [${detail.slice(0, 200)}]` : '';
+    // El detalle técnico sale al panel: sin URLs ni IPs (pueden delatar la red interna).
+    const technical = detail ? ` [${sanitizeProviderMessage(detail)}]` : '';
     return new ServiceUnavailableException(`El asistente de IA no pudo responder: ${friendly}${technical}`);
   }
 }
@@ -525,6 +541,8 @@ async function readFailure(response: Response): Promise<GroqFailure> {
   } catch {
     // El cuerpo no era JSON: se usa el texto crudo recortado.
   }
+  // Este texto termina en el panel: nunca crudo (sin URLs ni IPs, y recortado).
+  message = sanitizeProviderMessage(message, 300);
 
   const retryAfterHeader = response.headers?.get?.('retry-after') ?? null;
   const seconds = retryAfterHeader === null || retryAfterHeader === '' ? NaN : Number(retryAfterHeader);

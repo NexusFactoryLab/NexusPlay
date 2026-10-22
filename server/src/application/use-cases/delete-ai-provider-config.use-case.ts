@@ -11,6 +11,7 @@ import { ForbiddenActionError } from '../../domain/errors/authorization.errors.j
 import { AiProviderConfigNotFoundError } from '../errors/application.errors.js';
 import type { UseCase } from '../ports/use-case.port.js';
 import { RequesterAdminResolver } from '../services/requester-admin-resolver.service.js';
+import { AiAuditLogger } from '../services/ai-audit-logger.service.js';
 import { AiProviderConfigChangeNotifier } from '../services/ai-provider-config-change-notifier.service.js';
 
 export interface DeleteAiProviderConfigInput {
@@ -25,17 +26,26 @@ export class DeleteAiProviderConfigUseCase implements UseCase<DeleteAiProviderCo
     @Inject(AI_AGENT_CONFIG_REPOSITORY) private readonly agents: AiAgentConfigRepository,
     private readonly requesterAdminResolver: RequesterAdminResolver,
     private readonly notifier: AiProviderConfigChangeNotifier,
+    private readonly audit: AiAuditLogger,
   ) {}
 
   async execute({ requestingUserId, id }: DeleteAiProviderConfigInput): Promise<void> {
     if (!(await this.requesterAdminResolver.resolve(requestingUserId))) {
       throw new ForbiddenActionError('eliminar proveedores de IA');
     }
-    if (!(await this.repository.findById(id))) throw new AiProviderConfigNotFoundError();
+    const existing = await this.repository.findById(id);
+    if (!existing) throw new AiProviderConfigNotFoundError();
 
     await this.repository.delete(id);
     // Los agentes que lo usaban vuelven a la cadena general (en vez de quedar apuntando a la nada).
     await this.agents.clearProvider(id);
     this.notifier.notify();
+    await this.audit.record({
+      actorUserId: requestingUserId,
+      action: 'provider.delete',
+      targetType: 'provider',
+      targetId: id,
+      targetLabel: existing.name,
+    });
   }
 }
