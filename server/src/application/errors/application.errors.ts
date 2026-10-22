@@ -248,3 +248,12 @@ export class SecretCipherNotConfiguredError extends ApplicationError {
     );
   }
 }
+
+/** Otro administrador guardó cambios sobre el mismo proveedor/agente mientras este se editaba (bloqueo optimista). */
+export class AiConfigConflictError extends ApplicationError {
+  constructor(subject: string) {
+    super(
+      `Otro administrador modificó ${subject} mientras lo editabas; recarga y vuelve a intentarlo.`,
+    );
+  }
+}

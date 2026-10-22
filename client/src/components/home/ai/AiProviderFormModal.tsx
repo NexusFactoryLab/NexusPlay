@@ -31,6 +31,8 @@ type Props = {
   provider?: AiProviderConfig
   onClose: () => void
   onSaved: (provider: AiProviderConfig) => void
+  /** Otro administrador cambió el proveedor mientras se editaba (409): quien abre recarga y avisa. */
+  onConflict?: (message: string) => void
 }
 
 const STEPS = ['Conexión', 'Modelos', 'Ajustes'] as const
@@ -75,7 +77,7 @@ function Field({
  * ofrece primero el recomendado. La API key solo viaja del formulario al
  * servidor, nunca al revés.
  */
-export function AiProviderFormModal({ provider, onClose, onSaved }: Props) {
+export function AiProviderFormModal({ provider, onClose, onSaved, onConflict }: Props) {
   const { token } = useAuth()
   const uid = useId()
   const isEdit = Boolean(provider)
@@ -201,12 +203,17 @@ export function AiProviderFormModal({ provider, onClose, onSaved }: Props) {
         maxRpm: rpm,
         enabled,
         ...(typedKey ? { apiKey: typedKey } : {}),
+        ...(provider ? { expectedUpdatedAt: provider.updatedAt } : {}),
       }
       const saved = provider
         ? await updateAiProviderConfig(token, provider.id, input)
         : await createAiProviderConfig(token, input)
       onSaved(saved)
     } catch (err) {
+      if (err instanceof ApiError && err.status === 409 && onConflict) {
+        onConflict(err.message)
+        return
+      }
       setError(err instanceof ApiError ? err.message : 'No se pudo guardar el proveedor de IA.')
     } finally {
       setSubmitting(false)

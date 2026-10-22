@@ -1,6 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AiProviderConfig } from '../../domain/entities/ai-provider-config.entity.js';
-import type { AiProviderConfigRepository } from '../../domain/ports/ai-provider-config.repository.port.js';
 import type { SecretCipher } from '../../domain/ports/secret-cipher.port.js';
 import type { AiAssistantFactory } from '../../domain/ports/ai-assistant.factory.port.js';
 import { ForbiddenActionError } from '../../domain/errors/authorization.errors.js';
@@ -10,36 +8,12 @@ import {
 } from '../errors/application.errors.js';
 import { AiProviderConfigChangeNotifier } from '../services/ai-provider-config-change-notifier.service.js';
 import type { RequesterAdminResolver } from '../services/requester-admin-resolver.service.js';
+import { InMemoryAiProviderRepo } from './testing/ai-fakes.helper-spec.js';
 import { CreateAiProviderConfigUseCase } from './create-ai-provider-config.use-case.js';
 import { UpdateAiProviderConfigUseCase } from './update-ai-provider-config.use-case.js';
 import { ReorderAiProviderConfigsUseCase } from './reorder-ai-provider-configs.use-case.js';
 import { TestAiProviderConfigUseCase } from './test-ai-provider-config.use-case.js';
 import { ListAiProviderConfigsUseCase } from './list-ai-provider-configs.use-case.js';
-
-class InMemoryRepo implements AiProviderConfigRepository {
-  readonly items = new Map<string, AiProviderConfig>();
-  async findAll() {
-    return [...this.items.values()].sort((a, b) => a.priority - b.priority);
-  }
-  async findById(id: string) {
-    return this.items.get(id) ?? null;
-  }
-  async findByName(name: string) {
-    return [...this.items.values()].find((item) => item.name === name) ?? null;
-  }
-  async save(config: AiProviderConfig) {
-    this.items.set(config.id, config);
-  }
-  async delete(id: string) {
-    this.items.delete(id);
-  }
-  async recordTestResult(id: string, testedVersion: Date, result: { at: Date; ok: boolean; message: string }) {
-    const current = this.items.get(id);
-    if (current && current.updatedAt.getTime() === testedVersion.getTime()) {
-      this.items.set(id, current.with({ lastTestAt: result.at, lastTestOk: result.ok, lastTestMessage: result.message }));
-    }
-  }
-}
 
 const cipher: SecretCipher = {
   encrypt: (plain) => `enc(${plain})`,
@@ -57,7 +31,7 @@ const VALID = {
 };
 
 describe('casos de uso de proveedores de IA', () => {
-  let repo: InMemoryRepo;
+  let repo: InMemoryAiProviderRepo;
   let notifier: AiProviderConfigChangeNotifier;
   let notify: ReturnType<typeof vi.fn>;
   let admin: RequesterAdminResolver;
@@ -67,7 +41,7 @@ describe('casos de uso de proveedores de IA', () => {
   const makeCreate = () => new CreateAiProviderConfigUseCase(repo, cipher, idGenerator, admin, notifier);
 
   beforeEach(() => {
-    repo = new InMemoryRepo();
+    repo = new InMemoryAiProviderRepo();
     ids = 0;
     notifier = new AiProviderConfigChangeNotifier();
     notify = vi.spyOn(notifier, 'notify') as unknown as ReturnType<typeof vi.fn>;
@@ -124,21 +98,19 @@ describe('casos de uso de proveedores de IA', () => {
     expect((await repo.findById(created.id))?.encryptedApiKey).toBe('enc(nueva-key-98765432)');
   });
 
-  it('reordena exigiendo todos los ids exactamente una vez', async () => {
+  it('reordena según lo pedido, ignora ids desconocidos y deja al final los que el cliente no incluyó', async () => {
     const a = await makeCreate().execute(VALID);
     const b = await makeCreate().execute({ ...VALID, name: 'B' });
+    const c = await makeCreate().execute({ ...VALID, name: 'C' });
     const reorder = new ReorderAiProviderConfigsUseCase(repo, admin, notifier);
 
-    const result = await reorder.execute({ requestingUserId: 'admin-1', orderedIds: [b.id, a.id] });
-    expect(result.map((item) => item.id)).toEqual([b.id, a.id]);
+    const result = await reorder.execute({ requestingUserId: 'admin-1', orderedIds: [b.id, 'fantasma', b.id, a.id] });
+    // C no venía en la lista (p. ej. lo creó otro admin): queda al final.
+    expect(result.map((item) => item.id)).toEqual([b.id, a.id, c.id]);
     expect((await repo.findById(b.id))?.priority).toBe(0);
-
-    await expect(reorder.execute({ requestingUserId: 'admin-1', orderedIds: [a.id] })).rejects.toThrow(
-      InvalidAiProviderConfigError,
-    );
-    await expect(reorder.execute({ requestingUserId: 'admin-1', orderedIds: [a.id, a.id] })).rejects.toThrow(
-      InvalidAiProviderConfigError,
-    );
+    expect((await repo.findById(c.id))?.priority).toBe(2);
+    // Una sola operación (transacción) con el orden completo.
+    expect(repo.priorityBatches).toEqual([[b.id, a.id, c.id]]);
   });
 
   describe('probar conexión', () => {
@@ -160,7 +132,7 @@ describe('casos de uso de proveedores de IA', () => {
         create: () =>
           ({
             ping: async () => {
-              // Mientras "la red" responde, otro admin cambia el modelo.
+              // Mientras 'la red' responde, otro admin cambia el modelo.
               await new Promise((resolve) => setTimeout(resolve, 5));
               await update.execute({ ...VALID, id: created.id, textModel: 'modelo-nuevo', apiKey: '' });
             },

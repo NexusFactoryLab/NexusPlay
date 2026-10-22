@@ -62,6 +62,29 @@ export class PrismaAiProviderConfigRepository implements AiProviderConfigReposit
     }
   }
 
+  async saveIfUnchanged(config: AiProviderConfig, expectedVersion: Date): Promise<boolean> {
+    const { id, createdAt: _createdAt, ...data } = config.toProps();
+    try {
+      // La condición `updatedAt` vive en el WHERE del UPDATE: es atómica en la base de datos.
+      const { count } = await this.prisma.aiProviderConfigModel.updateMany({
+        where: { id, updatedAt: expectedVersion },
+        data,
+      });
+      return count > 0;
+    } catch (error) {
+      if ((error as { code?: string }).code === 'P2002') throw new AiProviderConfigNameTakenError(config.name);
+      throw error;
+    }
+  }
+
+  async savePriorities(orderedIds: string[]): Promise<void> {
+    await this.prisma.$transaction(
+      orderedIds.map((id, index) =>
+        this.prisma.aiProviderConfigModel.updateMany({ where: { id }, data: { priority: index } }),
+      ),
+    );
+  }
+
   async recordTestResult(
     id: string,
     testedVersion: Date,

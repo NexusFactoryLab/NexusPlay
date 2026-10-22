@@ -34,6 +34,8 @@ export type AiAgentInput = {
   providerId: string | null
   modelOverride: string | null
   fallbackToDefault: boolean
+  /** Versión (`updatedAt`) del agente que se vio; `null` = aún sin personalizar. */
+  expectedUpdatedAt?: string | null
 }
 
 export type AiAgentTestResult = {

@@ -39,6 +39,8 @@ export type AiProviderConfigInput = {
   enabled?: boolean
   /** Obligatoria al crear; al editar solo se envía para rotarla. */
   apiKey?: string
+  /** Versión (`updatedAt`) que se vio al abrir el formulario; si cambió, el servidor responde 409. */
+  expectedUpdatedAt?: string
 }
 
 export type AiProviderTestResult = {
@@ -64,6 +66,19 @@ export function updateAiProviderConfig(
   input: AiProviderConfigInput,
 ): Promise<AiProviderConfig> {
   return request<AiProviderConfig>(`${BASE}/${id}`, { method: 'PATCH', token, body: input })
+}
+
+/** Cambia SOLO el interruptor (no reenvía el formulario, así no pisa ediciones de otro admin). */
+export function setAiProviderEnabled(
+  token: string,
+  provider: Pick<AiProviderConfig, 'id' | 'updatedAt'>,
+  enabled: boolean,
+): Promise<AiProviderConfig> {
+  return request<AiProviderConfig>(`${BASE}/${provider.id}/enabled`, {
+    method: 'PATCH',
+    token,
+    body: { enabled, expectedUpdatedAt: provider.updatedAt },
+  })
 }
 
 export function deleteAiProviderConfig(token: string, id: string): Promise<void> {

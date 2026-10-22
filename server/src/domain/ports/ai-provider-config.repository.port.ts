@@ -10,6 +10,19 @@ export interface AiProviderConfigRepository {
   /** Lanza `AiProviderConfigNameTakenError` si otro proveedor ya usa ese nombre (también ante una carrera). */
   save(config: AiProviderConfig): Promise<void>;
   /**
+   * Guardado condicional (bloqueo optimista): actualiza SOLO si la fila sigue
+   * con el `updatedAt` que se leyó (`expectedVersion`), en una sola
+   * sentencia de la base de datos —no un if previo— para que dos admins
+   * simultáneos no se pisen. Devuelve `false` si otro cambió/borró la fila.
+   * Lanza `AiProviderConfigNameTakenError` ante un nombre repetido.
+   */
+  saveIfUnchanged(config: AiProviderConfig, expectedVersion: Date): Promise<boolean>;
+  /**
+   * Fija la prioridad (0, 1, 2…) según la posición en `orderedIds`, todo en
+   * una sola transacción: o queda el orden completo o no cambia nada.
+   */
+  savePriorities(orderedIds: string[]): Promise<void>;
+  /**
    * Guarda SOLO el resultado de la última prueba de conexión. La prueba tarda
    * segundos; reescribir la entidad entera al terminar pisaría lo que otro
    * admin hubiera editado mientras tanto. Si la configuración cambió desde que

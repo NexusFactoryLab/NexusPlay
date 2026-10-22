@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { AiAgentConfig, isAiAgentKey } from '../../domain/entities/ai-agent.entity.js';
+import { AI_AGENT_CATALOG, AiAgentConfig, isAiAgentKey, type AiAgentKey } from '../../domain/entities/ai-agent.entity.js';
 import {
   AI_AGENT_CONFIG_REPOSITORY,
   type AiAgentConfigRepository,
@@ -9,7 +9,12 @@ import {
   type AiProviderConfigRepository,
 } from '../../domain/ports/ai-provider-config.repository.port.js';
 import { ForbiddenActionError } from '../../domain/errors/authorization.errors.js';
-import { AiProviderConfigNotFoundError, InvalidAiProviderConfigError } from '../errors/application.errors.js';
+import {
+  AiConfigConflictError,
+  AiProviderConfigNotFoundError,
+  InvalidAiProviderConfigError,
+} from '../errors/application.errors.js';
+import { isStaleVersion, parseExpectedVersion } from '../services/ai-optimistic-lock.js';
 import { toAiAgentDto, type AiAgentDto } from '../dtos/ai-agent-response.dto.js';
 import type { UseCase } from '../ports/use-case.port.js';
 import { RequesterAdminResolver } from '../services/requester-admin-resolver.service.js';
@@ -26,6 +31,11 @@ export interface UpdateAiAgentInput {
   /** Solo con `providerId`. `null`/vacío = el modelo configurado en el proveedor. */
   modelOverride?: string | null;
   fallbackToDefault?: boolean;
+  /**
+   * Versión (`updatedAt`, ISO) que el admin vio; `null` = el agente aún no
+   * estaba personalizado. Si ya cambió, se responde 409.
+   */
+  expectedUpdatedAt?: string | null;
 }
 
 /** Cambia el enfoque y el proveedor/modelo de un agente. Un agente sin proveedor propio usa la cadena general. */
@@ -61,6 +71,9 @@ export class UpdateAiAgentUseCase implements UseCase<UpdateAiAgentInput, AiAgent
     }
 
     const current = (await this.agents.findByKey(input.key)) ?? AiAgentConfig.defaults(input.key);
+    const conflict = () => new AiConfigConflictError(`el agente "${AI_AGENT_CATALOG[input.key as AiAgentKey].name}"`);
+    if (isStaleVersion(current.updatedAt, parseExpectedVersion(input.expectedUpdatedAt))) throw conflict();
+
     const updated = current.with({
       instructions,
       providerId,
@@ -68,7 +81,8 @@ export class UpdateAiAgentUseCase implements UseCase<UpdateAiAgentInput, AiAgent
       fallbackToDefault: input.fallbackToDefault ?? current.fallbackToDefault,
     });
 
-    await this.agents.save(updated);
+    // Condicional en la base de datos: si otro admin guardó entre la lectura y este punto, no se pisa.
+    if (!(await this.agents.saveIfUnchanged(updated, current.updatedAt))) throw conflict();
     return toAiAgentDto(updated, await this.providers.findAll());
   }
 }

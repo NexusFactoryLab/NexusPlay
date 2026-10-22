@@ -58,9 +58,11 @@ type CardProps = {
   providers: AiProviderConfig[]
   index: number
   onChanged: (agent: AiAgent) => void
+  /** Otro administrador cambió el agente (409): el padre recarga la lista. */
+  onConflict: (message: string) => void
 }
 
-function AgentCard({ agent, providers, index, onChanged }: CardProps) {
+function AgentCard({ agent, providers, index, onChanged, onConflict }: CardProps) {
   const { token } = useAuth()
   const uid = useId()
 
@@ -140,11 +142,16 @@ function AgentCard({ agent, providers, index, onChanged }: CardProps) {
         providerId: providerId || null,
         modelOverride: providerId ? modelOverride.trim() || null : null,
         fallbackToDefault: fallback,
+        expectedUpdatedAt: agent.updatedAt,
       })
       onChanged(updated)
       setTestResult(null)
       setSaved(true)
     } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        onConflict(err.message)
+        return
+      }
       setError(err instanceof ApiError ? err.message : 'No se pudo guardar el agente.')
     } finally {
       setSaving(false)
@@ -468,6 +475,11 @@ export function AdminAiAgentsSection() {
     load()
   }, [load])
 
+  function handleConflict(message: string) {
+    load()
+    setError(message)
+  }
+
   function handleChanged(updated: AiAgent) {
     setAgents((current) => current.map((agent) => (agent.key === updated.key ? updated : agent)))
   }
@@ -497,7 +509,7 @@ export function AdminAiAgentsSection() {
       ) : (
         <ol className="grid gap-5">
           {agents.map((agent, index) => (
-            <AgentCard key={agent.key} agent={agent} providers={providers} index={index} onChanged={handleChanged} />
+            <AgentCard key={agent.key} agent={agent} providers={providers} index={index} onChanged={handleChanged} onConflict={handleConflict} />
           ))}
         </ol>
       )}
