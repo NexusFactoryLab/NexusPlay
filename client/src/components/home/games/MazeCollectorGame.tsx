@@ -1,9 +1,9 @@
-import { GameInstructionsGate } from './GameInstructionsGate'
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, LogOut, Maximize, Minimize, Pause, Play, X, Zap } from 'lucide-react'
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, BookOpen, LogOut, Maximize, Minimize, Pause, Play, X, Zap } from 'lucide-react'
 import type { MazeCollectorConfig, MazeCollectorItem, MazeLayoutDef, CellPosition } from './mazeCollectorTypes'
 import { iconForConcept } from './mazeCollectorTypes'
+import { POWER_MODE_MS } from './mazeEngine'
 import { useMazeCollectorGame } from './useMazeCollectorGame'
 import type { Direction } from './useMazeCollectorGame'
 import { EcoTruckSprite } from './EcoTruckSprite'
@@ -11,6 +11,7 @@ import { PollutionGhostSprite } from './PollutionGhostSprite'
 import { BonusSprite, PetSprite, PowerPelletSprite, TrashBagSprite } from './mazeCollectibleSprites'
 import { SostenibleCityBackground } from './SostenibleCityBackground'
 import { SpriteStrip, mazeSpriteUrl } from './mazeSpriteStrip'
+import { MazeCollectorGuide } from './MazeCollectorGuide'
 import { ConfettiBurst } from '../../kids/ConfettiBurst'
 
 type MazeCollectorGameProps = {
@@ -24,11 +25,18 @@ type MazeCollectorGameProps = {
 
 /** Celda mínima: por debajo de esto los sprites dejan de leerse (en ese caso el tablero se desplaza). */
 const MIN_CELL_SIZE = 14
-/** Celda máxima: en monitores grandes el tablero no crece sin límite. */
-const MAX_CELL_SIZE = 64
-/** Los sprites se dibujan algo más grandes que su celda, como en el arcade: el camión y las nubes llenan el carril. */
-const TRUCK_SCALE = 1.6
-const GHOST_SCALE = 1.3
+/** Celda máxima: en monitores muy grandes el tablero no crece sin límite. */
+const MAX_CELL_SIZE = 96
+/**
+ * Tamaño de los sprites respecto a su celda. El camión y las nubes llenan el
+ * carril; las botellas van más chicas para que la vista se quede en el camión.
+ */
+const TRUCK_SCALE = 1.3
+const GHOST_SCALE = 1.2
+const PET_SCALE = 0.55
+const POWER_SCALE = 0.9
+const BAG_SCALE = 0.8
+const BONUS_SCALE = 1
 const FULLSCREEN_PREF_KEY = 'nexusplay-maze-collector-fullscreen'
 
 /**
@@ -89,17 +97,41 @@ function hashCell(row: number, col: number): number {
   return Math.abs(row * 31 + col * 17)
 }
 
+/**
+ * Camión Reciclador. Antes de jugar se muestra una guía visual de 5 pasos
+ * (igual que en el Laberinto Verdadero o Falso); se puede volver a abrir
+ * desde el botón de ayuda.
+ */
 export function MazeCollectorGame(props: MazeCollectorGameProps) {
+  const [guideOpen, setGuideOpen] = useState(true)
+  // La guía se dibuja DENTRO de la sesión: en pantalla completa el navegador
+  // solo muestra lo que está dentro del elemento que la pidió.
   return (
-    <GameInstructionsGate kind={'MAZE_COLLECTOR'}>
-      <MazeCollectorSession {...props} />
-    </GameInstructionsGate>
+    <MazeCollectorSession
+      {...props}
+      guideOpen={guideOpen}
+      onOpenGuide={() => setGuideOpen(true)}
+      onCloseGuide={() => setGuideOpen(false)}
+    />
   )
 }
 
-function MazeCollectorSession({ title, primaryColor, layout, items, config, onExit }: MazeCollectorGameProps) {
-  const game = useMazeCollectorGame({ layout, items, config })
+function MazeCollectorSession({
+  title,
+  primaryColor,
+  layout,
+  items,
+  config,
+  onExit,
+  guideOpen,
+  onOpenGuide,
+  onCloseGuide,
+}: MazeCollectorGameProps & { guideOpen: boolean; onOpenGuide: () => void; onCloseGuide: () => void }) {
+  const game = useMazeCollectorGame({ layout, items, config, inputEnabled: !guideOpen })
   const isCity = config.layout === 'CITY'
+  // En Ciudad, la primera y la última fila son franjas verdes decorativas: se
+  // muestra solo media de cada una y ese alto se le da al resto del mapa.
+  const trimmedRows = isCity ? 1 : 0
   const rootRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const [cellSize, setCellSize] = useState(24)
@@ -109,8 +141,6 @@ function MazeCollectorSession({ title, primaryColor, layout, items, config, onEx
   const canFullscreen = typeof document !== 'undefined' && document.fullscreenEnabled
   // La cruceta aparece en cualquier pantalla táctil, no según el ancho.
   const coarsePointer = useMediaQuery('(pointer: coarse)')
-  // Celular en horizontal: no sobra alto, así que la leyenda de nubes se oculta.
-  const compactLandscape = useMediaQuery('(orientation: landscape) and (max-height: 520px)')
 
   function enterFullscreen() {
     const root = rootRef.current
@@ -149,16 +179,21 @@ function MazeCollectorSession({ title, primaryColor, layout, items, config, onEx
       const style = window.getComputedStyle(stage)
       const innerWidth = stage.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
       const innerHeight = stage.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom)
-      const fit = Math.floor(Math.min(innerWidth / layout.cols, innerHeight / layout.rows))
+      const fit = Math.floor(Math.min(innerWidth / layout.cols, innerHeight / (layout.rows - trimmedRows)))
       setCellSize(Math.max(MIN_CELL_SIZE, Math.min(MAX_CELL_SIZE, fit)))
     }
     measure()
     const observer = new ResizeObserver(measure)
     observer.observe(stage)
     return () => observer.disconnect()
-  }, [layout.cols, layout.rows])
+  }, [layout.cols, layout.rows, trimmedRows])
 
   const { pause, resume } = game
+  // Abrir la guía a mitad de partida pausa el juego.
+  useEffect(() => {
+    if (guideOpen) pause()
+  }, [guideOpen, pause])
+
   useEffect(() => {
     const onChange = () => {
       const active = !!document.fullscreenElement
@@ -184,6 +219,7 @@ function MazeCollectorSession({ title, primaryColor, layout, items, config, onEx
     keysRef.current = { toggleFullscreen, enterFullscreen, phase: game.phase, paused: game.paused, wantFullscreen }
   })
   useEffect(() => {
+    if (guideOpen) return
     function handleKeyDown(event: KeyboardEvent) {
       if (event.ctrlKey || event.metaKey || event.altKey) return
       const keys = keysRef.current
@@ -198,7 +234,7 @@ function MazeCollectorSession({ title, primaryColor, layout, items, config, onEx
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [pause, resume])
+  }, [pause, resume, guideOpen])
 
   const width = layout.cols * cellSize
   const height = layout.rows * cellSize
@@ -254,6 +290,15 @@ function MazeCollectorSession({ title, primaryColor, layout, items, config, onEx
           </span>
         </div>
 
+        <button
+          type="button"
+          aria-label="Ver la guía"
+          title="Ver la guía"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-slate-950/70 text-slate-200 backdrop-blur transition-colors hover:bg-white/10"
+          onClick={onOpenGuide}
+        >
+          <BookOpen className="h-4 w-4" />
+        </button>
         {canFullscreen && (
           <button
             type="button"
@@ -273,28 +318,25 @@ function MazeCollectorSession({ title, primaryColor, layout, items, config, onEx
         )}
       </header>
 
-      <div className="relative z-10 flex min-h-7 flex-wrap items-center justify-center gap-x-3 gap-y-1 px-3 pt-1.5">
-        {energized ? (
-          <div className="flex w-full max-w-[420px] items-center gap-2 rounded-full border border-emerald-300/40 bg-emerald-500/15 px-3 py-1">
+      <div ref={stageRef} className="relative min-h-0 flex-1 overflow-auto p-1.5 sm:p-2">
+        {/* Barra del purificador: flota sobre el mapa para no quitarle alto. */}
+        {energized && (
+          <div className="pointer-events-none absolute left-1/2 top-3 z-20 flex w-[min(80%,420px)] -translate-x-1/2 items-center gap-2 rounded-full border border-emerald-300/50 bg-slate-950/85 px-3 py-1 shadow-lg">
             <Zap className="h-4 w-4 shrink-0 text-emerald-300" strokeWidth={2.5} />
             <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/10">
               <div
                 className="h-full rounded-full bg-emerald-400 transition-[width] duration-100 ease-linear"
-                style={{ width: `${Math.min(100, (game.energizedRemainingMs / 6000) * 100)}%` }}
+                style={{ width: `${Math.min(100, (game.energizedRemainingMs / POWER_MODE_MS) * 100)}%` }}
               />
             </div>
             <span className="text-[11px] font-semibold text-emerald-200">Purificador</span>
           </div>
-        ) : (
-          !compactLandscape && <GhostLegend />
         )}
-      </div>
-
-      <div ref={stageRef} className="relative min-h-0 flex-1 overflow-auto p-2 sm:p-3">
         <div
           className="relative mx-auto overflow-hidden rounded-xl shadow-[0_18px_40px_-12px_rgba(0,0,0,0.7)]"
-          style={{ width, height, outline: `2px solid ${isCity ? '#2ecc71' : primaryColor}` }}
+          style={{ width, height: height - trimmedRows * cellSize, outline: `2px solid ${isCity ? '#2ecc71' : primaryColor}` }}
         >
+        <div className="relative" style={{ width, height, marginTop: -(trimmedRows * cellSize) / 2 }}>
           {game.collectedPet > 0 && <ConfettiBurst trigger={game.collectedPet} />}
 
           {/* Capa 1: laberinto estático (sin costo por frame). Ciudad usa el mapa
@@ -345,7 +387,7 @@ function MazeCollectorSession({ title, primaryColor, layout, items, config, onEx
             const { left, top } = pixelPos(pickup.pos)
             return (
               <div key={pickup.id} className="absolute flex items-center justify-center" style={{ left, top, width: cellSize, height: cellSize }}>
-                {pickup.kind === 'PET' ? <PetSprite size={cellSize * 0.8} /> : <PowerPelletSprite size={cellSize * 1.05} />}
+                {pickup.kind === 'PET' ? <PetSprite size={cellSize * PET_SCALE} /> : <PowerPelletSprite size={cellSize * POWER_SCALE} />}
               </div>
             )
           })}
@@ -353,7 +395,7 @@ function MazeCollectorSession({ title, primaryColor, layout, items, config, onEx
             const { left, top } = pixelPos(bag.pos)
             return (
               <div key={bag.id} className="absolute flex items-center justify-center" style={{ left, top, width: cellSize, height: cellSize }}>
-                <TrashBagSprite size={cellSize * 0.95} />
+                <TrashBagSprite size={cellSize * BAG_SCALE} />
               </div>
             )
           })}
@@ -380,6 +422,7 @@ function MazeCollectorSession({ title, primaryColor, layout, items, config, onEx
               slowed={game.player.slowed}
             />
           </CenteredSprite>
+        </div>
         </div>
       </div>
 
@@ -417,10 +460,18 @@ function MazeCollectorSession({ title, primaryColor, layout, items, config, onEx
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
             <button
               type="button"
+              autoFocus
               className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 px-6 py-3 text-[15px] font-bold text-white shadow-[0_12px_30px_-10px_rgba(52,211,153,0.7)] transition-transform hover:-translate-y-0.5"
               onClick={() => move('RIGHT')}
             >
               <Play className="h-4 w-4" fill="currentColor" /> Empezar
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 rounded-2xl border border-white/15 px-4 py-3 text-[13.5px] font-medium text-slate-200 hover:bg-white/5"
+              onClick={onOpenGuide}
+            >
+              <BookOpen className="h-4 w-4" /> Ver la guía
             </button>
             <button
               type="button"
@@ -462,15 +513,17 @@ function MazeCollectorSession({ title, primaryColor, layout, items, config, onEx
         </Overlay>
       )}
 
-      {game.paused && (
+      {game.paused && !guideOpen && (
         <PauseOverlay
           fullscreen={fullscreen}
+          onGuide={onOpenGuide}
           canFullscreen={canFullscreen}
           onResume={resume}
           onToggleFullscreen={toggleFullscreen}
           onExit={onExit}
         />
       )}
+      {guideOpen && <MazeCollectorGuide onClose={onCloseGuide} />}
     </div>
   )
 }
@@ -516,7 +569,7 @@ function BonusMarker({
       style={{ left, top, width: cellSize, height: cellSize }}
       title={bonus.item.label}
     >
-      <BonusSprite size={cellSize * 1.1} />
+      <BonusSprite size={cellSize * BONUS_SCALE} />
     </div>
   )
 }
@@ -527,26 +580,6 @@ function Stat({ label, value }: { label: string; value: string }) {
       <span className="text-[9.5px] font-semibold uppercase tracking-[0.16em] text-slate-400">{label}</span>
       <span className="mt-0.5 text-[16px] font-bold tabular-nums text-white">{value}</span>
     </div>
-  )
-}
-
-const GHOST_LEGEND: Array<{ label: string; strip: string }> = [
-  { label: 'Smog Gris', strip: 'cloud-chaser' },
-  { label: 'Gas Tóxico', strip: 'cloud-ambusher' },
-  { label: 'Polución Industrial', strip: 'cloud-patroller' },
-  { label: 'Lluvia Ácida', strip: 'cloud-random' },
-]
-
-function GhostLegend() {
-  return (
-    <>
-      {GHOST_LEGEND.map((entry) => (
-        <span key={entry.label} className="flex items-center gap-1 text-[11px] text-slate-300">
-          <SpriteStrip name={entry.strip} frames={4} size={22} frame={0} />
-          {entry.label}
-        </span>
-      ))}
-    </>
   )
 }
 
@@ -630,12 +663,14 @@ function FullscreenChoice({ wanted, active, onChange }: FullscreenChoiceProps) {
 /** Menú de pausa: todo detenido (también los tiempos del purificador y del bonus). */
 function PauseOverlay({
   fullscreen,
+  onGuide,
   canFullscreen,
   onResume,
   onToggleFullscreen,
   onExit,
 }: {
   fullscreen: boolean
+  onGuide: () => void
   canFullscreen: boolean
   onResume: () => void
   onToggleFullscreen: () => void
@@ -664,6 +699,7 @@ function PauseOverlay({
           <Play className="h-5 w-5" fill="currentColor" /> Continuar jugando
         </button>
         <div className="mt-2.5 grid grid-cols-1 gap-2 min-[380px]:grid-cols-2">
+          <MenuButton icon={BookOpen} label="Cómo se juega" onClick={onGuide} />
           {canFullscreen && (
             <MenuButton
               icon={fullscreen ? Minimize : Maximize}

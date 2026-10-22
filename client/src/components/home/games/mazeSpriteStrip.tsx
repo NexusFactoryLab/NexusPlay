@@ -20,7 +20,8 @@ type SpriteStripProps = {
   /** Nombre del archivo sin extensión, ej. `truck-drive`. */
   name: string
   frames: number
-  size: number
+  /** Lado del cuadro: px, o cualquier medida CSS (ej. `12cqw` en las escenas de la guía). */
+  size: number | string
   /** Duración de una vuelta completa de la animación. */
   durationMs?: number
   /** Frame fijo (sin animar), ej. los ojos de la nube según hacia dónde mira. */

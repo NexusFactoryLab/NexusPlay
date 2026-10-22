@@ -27,7 +27,7 @@ async function main() {
   let structure
   const visualExamples = new Map()
   try {
-    for (const [kind, close] of [['PAIRS', 'button'], ['OPPOSITES', 'escape'], ['MAZE_COLLECTOR', 'backdrop'], ['DUAL_QUEST_PIXI', 'button'], ['DEMO', 'button']]) {
+    for (const [kind, close] of [['PAIRS', 'backdrop'], ['OPPOSITES', 'escape'], ['DUAL_QUEST_PIXI', 'button'], ['DEMO', 'button']]) {
       const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' })
       page.setDefaultTimeout(15000)
       const errors = []
@@ -49,9 +49,9 @@ async function main() {
         return route.abort()
       })
       await page.goto(base + (kind === 'DEMO' ? '/dual-quest/pixi-demo' : kind === 'DUAL_QUEST_PIXI' ? '/dual-quest-pixi/test-game' : '/test-game'))
-      if (['PAIRS', 'OPPOSITES', 'MAZE_COLLECTOR'].includes(kind)) {
+      if (['PAIRS', 'OPPOSITES'].includes(kind)) {
         await page.getByRole('button', { name: 'Jugar', exact: true }).click()
-        if (kind !== 'MAZE_COLLECTOR') await page.getByRole('button', { name: 'Empezar', exact: true }).click()
+        await page.getByRole('button', { name: 'Empezar', exact: true }).click()
       }
       const intro = page.locator('[data-game-instructions]')
       await intro.waitFor()
@@ -82,7 +82,6 @@ async function main() {
       else { await intro.getByRole('button').focus(); await page.keyboard.press('Enter') }
       await intro.waitFor({ state: 'detached' })
       if (kind === 'PAIRS' || kind === 'OPPOSITES') await page.getByText(/Zona 1 de/).waitFor()
-      else if (kind === 'MAZE_COLLECTOR') await page.getByRole('heading', { name: /nubes de contaminación/ }).waitFor()
       else await page.locator('canvas').waitFor().catch(async error => { console.error(await page.locator('body').innerText(), errors); throw error })
       assert.deepEqual(errors, [])
       console.log(`PASS ${kind}: entrada real, espera previa, misma estética, móvil, continuación por ${close} y juego activo`)

@@ -471,9 +471,11 @@ export type UseMazeCollectorGameOptions = {
   layout: MazeLayoutDef
   items: MazeCollectorItem[]
   config: MazeCollectorConfig
+  /** false mientras hay algo encima del juego (la guía): las flechas no mueven el camión. */
+  inputEnabled?: boolean
 }
 
-export function useMazeCollectorGame({ layout, items, config }: UseMazeCollectorGameOptions) {
+export function useMazeCollectorGame({ layout, items, config, inputEnabled = true }: UseMazeCollectorGameOptions) {
   const stateRef = useRef<InternalState | undefined>(undefined)
   if (!stateRef.current) {
     stateRef.current = createInitialState(layout, items, config)
@@ -533,6 +535,7 @@ export function useMazeCollectorGame({ layout, items, config }: UseMazeCollector
   }, [])
 
   useEffect(() => {
+    if (!inputEnabled) return
     function handleKeyDown(event: KeyboardEvent) {
       const direction = KEY_TO_DIRECTION[event.key]
       if (!direction) return
@@ -541,7 +544,7 @@ export function useMazeCollectorGame({ layout, items, config }: UseMazeCollector
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [setDirection])
+  }, [setDirection, inputEnabled])
 
   return { ...snapshot, paused, pause, resume, setDirection }
 }
