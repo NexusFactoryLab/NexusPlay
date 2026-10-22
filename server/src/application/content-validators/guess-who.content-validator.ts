@@ -52,7 +52,7 @@ export interface GuessWhoConfig {
 
 const DEFAULT_CONFIG: GuessWhoConfig = {
   maxAccusationCount: 6,
-  turnDurationSeconds: 15,
+  turnDurationSeconds: 30,
 };
 
 const MAX_LABEL_LENGTH = 120;

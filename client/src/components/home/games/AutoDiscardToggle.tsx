@@ -44,8 +44,8 @@ export function AutoDiscardToggle({
       </div>
       <p className="mt-1.5 text-[12px] leading-snug text-text">
         {enabled
-          ? 'Al responder una pregunta, el juego descarta solo las tarjetas que no coinciden.'
-          : 'Tú decides qué tarjetas descartar con lo que sabes del tema: más reto y se aprende más.'}
+          ? 'Cada respuesta descarta sola las tarjetas que no coinciden.'
+          : 'Tú decides qué descartar: más reto, se aprende más.'}
       </p>
       {!editable && readOnlyNote && <p className="mt-1 text-[11.5px] text-text">{readOnlyNote}</p>}
     </div>
