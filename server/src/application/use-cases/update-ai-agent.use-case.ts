@@ -18,6 +18,8 @@ import { isStaleVersion, parseExpectedVersion } from '../services/ai-optimistic-
 import { toAiAgentDto, type AiAgentDto } from '../dtos/ai-agent-response.dto.js';
 import type { UseCase } from '../ports/use-case.port.js';
 import { RequesterAdminResolver } from '../services/requester-admin-resolver.service.js';
+import { SECRET_CIPHER, type SecretCipher } from '../../domain/ports/secret-cipher.port.js';
+import { providerUsabilityFromCipher } from '../services/ai-agent-provider-plan.js';
 
 export const MAX_AGENT_INSTRUCTIONS = 4_000;
 
@@ -45,6 +47,7 @@ export class UpdateAiAgentUseCase implements UseCase<UpdateAiAgentInput, AiAgent
     @Inject(AI_AGENT_CONFIG_REPOSITORY) private readonly agents: AiAgentConfigRepository,
     @Inject(AI_PROVIDER_CONFIG_REPOSITORY) private readonly providers: AiProviderConfigRepository,
     private readonly requesterAdminResolver: RequesterAdminResolver,
+    @Inject(SECRET_CIPHER) private readonly cipher: SecretCipher,
   ) {}
 
   async execute(input: UpdateAiAgentInput): Promise<AiAgentDto> {
@@ -83,6 +86,6 @@ export class UpdateAiAgentUseCase implements UseCase<UpdateAiAgentInput, AiAgent
 
     // Condicional en la base de datos: si otro admin guardó entre la lectura y este punto, no se pisa.
     if (!(await this.agents.saveIfUnchanged(updated, current.updatedAt))) throw conflict();
-    return toAiAgentDto(updated, await this.providers.findAll());
+    return toAiAgentDto(updated, await this.providers.findAll(), providerUsabilityFromCipher(this.cipher));
   }
 }

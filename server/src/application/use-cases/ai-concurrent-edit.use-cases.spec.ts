@@ -147,7 +147,7 @@ describe('edición simultánea entre administradores (bloqueo optimista)', () =>
     const input = { requestingUserId: 'admin-1', key: 'GAME_PLAYER', instructions: 'Sé breve.' };
 
     it('un agente sin personalizar acepta expectedUpdatedAt = null', async () => {
-      const update = new UpdateAiAgentUseCase(agents, providers, admin);
+      const update = new UpdateAiAgentUseCase(agents, providers, admin, cipher);
       const dto = await update.execute({ ...input, expectedUpdatedAt: null });
       expect(dto.updatedAt).not.toBeNull();
       expect(agents.items.get('GAME_PLAYER')?.instructions).toBe('Sé breve.');
@@ -155,7 +155,7 @@ describe('edición simultánea entre administradores (bloqueo optimista)', () =>
 
     it('conflicto si el cliente creía que no estaba personalizado y otro admin ya lo guardó', async () => {
       agents.items.set('GAME_PLAYER', AiAgentConfig.defaults('GAME_PLAYER').with({ instructions: 'del otro' }));
-      const update = new UpdateAiAgentUseCase(agents, providers, admin);
+      const update = new UpdateAiAgentUseCase(agents, providers, admin, cipher);
       await expect(update.execute({ ...input, expectedUpdatedAt: null })).rejects.toThrow(AiConfigConflictError);
       expect(agents.items.get('GAME_PLAYER')?.instructions).toBe('del otro');
     });
@@ -163,7 +163,7 @@ describe('edición simultánea entre administradores (bloqueo optimista)', () =>
     it('conflicto con una versión distinta y éxito con la vigente', async () => {
       const stored = AiAgentConfig.defaults('GAME_PLAYER').with({ instructions: 'v1' });
       agents.items.set('GAME_PLAYER', stored);
-      const update = new UpdateAiAgentUseCase(agents, providers, admin);
+      const update = new UpdateAiAgentUseCase(agents, providers, admin, cipher);
 
       await expect(update.execute({ ...input, expectedUpdatedAt: '2020-01-01T00:00:00.000Z' })).rejects.toThrow(
         AiConfigConflictError,
@@ -173,7 +173,7 @@ describe('edición simultánea entre administradores (bloqueo optimista)', () =>
     });
 
     it('detecta la carrera en el guardado condicional', async () => {
-      const update = new UpdateAiAgentUseCase(agents, providers, admin);
+      const update = new UpdateAiAgentUseCase(agents, providers, admin, cipher);
       const original = agents.saveIfUnchanged.bind(agents);
       vi.spyOn(agents, 'saveIfUnchanged').mockImplementationOnce(async (config, expected) => {
         agents.items.set('GAME_PLAYER', AiAgentConfig.defaults('GAME_PLAYER').with({ instructions: 'del otro' }));

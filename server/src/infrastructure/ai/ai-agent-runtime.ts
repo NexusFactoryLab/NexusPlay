@@ -11,6 +11,7 @@ import {
 import type { AiContentAssistant } from '../../domain/ports/ai-content-assistant.port.js';
 import type { AiAgentProbe, AiAgentProbeResult } from '../../domain/ports/ai-agent-probe.port.js';
 import { AiProviderAttemptTracker } from '../../application/services/ai-provider-attempt-tracker.service.js';
+import { planAgentProviders } from '../../application/services/ai-agent-provider-plan.js';
 import { AiProviderChainResolver } from './ai-provider-chain-resolver.js';
 import { AiProviderOrchestrator, type AiProviderChainEntry } from './ai-provider-orchestrator.js';
 
@@ -53,13 +54,18 @@ export class AiAgentRuntime implements AiAgentProbe {
     const config = await this.configOf(key);
     const entries: AiProviderChainEntry[] = [];
 
-    if (config.providerId) {
-      const provider = await this.providers.findById(config.providerId);
-      const own = provider ? this.chains.entryForConfig(provider, config.modelOverride) : null;
+    // La misma regla que usa el panel (`toAiAgentDto`): ver `planAgentProviders`.
+    const plan = planAgentProviders(
+      config,
+      config.providerId ? await this.providers.findAll() : [],
+      (provider) => this.chains.entryForConfig(provider) !== null,
+    );
+    if (plan.own) {
+      const own = this.chains.entryForConfig(plan.own, plan.model);
       if (own) entries.push(own);
     }
 
-    if (entries.length === 0 || config.fallbackToDefault) {
+    if (plan.useGeneralChain) {
       try {
         const general = await this.chains.defaultEntries();
         const ownName = entries[0]?.name;
