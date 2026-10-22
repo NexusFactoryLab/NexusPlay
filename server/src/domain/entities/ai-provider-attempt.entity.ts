@@ -6,6 +6,8 @@ export interface AiProviderAttemptProps {
   /** Nombre corto del proveedor tal como aparece en la cadena de fallback (ver `AiProviderOrchestrator`), ej. "gemini", "groq". */
   provider: string;
   operation: AiProviderOperation;
+  /** Clave del agente que hizo la llamada; `null` en registros anteriores a que se guardara. */
+  agent: string | null;
   succeeded: boolean;
   /** true si NO fue el primer proveedor de la cadena el que respondió (issue #204). */
   usedFallback: boolean;
@@ -45,6 +47,10 @@ export class AiProviderAttempt {
 
   get operation(): AiProviderOperation {
     return this.props.operation;
+  }
+
+  get agent(): string | null {
+    return this.props.agent;
   }
 
   get succeeded(): boolean {

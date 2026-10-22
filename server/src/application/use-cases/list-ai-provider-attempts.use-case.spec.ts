@@ -25,6 +25,7 @@ describe('ListAiProviderAttemptsUseCase', () => {
     const attempt = AiProviderAttempt.create({
       provider: 'groq',
       operation: 'generateGameDraft',
+      agent: 'GAME_CONFIGURATOR',
       succeeded: true,
       usedFallback: true,
       errorMessage: null,
@@ -45,6 +46,7 @@ describe('ListAiProviderAttemptsUseCase', () => {
           id: attempt.id,
           provider: 'groq',
           operation: 'generateGameDraft',
+          agent: 'GAME_CONFIGURATOR',
           succeeded: true,
           usedFallback: true,
           errorMessage: null,

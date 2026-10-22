@@ -8,6 +8,8 @@ import { AiProviderAttempt, type AiProviderOperation } from '../../domain/entiti
 export interface RecordAiProviderAttemptInput {
   provider: string;
   operation: AiProviderOperation;
+  /** Clave del agente que hizo la llamada (`GAME_PLAYER`…); ausente si no se sabe. */
+  agent?: string | null;
   succeeded: boolean;
   usedFallback: boolean;
   errorMessage?: string | null;
@@ -34,6 +36,7 @@ export class AiProviderAttemptTracker {
     const attempt = AiProviderAttempt.create({
       provider: input.provider,
       operation: input.operation,
+      agent: input.agent ?? null,
       succeeded: input.succeeded,
       usedFallback: input.usedFallback,
       errorMessage: input.errorMessage ?? null,

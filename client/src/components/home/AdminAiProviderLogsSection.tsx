@@ -4,14 +4,9 @@ import { useAuth } from '../../hooks/useAuth'
 import { listAiProviderAttempts } from '../../services/ai-provider-log.service'
 import type { AiProviderAttempt } from '../../services/ai-provider-log.service'
 import { ApiError } from '../../utils/http'
+import { agentLabel, operationLabel } from './ai/aiLogFormat'
 
 const PAGE_SIZE = 20
-
-const OPERATION_LABEL: Record<string, string> = {
-  describeImage: 'Describir imagen',
-  generateGameDraft: 'Generar borrador de juego',
-  complete: 'Consulta del agente Jugador',
-}
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString('es-CO', {
@@ -102,6 +97,7 @@ export function AdminAiProviderLogsSection() {
             <tr>
               <th className="px-4 py-3 font-medium">Fecha</th>
               <th className="px-4 py-3 font-medium">Operación</th>
+              <th className="px-4 py-3 font-medium">Agente</th>
               <th className="px-4 py-3 font-medium">Proveedor</th>
               <th className="px-4 py-3 font-medium">Resultado</th>
               <th className="px-4 py-3 font-medium">Latencia</th>
@@ -111,13 +107,13 @@ export function AdminAiProviderLogsSection() {
           <tbody>
             {loading ? (
               <tr>
-                <td className="px-4 py-6 text-center text-text" colSpan={6}>
+                <td className="px-4 py-6 text-center text-text" colSpan={7}>
                   Cargando…
                 </td>
               </tr>
             ) : items.length === 0 ? (
               <tr>
-                <td className="px-4 py-6 text-center text-text" colSpan={6}>
+                <td className="px-4 py-6 text-center text-text" colSpan={7}>
                   Todavía no se ha usado el asistente de IA.
                 </td>
               </tr>
@@ -125,7 +121,8 @@ export function AdminAiProviderLogsSection() {
               items.map((item) => (
                 <tr key={item.id} className="border-t border-border align-top">
                   <td className="px-4 py-3 text-text">{formatDate(item.createdAt)}</td>
-                  <td className="px-4 py-3 text-text">{OPERATION_LABEL[item.operation] ?? item.operation}</td>
+                  <td className="px-4 py-3 text-text">{operationLabel(item.operation)}</td>
+                  <td className="px-4 py-3 text-text">{agentLabel(item.agent)}</td>
                   <td className="px-4 py-3 text-text-h">
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-surface px-2.5 py-1 text-[12.5px] font-medium capitalize">
                       {item.provider}

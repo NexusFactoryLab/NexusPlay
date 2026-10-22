@@ -104,6 +104,6 @@ export class AiAgentRuntime implements AiAgentProbe {
   /** Asistente (con respaldo entre proveedores) del agente, y el enfoque que debe aplicar. */
   async assistantFor(key: AiAgentKey): Promise<{ assistant: AiContentAssistant; instructions: string }> {
     const { entries, instructions } = await this.resolve(key);
-    return { assistant: new AiProviderOrchestrator(entries, this.tracker), instructions };
+    return { assistant: new AiProviderOrchestrator(entries, this.tracker, key), instructions };
   }
 }

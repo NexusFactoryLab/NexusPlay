@@ -18,6 +18,7 @@ export class PrismaAiProviderAttemptRepository implements AiProviderAttemptRepos
         id: attempt.id,
         provider: attempt.provider,
         operation: attempt.operation,
+        agent: attempt.agent,
         succeeded: attempt.succeeded,
         usedFallback: attempt.usedFallback,
         errorMessage: attempt.errorMessage,

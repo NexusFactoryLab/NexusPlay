@@ -81,6 +81,27 @@ describe('AiProviderOrchestrator', () => {
     expect(tracker.record).toHaveBeenCalledTimes(2);
   });
 
+  it('pasa la clave del agente al tracker en cada intento (éxito y falla), o null si no se indica', async () => {
+    const failing = fakeAssistant({ complete: vi.fn().mockRejectedValue(new Error('cuota')) });
+    const tracker = fakeTracker();
+    const withAgent = new AiProviderOrchestrator(
+      [{ name: 'a', assistant: failing }, { name: 'b', assistant: fakeAssistant() }],
+      tracker,
+      'GAME_PLAYER',
+    );
+
+    await withAgent.complete({ prompt: 'hola' } as never);
+
+    expect(tracker.record).toHaveBeenNthCalledWith(1, expect.objectContaining({ provider: 'a', succeeded: false, agent: 'GAME_PLAYER' }));
+    expect(tracker.record).toHaveBeenNthCalledWith(2, expect.objectContaining({ provider: 'b', succeeded: true, agent: 'GAME_PLAYER' }));
+
+    const anonymousTracker = fakeTracker();
+    await new AiProviderOrchestrator([{ name: 'a', assistant: fakeAssistant() }], anonymousTracker).complete({
+      prompt: 'hola',
+    } as never);
+    expect(anonymousTracker.record).toHaveBeenCalledWith(expect.objectContaining({ agent: null }));
+  });
+
   it('rechaza construirse sin ningún proveedor en la cadena', () => {
     expect(() => new AiProviderOrchestrator([], fakeTracker())).toThrow();
   });

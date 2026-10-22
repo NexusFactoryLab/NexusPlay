@@ -255,6 +255,8 @@ model AiProviderAttemptModel {
   id           String   @id @default(uuid())
   provider     String
   operation    String
+  /// Agente que hizo la llamada (`GAME_PLAYER`…); null en filas anteriores.
+  agent        String?
   succeeded    Boolean
   usedFallback Boolean  @map("used_fallback")
   errorMessage String?  @map("error_message")
