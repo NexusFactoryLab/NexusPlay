@@ -7,7 +7,7 @@ import { ChevronLeft, ChevronRight, Crosshair, Hand, LogOut, PackageOpen, Rotate
 import { useAuth } from '../../../hooks/useAuth'
 import { useDominoRoom } from './useDominoRoom'
 import { iconForConcept, type DominoConcept, type DominoLevel } from './dominoTypes'
-import { DominoLevelPicker } from './DominoLevelPicker'
+import { DominoSettingsPanel } from './DominoSettingsPanel'
 import { DominoQuestionModal } from './DominoQuestionModal'
 import { DOMINO_FEEDBACK_MS } from './dominoLevels'
 import { dominoTileCategoryInk } from './dominoTileVisualTokens'
@@ -462,7 +462,7 @@ function DominoRoomPageSession() {
     room={room} roomPath={`/domino/sala/${encodeURIComponent(room.code)}`} maxPlayers={2}
     isHost={Boolean(self?.isHost)} connecting={connecting} error={error}
     turnDurationSeconds={room.turnDurationSeconds} onUpdateTurnDuration={updateTurnDuration}
-    settings={<DominoLevelPicker level={level} isHost={Boolean(self?.isHost)} disabled={connecting} onChange={updateLevel} />}
+    settingsPanel={<DominoSettingsPanel level={level} turnDurationSeconds={room.turnDurationSeconds} isHost={Boolean(self?.isHost)} disabled={connecting} onChangeLevel={updateLevel} onUpdateTurnDuration={updateTurnDuration} />}
     onReady={setReady} onExit={handleExit} messages={messages} onSend={sendChatMessage}
   >{dealCountdownMs !== null && <DealCountdownOverlay remainingMs={dealCountdownMs} />}</MultiplayerLobby>
 

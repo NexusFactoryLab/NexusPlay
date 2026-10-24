@@ -6,9 +6,7 @@ import { Modal } from './Modal'
 import { gameInstructions, type InstructionKind } from './gameInstructions'
 import { GuessWhoVisualDemo } from './GuessWhoVisualDemo'
 import { flagsDemoExample, type GuessWhoDemoExample } from './guessWhoDemoExamples'
-import { DominoVisualDemo } from './DominoVisualDemo'
-import { DOMINO_LEVEL_INFO, DOMINO_LEVEL_ORDER } from './dominoLevels'
-import { MemoryMatchDemo } from './MemoryMatchFlash'
+import { DominoVisualDemo } from './DominoVisualDemo'import { MemoryMatchDemo } from './MemoryMatchFlash'
 
 const SEEN_KEY_PREFIX = 'nexusplay:guia-vista:'
 
@@ -69,17 +67,7 @@ export function GameInstructionsGate({ kind, children, guessWhoExample = flagsDe
             <X className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden="true" />
           </button>
         </div>
-        {isGuessWho ? <GuessWhoVisualDemo example={guessWhoExample} onContinue={onContinue} /> : isDomino ? <>
-          <DominoVisualDemo onContinue={onContinue} />
-          <div className="rounded-2xl border border-border bg-code-bg p-3 text-[12px] leading-snug text-text" data-domino-levels>
-            <p className="mb-1 font-semibold text-text-h">Niveles (los elige quien crea la sala)</p>
-            <ul className="space-y-0.5">
-              {DOMINO_LEVEL_ORDER.map((level) => (
-                <li key={level}><strong className="text-text-h">{DOMINO_LEVEL_INFO[level].label}:</strong> {DOMINO_LEVEL_INFO[level].description}</li>
-              ))}
-            </ul>
-          </div>
-        </> : <>
+        {isGuessWho ? <GuessWhoVisualDemo example={guessWhoExample} onContinue={onContinue} /> : isDomino ? <DominoVisualDemo onContinue={onContinue} /> : <>
         {isMemory ? <MemoryMatchDemo opposites={kind === 'OPPOSITES'} /> : <>
         <p className="text-[13.5px] leading-relaxed text-text">{content.text}</p>
         <div className="rounded-2xl border border-border bg-code-bg p-4">

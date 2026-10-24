@@ -34,6 +34,8 @@ type Props = {
   onSend: (text: string) => void
   /** Ajustes propios del juego, debajo de los segundos por turno (ej. descarte automático de ¿Quién Es?). */
   settings?: ReactNode
+  /** Reemplaza por completo el bloque de turno + ajustes con un panel propio (ej. Dominexo). Los demás juegos no lo usan. */
+  settingsPanel?: ReactNode
   /** Partida contra el bot: sin código, enlace, QR ni chat (no hay a quién invitar). */
   solo?: boolean
   children?: ReactNode
@@ -57,6 +59,7 @@ export function MultiplayerLobby({
   messages,
   onSend,
   settings,
+  settingsPanel,
   solo = false,
   children,
 }: Props) {
@@ -231,7 +234,7 @@ export function MultiplayerLobby({
         )}
         <div className="flex flex-col gap-3">
           {/* Turno y ajustes extra (ej. descarte automático) lado a lado para que el modal no necesite scroll (issue #80). */}
-          <div className={settings ? 'grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 [&>*]:h-full' : 'contents'}>
+          {settingsPanel ?? <div className={settings ? 'grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 [&>*]:h-full' : 'contents'}>
           {turnDurationSeconds === undefined ? (
             <div className="rounded-[22px] border border-border bg-surface p-4 shadow-[var(--shadow)]">
               <p className="text-[13px] font-medium text-text-h">
@@ -290,7 +293,7 @@ export function MultiplayerLobby({
           )}
 
           {settings}
-          </div>
+          </div>}
 
           <LobbyReadyControl
             players={room.players}
