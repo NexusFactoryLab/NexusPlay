@@ -21,6 +21,7 @@ import {
   type TournamentMatch,
 } from '../../domain/ports/tournament-store.port.js';
 import type { GuessWhoCard } from '../../application/content-validators/guess-who.content-validator.js';
+import { dominoQuestionBank, pickDominoQuestion } from '../../application/content-validators/domino-question-bank.js';
 import { DOMINO_LEVELS, type DominoConcept, type DominoLevel } from '../../application/content-validators/domino.content-validator.js';
 import {
   DOMINO_ROOM_STORE,
@@ -28,6 +29,7 @@ import {
   type DominoRoomState,
   type DominoTile,
   type DominoPlacedTile,
+  type DominoPendingQuestion,
 } from '../../domain/ports/domino-room-store.port.js';
 import {
   SNAKES_LADDERS_ROOM_STORE,
@@ -276,10 +278,11 @@ export const DOMINO_LEVEL_TURN_SECONDS: Record<DominoLevel, number> = { EASY: 30
  * en la pantalla de cierre, `missedConcepts`).
  */
 export function toDominoClientConcept(concept: DominoConcept) {
-  const { question, ...rest } = concept;
-  if (!question) return rest;
-  // Se arma campo por campo (lista blanca) para que un campo nuevo no se filtre por accidente.
-  return { ...rest, question: { text: question.text, options: question.options } };
+  // El cliente nunca conoce el banco: ni `question` ni `questions`. La pregunta elegida
+  // viaja aparte en `pendingQuestion` (solo texto y opciones).
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { question: _question, questions: _questions, ...rest } = concept;
+  return rest;
 }
 
 /**
@@ -312,6 +315,16 @@ function buildDominoPlacement(room: DominoRoomState, tile: DominoTile, side: 'le
     : { id: tile.id, left: tile.a, right: tile.b, isDouble, placedByUserId: userId };
 }
 
+/** Pregunta pendiente tal como la ve el cliente: quién responde y la pregunta elegida, sin correctIndex ni explanation. */
+function dominoPendingQuestionView(room: DominoRoomState, pending: DominoPendingQuestion) {
+  const question = dominoQuestionBank(room.concepts[pending.conceptIndex])[pending.questionIndex];
+  return {
+    userId: pending.userId,
+    conceptIndex: pending.conceptIndex,
+    question: question ? { text: question.text, options: question.options } : null,
+  };
+}
+
 /** Vista pública de la sala de dominó para un jugador dado: la mano ajena solo se ve como cantidad. */
 export function toDominoClientView(room: DominoRoomState, forSocketId: string) {
   return {
@@ -322,18 +335,16 @@ export function toDominoClientView(room: DominoRoomState, forSocketId: string) {
     turnDurationSeconds: room.turnDurationSeconds,
     level: room.level ?? 'EASY',
     // Solo quién responde y de qué concepto: ficha, lado y respuesta correcta se quedan en el servidor.
-    pendingQuestion: room.pendingQuestion
-      ? { userId: room.pendingQuestion.userId, conceptIndex: room.pendingQuestion.conceptIndex }
-      : null,
+    pendingQuestion: room.pendingQuestion ? dominoPendingQuestionView(room, room.pendingQuestion) : null,
     seenConceptIndexes: room.seenConceptIndexes ?? [],
     missedConceptIndexes: room.missedConceptIndexes ?? [],
     // La explicación de lo fallado solo llega al terminar la partida (ya se reveló al responder).
     missedConcepts:
       room.phase === 'FINISHED'
-        ? (room.missedConceptIndexes ?? []).map((conceptIndex) => ({
-            conceptIndex,
-            explanation: room.concepts[conceptIndex]?.question?.explanation ?? null,
-          }))
+        ? (room.missedQuestions ?? []).map(({ conceptIndex, questionIndex }) => {
+            const question = dominoQuestionBank(room.concepts[conceptIndex])[questionIndex];
+            return { conceptIndex, questionText: question?.text ?? null, explanation: question?.explanation ?? null };
+          })
         : [],
     phase: room.phase,
     board: room.board,
@@ -544,6 +555,8 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
 
   /** Timers de turno de salas de dominó, mismo criterio que `turnTimers` para "¿Quién Es?". */
   private readonly dominoTurnTimers = new Map<string, NodeJS.Timeout>();
+  /** Azar de la rotación de preguntas; las pruebas lo reemplazan por uno determinista. */
+  dominoQuestionRng: () => number = Math.random;
 
   /**
    * Timers de Escaleras y Serpientes — un solo timer por sala que cubre TANTO
@@ -2009,6 +2022,10 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     room.pendingQuestion = null;
     room.seenConceptIndexes = [];
     room.missedConceptIndexes = [];
+    room.missedQuestions = [];
+    // Revancha: el registro de preguntas hechas empieza de cero.
+    room.askedQuestions = {};
+    room.lastQuestion = {};
 
     const firstPlayer = room.players[Math.floor(Math.random() * room.players.length)];
     this.setActiveDominoTurn(room, firstPlayer.userId);
@@ -2041,10 +2058,15 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     const placed = buildDominoPlacement(room, tile, side, player.userId);
 
     // Intermedio: antes de colocar, se responde la pregunta del concepto del extremo que empata.
-    // Un concepto sin `question` (juegos viejos) se coloca directo.
+    // Un concepto sin preguntas (juegos viejos) se coloca directo.
     const conceptIndex = dominoMatchedConceptIndex(room, side);
-    if ((room.level ?? 'EASY') === 'MEDIUM' && conceptIndex !== null && room.concepts[conceptIndex]?.question) {
-      room.pendingQuestion = { userId: player.userId, tileId: tile.id, side, conceptIndex };
+    const bankSize = conceptIndex === null ? 0 : dominoQuestionBank(room.concepts[conceptIndex]).length;
+    if ((room.level ?? 'EASY') === 'MEDIUM' && conceptIndex !== null && bankSize > 0) {
+      // Rotación: una pregunta del banco que aún no se hizo en la sala (robar y volver a jugar el mismo concepto no la repite).
+      const pick = pickDominoQuestion(bankSize, room.askedQuestions?.[conceptIndex] ?? [], room.lastQuestion?.[conceptIndex], this.dominoQuestionRng)!;
+      room.askedQuestions = { ...room.askedQuestions, [conceptIndex]: pick.asked };
+      room.lastQuestion = { ...room.lastQuestion, [conceptIndex]: pick.index };
+      room.pendingQuestion = { userId: player.userId, tileId: tile.id, side, conceptIndex, questionIndex: pick.index };
       // El tiempo de responder cuenta como un turno completo: se reinicia el reloj.
       room.turnDeadline = Date.now() + room.turnDurationSeconds * 1000;
       this.startDominoTurnTimer(room, player.userId);
@@ -2072,7 +2094,8 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       throw new Error('No tienes ninguna pregunta pendiente.');
     }
 
-    const question = room.concepts[pending.conceptIndex]?.question;
+    // Se valida contra la pregunta elegida y guardada en el servidor, no contra otra del banco.
+    const question = dominoQuestionBank(room.concepts[pending.conceptIndex])[pending.questionIndex];
     const optionIndex = body?.optionIndex;
     if (!question || !Number.isInteger(optionIndex) || optionIndex < 0 || optionIndex >= question.options.length) {
       throw new Error('Opción no válida.');
@@ -2097,7 +2120,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       correct,
       timedOut,
       conceptIndex: pending.conceptIndex,
-      explanation: room.concepts[pending.conceptIndex]?.question?.explanation ?? null,
+      explanation: dominoQuestionBank(room.concepts[pending.conceptIndex])[pending.questionIndex]?.explanation ?? null,
     });
 
     if (correct) {
@@ -2112,6 +2135,10 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
 
     const missed = room.missedConceptIndexes ?? [];
     if (!missed.includes(pending.conceptIndex)) room.missedConceptIndexes = [...missed, pending.conceptIndex];
+    const missedQuestions = room.missedQuestions ?? [];
+    if (!missedQuestions.some((m) => m.conceptIndex === pending.conceptIndex && m.questionIndex === pending.questionIndex)) {
+      room.missedQuestions = [...missedQuestions, { conceptIndex: pending.conceptIndex, questionIndex: pending.questionIndex }];
+    }
     this.advanceDominoTurn(room);
   }
 

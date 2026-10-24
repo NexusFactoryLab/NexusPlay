@@ -73,6 +73,12 @@ export interface DominoRoomState {
   seenConceptIndexes?: number[];
   /** Conceptos cuya pregunta se falló (o se agotó el tiempo) en la partida actual. */
   missedConceptIndexes?: number[];
+  /** Preguntas falladas (concepto + posición en su banco), para el repaso de la pantalla de cierre. */
+  missedQuestions?: Array<{ conceptIndex: number; questionIndex: number }>;
+  /** Por concepto, índices del banco ya preguntados en esta sala; base de la rotación sin repetir. */
+  askedQuestions?: Record<number, number[]>;
+  /** Por concepto, última pregunta hecha: evita repetirla justo al reiniciar el registro. */
+  lastQuestion?: Record<number, number>;
 }
 
 export interface DominoPendingQuestion {
@@ -81,6 +87,8 @@ export interface DominoPendingQuestion {
   side: 'left' | 'right';
   /** Concepto del extremo que empata; de él sale la pregunta. */
   conceptIndex: number;
+  /** Posición, dentro del banco del concepto, de la pregunta elegida; la respuesta se valida contra ella. */
+  questionIndex: number;
 }
 
 /** Almacén efímero en memoria: la sala vive solo mientras el proceso corre (ver RoomsGateway). */

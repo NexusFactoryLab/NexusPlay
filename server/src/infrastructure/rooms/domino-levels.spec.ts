@@ -125,7 +125,7 @@ describe('Intermedio: pregunta antes de colocar', () => {
     expect(h.room.pendingQuestion).toMatchObject({ userId: 'p1', tileId: 'to1', side: 'right', conceptIndex: 1 });
     expect(h.room.board).toHaveLength(1);
     const view = toDominoClientView(h.room, 's1');
-    expect(view.pendingQuestion).toEqual({ userId: 'p1', conceptIndex: 1 });
+    expect(view.pendingQuestion).toEqual({ userId: 'p1', conceptIndex: 1, question: { text: 'Q1', options: ['A', 'B', 'C'] } });
     expect(JSON.stringify(view)).not.toContain('correctIndex');
     expect(JSON.stringify(view)).not.toContain('Explica');
   });
@@ -208,6 +208,86 @@ describe('Intermedio: pregunta antes de colocar', () => {
     h.gateway.handleDominoPlay(h.p1, { tileId: 'to1', side: 'right' });
     h.gateway.handleDisconnect(h.p2);
     expect(h.room.pendingQuestion).toBeNull();
+  });
+});
+
+describe('Intermedio: banco de preguntas por concepto', () => {
+  const bank = [0, 1, 2].map((i) => ({
+    text: `B${i}`,
+    options: ['A', 'B', 'C'],
+    correctIndex: i,
+    explanation: `Explica B${i}`,
+  }));
+
+  /** Partida con el concepto 1 con banco de 3 preguntas; el azar siempre devuelve 0 (toma la primera candidata). */
+  function withBank() {
+    const h = mediumPlaying();
+    h.room.concepts[1].questions = bank;
+    h.gateway.dominoQuestionRng = () => 0;
+    return h;
+  }
+
+  function askAndFail(h: ReturnType<typeof withBank>) {
+    h.room.activePlayerUserId = 'p1';
+    h.gateway.handleDominoPlay(h.p1, { tileId: 'to1', side: 'right' });
+    const asked = h.room.pendingQuestion!.questionIndex;
+    const view = toDominoClientView(h.room, 's1').pendingQuestion;
+    h.gateway.handleDominoAnswer(h.p1, { optionIndex: (asked + 1) % 3 }); // incorrecta: pasa el turno
+    return { asked, view };
+  }
+
+  it('volver a jugar el mismo concepto cambia la pregunta mientras queden sin hacer', () => {
+    const h = withBank();
+    const seen = [askAndFail(h).asked, askAndFail(h).asked, askAndFail(h).asked];
+    expect([...seen].sort()).toEqual([0, 1, 2]);
+  });
+
+  it('al agotar el banco reinicia el registro y no repite la última de inmediato', () => {
+    const h = withBank();
+    const seen = [askAndFail(h).asked, askAndFail(h).asked, askAndFail(h).asked];
+    const next = askAndFail(h).asked;
+    expect(next).not.toBe(seen[2]);
+    expect(h.room.askedQuestions?.[1]).toEqual([next]);
+  });
+
+  it('el cliente recibe la pregunta elegida sin correctIndex ni explanation, y el banco no viaja', () => {
+    const h = withBank();
+    const { asked, view } = askAndFail(h);
+    expect(view).toEqual({ userId: 'p1', conceptIndex: 1, question: { text: `B${asked}`, options: ['A', 'B', 'C'] } });
+    const json = JSON.stringify(toDominoClientView(h.room, 's1'));
+    expect(json).not.toContain('correctIndex');
+    expect(json).not.toContain('Explica');
+    expect(json).not.toContain('"questions"');
+  });
+
+  it('valida contra el correctIndex de la pregunta elegida y entrega esa explicación', () => {
+    const h = withBank();
+    h.gateway.handleDominoPlay(h.p1, { tileId: 'to1', side: 'right' });
+    const asked = h.room.pendingQuestion!.questionIndex;
+    h.gateway.handleDominoAnswer(h.p1, { optionIndex: asked }); // correctIndex de B<asked> es <asked>
+    expect(h.events.find((e) => e.event === 'domino:answer-result')).toMatchObject({
+      payload: { correct: true, explanation: `Explica B${asked}` },
+    });
+    expect(h.room.board).toHaveLength(2);
+  });
+
+  it('la revancha reinicia el registro de preguntas hechas', () => {
+    const h = withBank();
+    askAndFail(h);
+    expect(h.room.askedQuestions?.[1]).toHaveLength(1);
+    (h.gateway as unknown as { dealNewDominoGame: (r: DominoRoomState) => void }).dealNewDominoGame(h.room);
+    expect(h.room.askedQuestions).toEqual({});
+    expect(h.room.lastQuestion).toEqual({});
+    expect(h.room.missedQuestions).toEqual([]);
+  });
+
+  it('un banco de 1 pregunta se repite sin romper la partida', () => {
+    const h = mediumPlaying();
+    h.room.concepts[1].questions = [bank[0]];
+    askAndFail({ ...h } as ReturnType<typeof withBank>);
+    h.room.activePlayerUserId = 'p1';
+    h.gateway.handleDominoPlay(h.p1, { tileId: 'to1', side: 'right' });
+    expect(h.room.pendingQuestion?.questionIndex).toBe(0);
   });
 });
 
