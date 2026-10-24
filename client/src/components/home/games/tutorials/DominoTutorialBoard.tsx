@@ -1,18 +1,17 @@
 import { useEffect, useState } from 'react'
+import type { DominoConcept } from '../dominoTypes'
+import type { DominoPlacedTileView, DominoTileView } from '../dominoRoomTypes'
+import { BoardTileView, HandTileView } from '../DominoRoomPage'
 import type { TutorialBoardProps } from './InteractiveTutorial'
 
-export type DominoConcept = { label: string; emoji: string }
-export type DominoTutorialTile = { id: string; a: DominoConcept; b: DominoConcept }
-
-type Placed = { tile: DominoTutorialTile; left: DominoConcept; right: DominoConcept }
-
 /**
- * Mini mesa de Dominexo: una cadena con dos extremos y una mano de fichas.
- * Tocar una ficha que comparte concepto con un extremo la conecta ahí (girada
- * si hace falta); si ninguna encaja, "Robar ficha" trae una nueva.
- * `goal`: cuántas fichas hay que conectar para lograr el paso.
+ * Mini mesa de Dominexo con las MISMAS fichas del juego (`BoardTileView` en
+ * la mesa, `HandTileView` en la mano). Tocar una ficha que comparte concepto
+ * con un extremo la conecta ahí (girada si hace falta); si ninguna encaja,
+ * "Robar ficha" trae una del montón. `goal`: cuántas fichas hay que conectar.
  */
 export function DominoTutorialBoard({
+  concepts,
   chain: initialChain,
   hand: initialHand,
   pile = [],
@@ -21,41 +20,51 @@ export function DominoTutorialBoard({
   onMistake,
   hint,
   done,
-}: TutorialBoardProps & { chain: DominoTutorialTile[]; hand: DominoTutorialTile[]; pile?: DominoTutorialTile[]; goal: number }) {
-  const [chain, setChain] = useState<Placed[]>(() => initialChain.map((tile) => ({ tile, left: tile.a, right: tile.b })))
+}: TutorialBoardProps & {
+  concepts: DominoConcept[]
+  chain: DominoTileView[]
+  hand: DominoTileView[]
+  pile?: DominoTileView[]
+  goal: number
+}) {
+  const [chain, setChain] = useState<DominoPlacedTileView[]>(() =>
+    initialChain.map((tile) => ({ id: tile.id, left: tile.a, right: tile.b, isDouble: tile.a === tile.b, placedByUserId: '' })),
+  )
   const [hand, setHand] = useState(initialHand)
   const [deck, setDeck] = useState(pile)
   const [played, setPlayed] = useState(0)
   const [justPlaced, setJustPlaced] = useState<string | null>(null)
+  const conceptOf = (id: number) => concepts[id]
 
   const leftEnd = chain[0].left
   const rightEnd = chain[chain.length - 1].right
-  const fits = (tile: DominoTutorialTile) =>
-    [tile.a.label, tile.b.label].some((label) => label === leftEnd.label || label === rightEnd.label)
+  const fits = (tile: DominoTileView) => [tile.a, tile.b].some((half) => half === leftEnd || half === rightEnd)
   const anyFits = hand.some(fits)
 
   useEffect(() => {
     if (!done && played >= goal) onDone()
   }, [played, goal, done, onDone])
 
-  function play(tile: DominoTutorialTile) {
+  function play(tile: DominoTileView) {
     if (done) return
-    let placed: Placed | null = null
+    const placed = (left: number, right: number): DominoPlacedTileView => ({ id: tile.id, left, right, isDouble: tile.a === tile.b, placedByUserId: 'tu' })
+    let next: DominoPlacedTileView | null = null
     let side: 'left' | 'right' = 'right'
-    if (tile.a.label === rightEnd.label) placed = { tile, left: tile.a, right: tile.b }
-    else if (tile.b.label === rightEnd.label) placed = { tile, left: tile.b, right: tile.a }
-    else if (tile.b.label === leftEnd.label) {
-      placed = { tile, left: tile.a, right: tile.b }
+    if (tile.a === rightEnd) next = placed(tile.a, tile.b)
+    else if (tile.b === rightEnd) next = placed(tile.b, tile.a)
+    else if (tile.b === leftEnd) {
+      next = placed(tile.a, tile.b)
       side = 'left'
-    } else if (tile.a.label === leftEnd.label) {
-      placed = { tile, left: tile.b, right: tile.a }
+    } else if (tile.a === leftEnd) {
+      next = placed(tile.b, tile.a)
       side = 'left'
     }
-    if (!placed) {
-      onMistake(`Esa ficha no tiene «${leftEnd.label}» ni «${rightEnd.label}», los conceptos de los extremos.`)
+    if (!next) {
+      onMistake(`Esa ficha no tiene «${conceptOf(leftEnd).label}» ni «${conceptOf(rightEnd).label}», los conceptos de los extremos.`)
       return
     }
-    setChain((value) => (side === 'left' ? [placed!, ...value] : [...value, placed!]))
+    const placedTile = next
+    setChain((value) => (side === 'left' ? [placedTile, ...value] : [...value, placedTile]))
     setHand((value) => value.filter((item) => item.id !== tile.id))
     setPlayed((value) => value + 1)
     setJustPlaced(tile.id)
@@ -77,76 +86,40 @@ export function DominoTutorialBoard({
   const hintDraw = hint && !anyFits
 
   return (
-    <div className="flex w-full flex-col items-center gap-3">
-      <div className="flex max-w-full items-center gap-1 overflow-x-auto pb-1" aria-label="Fichas en la mesa">
-        {chain.map((placed, i) => (
-          <TileFace
-            key={placed.tile.id}
-            left={placed.left}
-            right={placed.right}
-            highlightLeft={i === 0}
-            highlightRight={i === chain.length - 1}
-            fresh={placed.tile.id === justPlaced}
-          />
+    // Fondo de la mesa del juego (`domino-premium-board` pinta los brillos; el azul va en línea para que no lo pise).
+    <div className="domino-premium-board flex w-full flex-col items-center gap-3 rounded-2xl p-3 text-slate-100" style={{ backgroundColor: '#111d38' }}>
+      <div className="flex max-w-full items-center gap-1.5 overflow-x-auto px-1 py-2" aria-label="Fichas en la mesa">
+        {chain.map((placed) => (
+          <BoardTileView key={placed.id} placed={placed} conceptOf={conceptOf} justPlaced={placed.id === justPlaced} />
         ))}
       </div>
-      <p className="text-[12px] font-semibold opacity-80">
-        Extremos: <b>{leftEnd.emoji} {leftEnd.label}</b> y <b>{rightEnd.emoji} {rightEnd.label}</b>
+      <p className="text-center text-[12.5px] font-semibold text-slate-300">
+        Extremos de la mesa: <b className="text-white">{conceptOf(leftEnd).label}</b> y <b className="text-white">{conceptOf(rightEnd).label}</b>
       </p>
-      <div className="flex flex-wrap items-center justify-center gap-2" aria-label="Tu mano">
+      <div className="flex flex-wrap items-center justify-center gap-2 max-sm:[zoom:0.7]" aria-label="Tu mano">
         {hand.map((tile) => (
-          <button
-            key={tile.id}
-            type="button"
-            data-domino-tile={tile.id}
-            aria-label={`Ficha ${tile.a.label} y ${tile.b.label}`}
-            onClick={() => play(tile)}
-            className={`rounded-xl transition-transform hover:-translate-y-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${hintTile === tile.id ? 'animate-pulse ring-4 ring-amber-300' : ''}`}
-          >
-            <TileFace left={tile.a} right={tile.b} />
-          </button>
+          <span key={tile.id} data-domino-tile={tile.id} className={`rounded-xl ${hintTile === tile.id ? 'animate-pulse ring-4 ring-amber-300' : ''}`}>
+            <HandTileView
+              tile={tile}
+              selected={false}
+              state={hintTile === tile.id ? 'selected' : 'playable'}
+              conceptOf={conceptOf}
+              onClick={() => play(tile)}
+              onDragStart={() => {}}
+            />
+          </span>
         ))}
         {deck.length > 0 && (
           <button
             type="button"
             onClick={draw}
-            className={`flex h-[64px] items-center gap-1.5 rounded-xl border-2 border-dashed border-accent/60 px-3 text-[13px] font-bold text-accent hover:bg-accent/10 ${hintDraw ? 'animate-pulse ring-4 ring-amber-300' : ''}`}
+            className={`domino-premium-boneyard flex h-[104px] items-center gap-2 rounded-xl border-2 border-dashed px-4 text-[14px] font-bold text-slate-100 ${hintDraw ? 'animate-pulse ring-4 ring-amber-300' : ''}`}
           >
             🂠 Robar ficha
+            <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px]">{deck.length} en el montón</span>
           </button>
         )}
       </div>
     </div>
-  )
-}
-
-function TileFace({
-  left,
-  right,
-  highlightLeft,
-  highlightRight,
-  fresh,
-}: {
-  left: DominoConcept
-  right: DominoConcept
-  highlightLeft?: boolean
-  highlightRight?: boolean
-  fresh?: boolean
-}) {
-  return (
-    <span className={`flex h-[64px] w-[128px] shrink-0 overflow-hidden rounded-xl border-[3px] border-accent bg-surface shadow-[var(--shadow)] ${fresh ? 'tour-step-in' : ''}`}>
-      <Half concept={left} lit={highlightLeft} />
-      <span className="h-full w-[3px] bg-border" />
-      <Half concept={right} lit={highlightRight} />
-    </span>
-  )
-}
-
-function Half({ concept, lit }: { concept: DominoConcept; lit?: boolean }) {
-  return (
-    <span className={`flex flex-1 flex-col items-center justify-center gap-0.5 px-1 ${lit ? 'bg-amber-300/25' : ''}`}>
-      <span className="text-[22px] leading-none" aria-hidden="true">{concept.emoji}</span>
-      <span className="text-center text-[9.5px] leading-tight font-semibold text-text-h">{concept.label}</span>
-    </span>
   )
 }

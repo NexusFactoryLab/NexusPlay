@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { ArrowRight, Check, Hand, Lightbulb, Play, RotateCcw, TriangleAlert } from 'lucide-react'
+import { useCoarsePointer } from './useCoarsePointer'
 
 /**
  * Lo que recibe el mini tablero de cada paso. El tablero es un pedazo
@@ -23,6 +24,8 @@ export type TutorialStep = {
   task: string
   /** Contexto corto de por qué importa (opcional). */
   tip?: string
+  /** El mismo consejo para celular o tablet (cruceta, deslizar), si cambia respecto al de computador. */
+  tipTouch?: string
   /** Lo que se le dice al lograrlo. */
   success?: string
   board: (props: TutorialBoardProps) => ReactNode
@@ -84,6 +87,8 @@ export function InteractiveTutorial({
   const step = steps[index]
   const last = index === steps.length - 1
   const colors = TONES[tone]
+  const touch = useCoarsePointer()
+  const tip = touch ? (step.tipTouch ?? step.tip) : step.tip
 
   // Al lograrlo, el foco pasa a "Siguiente": Enter sigue sin buscar el botón.
   useEffect(() => {
@@ -129,7 +134,7 @@ export function InteractiveTutorial({
           Paso {index + 1} de {steps.length} · Hazlo tú
         </p>
         <h3 className={`mt-0.5 text-[19px] leading-tight font-bold ${colors.heading}`}>{step.title}</h3>
-        {step.tip && <p className={`mt-1 text-[13px] leading-snug ${colors.muted}`}>{step.tip}</p>}
+        {tip && <p className={`mt-1 text-[13px] leading-snug ${colors.muted}`}>{tip}</p>}
         <p data-tutorial-task className={`mt-2 flex items-center gap-2.5 rounded-2xl border-2 border-dashed px-3 py-2 text-[14px] font-semibold ${colors.task}`}>
           <Hand className={`tour-task-hand h-5 w-5 shrink-0 ${tone === 'dark' ? 'text-emerald-300' : 'text-accent'}`} aria-hidden="true" />
           {step.task}

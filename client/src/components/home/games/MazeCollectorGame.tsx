@@ -161,7 +161,8 @@ function MazeCollectorSession({
   // La cruceta aparece en cualquier pantalla táctil, no según el ancho.
   const coarsePointer = useMediaQuery('(pointer: coarse)')
   // Pantalla chica: teléfono en vertical o en horizontal (poco alto). Ahí el encabezado se compacta.
-  const compact = useMediaQuery('(max-width: 640px), (max-height: 520px)')
+  // Solo en pantallas táctiles: un computador con la ventana chica sigue viendo la versión de computador.
+  const compact = useMediaQuery('(max-width: 640px) and (pointer: coarse), (max-height: 520px) and (pointer: coarse)')
   const portrait = useMediaQuery('(orientation: portrait)')
   // En vertical la cruceta tiene su propia franja (no tapa el mapa); en horizontal flota sobre él.
   const dock = coarsePointer && portrait
@@ -204,7 +205,8 @@ function MazeCollectorSession({
       const innerWidth = stage.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
       const innerHeight = stage.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom)
       const fit = Math.floor(Math.min(innerWidth / layout.cols, innerHeight / (layout.rows - trimmedRows)))
-      const follow = fit < CAMERA_FIT_THRESHOLD
+      // La cámara que sigue al camión es de celular/tablet; en computador se ve el mapa entero (con scroll si no cabe).
+      const follow = fit < CAMERA_FIT_THRESHOLD && window.matchMedia('(pointer: coarse)').matches
       setCameraMode(follow)
       setView({ width: innerWidth, height: innerHeight })
       setCellSize(follow ? CAMERA_CELL_SIZE : Math.max(MIN_CELL_SIZE, Math.min(MAX_CELL_SIZE, fit)))

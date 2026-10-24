@@ -16,7 +16,8 @@ await import('/src/index.css');
 const {GameInstructionsGate}=await import('/src/components/home/games/GameInstructionsGate.tsx');
 window.finished=0;
 function Done(){ window.finished++; return React.createElement('p',{id:'game'},'Juego montado') }
-createRoot(document.getElementById('root')).render(React.createElement(GameInstructionsGate,{kind:'${kind}'},React.createElement(Done)));
+const {AuthProvider}=await import('/src/hooks/useAuth.tsx'); const {ThemeProvider}=await import('/src/hooks/useTheme.tsx');
+createRoot(document.getElementById('root')).render(React.createElement(AuthProvider,null,React.createElement(ThemeProvider,null,React.createElement(GameInstructionsGate,{kind:'${kind}'},React.createElement(Done)))));
 </script></body></html>`
 
 const key = (page, keys) => keys.reduce((p, k) => p.then(() => page.keyboard.press(k)).then(() => page.waitForTimeout(170)), Promise.resolve())
@@ -59,13 +60,13 @@ const SOLUTIONS = {
     (p) => p.getByRole('button', { name: 'Tirar el dado' }).click(),
   ],
   MAZE_COLLECTOR: [
-    (p) => key(p, [...R(4), ...D(2)]),
-    (p) => key(p, [...R(4), ...D(2), ...L(4)]),
-    (p) => key(p, [...R(4), ...D(2), ...U(2), ...L(4), ...D(2)]),
-    (p) => key(p, [...U(2), ...R(4)]),
+    (p) => key(p, [...R(9), ...D(5)]),
+    (p) => key(p, [...R(5), ...D(5), ...L(3), ...R(6)]),
+    (p) => key(p, [...R(11), ...D(4), ...U(4), ...L(11), ...D(4)]),
+    (p) => key(p, [...U(5), ...R(5)]),
   ],
   TRUE_FALSE_MAZE: [
-    (p) => key(p, [...R(4), ...D(2)]),
+    (p) => key(p, [...R(2), ...D(2), ...R(2)]),
     (p) => key(p, [...L(2), ...U(2)]),
     (p) => key(p, [...R(2), ...U(2)]),
     (p) => key(p, [...R(2), ...U(2)]),
@@ -78,10 +79,24 @@ const SOLUTIONS = {
     },
     (p) => key(p, [...repeat('s', 2), ...repeat('d', 2), ...D(2), ...L(1)]),
   ],
+  // Lumen y Gota: vista de lado con gravedad (↑ / W saltan; hay que avanzar en el aire).
   DUAL_QUEST_PIXI: [
-    (p) => key(p, repeat('d', 4)),
-    (p) => key(p, L(4)),
-    (p) => key(p, [...repeat('s', 2), ...repeat('d', 2), ...D(2), ...L(1)]),
+    (p) => key(p, repeat('d', 8)),
+    async (p) => {
+      await key(p, [...R(3), 'ArrowUp', 'ArrowRight'])
+      await p.waitForTimeout(900)
+      await key(p, ['ArrowRight'])
+      await p.waitForTimeout(900)
+      await key(p, R(3))
+    },
+    async (p) => {
+      await key(p, ['d', 'd', 'd', 'd', 'd', 'w', 'd', 'd'])
+      await p.waitForTimeout(1000)
+      await key(p, ['d'])
+      await key(p, ['ArrowRight', 'ArrowUp', 'ArrowRight', 'ArrowRight'])
+      await p.waitForTimeout(1000)
+      await key(p, R(5))
+    },
   ],
 }
 

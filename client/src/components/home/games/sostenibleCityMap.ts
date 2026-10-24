@@ -12,7 +12,7 @@ import type { CellPosition, MazeLayoutDef } from './mazeCollectorTypes'
  * bordes son calles que rodean la ciudad; las 5 avenidas horizontales tienen
  * su puerta de teletransporte en ambos extremos.
  */
-const CITY_MAP_ROWS_ASCII = [
+export const CITY_MAP_ROWS_ASCII = [
   '########################',
   '........................',
   '.####.###.####.####.###.',

@@ -1,18 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
+import { SnakesLaddersBoard } from '../SnakesLaddersBoard'
+import { ChallengeModal } from '../ChallengeModal'
+import type { SnakesLaddersChallengeResult, SnakesLaddersLink, SnakesLaddersPendingChallengeView } from '../snakesLaddersTypes'
 import type { TutorialBoardProps } from './InteractiveTutorial'
 
-const SIZE = 12
-const COLS = 4
-const LADDERS: Record<number, number> = { 3: 8 }
-const SNAKES: Record<number, number> = { 11: 6 }
-const CHALLENGE = 9
-const STEP_MS = 280
+const SIZE = 15
+const LADDERS: SnakesLaddersLink[] = [{ from: 3, to: 9 }]
+const SNAKES: SnakesLaddersLink[] = [{ from: 13, to: 7 }]
+const CHALLENGE_CELL = 10
+const STEP_MS = 300
 
 /**
- * Mini tablero de Escaleras y Serpientes (casillas 1–12, en zigzag como el
- * real): una escalera del 3 al 8, una serpiente del 11 al 6, un reto en el 9
- * y la meta en el 12. El dado da un número fijo por paso para que el
- * tutorial muestre siempre lo mismo: `roll` es ese número.
+ * Mini partida de Escaleras y Serpientes con el MISMO tablero del juego
+ * (`SnakesLaddersBoard`) y la misma ventana de reto (`ChallengeModal`):
+ * 15 casillas, una escalera del 3 al 9, una serpiente del 13 al 7 y un reto
+ * en la 10. El dado da un número fijo por paso (`roll`) para que el
+ * tutorial enseñe siempre lo mismo.
  */
 export function SnakesLaddersTutorialBoard({
   start,
@@ -34,7 +37,10 @@ export function SnakesLaddersTutorialBoard({
   const [face, setFace] = useState<number | null>(null)
   const [rolling, setRolling] = useState(false)
   const [rolled, setRolled] = useState(false)
-  const [asking, setAsking] = useState(false)
+  const [pending, setPending] = useState<SnakesLaddersPendingChallengeView | null>(null)
+  const [result, setResult] = useState<SnakesLaddersChallengeResult | null>(null)
+  // Cada intento de respuesta remonta la ventana del reto (la real se bloquea tras elegir).
+  const [attempt, setAttempt] = useState(0)
   const timers = useRef<number[]>([])
   useEffect(() => () => timers.current.forEach((timer) => window.clearTimeout(timer)), [])
 
@@ -53,22 +59,24 @@ export function SnakesLaddersTutorialBoard({
       setRolled(true)
       const target = Math.min(SIZE, start + roll)
       for (let i = 1; i <= target - start; i++) later(i * STEP_MS, () => setPosition(start + i))
-      later((target - start) * STEP_MS + 350, () => arrive(target))
+      later((target - start) * STEP_MS + 400, () => arrive(target))
     })
   }
 
   function arrive(cell: number) {
-    if (LADDERS[cell]) {
-      setPosition(LADDERS[cell])
-      if (goal === 'ladder') later(500, onDone)
+    const ladder = LADDERS.find((link) => link.from === cell)
+    if (ladder) {
+      setPosition(ladder.to)
+      if (goal === 'ladder') later(600, onDone)
       return
     }
-    if (SNAKES[cell]) {
-      setPosition(SNAKES[cell])
+    const snake = SNAKES.find((link) => link.from === cell)
+    if (snake) {
+      setPosition(snake.to)
       return
     }
-    if (cell === CHALLENGE && challenge) {
-      setAsking(true)
+    if (cell === CHALLENGE_CELL && challenge) {
+      setPending({ cellNumber: cell, triggerType: 'CELL', forUserId: 'tu', prompt: challenge.text, options: challenge.options, deadlineTs: Date.now() + 60_000 })
       return
     }
     if (cell === SIZE && goal === 'finish') onDone()
@@ -76,42 +84,32 @@ export function SnakesLaddersTutorialBoard({
 
   function answer(option: number) {
     if (!challenge) return
-    if (option === challenge.correct) {
-      setAsking(false)
-      onDone()
+    const correct = option === challenge.correct
+    setResult({ userId: 'tu', correct, correctOptionIndex: correct ? option : null, position })
+    if (correct) {
+      later(1200, () => {
+        setPending(null)
+        onDone()
+      })
     } else {
       onMistake('Esa no es la respuesta. Piénsalo otra vez: el reto sigue abierto.')
+      later(1300, () => {
+        setResult(null)
+        setAttempt((value) => value + 1)
+      })
     }
   }
 
-  // Casillas en zigzag de abajo hacia arriba, como en el tablero real.
-  const rows = Array.from({ length: SIZE / COLS }, (_, row) => {
-    const cells = Array.from({ length: COLS }, (_, col) => row * COLS + col + 1)
-    return row % 2 === 0 ? cells : cells.reverse()
-  }).reverse()
-
   return (
-    <div className="flex w-full flex-col items-center gap-3 sm:flex-row sm:justify-center sm:gap-5">
-      <div className="relative grid grid-cols-4 gap-1 rounded-2xl border-2 border-accent/40 bg-surface p-1.5" aria-label="Tablero del ejemplo">
-        {rows.flat().map((cell) => (
-          <div
-            key={cell}
-            data-snakes-cell={cell}
-            className={`relative flex h-[52px] w-[52px] flex-col items-center justify-center rounded-lg text-[11px] font-bold ${
-              cell === SIZE ? 'bg-amber-300/40' : cell === CHALLENGE ? 'bg-sky-400/25' : LADDERS[cell] || Object.values(LADDERS).includes(cell) ? 'bg-emerald-400/20' : SNAKES[cell] || Object.values(SNAKES).includes(cell) ? 'bg-rose-400/20' : 'bg-code-bg'
-            }`}
-          >
-            <span className="absolute top-0.5 left-1 text-text/70">{cell}</span>
-            <span className="text-[18px]" aria-hidden="true">
-              {cell === SIZE ? '🏁' : cell === CHALLENGE ? '❓' : LADDERS[cell] ? '🪜' : SNAKES[cell] ? '🐍' : ''}
-            </span>
-            {position === cell && (
-              <span data-snakes-token className="absolute inset-0 flex items-center justify-center text-[26px] drop-shadow-md transition-all" aria-label="Tu ficha">
-                🔵
-              </span>
-            )}
-          </div>
-        ))}
+    <div className="flex w-full flex-col items-center gap-3 sm:flex-row sm:items-center sm:justify-center sm:gap-5">
+      <div className="w-full max-w-[300px]">
+        <SnakesLaddersBoard
+          boardSize={SIZE}
+          ladders={LADDERS}
+          snakes={SNAKES}
+          players={[{ userId: 'tu', displayName: 'Tú', position, isSelf: true, isHost: true, hasVotedRematch: false }]}
+          activePlayerUserId="tu"
+        />
       </div>
 
       <div className="flex flex-col items-center gap-2">
@@ -127,29 +125,13 @@ export function SnakesLaddersTutorialBoard({
           {face ?? '🎲'}
         </button>
         <span className="text-[12px] font-semibold opacity-80">{rolled ? `Sacaste ${roll}` : 'Toca el dado'}</span>
-        <p className="max-w-[170px] text-center text-[11.5px] opacity-75">🪜 sube · 🐍 baja · ❓ reto · 🏁 meta</p>
+        <p className="max-w-[180px] text-center text-[11.5px] opacity-75">
+          <span className="font-bold text-emerald-500">Verde</span>: escalera, subes · <span className="font-bold text-rose-500">Rojo</span>: serpiente, bajas · Reto en la casilla {CHALLENGE_CELL}
+        </p>
       </div>
 
-      {asking && challenge && (
-        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/55 p-3" role="dialog" aria-label="Reto">
-          <div className="w-full max-w-[320px] rounded-2xl border-2 border-sky-400 bg-surface p-3 text-center">
-            <p className="text-[12px] font-bold tracking-wide text-sky-500 uppercase">Reto</p>
-            <p className="mt-1 text-[15px] font-bold text-text-h">{challenge.text}</p>
-            <div className="mt-2 grid gap-1.5">
-              {challenge.options.map((option, index) => (
-                <button
-                  key={option}
-                  type="button"
-                  onClick={() => answer(index)}
-                  className={`rounded-xl border-2 px-3 py-2 text-[14px] font-semibold text-text-h hover:border-accent ${hint && index === challenge.correct ? 'border-amber-300 ring-2 ring-amber-300' : 'border-border'}`}
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* La misma ventana de reto del juego (va sobre toda la pantalla, como al jugar). */}
+      {pending && <ChallengeModal key={attempt} challenge={pending} isSelf answeringDisplayName="Tú" result={result} onAnswer={answer} />}
     </div>
   )
 }

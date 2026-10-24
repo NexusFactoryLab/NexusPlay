@@ -180,10 +180,10 @@ function TrueFalseMazeSession({
     },
   })
   // Celular en horizontal: el HUD pasa a una columna lateral para que la nave use toda la altura.
-  const compactLandscape = useMediaQuery('(orientation: landscape) and (max-height: 520px)')
+  const compactLandscape = useMediaQuery('(orientation: landscape) and (max-height: 520px) and (pointer: coarse)')
   // La cruceta aparece en cualquier pantalla táctil, no según el ancho.
   const coarsePointer = useMediaQuery('(pointer: coarse)')
-  const portraitPhone = useMediaQuery('(orientation: portrait) and (max-width: 600px)')
+  const portraitPhone = useMediaQuery('(orientation: portrait) and (max-width: 600px) and (pointer: coarse)')
 
   useEffect(() => {
     let cancelled = false
