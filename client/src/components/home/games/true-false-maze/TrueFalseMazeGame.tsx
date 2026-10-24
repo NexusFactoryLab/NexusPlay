@@ -436,6 +436,7 @@ function TrueFalseMazeSession({
           total={hud.totalQuestions}
           lives={hud.maxLives}
           compact={compactLandscape}
+          touch={coarsePointer}
           fullscreen={canFullscreen ? { wanted: wantFullscreen, active: fullscreen, onChange: chooseFullscreen } : null}
           onStart={actions.start}
           onGuide={onOpenGuide}
@@ -694,7 +695,7 @@ function QuestionPanel({
   compact?: boolean
   className?: string
 }) {
-  let label = `${title} · Pregunta ${hud.questionIndex + 1} de ${hud.totalQuestions}`
+  let label = `Pregunta ${hud.questionIndex + 1} de ${hud.totalQuestions}`
   let statement = hud.statement ?? ''
   if (hud.phase === 'ready') {
     label = title
@@ -910,6 +911,7 @@ function FullscreenChoice({ wanted, active, onChange }: FullscreenChoiceProps) {
 function ReadyOverlay({
   total,
   lives,
+  touch,
   compact,
   fullscreen,
   onStart,
@@ -918,6 +920,7 @@ function ReadyOverlay({
 }: {
   total: number
   lives: number
+  touch: boolean
   compact: boolean
   /** null si el navegador no permite pantalla completa (por ejemplo, iPhone). */
   fullscreen: FullscreenChoiceProps | null
@@ -947,7 +950,7 @@ function ReadyOverlay({
         </h2>
         <p className="mx-auto mt-1.5 max-w-[420px] text-[13.5px] leading-relaxed text-slate-300">
           Son <b className="text-white">{total} afirmaciones</b> y tienes <b className="text-white">{lives}</b>{' '}
-          {lives === 1 ? 'batería' : 'baterías'}. Muévete con las <b className="text-white">flechas del teclado</b> (o W A S D).
+          {lives === 1 ? 'batería' : 'baterías'}. {touch ? (<>Muévete con la <b className="text-white">cruceta</b> o <b className="text-white">deslizando el dedo</b>.</>) : (<>Muévete con las <b className="text-white">flechas del teclado</b> (o W A S D).</>)}
         </p>
         {fullscreen && <FullscreenChoice {...fullscreen} />}
         <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
@@ -976,7 +979,7 @@ function ReadyOverlay({
         {/* En celular horizontal no sobra alto: estos consejos están en la guía y el botón Pausa ya se ve. */}
         {!compact && (
           <>
-            <p className="mt-2 text-[11.5px] text-slate-400">o presiona cualquier flecha para despegar</p>
+            {!touch && <p className="mt-2 text-[11.5px] text-slate-400">o presiona cualquier flecha para despegar</p>}
             <p className="mt-1 text-[11.5px] text-slate-400">
               ¿Necesitas parar? Usa el botón <b className="text-slate-200">Pausa</b> (arriba a la izquierda) o la tecla{' '}
               <b className="text-slate-200">P</b>.
