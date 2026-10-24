@@ -6,10 +6,13 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Crosshair, Hand, LogOut, PackageOpen, RotateCcw, SkipForward, Trophy, Volume2, VolumeX } from 'lucide-react'
 import { useAuth } from '../../../hooks/useAuth'
 import { useDominoRoom } from './useDominoRoom'
-import { iconForConcept, type DominoConcept } from './dominoTypes'
+import { iconForConcept, type DominoConcept, type DominoLevel } from './dominoTypes'
+import { DominoLevelPicker } from './DominoLevelPicker'
+import { DominoQuestionModal } from './DominoQuestionModal'
+import { DOMINO_FEEDBACK_MS } from './dominoLevels'
 import { dominoTileCategoryInk } from './dominoTileVisualTokens'
 import { resolveDominoTooltipPlacement, type DominoTooltipPlacement } from './dominoConceptTooltip'
-import type { DominoPlacedTileView, DominoTileView } from './dominoRoomTypes'
+import type { DominoPlacedTileView, DominoRoomStateView, DominoTileView } from './dominoRoomTypes'
 import type { DominoVisualOrientation, Point } from './dominoChainLayout'
 import { DEFAULT_DOMINO_BOARD_RENDER_MODE, resolveDominoBoardPresentation } from './dominoBoardRenderMode'
 import {
@@ -63,6 +66,10 @@ function DominoRoomPageSession() {
     messages,
     sendChatMessage,
     updateTurnDuration,
+    updateLevel,
+    answerQuestion,
+    answerResult,
+    dismissAnswerResult,
     playTile,
     drawTile,
     passTurn,
@@ -164,6 +171,34 @@ function DominoRoomPageSession() {
   const opponent = room?.players.find((p) => !p.isSelf)
   const isMyTurn = room?.phase === 'PLAYING' && room.activePlayerUserId === user?.id
   const conceptOf = (id: number): DominoConcept => room!.concepts[id]
+  const level: DominoLevel = room?.level ?? 'EASY'
+
+  // Retroalimentación al colocar una ficha: línea breve con la definición, sin bloquear la jugada.
+  const [feedback, setFeedback] = useState<{ key: string; lines: string[] } | null>(null)
+  const lastBoardLengthRef = useRef(0)
+  useEffect(() => {
+    const boardNow = room?.board ?? []
+    const grew = boardNow.length > lastBoardLengthRef.current
+    lastBoardLengthRef.current = boardNow.length
+    const placed = boardNow.find((tile) => tile.id === lastPlacedTileId)
+    if (!grew || !placed || !room) return
+    const lines: string[] = []
+    for (const index of new Set([placed.left, placed.right])) {
+      const concept = room.concepts[index]
+      if (concept?.definition) lines.push(`${concept.label}: ${concept.definition}`)
+    }
+    if (lines.length === 0) return
+    setFeedback({ key: placed.id, lines })
+    const timer = setTimeout(() => setFeedback(null), DOMINO_FEEDBACK_MS)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [room?.board.length, lastPlacedTileId])
+
+  // Pregunta de Intermedio: mientras el servidor la tiene pendiente (o hasta cerrar el resultado propio).
+  const pendingQuestion = room?.pendingQuestion ?? null
+  const questionConceptIndex = answerResult ? answerResult.conceptIndex : pendingQuestion?.conceptIndex ?? null
+  const questionConcept = room && questionConceptIndex !== null ? room.concepts[questionConceptIndex] : undefined
+  const questionIsSelf = answerResult ? true : pendingQuestion?.userId === user?.id
 
   const board = room?.board ?? []
   const leftEnd = board[0]?.left
@@ -427,13 +462,36 @@ function DominoRoomPageSession() {
     room={room} roomPath={`/domino/sala/${encodeURIComponent(room.code)}`} maxPlayers={2}
     isHost={Boolean(self?.isHost)} connecting={connecting} error={error}
     turnDurationSeconds={room.turnDurationSeconds} onUpdateTurnDuration={updateTurnDuration}
-
+    settings={<DominoLevelPicker level={level} isHost={Boolean(self?.isHost)} disabled={connecting} onChange={updateLevel} />}
     onReady={setReady} onExit={handleExit} messages={messages} onSend={sendChatMessage}
   >{dealCountdownMs !== null && <DealCountdownOverlay remainingMs={dealCountdownMs} />}</MultiplayerLobby>
 
   return (
     <div className="domino-premium-room fixed inset-0 z-50 overflow-y-auto bg-[#080F24]">
       {dealCountdownMs !== null && <DealCountdownOverlay remainingMs={dealCountdownMs} />}
+
+      {room?.phase === 'PLAYING' && questionConcept?.question && (
+        <DominoQuestionModal
+          concept={questionConcept}
+          isSelf={questionIsSelf}
+          answeringDisplayName={room.players.find((p) => p.userId === pendingQuestion?.userId)?.displayName ?? 'tu rival'}
+          result={answerResult}
+          onAnswer={answerQuestion}
+          onClose={dismissAnswerResult}
+        />
+      )}
+
+      {feedback && (
+        <div
+          key={feedback.key}
+          role="status"
+          aria-live="polite"
+          className="pointer-events-none fixed inset-x-0 bottom-24 z-[65] mx-auto w-[min(92vw,560px)] animate-[fade-in-up_0.3s_ease-out] rounded-xl border border-accent/40 bg-surface/95 px-4 py-2.5 text-center text-[13px] leading-snug text-text-h shadow-[var(--shadow)]"
+        >
+          {level === 'EASY' && <strong className="mr-1 text-accent">¡Muy bien!</strong>}
+          {feedback.lines.join(' · ')}
+        </div>
+      )}
 
       <div className="domino-premium-shell mx-auto flex min-h-full w-full max-w-[1600px] flex-col p-3 sm:h-full sm:p-5">
         <header className={`domino-premium-header ${room?.phase === 'PLAYING' ? 'domino-premium-header--playing' : ''} mb-1.5 flex flex-wrap items-center justify-between gap-2 rounded-2xl border px-3 py-1.5 sm:flex-nowrap`}>
@@ -745,6 +803,7 @@ function DominoRoomPageSession() {
                       selected={selectedTileId === tile.id}
                       state={!isMyTurn ? 'waiting' : selectedTileId === tile.id ? 'selected' : playable ? 'playable' : 'unavailable'}
                       conceptOf={conceptOf}
+                      level={level}
                       onClick={() => handleHandTileClick(tile)}
                       onDragStart={() => {
                         setDraggedTileId(tile.id)
@@ -782,6 +841,8 @@ function DominoRoomPageSession() {
                 : 'Se quedó sin fichas primero.'}
             </p>
 
+            <DominoLearningSummary room={room} level={level} />
+
             <div className="mt-2 flex flex-col items-center gap-2">
               <p className="domino-premium-finish__rematch text-[12.5px]">
                 {self.hasVotedRematch
@@ -816,15 +877,53 @@ function DominoRoomPageSession() {
   )
 }
 
-type DominoConceptTileSize = 'board' | 'sm' | 'md' | 'lg'
+/** Pantalla de cierre con aprendizaje: conceptos vistos y, en Intermedio, los fallados con su explicación. */
+function DominoLearningSummary({ room, level }: { room: DominoRoomStateView; level: DominoLevel }) {
+  const seen = (room.seenConceptIndexes ?? []).map((index) => room.concepts[index]).filter(Boolean)
+  const missed = room.missedConcepts ?? []
+  if (seen.length === 0 && missed.length === 0) return null
+  return (
+    <div className="w-full max-w-[520px] rounded-2xl border border-border bg-surface/90 p-4 text-left" data-domino-learning>
+      <p className="mb-2 text-[13px] font-semibold text-text-h">Lo que viste en la partida</p>
+      <ul className="space-y-1 text-[12.5px] text-text">
+        {seen.map((concept) => (
+          <li key={concept.conceptId}>
+            <strong className="text-text-h">{concept.label}</strong>
+            {concept.definition ? `: ${concept.definition}` : ''}
+          </li>
+        ))}
+      </ul>
+      {level === 'MEDIUM' && missed.length > 0 && (
+        <>
+          <p className="mb-2 mt-4 text-[13px] font-semibold text-rose-600">Para repasar (preguntas falladas)</p>
+          <ul className="space-y-2 text-[12.5px] text-text">
+            {missed.map((item) => {
+              const concept = room.concepts[item.conceptIndex]
+              return (
+                <li key={item.conceptIndex}>
+                  <strong className="text-text-h">{concept?.label}</strong>
+                  {concept?.question ? ` — ${concept.question.text}` : ''}
+                  {item.explanation && <span className="block italic">{item.explanation}</span>}
+                </li>
+              )
+            })}
+          </ul>
+        </>
+      )}
+    </div>
+  )
+}
+
+type DominoConceptTileSize ='board' | 'sm' | 'md' | 'lg'
 
 export function dominoConceptHalfPresentation(size: DominoConceptTileSize) {
   if (size === 'board') {
     return {
-      showLabel: false,
-      sizing: 'domino-tile-half--board px-1 py-1',
+      // La etiqueta del concepto siempre es visible en el tablero (el tooltip queda como apoyo).
+      showLabel: true,
+      sizing: 'domino-tile-half--board gap-0.5 px-1 py-1',
       iconSize: 'h-7 w-7 shrink-0',
-      textSize: '',
+      textSize: 'text-[8px] line-clamp-2',
     }
   }
 
@@ -840,12 +939,15 @@ export function boardConceptAccessibility(label: string) {
   return { ariaLabel: `Concepto: ${label}` }
 }
 
-function ConceptHalf({ concept, size = 'md' }: { concept: DominoConcept; size?: DominoConceptTileSize }) {
+function ConceptHalf({ concept, size = 'md', level, selected = false }: { concept: DominoConcept; size?: DominoConceptTileSize; level?: DominoLevel; selected?: boolean }) {
   if (size === 'board') return <BoardConceptHalf concept={concept} />
 
   const Icon = iconForConcept(concept.icon)
   const categoryInk = dominoTileCategoryInk(concept.color)
   const presentation = dominoConceptHalfPresentation(size)
+  // Fácil: texto más grande y ejemplo en la ficha seleccionada. Universitario: caso o situación del concepto.
+  const textSize = level === 'EASY' ? 'text-[13px]' : presentation.textSize
+  const detail = level === 'EASY' ? (selected ? concept.example : undefined) : level === 'ADVANCED' ? concept.application : undefined
 
   return (
     <div
@@ -853,7 +955,8 @@ function ConceptHalf({ concept, size = 'md' }: { concept: DominoConcept; size?: 
       style={{ background: `color-mix(in srgb, ${concept.color} 10%, transparent)` }}
     >
       <Icon className={presentation.iconSize} style={{ color: categoryInk }} strokeWidth={2} aria-hidden="true" focusable="false" />
-      {presentation.showLabel && <span className={`domino-tile-label w-full text-center font-semibold text-text-h leading-tight ${presentation.textSize}`}>{concept.label}</span>}
+      {presentation.showLabel && <span className={`domino-tile-label w-full text-center font-semibold text-text-h leading-tight ${textSize}`}>{concept.label}</span>}
+      {detail && <span className="domino-tile-label w-full text-center text-[8.5px] font-normal italic leading-tight text-text-h">{detail}</span>}
     </div>
   )
 }
@@ -888,6 +991,7 @@ function BoardConceptHalf({ concept }: { concept: DominoConcept }) {
       style={{ '--domino-category-ink': categoryInk } as CSSProperties}
     >
       <Icon className={presentation.iconSize} style={{ color: categoryInk }} strokeWidth={2} aria-hidden="true" focusable="false" />
+      {presentation.showLabel && <span className={`domino-tile-label w-full text-center font-semibold text-text-h leading-tight ${presentation.textSize}`} aria-hidden="true">{concept.label}</span>}
       <DominoConceptTooltip id={tooltipId} anchorRef={anchorRef} concept={concept} open={tooltipOpen} />
     </button>
   )
@@ -1071,10 +1175,12 @@ function HandTileView({
   selected,
   state,
   conceptOf,
+  level,
   onClick,
   onDragStart,
 }: {
   tile: DominoTileView
+  level: DominoLevel
   selected: boolean
   state: 'waiting' | 'playable' | 'selected' | 'unavailable'
   conceptOf: (id: number) => DominoConcept
@@ -1104,11 +1210,11 @@ function HandTileView({
         // The board keeps the click selection when a drag is cancelled.
       }}
       aria-pressed={selected}
-      className={`domino-premium-tile domino-hand-tile flex h-[104px] w-[196px] shrink-0 overflow-hidden rounded-xl border-[3px] transition-all duration-200 ${stateStyles}`}
+      className={`domino-premium-tile domino-hand-tile flex ${level === 'EASY' || level === 'ADVANCED' ? 'min-h-[104px] w-[220px]' : 'h-[104px] w-[196px]'} shrink-0 overflow-hidden rounded-xl border-[3px] transition-all duration-200 ${stateStyles}`}
     >
-      <ConceptHalf concept={a} size="lg" />
-      <div className="domino-tile-divider h-full w-[3px]" style={{ background: `linear-gradient(${a.color}, ${b.color})` }} />
-      <ConceptHalf concept={b} size="lg" />
+      <ConceptHalf concept={a} size="lg" level={level} selected={selected} />
+      <div className="domino-tile-divider w-[3px] self-stretch" style={{ background: `linear-gradient(${a.color}, ${b.color})` }} />
+      <ConceptHalf concept={b} size="lg" level={level} selected={selected} />
     </button>
   )
 }

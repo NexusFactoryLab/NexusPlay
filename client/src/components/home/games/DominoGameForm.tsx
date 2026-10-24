@@ -357,7 +357,7 @@ export function DominoGameForm({
       description={
         <>
           Cada mitad de una ficha es un concepto tuyo en vez de un número. Con {concepts.length}{' '}
-          conceptos el set queda en {tileCount} fichas — se juega solo contra el tablero, empatando
+          conceptos el set queda en {tileCount} fichas — se juega 1 contra 1 en una sala, empatando
           los extremos abiertos.
         </>
       }

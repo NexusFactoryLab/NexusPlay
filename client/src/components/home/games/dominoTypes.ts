@@ -110,7 +110,8 @@ export type DominoConcept = {
     text: string
     options: string[]
     correctIndex?: number
-    explanation: string
+    /** En la sala llega vacía: el servidor la entrega solo después de evaluar la respuesta. */
+    explanation?: string
   }
   /** Nivel Universitario: caso o situación donde aplica el concepto. */
   application?: string

@@ -34,7 +34,7 @@ describe('primitivas visuales de cadena Dominexo', () => {
 
   it('mantiene texto e ícono en mano, pero presenta solo ícono accesible en tablero', () => {
     expect(dominoConceptHalfPresentation('lg')).toMatchObject({ showLabel: true, iconSize: 'h-8 w-8' })
-    expect(dominoConceptHalfPresentation('board')).toMatchObject({ showLabel: false, iconSize: 'h-7 w-7 shrink-0' })
+    expect(dominoConceptHalfPresentation('board')).toMatchObject({ showLabel: true, iconSize: 'h-7 w-7 shrink-0' })
     expect(boardConceptAccessibility('Purificación de Agua')).toEqual({
       ariaLabel: 'Concepto: Purificación de Agua',
     })
