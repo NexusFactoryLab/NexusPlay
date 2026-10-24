@@ -383,7 +383,7 @@ const STEPS: Step[] = [
           <div className="min-w-0 flex-1 basis-[9rem]">
             <p className="font-bold text-white">Muévete con las flechas del teclado</p>
             <p className="text-slate-300">
-              También sirven <b className="text-white">W A S D</b>. En el celular, usa la cruceta de la pantalla.
+              También sirven <b className="text-white">W A S D</b>. En el celular, usa la cruceta de la pantalla o desliza el dedo sobre el mapa.
             </p>
           </div>
         </div>

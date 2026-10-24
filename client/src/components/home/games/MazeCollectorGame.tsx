@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
-import type { ReactNode } from 'react'
+import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, BookOpen, LogOut, Maximize, Minimize, Pause, Play, X, Zap } from 'lucide-react'
 import type { MazeCollectorConfig, MazeCollectorItem, MazeLayoutDef, CellPosition } from './mazeCollectorTypes'
 import { iconForConcept } from './mazeCollectorTypes'
@@ -27,6 +27,17 @@ type MazeCollectorGameProps = {
 const MIN_CELL_SIZE = 14
 /** Celda máxima: en monitores muy grandes el tablero no crece sin límite. */
 const MAX_CELL_SIZE = 96
+/**
+ * Si el mapa entero obliga a celdas más chicas que esto (un celular), se deja de
+ * mostrar completo: las celdas pasan a CAMERA_CELL_SIZE y la cámara sigue al
+ * camión. Un mapa de 27x15 celdas en 390 px de ancho sería un mar de puntitos.
+ */
+const CAMERA_FIT_THRESHOLD = 26
+const CAMERA_CELL_SIZE = 32
+/** Cuánto hay que arrastrar el dedo sobre el mapa para que cuente como un giro. */
+const SWIPE_THRESHOLD = 22
+/** Alto de la zona de controles táctiles cuando el teléfono está en vertical. */
+const DOCK_HEIGHT = 176
 /**
  * Tamaño de los sprites respecto a su celda. El camión y las nubes llenan el
  * carril; las botellas van más chicas para que la vista se quede en el camión.
@@ -72,6 +83,11 @@ function useMediaQuery(query: string): boolean {
     () => window.matchMedia(query).matches,
     () => false,
   )
+}
+
+/** Posición de la cámara en un eje: si el mapa cabe, 0; si no, pegada a los bordes en vez de mostrar vacío. */
+function clampCamera(position: number, maxOffset: number): number {
+  return Math.max(0, Math.min(maxOffset, position))
 }
 
 /** Aclara (percent > 0) u oscurece (percent < 0) un color hex. */
@@ -135,12 +151,20 @@ function MazeCollectorSession({
   const rootRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const [cellSize, setCellSize] = useState(24)
+  const [cameraMode, setCameraMode] = useState(false)
+  const [view, setView] = useState({ width: 0, height: 0 })
+  const swipeStart = useRef<{ x: number; y: number } | null>(null)
   const [fullscreen, setFullscreen] = useState(false)
   const [wantFullscreen, setWantFullscreen] = useState(readFullscreenPreference)
   const [fullscreenHintClosed, setFullscreenHintClosed] = useState(false)
   const canFullscreen = typeof document !== 'undefined' && document.fullscreenEnabled
   // La cruceta aparece en cualquier pantalla táctil, no según el ancho.
   const coarsePointer = useMediaQuery('(pointer: coarse)')
+  // Pantalla chica: teléfono en vertical o en horizontal (poco alto). Ahí el encabezado se compacta.
+  const compact = useMediaQuery('(max-width: 640px), (max-height: 520px)')
+  const portrait = useMediaQuery('(orientation: portrait)')
+  // En vertical la cruceta tiene su propia franja (no tapa el mapa); en horizontal flota sobre él.
+  const dock = coarsePointer && portrait
 
   function enterFullscreen() {
     const root = rootRef.current
@@ -180,7 +204,10 @@ function MazeCollectorSession({
       const innerWidth = stage.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
       const innerHeight = stage.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom)
       const fit = Math.floor(Math.min(innerWidth / layout.cols, innerHeight / (layout.rows - trimmedRows)))
-      setCellSize(Math.max(MIN_CELL_SIZE, Math.min(MAX_CELL_SIZE, fit)))
+      const follow = fit < CAMERA_FIT_THRESHOLD
+      setCameraMode(follow)
+      setView({ width: innerWidth, height: innerHeight })
+      setCellSize(follow ? CAMERA_CELL_SIZE : Math.max(MIN_CELL_SIZE, Math.min(MAX_CELL_SIZE, fit)))
     }
     measure()
     const observer = new ResizeObserver(measure)
@@ -249,43 +276,84 @@ function MazeCollectorSession({
   // Si había elegido pantalla completa y se salió (Esc, por ejemplo), se ofrece volver con un clic.
   const showFullscreenHint = canFullscreen && wantFullscreen && !fullscreen && !fullscreenHintClosed && playing && !game.paused
 
+  // Tablero y ventana: con cámara solo se ve un pedazo, centrado en el camión sin salirse del mapa.
+  const boardWidth = width
+  const boardHeight = height - trimmedRows * cellSize
+  const windowWidth = cameraMode ? Math.min(boardWidth, view.width) : boardWidth
+  const windowHeight = cameraMode ? Math.min(boardHeight, view.height) : boardHeight
+  const trimShift = (trimmedRows * cellSize) / 2
+  const cameraX = cameraMode ? clampCamera((game.player.col + 0.5) * cellSize - windowWidth / 2, boardWidth - windowWidth) : 0
+  const cameraY = cameraMode
+    ? clampCamera((game.player.row + 0.5) * cellSize - trimShift - windowHeight / 2, boardHeight - windowHeight)
+    : 0
+
+  /** Deslizar el dedo sobre el mapa gira el camión (sin soltar: el giro se aplica en cuanto pasa el umbral). */
+  function handleSwipeDown(event: ReactPointerEvent<HTMLDivElement>) {
+    swipeStart.current = { x: event.clientX, y: event.clientY }
+  }
+
+  function handleSwipeMove(event: ReactPointerEvent<HTMLDivElement>) {
+    const start = swipeStart.current
+    if (!start) return
+    const dx = event.clientX - start.x
+    const dy = event.clientY - start.y
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < SWIPE_THRESHOLD) return
+    swipeStart.current = { x: event.clientX, y: event.clientY }
+    move(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'RIGHT' : 'LEFT') : dy > 0 ? 'DOWN' : 'UP')
+  }
+
   function pixelPos(cell: { row: number; col: number }) {
     return { left: cell.col * cellSize, top: cell.row * cellSize }
   }
 
   return (
-    <div ref={rootRef} className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-[#1c2733] text-slate-100">
-      <header className="relative z-10 flex flex-wrap items-center gap-2 px-2 pt-2 sm:px-3">
+    <div
+      ref={rootRef}
+      className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-[#1c2733] text-slate-100"
+      style={{
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+        paddingLeft: 'env(safe-area-inset-left)',
+        paddingRight: 'env(safe-area-inset-right)',
+      }}
+    >
+      <header className="relative z-10 flex items-center gap-2 px-2 pt-2 sm:px-3">
         <button
           type="button"
           aria-label="Pausa"
           aria-keyshortcuts={pauseKey === 'Esc' ? 'Escape P' : 'P'}
           title={`Pausar el juego (${pauseKey})`}
           disabled={!playing}
-          className="flex h-10 shrink-0 items-center gap-1.5 rounded-2xl border border-emerald-300/55 bg-emerald-500/20 px-3.5 text-[14px] font-bold text-white backdrop-blur transition-colors hover:bg-emerald-500/35 disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex h-11 shrink-0 items-center gap-1.5 rounded-2xl border border-emerald-300/55 bg-emerald-500/20 px-3.5 text-[14px] font-bold text-white backdrop-blur transition-colors hover:bg-emerald-500/35 disabled:cursor-not-allowed disabled:opacity-40 sm:h-10"
           onClick={pause}
         >
           <Pause className="h-4 w-4" fill="currentColor" strokeWidth={1.5} />
           Pausa
         </button>
 
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-1 rounded-2xl border border-white/10 bg-slate-950/60 px-3 py-1.5 backdrop-blur">
-          <p className="hidden min-w-0 items-center gap-1.5 truncate text-[13px] font-semibold md:flex">
-            <CollectorIcon className="h-4 w-4 shrink-0" style={{ color: primaryColor }} strokeWidth={2} />
-            <span className="truncate">{title}</span>
-          </p>
+        <div className="flex min-h-11 min-w-0 flex-1 items-center justify-between gap-x-3 rounded-2xl border border-white/10 bg-slate-950/60 px-2.5 py-1 backdrop-blur sm:justify-start sm:gap-x-4 sm:px-3 sm:py-1.5">
+          {!compact && (
+            <p className="hidden min-w-0 items-center gap-1.5 truncate text-[13px] font-semibold md:flex">
+              <CollectorIcon className="h-4 w-4 shrink-0" style={{ color: primaryColor }} strokeWidth={2} />
+              <span className="truncate">{title}</span>
+            </p>
+          )}
           <div className="flex items-center gap-0.5" aria-label={`Vidas: ${game.lives}`}>
             {Array.from({ length: Math.max(0, game.lives) }, (_, index) => (
-              <img key={index} src={mazeSpriteUrl('ui-life')} alt="" className="h-6 w-6" />
+              <img key={index} src={mazeSpriteUrl('ui-life')} alt="" className="h-5 w-5 sm:h-6 sm:w-6" />
             ))}
           </div>
-          <Stat label="Nivel" value={String(game.level)} />
+          <span className="max-[400px]:hidden">
+            <Stat label="Nivel" value={String(game.level)} />
+          </span>
           <span className="flex items-center gap-1.5">
-            <PetSprite size={26} />
+            <span className="max-[420px]:hidden">
+              <PetSprite size={26} />
+            </span>
             <Stat label="PET" value={`${game.collectedPet}/${game.totalPet}`} />
           </span>
-          <span className="ml-auto flex items-center gap-1.5">
-            <img src={mazeSpriteUrl('ui-star')} alt="" className="h-6 w-6" />
+          <span className="flex items-center gap-1.5 sm:ml-auto">
+            <img src={mazeSpriteUrl('ui-star')} alt="" className="h-5 w-5 sm:h-6 sm:w-6" />
             <Stat label="Puntos" value={game.score.toLocaleString('es')} />
           </span>
         </div>
@@ -294,7 +362,7 @@ function MazeCollectorSession({
           type="button"
           aria-label="Ver la guía"
           title="Ver la guía"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-slate-950/70 text-slate-200 backdrop-blur transition-colors hover:bg-white/10"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-slate-950/70 text-slate-200 max-sm:hidden backdrop-blur transition-colors hover:bg-white/10"
           onClick={onOpenGuide}
         >
           <BookOpen className="h-4 w-4" />
@@ -305,7 +373,7 @@ function MazeCollectorSession({
             type="button"
             aria-label={fullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
             title={fullscreen ? 'Salir de pantalla completa (F)' : 'Pantalla completa (F)'}
-            className={`flex h-10 shrink-0 items-center gap-1.5 rounded-2xl border px-3 text-[13px] font-bold backdrop-blur transition-colors ${
+            className={`flex h-10 shrink-0 items-center gap-1.5 rounded-2xl border px-3 text-[13px] font-bold backdrop-blur transition-colors max-sm:hidden ${
               fullscreen
                 ? 'border-white/10 bg-slate-950/70 text-slate-200 hover:bg-white/10'
                 : 'border-emerald-300/60 bg-emerald-500/25 text-white shadow-[0_0_20px_-6px_rgba(52,211,153,0.9)] hover:bg-emerald-500/40'
@@ -313,7 +381,7 @@ function MazeCollectorSession({
             onClick={toggleFullscreen}
           >
             {fullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
-            <span className="max-sm:hidden">{fullscreen ? 'Salir' : 'Pantalla completa'}</span>
+            {!compact && <span className="max-sm:hidden">{fullscreen ? 'Salir' : 'Pantalla completa'}</span>}
           </button>
         )}
 
@@ -324,7 +392,14 @@ function MazeCollectorSession({
         )}
       </header>
 
-      <div ref={stageRef} className="relative min-h-0 flex-1 overflow-auto p-1.5 sm:p-2">
+      <div
+        ref={stageRef}
+        className={`relative min-h-0 flex-1 p-1.5 sm:p-2 ${cameraMode ? 'overflow-hidden' : 'overflow-auto'} ${coarsePointer ? 'touch-none select-none' : ''}`}
+        onPointerDown={coarsePointer ? handleSwipeDown : undefined}
+        onPointerMove={coarsePointer ? handleSwipeMove : undefined}
+        onPointerUp={coarsePointer ? () => (swipeStart.current = null) : undefined}
+        onPointerCancel={coarsePointer ? () => (swipeStart.current = null) : undefined}
+      >
         {/* Barra del purificador: flota sobre el mapa para no quitarle alto. */}
         {energized && (
           <div className="pointer-events-none absolute left-1/2 top-3 z-20 flex w-[min(80%,420px)] -translate-x-1/2 items-center gap-2 rounded-full border border-emerald-300/50 bg-slate-950/85 px-3 py-1 shadow-lg">
@@ -340,9 +415,22 @@ function MazeCollectorSession({
         )}
         <div
           className="relative mx-auto overflow-hidden rounded-xl shadow-[0_18px_40px_-12px_rgba(0,0,0,0.7)]"
-          style={{ width, height: height - trimmedRows * cellSize, outline: `2px solid ${isCity ? '#2ecc71' : primaryColor}` }}
+          style={{
+            width: windowWidth,
+            height: windowHeight,
+            marginTop: cameraMode ? Math.max(0, (view.height - windowHeight) / 2) : undefined,
+            outline: `2px solid ${isCity ? '#2ecc71' : primaryColor}`,
+          }}
         >
-        <div className="relative" style={{ width, height, marginTop: -(trimmedRows * cellSize) / 2 }}>
+        <div
+          className="relative"
+          style={{
+            width,
+            height,
+            marginTop: -trimShift,
+            transform: cameraMode ? `translate3d(${-cameraX}px, ${-cameraY}px, 0)` : undefined,
+          }}
+        >
           {game.collectedPet > 0 && <ConfettiBurst trigger={game.collectedPet} />}
 
           {/* Capa 1: laberinto estático (sin costo por frame). Ciudad usa el mapa
@@ -435,32 +523,46 @@ function MazeCollectorSession({
       {game.lastCollected?.fact && playing && (
         <p
           key={game.lastCollected.itemId}
-          className="pointer-events-none absolute bottom-3 left-1/2 z-20 w-[min(92vw,460px)] -translate-x-1/2 animate-[fade-in-up_0.4s_ease-out] rounded-2xl border border-emerald-300/40 bg-slate-950/90 px-4 py-2.5 text-center text-[13px] text-slate-100 shadow-lg"
+          style={{ bottom: dock ? DOCK_HEIGHT + 8 : 12 }}
+          className="pointer-events-none absolute left-1/2 z-20 w-[min(92vw,460px)] -translate-x-1/2 animate-[fade-in-up_0.4s_ease-out] rounded-2xl border border-emerald-300/40 bg-slate-950/90 px-4 py-2.5 text-center text-[13px] text-slate-100 shadow-lg"
         >
           💡 {game.lastCollected.fact}
         </p>
       )}
 
       {/* La cruceta flota sobre el mapa (no le quita alto): abajo a la derecha, donde cae el pulgar. */}
-      {coarsePointer && (
-        <div className="absolute bottom-3 right-3 z-20 opacity-90">
+      {dock && (
+        <div className="relative z-20 flex shrink-0 items-center justify-center bg-slate-950/50" style={{ height: DOCK_HEIGHT }}>
+          <DirectionPad onPress={move} size="large" />
+        </div>
+      )}
+      {coarsePointer && !dock && (
+        <div className="absolute bottom-3 right-3 z-20 opacity-75">
           <DirectionPad onPress={move} />
         </div>
       )}
 
       {game.phase === 'ready' && (
         <Overlay>
-          <div className="flex items-end justify-center gap-3">
+          <div className="flex items-end justify-center gap-3 [@media(max-height:520px)]:hidden">
             <SpriteStrip name="truck-drive" frames={4} size={84} durationMs={640} />
             <SpriteStrip name="item-pet" frames={4} size={48} durationMs={1200} />
             <SpriteStrip name="cloud-chaser" frames={4} size={64} durationMs={900} />
           </div>
-          <h2 className="mt-2 text-[22px] font-bold tracking-tight text-white">¡A limpiar la ciudad!</h2>
+          <h2 className="mt-2 text-[22px] font-bold tracking-tight text-white [@media(max-height:520px)]:mt-0">¡A limpiar la ciudad!</h2>
           <p className="mx-auto mt-1.5 max-w-[400px] text-[13.5px] leading-relaxed text-slate-300">
-            Recoge todas las botellas PET con el {config.collectorLabel.toLowerCase()} y esquiva las nubes de contaminación.
-            Muévete con las <b className="text-white">flechas del teclado</b> (o W A S D).
+            Recoge todas las botellas PET con el {config.collectorLabel.toLowerCase()} y esquiva las nubes de contaminación.{' '}
+            {coarsePointer ? (
+              <>
+                Muévete con la <b className="text-white">cruceta</b> o <b className="text-white">deslizando el dedo</b> sobre el mapa.
+              </>
+            ) : (
+              <>
+                Muévete con las <b className="text-white">flechas del teclado</b> (o W A S D).
+              </>
+            )}
           </p>
-          {canFullscreen && (
+          {canFullscreen && !compact && (
             <FullscreenChoice wanted={wantFullscreen} active={fullscreen} onChange={chooseFullscreen} />
           )}
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
@@ -487,9 +589,15 @@ function MazeCollectorSession({
               <ArrowLeft className="h-4 w-4" /> Salir
             </button>
           </div>
-          <p className="mt-2 text-[11.5px] text-slate-400">
-            o presiona cualquier flecha · <b className="text-slate-200">P</b> pausa · <b className="text-slate-200">F</b> pantalla completa
-          </p>
+          {coarsePointer ? (
+            <p className="mt-2 text-[11.5px] text-slate-400">
+              ¿Necesitas parar? Toca <b className="text-slate-200">Pausa</b> (arriba a la izquierda).
+            </p>
+          ) : (
+            <p className="mt-2 text-[11.5px] text-slate-400">
+              o presiona cualquier flecha · <b className="text-slate-200">P</b> pausa · <b className="text-slate-200">F</b> pantalla completa
+            </p>
+          )}
         </Overlay>
       )}
 
@@ -591,9 +699,9 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 function Overlay({ children, celebrate }: { children: ReactNode; celebrate?: boolean }) {
   return (
-    <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#0b1220]/60 p-3 sm:p-6">
+    <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#0b1220]/60 p-2 sm:p-6">
       {celebrate && <ConfettiBurst trigger="won" />}
-      <div className="w-full max-w-[520px] animate-[maze-levelup-pop_0.45s_cubic-bezier(0.16,1,0.3,1)] rounded-3xl border border-white/15 bg-slate-950/85 p-5 text-center shadow-[0_24px_60px_-20px_rgba(0,0,0,0.8)] backdrop-blur-md sm:p-6">
+      <div className="max-h-full w-full max-w-[520px] animate-[maze-levelup-pop_0.45s_cubic-bezier(0.16,1,0.3,1)] overflow-y-auto rounded-3xl border border-white/15 bg-slate-950/85 p-4 text-center shadow-[0_24px_60px_-20px_rgba(0,0,0,0.8)] backdrop-blur-md sm:p-6">
         {children}
       </div>
     </div>
@@ -684,7 +792,7 @@ function PauseOverlay({
 }) {
   return (
     <div className="absolute inset-0 z-40 flex items-center justify-center bg-[#0b1220]/75 p-3 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="maze-pause-title">
-      <div className="w-full max-w-[420px] animate-[maze-levelup-pop_0.35s_cubic-bezier(0.16,1,0.3,1)] rounded-3xl border border-white/15 bg-slate-950/90 p-5 text-left shadow-[0_24px_60px_-20px_rgba(0,0,0,0.8)]">
+      <div className="max-h-full w-full max-w-[420px] animate-[maze-levelup-pop_0.35s_cubic-bezier(0.16,1,0.3,1)] overflow-y-auto rounded-3xl border border-white/15 bg-slate-950/90 p-5 text-left shadow-[0_24px_60px_-20px_rgba(0,0,0,0.8)]">
         <div className="flex items-center gap-3">
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-400/15 text-emerald-300">
             <Pause className="h-6 w-6" fill="currentColor" strokeWidth={1.5} />
@@ -734,15 +842,15 @@ function MenuButton({ icon: Icon, label, onClick }: { icon: typeof Play; label: 
 }
 
 /** Controles táctiles: aparecen en cualquier pantalla táctil, no según el ancho. */
-function DirectionPad({ onPress }: { onPress: (direction: Direction) => void }) {
+function DirectionPad({ onPress, size = 'normal' }: { onPress: (direction: Direction) => void; size?: 'normal' | 'large' }) {
   return (
     <div className="grid grid-cols-3 gap-1.5">
       <span />
-      <PadButton direction="UP" onPress={onPress} icon={ArrowUp} />
+      <PadButton direction="UP" onPress={onPress} icon={ArrowUp} size={size} />
       <span />
-      <PadButton direction="LEFT" onPress={onPress} icon={ArrowLeft} />
-      <PadButton direction="DOWN" onPress={onPress} icon={ArrowDown} />
-      <PadButton direction="RIGHT" onPress={onPress} icon={ArrowRight} />
+      <PadButton direction="LEFT" onPress={onPress} icon={ArrowLeft} size={size} />
+      <PadButton direction="DOWN" onPress={onPress} icon={ArrowDown} size={size} />
+      <PadButton direction="RIGHT" onPress={onPress} icon={ArrowRight} size={size} />
     </div>
   )
 }
@@ -751,17 +859,25 @@ function PadButton({
   direction,
   onPress,
   icon: Icon,
+  size,
 }: {
   direction: Direction
   onPress: (direction: Direction) => void
   icon: typeof ArrowUp
+  size: 'normal' | 'large'
 }) {
   return (
     <button
       type="button"
       aria-label={{ UP: 'Arriba', DOWN: 'Abajo', LEFT: 'Izquierda', RIGHT: 'Derecha' }[direction]}
-      className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/15 bg-slate-950/70 text-white backdrop-blur active:bg-emerald-500/30"
-      onClick={() => onPress(direction)}
+      className={`flex touch-none items-center justify-center rounded-2xl border border-white/15 text-white backdrop-blur active:bg-emerald-500/30 ${
+        size === 'large' ? 'h-[3.6rem] w-[4.6rem] bg-slate-950/70' : 'h-12 w-12 bg-slate-950/50'
+      }`}
+      onPointerDown={(event) => {
+        // Gira al tocar, sin esperar a que el dedo se levante (en un laberinto cada décima cuenta).
+        event.stopPropagation()
+        onPress(direction)
+      }}
     >
       <Icon className="h-5 w-5" strokeWidth={2} />
     </button>
