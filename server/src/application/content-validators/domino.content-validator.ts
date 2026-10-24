@@ -14,7 +14,30 @@ export interface DominoConcept {
   icon: string;
   /** Color hex #rgb o #rrggbb con el que se pinta el ícono. */
   color: string;
+  /** Todos los niveles; base de la retroalimentación al jugar. */
+  definition?: string;
+  /** Nivel Fácil. */
+  example?: string;
+  /** Nivel Intermedio. `correctIndex` NUNCA debe viajar al cliente durante la partida. */
+  question?: DominoConceptQuestion;
+  /** Nivel Universitario: caso o situación donde aplica el concepto. */
+  application?: string;
 }
+
+export interface DominoConceptQuestion {
+  text: string;
+  /** De 3 a 4 opciones, sin duplicados. */
+  options: string[];
+  correctIndex: number;
+  explanation: string;
+}
+
+/**
+ * Nivel de dificultad de una partida. Es ajuste de la sala, no del contenido:
+ * el contenido trae el material de todos los niveles. Su uso llega en el Issue 1.
+ */
+export const DOMINO_LEVELS = ['EASY', 'MEDIUM', 'ADVANCED'] as const;
+export type DominoLevel = (typeof DOMINO_LEVELS)[number];
 
 export interface DominoConfig {
   /** Fichas que recibe el jugador al repartir; el resto queda en el pozo. */
@@ -27,6 +50,14 @@ const DEFAULT_CONFIG: DominoConfig = {
 
 const MAX_LABEL_LENGTH = 60;
 const MAX_ICON_LENGTH = 60;
+const MAX_DEFINITION_LENGTH = 300;
+const MAX_EXAMPLE_LENGTH = 300;
+const MAX_APPLICATION_LENGTH = 400;
+const MAX_QUESTION_LENGTH = 300;
+const MAX_OPTION_LENGTH = 120;
+const MAX_EXPLANATION_LENGTH = 400;
+const MIN_OPTIONS = 3;
+const MAX_OPTIONS = 4;
 /**
  * Mínimo 6: con N conceptos el set completo tiene N*(N+1)/2 fichas únicas
  * (todas las combinaciones a<=b). Con 6 conceptos son 21 fichas — el tamaño
@@ -43,8 +74,8 @@ function isNonEmptyString(value: unknown, maxLength: number): value is string {
 }
 
 /**
- * Valida config y content para DOMINO — dominó temático de un jugador contra
- * el tablero: cada mitad de ficha es un concepto en vez de un número, y la
+ * Valida config y content para DOMINO — dominó temático 1v1 (dos jugadores
+ * por sala): cada mitad de ficha es un concepto en vez de un número, y la
  * mecánica (empatar extremos abiertos) es la misma del dominó tradicional.
  */
 @Injectable()
@@ -105,11 +136,73 @@ export class DominoContentValidator implements ContentValidator {
       );
     }
 
-    return {
+    const result: DominoConcept = {
       conceptId: isNonEmptyString(concept.conceptId, 60) ? concept.conceptId : `concept-${index}`,
       label: concept.label.trim(),
       icon: concept.icon.trim(),
       color: concept.color.trim(),
+    };
+
+    const definition = this.optionalText(concept.definition, 'definition', MAX_DEFINITION_LENGTH, index);
+    if (definition !== undefined) result.definition = definition;
+    const example = this.optionalText(concept.example, 'example', MAX_EXAMPLE_LENGTH, index);
+    if (example !== undefined) result.example = example;
+    const application = this.optionalText(concept.application, 'application', MAX_APPLICATION_LENGTH, index);
+    if (application !== undefined) result.application = application;
+    if (concept.question !== undefined && concept.question !== null) {
+      result.question = this.validateQuestion(concept.question, index);
+    }
+
+    return result;
+  }
+
+  /** Campo de texto opcional: ausente es válido; si viene, no puede estar vacío ni exceder el límite. */
+  private optionalText(value: unknown, field: string, maxLength: number, index: number): string | undefined {
+    if (value === undefined || value === null) return undefined;
+    if (!isNonEmptyString(value, maxLength)) {
+      throw new InvalidGameContentError(
+        `el concepto en la posición ${index} tiene ${field} inválido (texto no vacío, máximo ${maxLength} caracteres).`,
+      );
+    }
+    return value.trim();
+  }
+
+  private validateQuestion(raw: unknown, index: number): DominoConceptQuestion {
+    const where = `la pregunta del concepto en la posición ${index}`;
+    if (typeof raw !== 'object' || Array.isArray(raw)) {
+      throw new InvalidGameContentError(`${where} no es un objeto válido.`);
+    }
+    const q = raw as Record<string, unknown>;
+
+    if (!isNonEmptyString(q.text, MAX_QUESTION_LENGTH)) {
+      throw new InvalidGameContentError(`${where} necesita text (máximo ${MAX_QUESTION_LENGTH} caracteres).`);
+    }
+    if (!isNonEmptyString(q.explanation, MAX_EXPLANATION_LENGTH)) {
+      throw new InvalidGameContentError(`${where} necesita explanation (máximo ${MAX_EXPLANATION_LENGTH} caracteres).`);
+    }
+    if (
+      !Array.isArray(q.options) ||
+      q.options.length < MIN_OPTIONS ||
+      q.options.length > MAX_OPTIONS ||
+      !q.options.every((o) => isNonEmptyString(o, MAX_OPTION_LENGTH))
+    ) {
+      throw new InvalidGameContentError(
+        `${where} necesita de ${MIN_OPTIONS} a ${MAX_OPTIONS} opciones de texto (máximo ${MAX_OPTION_LENGTH} caracteres).`,
+      );
+    }
+    const options = (q.options as string[]).map((o) => o.trim());
+    if (new Set(options.map((o) => o.toLowerCase())).size !== options.length) {
+      throw new InvalidGameContentError(`${where} tiene opciones duplicadas.`);
+    }
+    if (!Number.isInteger(q.correctIndex) || (q.correctIndex as number) < 0 || (q.correctIndex as number) >= options.length) {
+      throw new InvalidGameContentError(`${where} tiene un correctIndex fuera de rango.`);
+    }
+
+    return {
+      text: q.text.trim(),
+      options,
+      correctIndex: q.correctIndex as number,
+      explanation: q.explanation.trim(),
     };
   }
 }
