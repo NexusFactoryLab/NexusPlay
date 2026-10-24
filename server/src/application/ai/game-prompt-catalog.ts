@@ -1,4 +1,5 @@
 import type { GameTypeName } from '../../domain/value-objects/game-type.vo.js';
+import { DOMINO_ICON_CATALOG } from './domino-icon-catalog.js';
 
 /**
  * Instrucciones + forma de JSON esperada por cada `gameType` (y, para
@@ -79,13 +80,36 @@ const DOMINO_SPEC: GamePromptSpec = {
   instructions: `Genera el contenido de un juego de Dominó educativo a partir del texto fuente.
 Extrae entre 6 y 10 conceptos clave del texto (términos, personajes, fechas, eventos — lo que
 tenga más sentido para el tema). Cada concepto necesita una "label" corta (máximo 60 caracteres)
-y un color hexadecimal distinto y armonioso para cada uno. Para "icon" usa siempre el valor
-"star" (el cliente resuelve un ícono visual aparte; no inventes otras claves).`,
+y un color hexadecimal distinto y armonioso para cada uno. Para "icon" elige UNA clave de esta
+lista, la que mejor represente el concepto (si ninguna encaja usa "star"; no inventes claves):
+${DOMINO_ICON_CATALOG.join(', ')}.
+
+Además, cada concepto lleva material para los tres niveles del juego:
+- "definition": una frase clara que defina el concepto (máximo 300 caracteres).
+- "example": un ejemplo cotidiano y sencillo, pensado para niños (máximo 300 caracteres).
+- "application": un caso o situación real donde se aplica, para nivel universitario (máximo 400 caracteres).
+- "questions": entre 1 y 3 preguntas distintas sobre ESE concepto (nunca más de 6; la primera es obligatoria).
+  Varía el tipo: una conceptual, una de identificación y una de aplicación simple. Cada pregunta tiene
+  "text" (máximo 300 caracteres), "options" (3 o 4 opciones distintas, máximo 120 caracteres cada una),
+  "correctIndex" (posición 0 a 3 de la opción correcta; varía la posición entre preguntas, no pongas
+  siempre la primera) y "explanation" (por qué es correcta, máximo 400 caracteres). Solo hechos
+  verificables a partir del texto fuente o de conocimiento bien establecido; nada dudoso.`,
   jsonShapeExample: `{
   "config": { "handSize": 7 },
   "content": [
-    { "label": "Fotosíntesis", "icon": "star", "color": "#22c55e" },
-    { "label": "Clorofila", "icon": "star", "color": "#16a34a" }
+    {
+      "label": "Fotosíntesis", "icon": "sprout", "color": "#22c55e",
+      "definition": "Proceso por el que las plantas convierten luz, agua y dióxido de carbono en azúcar y oxígeno.",
+      "example": "Una planta en la ventana que crece gracias a la luz del sol.",
+      "application": "Un invernadero ajusta la luz y el CO2 para aumentar la producción de lechuga.",
+      "questions": [
+        { "text": "¿Qué gas liberan las plantas durante la fotosíntesis?", "options": ["Oxígeno", "Nitrógeno", "Metano"], "correctIndex": 0, "explanation": "La fotosíntesis produce azúcar y libera oxígeno." },
+        { "text": "¿Cuál de estas es una condición necesaria para la fotosíntesis?", "options": ["Oscuridad total", "Luz", "Aceite", "Sal"], "correctIndex": 1, "explanation": "La luz aporta la energía que impulsa el proceso." }
+      ]
+    },
+    { "label": "Clorofila", "icon": "leaf", "color": "#16a34a", "questions": [
+      { "text": "¿Qué pigmento da el color verde a las hojas?", "options": ["Clorofila", "Hemoglobina", "Melanina"], "correctIndex": 0, "explanation": "La clorofila absorbe la luz y refleja el verde." }
+    ] }
   ]
 }`,
   imageRequirement: null,
