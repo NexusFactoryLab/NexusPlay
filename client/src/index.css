@@ -490,6 +490,101 @@ code {
   }
 }
 
+/* Pregunta de Dominexo (DominoQuestionModal.tsx): entrada suave del panel, opciones
+ * en cascada (`--dq-i` es el índice de cada opción) y respuestas que acompañan el
+ * resultado sin sobresaltar: el acierto respira en verde, el error se sacude apenas. */
+@keyframes domino-q-backdrop-in {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0);
+  }
+  to {
+    opacity: 1;
+    backdrop-filter: blur(4px);
+  }
+}
+
+@keyframes domino-q-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes domino-q-option-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes domino-q-correct {
+  0% {
+    box-shadow: 0 0 0 0 rgb(52 211 153 / 0.45);
+    transform: scale(1);
+  }
+  45% {
+    box-shadow: 0 0 0 10px rgb(52 211 153 / 0);
+    transform: scale(1.025);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgb(52 211 153 / 0);
+    transform: scale(1);
+  }
+}
+
+@keyframes domino-q-wrong {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-5px);
+  }
+  40% {
+    transform: translateX(4px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(2px);
+  }
+}
+
+@keyframes domino-q-icon-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.4) rotate(-12deg);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.15) rotate(2deg);
+  }
+  100% {
+    transform: scale(1) rotate(0);
+  }
+}
+
+@keyframes domino-q-result-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Adaptación de un juego (AdaptGameModal.tsx): cada paso entra deslizándose
  * desde la derecha y sus opciones aparecen en cascada (`--adapt-i` es el
  * índice de cada opción), para que cambiar de paso no sea un salto brusco. */
