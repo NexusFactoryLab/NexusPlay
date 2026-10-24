@@ -101,7 +101,26 @@ export type DominoConcept = {
   icon: string
   /** Color hex con el que se pinta el ícono. */
   color: string
+  /** Todos los niveles; base de la retroalimentación al jugar. */
+  definition?: string
+  /** Nivel Fácil. */
+  example?: string
+  /** Nivel Intermedio. Desde el servidor llega sin `correctIndex` durante la partida. */
+  question?: {
+    text: string
+    options: string[]
+    correctIndex?: number
+    explanation: string
+  }
+  /** Nivel Universitario: caso o situación donde aplica el concepto. */
+  application?: string
 }
+
+/**
+ * Nivel de dificultad de una partida. Es ajuste de la sala, no del contenido
+ * (su uso llega en el Issue 1).
+ */
+export type DominoLevel = 'EASY' | 'MEDIUM' | 'ADVANCED'
 
 export type DominoConfig = {
   /** Fichas que recibe el jugador al repartir; el resto queda en el pozo. */

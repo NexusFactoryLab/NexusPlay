@@ -266,12 +266,23 @@ function dominoHasValidMove(hand: DominoTile[], board: DominoPlacedTile[]): bool
   return hand.some((tile) => dominoTileMatchesEnd(tile, left) || dominoTileMatchesEnd(tile, right));
 }
 
+/**
+ * Concepto tal como viaja al cliente: la pregunta se envía sin `correctIndex`
+ * (la respuesta correcta solo vive en el servidor; la validación llega en el Issue 1).
+ */
+export function toDominoClientConcept(concept: DominoConcept) {
+  const { question, ...rest } = concept;
+  if (!question) return rest;
+  // Se arma campo por campo (lista blanca) para que un campo nuevo no se filtre por accidente.
+  return { ...rest, question: { text: question.text, options: question.options, explanation: question.explanation } };
+}
+
 /** Vista pública de la sala de dominó para un jugador dado: la mano ajena solo se ve como cantidad. */
-function toDominoClientView(room: DominoRoomState, forSocketId: string) {
+export function toDominoClientView(room: DominoRoomState, forSocketId: string) {
   return {
     code: room.code,
     gameTitle: room.gameTitle,
-    concepts: room.concepts,
+    concepts: room.concepts.map(toDominoClientConcept),
     handSize: room.handSize,
     turnDurationSeconds: room.turnDurationSeconds,
     phase: room.phase,
