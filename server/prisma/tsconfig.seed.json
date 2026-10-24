@@ -11,6 +11,7 @@
   "include": [
     "seed.ts",
     "seed-nexus-play.ts",
+    "seed-domino-niveles-demo.ts",
     "seed-maze-collector-demos.ts",
     "seed-snakes-ladders-demo.ts",
     "seed-dual-quest-demo.ts",

@@ -6,7 +6,8 @@ import { Modal } from './Modal'
 import { gameInstructions, type InstructionKind } from './gameInstructions'
 import { GuessWhoVisualDemo } from './GuessWhoVisualDemo'
 import { flagsDemoExample, type GuessWhoDemoExample } from './guessWhoDemoExamples'
-import { DominoVisualDemo } from './DominoVisualDemo'import { MemoryMatchDemo } from './MemoryMatchFlash'
+import { DominoVisualDemo } from './DominoVisualDemo'
+import { MemoryMatchDemo } from './MemoryMatchFlash'
 
 const SEEN_KEY_PREFIX = 'nexusplay:guia-vista:'
 
