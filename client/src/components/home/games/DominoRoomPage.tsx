@@ -462,6 +462,7 @@ function DominoRoomPageSession() {
     room={room} roomPath={`/domino/sala/${encodeURIComponent(room.code)}`} maxPlayers={2}
     isHost={Boolean(self?.isHost)} connecting={connecting} error={error}
     turnDurationSeconds={room.turnDurationSeconds} onUpdateTurnDuration={updateTurnDuration}
+    large
     settingsPanel={<DominoSettingsPanel level={level} turnDurationSeconds={room.turnDurationSeconds} isHost={Boolean(self?.isHost)} disabled={connecting} onChangeLevel={updateLevel} onUpdateTurnDuration={updateTurnDuration} />}
     onReady={setReady} onExit={handleExit} messages={messages} onSend={sendChatMessage}
   >{dealCountdownMs !== null && <DealCountdownOverlay remainingMs={dealCountdownMs} />}</MultiplayerLobby>
