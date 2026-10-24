@@ -7,6 +7,7 @@ import { getWelcomeSteps, hasGreetedThisSession, hasSeenWelcome, initialWelcomeP
 import type { WelcomeOptions, WelcomePhase, WelcomeStep } from './welcomeTourSteps'
 import { WelcomeCard } from './WelcomeCard'
 import { TourSpotlight } from './TourSpotlight'
+import { WelcomeStepScene } from './WelcomeStepScene'
 import { pickCardCorner, tourCardBounds, useSpotlightRect } from './tourSpotlightLayout'
 import { getTourAway, setTourAway, useTourAway } from './tourProgress'
 import { isKidsMode } from '../../utils/kidsMode'
@@ -16,6 +17,46 @@ const icons = { play: Gamepad2, create: Plus, explore: Compass, profile: UserRou
 const NAVIGATION_GRACE_MS = 600
 const STUCK_MS = 12000
 const GENERIC_AWAY ='Esta es otra sección de NexusPlay. Mírala con calma y vuelve a la guía para seguir.'
+
+/** A la vista de verdad: con tamaño, dentro de la pantalla y no `invisible` (el menú del celular se esconde así, corrido fuera de la pantalla). */
+function isShown(element: Element | null): element is HTMLElement {
+  if (!(element instanceof HTMLElement)) return false
+  const box = element.getBoundingClientRect()
+  if (box.width === 0 || box.height === 0 || box.right <= 0 || box.left >= window.innerWidth) return false
+  return element.checkVisibility?.({ visibilityProperty: true }) ?? true
+}
+
+/**
+ * Al pasar a otro paso, la pantalla vuelve a como estaba: se cierra la
+ * ventana o el menú que abrió el paso (todos se cierran con Escape) y se
+ * deshace lo que cambió (el menú contraído, la búsqueda escrita). Si no, la
+ * guía avanzaba pero la pantalla seguía mostrando lo del paso anterior.
+ */
+function tidyAfterStep(step: WelcomeStep, wasDone: boolean) {
+  const target = document.querySelector(`[data-tour="${step.target}"]`)
+  if (wasDone && step.undo === 'toggle' && isShown(target)) target.click()
+  if (wasDone && step.undo === 'clear-search') {
+    const input = target?.querySelector('input')
+    if (input && input.value) {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, '')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    }
+  }
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+}
+
+/** Lleva la pantalla a donde ocurre el paso (Kids: fuera o dentro de un mundo; celular: con el menú abierto). */
+function placeForStep(step: WelcomeStep) {
+  const back = document.querySelector('[data-tour="worlds-back"]')
+  if (step.place === 'world-list' && isShown(back)) back.click()
+  if (step.place === 'inside-world' && !isShown(back)) {
+    document.querySelector<HTMLElement>('[data-tour="worlds"] button')?.click()
+  }
+  // En celular las opciones del menú viven en un panel escondido: se abre para poder tocarlas.
+  const target = document.querySelector(`[data-tour="${step.target}"]`)
+  const opener = document.querySelector('[aria-label="Abrir menú"]')
+  if (target && !isShown(target) && target.closest('aside, nav') && isShown(opener)) opener.click()
+}
 
 /** Toques que cuentan como "hacer" el paso: en un contenedor (los mundos de Kids) solo valen sus botones y enlaces. */
 function isActionClick(target: HTMLElement, event: Event) {
@@ -72,13 +113,25 @@ export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds }: 
   // Alto real de la tarjeta (cambia por paso): sirve para elegir la esquina libre y deslizarla hasta ahí.
   const [cardHeight, setCardHeight] = useState<number | null>(null)
   const [cardNode, setCardNode] = useState<HTMLElement | null>(null)
+  const [fullCardHeight, setFullCardHeight] = useState<number | null>(null)
+  // "Ver cómo se hace" en la tarjeta compacta: muestra el video aunque tape un poco.
+  const [showScene, setShowScene] = useState(false)
   useEffect(() => {
     if (!cardNode) return
-    const observer = new ResizeObserver(() => setCardHeight(cardNode.offsetHeight))
+    const observer = new ResizeObserver(() => {
+      setCardHeight(cardNode.offsetHeight)
+      // El alto completo (con video) se guarda aparte: decide si hace falta compactarla.
+      if (!cardNode.hasAttribute('data-compact')) setFullCardHeight(cardNode.offsetHeight)
+    })
     observer.observe(cardNode)
     return () => observer.disconnect()
   }, [cardNode])
   const step: WelcomeStep = steps[Math.min(index, steps.length - 1)]
+  // Paso actual para `close` (que es estable y no ve el render en curso).
+  const stepRef = useRef({ step, done: false })
+  useEffect(() => {
+    stepRef.current = { step, done: stepDone }
+  })
   const visible = atHome && phase !== 'closed'
   // Momento obligatorio: solo antes de que la persona inicie el recorrido.
   const forcedInvite = visible && phase === 'invite'
@@ -128,6 +181,7 @@ export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds }: 
   }, [leftHomeInTour, storageKey, index, steps.length, step])
 
   const close = useCallback((restoreFocus = true) => {
+    tidyAfterStep(stepRef.current.step, stepRef.current.done)
     markWelcomeSeen(storageKey)
     setTourAway(null)
     setPhase('closed')
@@ -140,7 +194,8 @@ export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds }: 
     // ventana: ahí Escape es para cerrar eso, no la guía.
     if (!visible || phase !== 'tour' || stepDone) return
     function onEscape(event: KeyboardEvent) {
-      if (event.key === 'Escape') close()
+      // El Escape que manda la propia guía para cerrar ventanas no la cierra a ella.
+      if (event.key === 'Escape' && event.isTrusted) close()
     }
     document.addEventListener('keydown', onEscape)
     return () => document.removeEventListener('keydown', onEscape)
@@ -159,6 +214,7 @@ export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds }: 
     if (!visible || phase !== 'tour') return
     headingRef.current?.focus({ preventScroll: true })
     if (stepDone) return
+    placeForStep(step)
     const target = document.querySelector<HTMLElement>(`[data-tour="${step.target}"]`)
     if (!target) return
     target.setAttribute('data-tour-active', 'true')
@@ -222,7 +278,9 @@ export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds }: 
   }
 
   function goTo(next: number) {
+    tidyAfterStep(step, stepDone)
     setStepDone(false)
+    setShowScene(false)
     setIndex(next)
   }
 
@@ -237,8 +295,7 @@ export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds }: 
   useEffect(() => {
     if (!inTour || stepDone || step.kind === 'look') return
     const timer = window.setTimeout(() => {
-      const box = document.querySelector(`[data-tour="${step.target}"]`)?.getBoundingClientRect()
-      setTargetMissing(!box || (box.width === 0 && box.height === 0))
+      setTargetMissing(!isShown(document.querySelector(`[data-tour="${step.target}"]`)))
     }, 400)
     return () => {
       window.clearTimeout(timer)
@@ -263,14 +320,26 @@ export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds }: 
   const viewport = { width: window.innerWidth, height: window.innerHeight }
   const margin = viewport.width >= 640 ? 24 : 12
   const bounds = tourCardBounds(viewport)
-  const card = { width: bounds.width, height: cardHeight ?? bounds.height }
-  const cardCorner = pickCardCorner(spotlightRect, card, viewport, margin)
   // Posición en píxeles (no clases de esquina) para que la tarjeta se deslice
   // con transición hacia la esquina libre y no tape lo que se está mostrando.
-  const cardPosition = {
-    left: cardCorner.endsWith('right') ? viewport.width - margin - card.width : margin,
-    top: cardCorner.startsWith('bottom') ? Math.max(margin, viewport.height - margin - card.height) : margin,
+  const placeCard = (size: { width: number; height: number }) => {
+    const corner = pickCardCorner(spotlightRect, size, viewport, margin)
+    return {
+      left: corner.endsWith('right') ? viewport.width - margin - size.width : margin,
+      top: corner.startsWith('bottom') ? Math.max(margin, viewport.height - margin - size.height) : margin,
+    }
   }
+  // Si la tarjeta entera (con su video) taparía lo que hay que tocar —pasa
+  // en el celular, con el menú abierto—, se queda compacta: solo la tarea y
+  // un botón para ver el video. Se decide con el alto COMPLETO medido, así no
+  // salta entre compacta y completa.
+  const fullCard = { width: bounds.width, height: fullCardHeight ?? bounds.height }
+  const fullPosition = placeCard(fullCard)
+  const coversTarget = !!spotlightRect &&
+    fullPosition.left < spotlightRect.left + spotlightRect.width && spotlightRect.left < fullPosition.left + fullCard.width &&
+    fullPosition.top < spotlightRect.top + spotlightRect.height && spotlightRect.top < fullPosition.top + fullCard.height
+  const compact = coversTarget && !stepDone && !showScene
+  const cardPosition = compact ? placeCard({ width: bounds.width, height: cardHeight ?? 200 }) : fullPosition
   const TaskIcon = step.kind === 'type' ? Keyboard : Hand
   return <>
     {forcedInvite && (
@@ -310,16 +379,29 @@ export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds }: 
     )}
 
     {inTour && createPortal(
-      <section ref={setCardNode} style={cardPosition} aria-label="Recorrido de NexusPlay" className={`welcome-tour-card fixed z-[45] w-[min(360px,calc(100vw-24px))] rounded-3xl border border-border bg-surface p-5 text-left text-text shadow-[var(--shadow)]`}>
+      // Con el paso hecho, la tarjeta va por encima de la ventana o el menú que se abrió: así "Siguiente" siempre se puede tocar.
+      <section ref={setCardNode} style={cardPosition} data-compact={compact ? '' : undefined} aria-label="Recorrido de NexusPlay" className={`welcome-tour-card fixed ${stepDone ? 'z-[80]' : 'z-[45]'} w-[min(360px,calc(100vw-24px))] rounded-3xl border border-border bg-surface p-5 text-left text-text shadow-[var(--shadow)]`}>
         <div className="mb-3 flex items-center justify-between gap-3">
           <span key={`icon-${index}`} className="tour-step-icon flex h-10 w-10 items-center justify-center rounded-2xl text-white shadow-md" style={{ background: 'linear-gradient(135deg, var(--accent), var(--color-accent-2, var(--accent)))' }}><Icon className="h-6 w-6" aria-hidden="true" /></span>
           <span className="flex-1 text-xs font-semibold text-accent">Paso {index + 1} de {steps.length} · Hazlo tú</span>
           <button type="button" onClick={() => close()} aria-label="Cerrar recorrido" className="rounded-full p-2 text-text hover:bg-code-bg focus-visible:outline-2 focus-visible:outline-accent"><X className="h-5 w-5" /></button>
         </div>
         <div key={index} className="tour-step-in" aria-live="polite" aria-atomic="true">
+          {/* El "video" del paso: muestra cómo se hace; debajo, la persona lo hace. En el celular sale un poco más chico. */}
+          {!compact && (
+            <div className="max-sm:[zoom:0.82]">
+              <WelcomeStepScene target={step.target} />
+            </div>
+          )}
           {last && stepDone && <FinishConfetti />}
           <h2 ref={headingRef} tabIndex={-1} className="text-xl font-bold text-text-h outline-none">{step.title}</h2>
-          <p className="mt-2 text-sm leading-relaxed">{step.text}</p>
+          {compact ? (
+            <button type="button" onClick={() => setShowScene(true)} className="mt-1 text-xs font-semibold text-accent underline">
+              Ver cómo se hace ▾
+            </button>
+          ) : (
+            <p className="mt-2 text-sm leading-relaxed">{step.text}</p>
+          )}
           {step.task && !stepDone && (
             <p data-tour-task className="tour-task mt-3 flex items-center gap-2.5 rounded-2xl border-2 border-dashed border-accent/60 bg-accent/10 px-3 py-2.5 text-[14px] font-semibold text-text-h">
               <TaskIcon className="tour-task-hand h-5 w-5 shrink-0 text-accent" aria-hidden="true" />

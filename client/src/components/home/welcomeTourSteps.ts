@@ -19,6 +19,14 @@ export type WelcomeStep = {
   away?: string
   /** Lo que se le dice al lograrlo sin salir del inicio (abrió un menú, una ventana…). */
   done?: string
+  /**
+   * Cómo dejar la pantalla como estaba al pasar a otro paso, si este la cambió:
+   * `toggle` vuelve a tocar el elemento (el menú contraído), `clear-search`
+   * borra la búsqueda. Las ventanas y menús abiertos se cierran siempre.
+   */
+  undo?: 'toggle' | 'clear-search'
+  /** Dónde tiene que estar la pantalla para este paso (Kids: la lista de mundos o dentro de uno). */
+  place?: 'world-list' | 'inside-world'
 }
 
 export type WelcomeOptions = {
@@ -39,18 +47,18 @@ export function getWelcomeSteps(role: string, isKids: boolean, options: WelcomeO
     text: 'Desde tu avatar ves tu cuenta, cambias tu avatar o cierras sesión. Usa Guía cuando quieras repetir este recorrido.',
     target: 'profile', icon: 'profile', kind: 'tap',
     task: 'Toca tu avatar para abrir tu menú.',
-    done: '¡Ese es tu menú! Ciérralo cuando quieras.',
+    done: '¡Ese es tu menú!',
   }
   if (isKids) return [
     {
       title: 'Elige tu mundo', text: 'Cada mundo es un área con sus juegos. Si aún no hay mundos, pídele a tu profe que publique un juego.',
-      target: 'worlds', icon: 'explore', kind: 'tap',
+      target: 'worlds', icon: 'explore', kind: 'tap', place: 'world-list',
       task: 'Toca un mundo para entrar.',
       done: '¡Entraste a un mundo! Aquí están sus juegos.',
     },
     {
       title: '¡A jugar con tu equipo!', text: 'Si tu profe te dio un código de sala, escríbelo en el juego y toca Unirme. Para jugar por tu cuenta, toca Jugar.',
-      target: 'worlds', icon: 'play', kind: 'tap',
+      target: 'worlds', icon: 'play', kind: 'tap', place: 'inside-world',
       task: 'Toca la portada de un juego.',
       away: 'Así se ve un juego por dentro. Aquí lees cómo se juega y empiezas la partida.',
       done: '¡Muy bien! Así se abre un juego.',
@@ -70,7 +78,7 @@ export function getWelcomeSteps(role: string, isKids: boolean, options: WelcomeO
       title: 'Entra con un código', text: '¿Te invitaron a una partida? Con el código de sala que te compartieron entras directo.',
       target: 'join', icon: 'play', kind: 'tap',
       task: 'Toca «Unirme con código».',
-      done: 'Ahí escribes el código. Cierra la ventana para seguir.',
+      done: 'Aquí escribes el código que te compartan. Al tocar «Siguiente», la guía cierra esta ventana.',
     },
   ]
   if (role === 'TEACHER' || role === 'ADMIN') steps.push({
@@ -138,19 +146,19 @@ export function getWelcomeSteps(role: string, isKids: boolean, options: WelcomeO
   steps.push(
     {
       title: 'Encuentra un juego', text: 'El buscador muestra los juegos que coinciden con lo que escribes. Borra el texto para volver al listado completo.',
-      target: 'search', icon: 'explore', kind: 'type',
+      target: 'search', icon: 'explore', kind: 'type', undo: 'clear-search',
       task: 'Escribe algo en «Buscar juegos» y pulsa Enter.',
-      done: '¡Así se busca! Borra el texto cuando quieras ver todo otra vez.',
+      done: '¡Así se busca! Al seguir, la guía borra la búsqueda.',
     },
     {
       title: 'Más espacio para jugar', text: 'Esta flecha contrae o expande el menú. Sus opciones siguen disponibles como iconos.',
-      target: 'menu-toggle', icon: 'explore', kind: 'tap', task: 'Toca la flecha del menú.',
-      done: '¡Listo! Tócala otra vez para dejarlo como estaba.',
+      target: 'menu-toggle', icon: 'explore', kind: 'tap', undo: 'toggle', task: 'Toca la flecha del menú.',
+      done: '¡Listo! Así ganas espacio. Al seguir, la guía deja el menú como estaba.',
     },
     {
       title: 'Hazlo a tu gusto', text: 'La tuerca abre tu configuración: ahí están los temas Fantasía, Pradera, Claro y Oscuro. La elección se recuerda en este dispositivo.',
       target: 'settings', icon: 'explore', kind: 'tap', task: 'Toca la tuerca de configuración.',
-      done: 'Esa es tu configuración. Ciérrala cuando quieras.',
+      done: 'Esa es tu configuración. Al tocar «Siguiente», la guía la cierra.',
     },
     profile,
   )

@@ -60,8 +60,9 @@ async function run() {
         assert.equal(await next.count(), 0, 'No hay "Siguiente" hasta hacer el paso')
         await page.locator('[data-tour="join"]').click()
         await page.getByPlaceholder('CÓDIGO').waitFor()
-        await page.getByRole('button', { name: 'Cancelar', exact: true }).click()
+        // Sin cerrar la ventana a mano: «Siguiente» la cierra (antes la guía seguía con la ventana encima).
         await doneThenNext()
+        await page.getByPlaceholder('CÓDIGO').waitFor({ state: 'detached' })
 
         // 2. Crear juego: lleva a otra página y la barra obliga a volver.
         await expectStep(2)
