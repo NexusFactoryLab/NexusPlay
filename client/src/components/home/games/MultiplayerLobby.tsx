@@ -142,8 +142,9 @@ export function MultiplayerLobby({
         onClose={chatOpen ? closeChat : onExit}
         maxWidthClassName={large ? 'max-w-[1180px]' : 'max-w-[840px]'}
         maxHeightClassName="max-h-[94dvh]"
-        // En modo grande no se encoge el contenido para que quepa: se prefiere desplazar a leer letra pequeña.
-        fitContent={!large}
+        // En modo grande se reduce un poco el contenido (hasta 50 %) para que quepa sin scroll.
+        fitContent
+        minFitScale={large ? 0.5 : undefined}
         ariaLabel="Sala de espera"
         ariaModal={!chatOpen}
       >
