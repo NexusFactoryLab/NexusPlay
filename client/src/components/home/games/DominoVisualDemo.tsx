@@ -10,8 +10,8 @@ const scenes = [
   { title: 'Elige tu nivel', text: 'Quien crea la sala escoge el nivel.', icon: Layers },
 ]
 
-const primaryButton = 'flex items-center justify-center gap-2 rounded-2xl min-h-[52px] px-5 py-3 text-[1.125rem] font-semibold text-white shadow-[0_12px_24px_-12px_var(--accent)] transition-all hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-accent'
-const secondaryButton = 'flex items-center justify-center gap-2 rounded-xl border border-border min-h-[52px] px-4 py-2.5 text-[1.0625rem] font-semibold text-text-h transition-colors hover:border-accent hover:bg-accent/5 focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40'
+const primaryButton = 'flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-[14.5px] font-semibold text-white shadow-[0_12px_24px_-12px_var(--accent)] transition-all hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-accent'
+const secondaryButton = 'flex items-center justify-center gap-2 rounded-xl border border-border px-3 py-2.5 text-[13px] font-semibold text-text-h transition-colors hover:border-accent hover:bg-accent/5 focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40'
 const gradient = { background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }
 
 type Concept = { label: string; color: string; icon: LucideIcon }
@@ -29,14 +29,14 @@ export function DominoVisualDemo({ onContinue }: { onContinue: () => void }) {
 
   return (
     <div className="space-y-4" data-domino-demo>
-      <div className="flex flex-wrap items-center justify-between gap-2 text-[1rem] text-text">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-text">
         <span>Dominexo · Aprende jugando</span>
         <span className="font-semibold text-accent" aria-live="polite">{scene + 1} de {scenes.length}</span>
       </div>
       <div className="flex gap-1.5" aria-hidden="true">
         {scenes.map((step, index) => <span key={step.title} className={`h-1.5 flex-1 rounded-full ${index <= scene ? 'bg-accent' : 'bg-border'}`} />)}
       </div>
-      <h3 ref={heading} tabIndex={-1} className="text-[1.5rem] font-bold text-text-h focus:outline-none">{current.title}</h3>
+      <h3 ref={heading} tabIndex={-1} className="text-[18px] font-bold text-text-h focus:outline-none">{current.title}</h3>
 
       <div className="rounded-2xl border border-border bg-code-bg p-4 sm:p-6">
         <div key={scene} className="grid items-center gap-5 animate-[fade-in-up_0.35s_ease-out] motion-reduce:animate-none sm:grid-cols-[minmax(0,1fr)_minmax(260px,1.2fr)] sm:gap-8">
@@ -44,7 +44,7 @@ export function DominoVisualDemo({ onContinue }: { onContinue: () => void }) {
             <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/15 text-accent sm:mx-0">
               <current.icon className="h-6 w-6" strokeWidth={2.2} aria-hidden="true" />
             </span>
-            <p className="mt-3 text-[1.5rem] font-bold leading-relaxed text-text-h">{current.text}</p>
+            <p className="mt-3 text-[17px] font-bold leading-relaxed text-text-h">{current.text}</p>
           </div>
           <DominoScene scene={scene} />
         </div>
@@ -99,24 +99,24 @@ function DominoScene({ scene }: { scene: number }) {
               <span className="flex flex-1 items-center justify-center bg-amber-100 text-xl font-black text-amber-800">B</span>
             </div>
           </div>
-          <span className="rounded-full border border-accent/25 bg-accent/10 px-4 py-2 text-[1rem] font-bold text-accent">Roba una ficha del pozo</span>
-          <span className="text-[1rem] text-text">Si el pozo está vacío, pasa el turno.</span>
+          <span className="rounded-full border border-accent/25 bg-accent/10 px-3 py-1.5 text-[12px] font-bold text-accent">Roba una ficha del pozo</span>
+          <span className="text-[11px] text-text">Si el pozo está vacío, pasa el turno.</span>
         </div>
       ) : (
         <div className="relative">
-          <p className="mb-2 text-center text-[1rem] font-semibold text-text">Tablero</p>
+          <p className="mb-2 text-center text-[10px] font-semibold tracking-wide text-text/70 uppercase">Tablero</p>
           <div className="flex items-center justify-center gap-1.5">
             <MiniTile context="board" left={peak} right={orbit} animationClass={scene === 0 ? 'animate-[domino-demo-board_0.7s_ease-out_both]' : undefined} />
             {connected && <MiniTile context="board" left={orbit} right={spark} entering />}
             {!connected && <span className="grid h-8 w-8 place-items-center rounded-full border border-dashed border-accent/60 bg-accent/5 text-[17px] font-bold text-accent animate-[result-glow-pulse_1.4s_ease-in-out_infinite] motion-reduce:animate-none">+</span>}
           </div>
-          <p className="mb-2 mt-5 text-center text-[1rem] font-semibold text-text">Tu mano</p>
+          <p className="mb-2 mt-5 text-center text-[10px] font-semibold tracking-wide text-text/70 uppercase">Tu mano</p>
           <div className="flex items-center justify-center gap-2">
             <MiniTile context="hand" left={spark} right={peak} />
             {!connected && <MiniTile context="hand" left={orbit} right={spark} selected={selected} animationClass={scene === 1 ? 'animate-[domino-demo-select_0.75s_cubic-bezier(0.16,1,0.3,1)_both]' : undefined} />}
           </div>
-          {scene === 1 && <p className="mt-3 text-center text-[1rem] font-semibold text-accent">La pieza A coincide con el extremo A.</p>}
-          {scene === 2 && <p className="mt-3 text-center text-[1rem] font-semibold text-accent">La ficha A/C sube desde tu mano y se conecta.</p>}
+          {scene === 1 && <p className="mt-3 text-center text-[11px] font-semibold text-accent">La pieza A coincide con el extremo A.</p>}
+          {scene === 2 && <p className="mt-3 text-center text-[11px] font-semibold text-accent">La ficha A/C sube desde tu mano y se conecta.</p>}
         </div>
       )}
     </div>

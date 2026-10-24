@@ -51,17 +51,17 @@ export function GameInstructionsGate({ kind, children, guessWhoExample = flagsDe
   // MatchMente: demostración animada en vez de párrafo (issue #30).
   const isMemory = kind === 'PAIRS' || kind === 'OPPOSITES'
   return (
-    <Modal onClose={onContinue} fitContent={!isDomino} maxWidthClassName={hasVisualDemo ? 'max-w-[1120px]' : 'max-w-[520px]'} maxHeightClassName="max-h-[calc(100dvh-40px)]" ariaLabel={isGuessWho ? 'Cómo jugar a Identidad Oculta' : isDomino ? 'Cómo jugar a Dominexo' : undefined}>
+    <Modal onClose={onContinue} fitContent minFitScale={isDomino ? 0.4 : undefined} maxWidthClassName={hasVisualDemo ? 'max-w-[1120px]' : 'max-w-[520px]'} maxHeightClassName="max-h-[calc(100dvh-40px)]" ariaLabel={isGuessWho ? 'Cómo jugar a Identidad Oculta' : isDomino ? 'Cómo jugar a Dominexo' : undefined}>
       <div className="space-y-4" data-game-instructions={kind}>
         <div className="flex items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-accent/12 via-accent/5 to-transparent px-4 py-3">
           <div>
-            <p className={isDomino ? 'text-[1rem] font-semibold text-accent' : 'text-[11px] font-semibold tracking-[0.18em] text-accent uppercase'}>Nexus Play</p>
-            <h2 className={`font-bold tracking-tight text-text-h ${isDomino ? 'text-[1.75rem]' : 'text-[22px]'}`}>Cómo jugar</h2>
+            <p className="text-[11px] font-semibold tracking-[0.18em] text-accent uppercase">Nexus Play</p>
+            <h2 className="text-[22px] font-bold tracking-tight text-text-h">Cómo jugar</h2>
           </div>
           <button
             type="button"
             data-skip-guide
-            className={`flex shrink-0 items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 font-semibold ${isDomino ? 'min-h-[48px] text-[1rem]' : 'text-[12.5px]'} text-text-h transition-colors hover:border-accent hover:text-accent focus-visible:outline-2 focus-visible:outline-accent`}
+            className="flex shrink-0 items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-[12.5px] font-semibold text-text-h transition-colors hover:border-accent hover:text-accent focus-visible:outline-2 focus-visible:outline-accent"
             onClick={onContinue}
           >
             {seenBefore ? 'Ya lo jugué · Saltar guía' : 'Saltar guía'}
