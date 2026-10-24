@@ -1,4 +1,4 @@
-import type { DominoConcept } from '../../application/content-validators/domino.content-validator.js';
+import type { DominoConcept, DominoLevel } from '../../application/content-validators/domino.content-validator.js';
 
 export const DOMINO_ROOM_STORE = Symbol('DOMINO_ROOM_STORE');
 
@@ -61,6 +61,26 @@ export interface DominoRoomState {
    * gana quien tenga menos puntos (suma de pips) en la mano.
    */
   consecutivePasses: number;
+  /** Nivel de la partida; lo fija el anfitrión en WAITING. Ausente en salas viejas = EASY. */
+  level?: DominoLevel;
+  /**
+   * Jugada de Intermedio a la espera de respuesta. Vive solo en el servidor:
+   * la ficha y el lado se guardan acá para no confiar en lo que el cliente
+   * reenvíe al responder.
+   */
+  pendingQuestion?: DominoPendingQuestion | null;
+  /** Índices de conceptos que aparecieron en fichas colocadas en la partida actual. */
+  seenConceptIndexes?: number[];
+  /** Conceptos cuya pregunta se falló (o se agotó el tiempo) en la partida actual. */
+  missedConceptIndexes?: number[];
+}
+
+export interface DominoPendingQuestion {
+  userId: string;
+  tileId: string;
+  side: 'left' | 'right';
+  /** Concepto del extremo que empata; de él sale la pregunta. */
+  conceptIndex: number;
 }
 
 /** Almacén efímero en memoria: la sala vive solo mientras el proceso corre (ver RoomsGateway). */

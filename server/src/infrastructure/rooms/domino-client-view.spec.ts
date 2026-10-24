@@ -37,13 +37,14 @@ function room(): DominoRoomState {
 }
 
 describe('toDominoClientView', () => {
-  it('no envía correctIndex al cliente y conserva el resto de la pregunta', () => {
+  it('no envía correctIndex ni explanation al cliente y conserva texto y opciones', () => {
     const r = room();
     const view = toDominoClientView(r, 's1');
     expect(JSON.stringify(view)).not.toContain('correctIndex');
+    expect(JSON.stringify(view)).not.toContain('"E"');
     expect(view.concepts[0]).toMatchObject({
       definition: 'Def',
-      question: { text: 'Q', options: ['A', 'B', 'C'], explanation: 'E' },
+      question: { text: 'Q', options: ['A', 'B', 'C'] },
     });
     // El estado del servidor no se muta.
     expect(r.concepts[0].question?.correctIndex).toBe(2);
