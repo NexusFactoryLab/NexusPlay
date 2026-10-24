@@ -105,14 +105,8 @@ export type DominoConcept = {
   definition?: string
   /** Nivel Fácil. */
   example?: string
-  /** Nivel Intermedio. Desde el servidor llega sin `correctIndex` durante la partida. */
-  question?: {
-    text: string
-    options: string[]
-    correctIndex?: number
-    /** En la sala llega vacía: el servidor la entrega solo después de evaluar la respuesta. */
-    explanation?: string
-  }
+  // Las preguntas (`question`/`questions`) nunca llegan a la sala: el servidor guarda el banco
+  // y envía solo la pregunta elegida en `pendingQuestion` (ver dominoRoomTypes.ts).
   /** Nivel Universitario: caso o situación donde aplica el concepto. */
   application?: string
 }

@@ -196,6 +196,12 @@ function DominoRoomPageSession() {
 
   // Pregunta de Intermedio: mientras el servidor la tiene pendiente (o hasta cerrar el resultado propio).
   const pendingQuestion = room?.pendingQuestion ?? null
+  // Al responder, el estado ya no trae la pregunta pendiente: se conserva la última para mostrar el resultado sobre ella.
+  const [lastQuestion, setLastQuestion] = useState<{ question: { text: string; options: string[] } } | null>(null)
+  if (pendingQuestion?.question && lastQuestion?.question !== pendingQuestion.question) {
+    setLastQuestion({ question: pendingQuestion.question })
+  }
+  const questionToShow = pendingQuestion?.question ?? (answerResult ? lastQuestion?.question ?? null : null)
   const questionConceptIndex = answerResult ? answerResult.conceptIndex : pendingQuestion?.conceptIndex ?? null
   const questionConcept = room && questionConceptIndex !== null ? room.concepts[questionConceptIndex] : undefined
   const questionIsSelf = answerResult ? true : pendingQuestion?.userId === user?.id
@@ -471,9 +477,10 @@ function DominoRoomPageSession() {
     <div className="domino-premium-room fixed inset-0 z-50 overflow-y-auto bg-[#080F24]">
       {dealCountdownMs !== null && <DealCountdownOverlay remainingMs={dealCountdownMs} />}
 
-      {room?.phase === 'PLAYING' && questionConcept?.question && (
+      {room?.phase === 'PLAYING' && questionConcept && questionToShow && (
         <DominoQuestionModal
           concept={questionConcept}
+          question={questionToShow}
           isSelf={questionIsSelf}
           answeringDisplayName={room.players.find((p) => p.userId === pendingQuestion?.userId)?.displayName ?? 'tu rival'}
           result={answerResult}
@@ -898,12 +905,12 @@ function DominoLearningSummary({ room, level }: { room: DominoRoomStateView; lev
         <>
           <p className="mb-2 mt-4 text-[13px] font-semibold text-rose-600">Para repasar (preguntas falladas)</p>
           <ul className="space-y-2 text-[12.5px] text-text">
-            {missed.map((item) => {
+            {missed.map((item, position) => {
               const concept = room.concepts[item.conceptIndex]
               return (
-                <li key={item.conceptIndex}>
+                <li key={`${item.conceptIndex}-${position}`}>
                   <strong className="text-text-h">{concept?.label}</strong>
-                  {concept?.question ? ` — ${concept.question.text}` : ''}
+                  {item.questionText ? ` — ${item.questionText}` : ''}
                   {item.explanation && <span className="block italic">{item.explanation}</span>}
                 </li>
               )

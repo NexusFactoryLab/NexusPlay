@@ -97,6 +97,22 @@ export type DominoConceptInput = {
   icon: string
   /** Color hexadecimal (#rgb o #rrggbb). */
   color: string
+  /** Fácil: definición breve (opcional). */
+  definition?: string
+  /** Fácil: ejemplo cotidiano (opcional). */
+  example?: string
+  /** Universitario: caso o situación de aplicación (opcional). */
+  application?: string
+  /** Intermedio: banco de 1 a 6 preguntas por concepto (la creación exige al menos 1). */
+  questions?: DominoQuestionInput[]
+}
+
+export type DominoQuestionInput = {
+  text: string
+  /** De 3 a 4 opciones distintas. */
+  options: string[]
+  correctIndex: number
+  explanation: string
 }
 
 export type GuessWhoCardInput = {

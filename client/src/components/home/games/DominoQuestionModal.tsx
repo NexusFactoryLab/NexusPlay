@@ -4,7 +4,10 @@ import type { DominoConcept } from './dominoTypes'
 import type { DominoAnswerResult } from './dominoRoomTypes'
 
 type Props = {
+  /** Concepto del extremo que empata: de él sale la pregunta. */
   concept: DominoConcept
+  /** Pregunta elegida por el servidor (del banco del concepto); sin respuesta correcta ni explicación. */
+  question: { text: string; options: string[] }
   /** true si la pregunta la responde quien mira esta pantalla; false = modo espectador. */
   isSelf: boolean
   answeringDisplayName: string
@@ -20,15 +23,13 @@ type Props = {
  * feedback (acierto/error + explicación) llega solo después de que el
  * servidor corrige — nunca se conoce la respuesta correcta antes.
  */
-export function DominoQuestionModal({ concept, isSelf, answeringDisplayName, result, onAnswer, onClose }: Props) {
+export function DominoQuestionModal({ concept, question, isSelf, answeringDisplayName, result, onAnswer, onClose }: Props) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
-  const question = concept.question
 
+  // Una pregunta nueva (aunque sea del mismo concepto) reinicia la selección.
   useEffect(() => {
     setSelectedIndex(null)
-  }, [concept.conceptId])
-
-  if (!question) return null
+  }, [concept.conceptId, question.text])
 
   function handleSelect(index: number) {
     if (!isSelf || selectedIndex !== null || result) return
