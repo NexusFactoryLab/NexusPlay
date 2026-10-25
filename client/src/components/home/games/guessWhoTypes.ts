@@ -146,6 +146,8 @@ export type TournamentMatchStateView = GuidedChatState & {
 export type TournamentStateView = {
   code: string
   gameTitle: string
+  /** Un título por juego del torneo; la ronda N usa el juego N, rotando. */
+  gameTitles: string[]
   maxParticipants: number
   turnDurationSeconds: number
   phase: TournamentPhase

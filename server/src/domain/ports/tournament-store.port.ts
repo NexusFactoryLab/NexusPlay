@@ -43,6 +43,9 @@ export interface TournamentMatch {
   isBye: boolean;
   /** Partida contra el bot: el participante impar de la ronda (issue #102). */
   vsBot?: boolean;
+  /** Juego de este match: con varios juegos por torneo cada ronda usa uno distinto. */
+  gameId?: string;
+  gameTitle?: string;
   phase: 'WAITING' | 'PLAYING' | 'FINISHED';
   cards: { cardId: string; imageUrl: string; label: string; audioUrl: string | null; traits?: { id: string; question: string }[] }[];
   players: {
@@ -69,6 +72,8 @@ export interface TournamentState {
   turnDurationSeconds: number;
   phase: TournamentPhase;
   participants: TournamentParticipant[];
+  /** Juegos del torneo, en orden: la ronda N usa el juego (N-1) % cantidad. Vacío = solo `gameId`. */
+  games?: { gameId: string; title: string }[];
   /** Administrador que modera el torneo: no juega ni entra al emparejamiento. */
   creatorUserId: string;
   /** Socket del moderador, para enviarle el panel en vivo (null si se desconectó). */

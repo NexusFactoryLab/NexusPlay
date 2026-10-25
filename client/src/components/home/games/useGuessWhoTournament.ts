@@ -77,8 +77,8 @@ export function useGuessWhoTournament(token: string | null) {
     }
   }, [token])
 
-  const createTournament = useCallback((gameId: string, maxParticipants: number, totalRounds: number) => {
-    socketRef.current?.emit('tournament:create', { gameId, maxParticipants, totalRounds })
+  const createTournament = useCallback((gameIds: string[], maxParticipants: number, totalRounds: number) => {
+    socketRef.current?.emit('tournament:create', { gameIds, maxParticipants, totalRounds })
   }, [])
 
   const startTournament = useCallback(() => {

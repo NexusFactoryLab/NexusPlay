@@ -142,6 +142,7 @@ const TOURNAMENT_MAX_PARTICIPANTS = 40;
 /** Rondas por defecto y tope de un torneo por puntos. */
 const TOURNAMENT_DEFAULT_ROUNDS = 3;
 const TOURNAMENT_MAX_ROUNDS = 10;
+const TOURNAMENT_MAX_GAMES = 5;
 const TOURNAMENT_BOT_DIFFICULTY: BotDifficulty = 'MEDIUM';
 
 /** Vista del match como si fuera una sala 1v1, para que el bot existente lo juegue sin duplicar su lógica. */
@@ -172,6 +173,7 @@ function toTournamentClientView(tournament: TournamentState, forUserId: string) 
   return {
     code: tournament.code,
     gameTitle: tournament.gameTitle,
+    gameTitles: (tournament.games ?? [{ title: tournament.gameTitle }]).map((g) => g.title),
     maxParticipants: tournament.maxParticipants,
     turnDurationSeconds: tournament.turnDurationSeconds,
     phase: tournament.phase,
@@ -268,7 +270,7 @@ function toMatchClientView(match: TournamentMatch, tournament: TournamentState, 
     matchCode: match.matchCode,
     round: match.round,
     isBye: match.isBye,
-    gameTitle: tournament.gameTitle,
+    gameTitle: match.gameTitle ?? tournament.gameTitle,
     cards: match.cards,
     maxAccusationCount: tournament.maxAccusationCount,
     turnDurationSeconds: tournament.turnDurationSeconds,
@@ -1503,24 +1505,33 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   @SubscribeMessage('tournament:create')
   async handleTournamentCreate(
     @ConnectedSocket() socket: AuthenticatedSocket,
-    @MessageBody() body: { gameId: string; maxParticipants: number; totalRounds?: number },
+    @MessageBody() body: { gameId?: string; gameIds?: string[]; maxParticipants: number; totalRounds?: number },
   ) {
     // Solo el administrador de la plataforma crea y modera torneos (issue #102).
     const requester = await this.userRepository.findById(socket.data.userId);
     if (!requester?.isAdmin()) throw new Error('Solo un administrador puede crear torneos.');
 
-    const game = await this.gameRepository.findById(body.gameId);
-    if (!game || game.gameType.getName() !== 'GUESS_WHO') {
-      throw new Error('Juego no encontrado o no es de tipo "¿Quién Es?".');
+    // Varios juegos por torneo (issue #102): la ronda N usa el juego N, rotando.
+    const gameIds = [...new Set(body.gameIds?.length ? body.gameIds : body.gameId ? [body.gameId] : [])];
+    if (gameIds.length === 0 || gameIds.length > TOURNAMENT_MAX_GAMES) {
+      throw new Error(`Elige entre 1 y ${TOURNAMENT_MAX_GAMES} juegos para el torneo.`);
     }
-    // El administrador lo habilita antes desde Edición (issue #102).
-    if (!game.tournamentEnabled) throw new Error('El torneo no está habilitado para este juego.');
+    const loaded = await Promise.all(gameIds.map((id) => this.gameRepository.findById(id)));
+    for (const candidate of loaded) {
+      if (!candidate || candidate.gameType.getName() !== 'GUESS_WHO') {
+        throw new Error('Juego no encontrado o no es de tipo "¿Quién Es?".');
+      }
+      // El administrador lo habilita antes desde Edición (issue #102).
+      if (!candidate.tournamentEnabled) throw new Error(`El torneo no está habilitado para "${candidate.title}".`);
+    }
+    const games = loaded as NonNullable<(typeof loaded)[number]>[];
+    const game = games[0];
 
     const maxParticipants = body.maxParticipants;
     if (!Number.isInteger(maxParticipants) || maxParticipants < 2 || maxParticipants > TOURNAMENT_MAX_PARTICIPANTS) {
       throw new Error(`El cupo debe ser un entero entre 2 y ${TOURNAMENT_MAX_PARTICIPANTS}.`);
     }
-    const totalRounds = body.totalRounds ?? TOURNAMENT_DEFAULT_ROUNDS;
+    const totalRounds = body.totalRounds ?? Math.max(TOURNAMENT_DEFAULT_ROUNDS, games.length);
     if (!Number.isInteger(totalRounds) || totalRounds < 1 || totalRounds > TOURNAMENT_MAX_ROUNDS) {
       throw new Error(`Las rondas deben ser un entero entre 1 y ${TOURNAMENT_MAX_ROUNDS}.`);
     }
@@ -1530,7 +1541,8 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     const tournament: TournamentState = {
       code,
       gameId: game.id,
-      gameTitle: game.title,
+      gameTitle: games.map((g) => g.title).join(' + '),
+      games: games.map((g) => ({ gameId: g.id, title: g.title })),
       maxParticipants,
       totalRounds,
       maxAccusationCount: (game.config.maxAccusationCount as number | undefined) ?? 6,
@@ -1546,7 +1558,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       participants: [],
     };
 
-    this.lastCreatedGameCards.set(game.id, game.content as GuessWhoCard[]);
+    for (const g of games) this.lastCreatedGameCards.set(g.id, g.content as GuessWhoCard[]);
     this.tournamentStore.create(tournament);
     socket.join(`tournament:${code}`);
     socket.emit('tournament:state', toTournamentClientView(tournament, socket.data.userId));
@@ -1722,9 +1734,12 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     const shuffledIds = shuffle(userIds);
 
     // Con número impar, quien sobra juega contra el bot en vez de esperar (issue #102).
+    // Se reparte parejo: entre los candidatos, el que menos veces ha jugado contra el bot (desempata el azar).
     let botUserId: string | null = null;
     if (shuffledIds.length % 2 !== 0) {
-      botUserId = shuffledIds.pop() ?? null;
+      const botGames = (id: string) => tournament.participants.find((p) => p.userId === id)?.botMatches ?? 0;
+      botUserId = shuffledIds.reduce((best, id) => (botGames(id) < botGames(best) ? id : best));
+      shuffledIds.splice(shuffledIds.indexOf(botUserId), 1);
     }
 
     const newMatches: TournamentMatch[] = [];
@@ -1780,10 +1795,13 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     round: number,
     playerUserIds: [string, string],
   ): TournamentMatch {
-    const shuffled = shuffle(this.matchCardSource(tournament));
+    const roundGame = this.gameForRound(tournament, round);
+    const shuffled = shuffle(this.lastCreatedGameCards.get(roundGame.gameId) ?? []);
     return {
       matchCode,
       round,
+      gameId: roundGame.gameId,
+      gameTitle: roundGame.title,
       playerUserIds,
       isBye: false,
       phase: 'PLAYING',
@@ -1811,8 +1829,9 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   }
 
   /** Set de cartas del torneo: se resuelve desde el juego una vez y se reutiliza (barajado distinto) por match. */
-  private matchCardSource(tournament: TournamentState): GuessWhoCard[] {
-    return this.lastCreatedGameCards.get(tournament.gameId) ?? [];
+  private gameForRound(tournament: TournamentState, round: number): { gameId: string; title: string } {
+    const games = tournament.games?.length ? tournament.games : [{ gameId: tournament.gameId, title: tournament.gameTitle }];
+    return games[(round - 1) % games.length];
   }
 
   /**

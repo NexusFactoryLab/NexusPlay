@@ -10,6 +10,7 @@ import { useGuessWhoTournament } from './useGuessWhoTournament'
 import { Modal } from './Modal'
 import { MatchBoard } from './MatchBoard'
 import { MIN_DISCARDS_TO_ACCUSE } from './guessWhoTypes'
+import { listGames, type GameSummary } from '../../../services/game.service'
 
 /** Debe coincidir con TOURNAMENT_MAX_PARTICIPANTS del gateway. */
 const MAX_PARTICIPANTS_LIMIT = 40
@@ -61,6 +62,15 @@ function TournamentSession() {
   const [joinCodeInput, setJoinCodeInput] = useState('')
   const [maxParticipantsText, setMaxParticipantsText] = useState('40')
   const [roundsText, setRoundsText] = useState(String(DEFAULT_ROUNDS))
+  // Juegos del torneo (uno por ronda, rotando): los que el administrador tiene habilitados.
+  const [enabledGames, setEnabledGames] = useState<GameSummary[]>([])
+  const [selectedGameIds, setSelectedGameIds] = useState<string[]>(gameIdToCreate ? [gameIdToCreate] : [])
+  useEffect(() => {
+    if (!token || !gameIdToCreate) return
+    listGames(token, { tournamentEnabled: true, pageSize: 50 })
+      .then((result) => setEnabledGames(result.items))
+      .catch(() => setEnabledGames([]))
+  }, [token, gameIdToCreate])
   const [maxParticipantsWarning, setMaxParticipantsWarning] = useState<string | null>(null)
   const [showPairingOverlay, setShowPairingOverlay] = useState(false)
 
@@ -118,7 +128,7 @@ function TournamentSession() {
     const parsedRounds = Number(roundsText)
     const safeRounds = Number.isInteger(parsedRounds) ? Math.min(MAX_ROUNDS, Math.max(1, parsedRounds)) : DEFAULT_ROUNDS
     startedRef.current = true
-    createTournament(gameIdToCreate ?? '', safeValue, safeRounds)
+    createTournament(selectedGameIds.length ? selectedGameIds : [gameIdToCreate ?? ''], safeValue, safeRounds)
   }
 
   // El administrador cerró el torneo.
@@ -210,6 +220,30 @@ function TournamentSession() {
               </p>
             )}
           </div>
+          {enabledGames.length > 1 && (
+            <div className="rounded-xl border border-border p-4">
+              <p className="mb-1.5 text-[13px] font-medium text-text-h">Juegos del torneo (uno por ronda, en orden)</p>
+              <div className="flex max-h-[160px] flex-col gap-1 overflow-y-auto">
+                {enabledGames.map((game) => (
+                  <label key={game.id} className="flex items-center gap-2 text-[13px] text-text-h">
+                    <input
+                      type="checkbox"
+                      checked={selectedGameIds.includes(game.id)}
+                      onChange={(event) => {
+                        const next = event.target.checked
+                          ? [...selectedGameIds, game.id]
+                          : selectedGameIds.filter((id) => id !== game.id)
+                        if (next.length === 0) return
+                        setSelectedGameIds(next)
+                        setRoundsText(String(Math.max(DEFAULT_ROUNDS, next.length)))
+                      }}
+                    />
+                    {game.title}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="rounded-xl border border-border p-4">
             <label className="mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="rounds-input">
               Rondas (1 a {MAX_ROUNDS})

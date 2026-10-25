@@ -35,7 +35,7 @@ function setup() {
   const users = { findById: async (id: string) => ({ isAdmin: () => id === 'admin' }) } as unknown as UserRepository;
   const gateway = new RoomsGateway(
     new JwtService(),
-    { findById: async () => game } as unknown as GameRepository,
+    { findById: async (id: string) => ({ ...game, id, title: id === 'g2' ? 'Animales' : 'Banderas' }) } as unknown as GameRepository,
     users,
     new InMemoryRoomStore(),
     tournaments,
@@ -131,6 +131,33 @@ describe('torneo grupal administrado', () => {
     };
     gateway.handleTournamentClose(admin);
     expect(tournaments.get(tournament.code)).toBeUndefined();
+  });
+});
+
+describe('varios juegos y reparto del bot', () => {
+  it('cada ronda usa un juego distinto, rotando', async () => {
+    const h = setup();
+    const admin = client('admin');
+    await h.gateway.handleTournamentCreate(admin, { gameIds: ['g', 'g2'], maxParticipants: 8, totalRounds: 3 });
+    const tournament = h.tournaments.findBySocketId('admin')!;
+    for (const id of ['a', 'b']) h.gateway.handleTournamentJoin(client(id), { code: tournament.code });
+    h.gateway.handleTournamentStart(admin);
+    expect(tournament.gameTitle).toBe('Banderas + Animales');
+    expect(tournament.matches.find((m) => m.round === 1)!.gameTitle).toBe('Banderas');
+    tournament.matches.forEach((m) => (m.phase = 'FINISHED'));
+    (h.gateway as unknown as { maybeAdvanceTournamentRound: (t: unknown) => void }).maybeAdvanceTournamentRound(tournament);
+    expect(tournament.matches.find((m) => m.round === 2)!.gameTitle).toBe('Animales');
+  });
+
+  it('el bot no se le asigna siempre a la misma persona', async () => {
+    const { gateway, admin, tournament } = await start(3, 3);
+    gateway.handleTournamentStart(admin);
+    const priv = gateway as unknown as { maybeAdvanceTournamentRound: (t: unknown) => void };
+    for (let round = 1; round < 3; round++) {
+      tournament.matches.forEach((m) => (m.phase = 'FINISHED'));
+      priv.maybeAdvanceTournamentRound(tournament);
+    }
+    expect(tournament.participants.map((p) => p.botMatches)).toEqual([1, 1, 1]);
   });
 });
 

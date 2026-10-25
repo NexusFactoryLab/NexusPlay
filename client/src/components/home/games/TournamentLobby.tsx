@@ -55,7 +55,10 @@ export function TournamentLobby({ tournament, error, onUpdateTurnDuration, onSta
               {tournament.isModerator ? 'Torneo · Administrador' : 'Torneo'}
             </p>
             <h2 className="mt-1 text-[22px] font-bold tracking-tight text-text-h">{tournament.gameTitle}</h2>
-            <p className="text-[12.5px] text-text">{tournament.totalRounds} rondas · puntos por partida ganada</p>
+            <p className="text-[12.5px] text-text">
+              {tournament.totalRounds} rondas · puntos por partida ganada
+              {tournament.gameTitles.length > 1 ? ` · un juego por ronda: ${tournament.gameTitles.join(' → ')}` : ''}
+            </p>
           </div>
           <button
             type="button"
