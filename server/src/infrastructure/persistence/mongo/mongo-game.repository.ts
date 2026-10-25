@@ -143,11 +143,7 @@ export class MongoGameRepository implements GameRepository, OnModuleInit {
     const query: Record<string, unknown> = {};
     if (filter.status) query.status = filter.status;
     if (filter.creatorUserId) query.creatorUserId = filter.creatorUserId;
-    if (filter.slugs) {
-      query.slug = { $in: filter.slugs };
-    } else if (filter.excludeSlugs && filter.excludeSlugs.length > 0) {
-      query.slug = { $nin: filter.excludeSlugs };
-    }
+    if (filter.featured) query.featured = true;
     if (filter.categoryId) query.categoryId = filter.categoryId;
     if (filter.organizationId) query.organizationId = filter.organizationId;
     // El caller (list-games.use-case.ts) ya corta antes de llegar aquí si
@@ -212,5 +208,10 @@ export class MongoGameRepository implements GameRepository, OnModuleInit {
       { $set: { status: 'PUBLISHED', updatedAt: new Date() }, $inc: { version: 1 } },
     );
     return result.modifiedCount;
+  }
+
+  async setFeatured(id: string, featured: boolean): Promise<boolean> {
+    const result = await this.collection.updateOne({ _id: id }, { $set: { featured } });
+    return result.matchedCount > 0;
   }
 }

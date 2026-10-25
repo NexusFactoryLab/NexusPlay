@@ -20,6 +20,7 @@ import { ListGamesUseCase } from '../../../application/use-cases/list-games.use-
 import { UpdateGameUseCase } from '../../../application/use-cases/update-game.use-case.js';
 import { PublishGameUseCase } from '../../../application/use-cases/publish-game.use-case.js';
 import { UnpublishGameUseCase } from '../../../application/use-cases/unpublish-game.use-case.js';
+import { SetGameFeaturedUseCase } from '../../../application/use-cases/set-game-featured.use-case.js';
 import { DeleteGameUseCase } from '../../../application/use-cases/delete-game.use-case.js';
 import { DonateGameToOrganizationUseCase } from '../../../application/use-cases/donate-game-to-organization.use-case.js';
 import { GameCreationDraftService } from '../../../application/services/game-creation-draft.service.js';
@@ -30,6 +31,7 @@ import { UpdateGameDto } from '../dtos/update-game.dto.js';
 import { ListGamesQueryDto } from '../dtos/list-games-query.dto.js';
 import { DonateGameDto } from '../dtos/donate-game.dto.js';
 import { AdaptGameDto } from '../dtos/adapt-game.dto.js';
+import { SetGameFeaturedDto } from '../dtos/set-game-featured.dto.js';
 
 @Controller('games')
 @UseGuards(JwtAuthGuard)
@@ -42,6 +44,7 @@ export class GameController {
     private readonly updateGameUseCase: UpdateGameUseCase,
     private readonly publishGameUseCase: PublishGameUseCase,
     private readonly unpublishGameUseCase: UnpublishGameUseCase,
+    private readonly setGameFeaturedUseCase: SetGameFeaturedUseCase,
     private readonly deleteGameUseCase: DeleteGameUseCase,
     private readonly donateGameUseCase: DonateGameToOrganizationUseCase,
     private readonly adaptGameUseCase: AdaptGameUseCase,
@@ -75,8 +78,7 @@ export class GameController {
       requestingUserId,
       status: query.status,
       onlyMine: query.onlyMine,
-      excludeDemos: query.community,
-      onlyDemos: query.demos,
+      onlyFeatured: query.featured,
       includeCreatorNames: query.community,
       search: query.search,
       categoryId: query.categoryId,
@@ -114,6 +116,20 @@ export class GameController {
   @Patch(':id/unpublish')
   unpublish(@CurrentUserId() requestingUserId: string, @Param('id') gameId: string) {
     return this.unpublishGameUseCase.execute({ gameId, requestingUserId });
+  }
+
+  /** Solo ADMIN: fija o quita el juego como destacado del Inicio. */
+  @Patch(':id/featured')
+  setFeatured(
+    @CurrentUserId() requestingUserId: string,
+    @Param('id') gameId: string,
+    @Body() dto: SetGameFeaturedDto,
+  ) {
+    return this.setGameFeaturedUseCase.execute({
+      gameId,
+      featured: dto.featured,
+      requestingUserId,
+    });
   }
 
   /**

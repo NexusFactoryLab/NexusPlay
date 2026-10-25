@@ -6,10 +6,8 @@ export const GAME_REPOSITORY = Symbol('GAME_REPOSITORY');
 export interface FindAllGamesFilter {
   status?: GameStatusName;
   creatorUserId?: string;
-  /** Solo los juegos con alguno de estos slugs (demos del Inicio). */
-  slugs?: string[];
-  /** Excluye los juegos con estos slugs (Comunidad no repite los demos del Inicio). */
-  excludeSlugs?: string[];
+  /** Solo los juegos destacados por un ADMIN (los que muestra el Inicio). */
+  featured?: boolean;
   categoryId?: string;
   /** Filtra juegos institucionales de una organización concreta. */
   organizationId?: string;
@@ -68,4 +66,10 @@ export interface GameRepository {
    * cuántos se publicaron.
    */
   publishAllDraftsByCategory(categoryId: string): Promise<number>;
+  /**
+   * Marca o desmarca un juego como destacado. Es un `updateOne` de un solo
+   * campo, sin tocar `version`: así no genera conflictos de edición al dueño
+   * del juego. Devuelve `false` si el juego no existe.
+   */
+  setFeatured(id: string, featured: boolean): Promise<boolean>;
 }
