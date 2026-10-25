@@ -34,6 +34,10 @@ type Props = {
   onSend: (text: string) => void
   /** Ajustes propios del juego, debajo de los segundos por turno (ej. descarte automático de ¿Quién Es?). */
   settings?: ReactNode
+  /** Reemplaza por completo el bloque de turno + ajustes con un panel propio (ej. Dominexo). Los demás juegos no lo usan. */
+  settingsPanel?: ReactNode
+  /** Legibilidad ampliada (letra ≥ 16 px, controles ≥ 44 px, dos columnas). Solo la usa Dominexo; el resto de juegos conserva su tamaño. */
+  large?: boolean
   /** Partida contra el bot: sin código, enlace, QR ni chat (no hay a quién invitar). */
   solo?: boolean
   children?: ReactNode
@@ -57,6 +61,8 @@ export function MultiplayerLobby({
   messages,
   onSend,
   settings,
+  settingsPanel,
+  large = false,
   solo = false,
   children,
 }: Props) {
@@ -134,9 +140,11 @@ export function MultiplayerLobby({
     >
       <Modal
         onClose={chatOpen ? closeChat : onExit}
-        maxWidthClassName="max-w-[840px]"
+        maxWidthClassName={large ? 'max-w-[1180px]' : 'max-w-[840px]'}
         maxHeightClassName="max-h-[94dvh]"
+        // En modo grande se reduce un poco el contenido (hasta 50 %) para que quepa sin scroll.
         fitContent
+        minFitScale={large ? 0.5 : undefined}
         ariaLabel="Sala de espera"
         ariaModal={!chatOpen}
       >
@@ -144,12 +152,12 @@ export function MultiplayerLobby({
         <div className="mb-3 rounded-[24px] border border-border/80 bg-gradient-to-r from-accent/8 via-surface to-bg p-3.5 shadow-[var(--shadow)]">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-[11px] font-semibold tracking-[0.18em] text-accent uppercase">
+              <p className={large ? 'text-[1rem] font-semibold text-accent' : 'text-[11px] font-semibold tracking-[0.18em] text-accent uppercase'}>
                 Sala activa
               </p>
               <h2
                 tabIndex={-1}
-                className="mt-1 text-[22px] font-bold tracking-tight text-text-h"
+                className={`mt-1 font-bold tracking-tight text-text-h ${large ? 'text-[clamp(1.75rem,3vw,2.25rem)] leading-tight' : 'text-[22px]'}`}
               >
                 {room.gameTitle}
               </h2>
@@ -157,7 +165,7 @@ export function MultiplayerLobby({
             <div className="flex shrink-0 gap-2">
               {!solo && <button
                 type="button"
-                className="relative flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-[13px] font-medium text-text-h transition-colors hover:border-accent/50 hover:text-accent"
+                className={`relative flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 font-medium text-text-h transition-colors hover:border-accent/50 hover:text-accent ${large ? 'min-h-[48px] gap-2 px-4 text-[1rem]' : 'text-[13px]'}`}
                 onClick={() => {
                   setChatOpen((current) => !current)
                   setReadCount(messages.length)
@@ -173,7 +181,7 @@ export function MultiplayerLobby({
               </button>}
               <button
                 type="button"
-                className="flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-[13px] font-medium text-text-h transition-colors hover:border-accent/50 hover:text-accent"
+                className={`flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 font-medium text-text-h transition-colors hover:border-accent/50 hover:text-accent ${large ? 'min-h-[48px] gap-2 px-4 text-[1rem]' : 'text-[13px]'}`}
                 onClick={onExit}
               >
                 <LogOut className="h-4 w-4" strokeWidth={2} />
@@ -184,39 +192,39 @@ export function MultiplayerLobby({
 
           {!solo && <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border border-border bg-surface/90 p-3">
             <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2 text-[12.5px] text-text">
+              <div className={`flex flex-wrap items-center gap-2 text-text ${large ? 'text-[1rem]' : 'text-[12.5px]'}`}>
                 <span className="font-medium text-text-h">Código de sala:</span>
-                <code className="rounded-lg border border-accent/30 bg-accent/5 px-2 py-1 text-[13px] font-semibold tracking-wider text-accent">
+                <code className={`rounded-lg border border-accent/30 bg-accent/5 px-2 py-1 font-semibold tracking-wider text-accent ${large ? 'px-3 font-mono text-[1.75rem] leading-tight' : 'text-[13px]'}`}>
                   {room.code}
                 </code>
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-bg px-2.5 py-1.5 text-[11px] font-medium text-text-h transition-colors hover:border-accent hover:text-accent"
+                  className={`inline-flex items-center gap-1.5 rounded-lg border border-border bg-bg px-2.5 py-1.5 font-medium text-text-h transition-colors hover:border-accent hover:text-accent ${large ? 'min-h-[46px] gap-2 px-4 text-[1rem]' : 'text-[11px]'}`}
                   onClick={() => copyValue(room.code, 'Código copiado')}
                 >
-                  <Copy className="h-3.5 w-3.5" strokeWidth={2} />
+                  <Copy className={large ? 'h-5 w-5' : 'h-3.5 w-3.5'} strokeWidth={2} />
                   Copiar código
                 </button>
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-accent/50 bg-accent/10 px-2.5 py-1.5 text-[11px] font-semibold text-accent transition-colors hover:border-accent hover:bg-accent/20"
+                  className={`inline-flex items-center gap-1.5 rounded-lg border border-accent/50 bg-accent/10 px-2.5 py-1.5 font-semibold text-accent transition-colors hover:border-accent hover:bg-accent/20 ${large ? 'min-h-[46px] gap-2 px-4 text-[1rem]' : 'text-[11px]'}`}
                   onClick={() => copyValue(invitationUrl, 'Enlace copiado')}
                 >
-                  <Link className="h-3.5 w-3.5" strokeWidth={2} />
+                  <Link className={large ? 'h-5 w-5' : 'h-3.5 w-3.5'} strokeWidth={2} />
                   Copiar enlace
                 </button>
                 {copyFeedback && (
-                  <span className="text-[11px] font-medium text-accent" role="status">
+                  <span className={`font-medium text-accent ${large ? 'text-[1rem]' : 'text-[11px]'}`} role="status">
                     {copyFeedback}
                   </span>
                 )}
               </div>
             </div>
             <figure className="flex shrink-0 flex-col items-center gap-1 rounded-xl border border-accent/30 bg-surface p-1.5" aria-label="Invitación por código QR">
-              <QRCodeSVG value={invitationUrl} size={84} level="M" marginSize={2} bgColor="#ffffff" fgColor="#000000" role="img" title={`Escanea para unirte a la sala ${room.code}`} />
-              <figcaption className="text-center text-[10px] font-semibold text-accent">Escanea para unirte</figcaption>
+              <QRCodeSVG value={invitationUrl} size={large ? 120 : 84} level="M" marginSize={2} bgColor="#ffffff" fgColor="#000000" role="img" title={`Escanea para unirte a la sala ${room.code}`} />
+              <figcaption className={`text-center font-semibold text-accent ${large ? 'text-[0.9rem]' : 'text-[10px]'}`}>Escanea para unirte</figcaption>
             </figure>
           </div>}
         </div>
@@ -229,9 +237,10 @@ export function MultiplayerLobby({
             {error}
           </p>
         )}
-        <div className="flex flex-col gap-3">
+        {/* Modo grande: ajustes a un lado y jugadores al otro en pantallas anchas. */}
+        <div className={large ? 'grid gap-4 lg:grid-cols-2 lg:items-start' : 'flex flex-col gap-3'}>
           {/* Turno y ajustes extra (ej. descarte automático) lado a lado para que el modal no necesite scroll (issue #80). */}
-          <div className={settings ? 'grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 [&>*]:h-full' : 'contents'}>
+          {settingsPanel ?? <div className={settings ? 'grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 [&>*]:h-full' : 'contents'}>
           {turnDurationSeconds === undefined ? (
             <div className="rounded-[22px] border border-border bg-surface p-4 shadow-[var(--shadow)]">
               <p className="text-[13px] font-medium text-text-h">
@@ -290,7 +299,7 @@ export function MultiplayerLobby({
           )}
 
           {settings}
-          </div>
+          </div>}
 
           <LobbyReadyControl
             players={room.players}
@@ -299,6 +308,7 @@ export function MultiplayerLobby({
             onReady={onReady}
             disconnected={connecting}
             requireEven={requireEven}
+            large={large}
           />
         </div>
       </Modal>

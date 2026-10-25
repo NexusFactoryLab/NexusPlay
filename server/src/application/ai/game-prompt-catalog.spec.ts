@@ -99,6 +99,17 @@ describe('catálogo de prompts de la IA', () => {
     }
   });
 
+  it('el prompt de Dominó pide definition, example, application y questions, y lista el catálogo de íconos', () => {
+    const spec = resolveGamePromptSpec('DOMINO')!;
+    for (const field of ['definition', 'example', 'application', 'questions', 'correctIndex', 'explanation']) {
+      expect(spec.instructions).toContain(field);
+    }
+    expect(spec.instructions).toContain('droplets');
+    expect(spec.instructions).not.toContain('usa siempre el valor');
+    const example = JSON.parse(spec.jsonShapeExample) as { content: Array<{ questions: unknown[] }> };
+    expect(example.content.every((c) => c.questions.length >= 1)).toBe(true);
+  });
+
   describe.each(CASES)('$name', ({ gameType, mode }) => {
     const spec = resolveGamePromptSpec(gameType, mode)!;
 

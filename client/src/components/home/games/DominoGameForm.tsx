@@ -37,28 +37,21 @@ import { listMyOrganizations, type OrganizationWithMyRole } from '../../../servi
 import { ApiError } from '../../../utils/http'
 import {
   DEFAULT_DOMINO_CONFIG,
-  DOMINO_ICON_KEYS,
   DOMINO_ICON_LABELS,
   MAX_DOMINO_CONCEPTS,
   MIN_DOMINO_CONCEPTS,
   iconForConcept,
 } from './dominoTypes'
-import { DOMINO_TILE_SUGGESTED_COLORS } from './dominoTileVisualTokens'
+import {
+  emptyConcept,
+  isConceptComplete,
+  toConceptDraft,
+  toConceptInputs,
+  validateDominoConcepts,
+  type ConceptDraft,
+} from './dominoContentDraft'
+import { DominoConceptContentEditor } from './DominoConceptContentEditor'
 
-type ConceptDraft = {
-  label: string
-  icon: string
-  color: string
-}
-
-/** Paleta sugerida: colores bien diferenciables entre sí, para que las mitades de ficha no se confundan de un vistazo. */
-function emptyConcept(index: number): ConceptDraft {
-  return {
-    label: '',
-    icon: DOMINO_ICON_KEYS[index % DOMINO_ICON_KEYS.length],
-    color: DOMINO_TILE_SUGGESTED_COLORS[index % DOMINO_TILE_SUGGESTED_COLORS.length],
-  }
-}
 
 /**
  * Fases del formulario (issue #218): antes era un único scroll largo
@@ -162,7 +155,9 @@ export function DominoGameForm({
     setTitle(savedString(state, 'title', ''))
     setDescription(savedString(state, 'description', ''))
     setCoverImageUrl(savedNullableString(state, 'coverImageUrl'))
-    const savedConcepts = savedList<ConceptDraft>(state, 'concepts')
+    // Los borradores guardados antes del banco de preguntas solo traen label/icon/color: se completan.
+    const savedRaw = savedList<unknown>(state, 'concepts')
+    const savedConcepts = savedRaw ? savedRaw.map((raw, index) => toConceptDraft(raw, index)) : null
     if (savedConcepts) setConcepts(savedConcepts)
     setHandSize(savedNumber(state, 'handSize', DEFAULT_DOMINO_CONFIG.handSize))
     setCategoryId(savedString(state, 'categoryId', ''))
@@ -183,18 +178,8 @@ export function DominoGameForm({
     const items = Array.isArray(draft.content) ? draft.content : []
     // El panel sigue al concepto más reciente mientras la IA llena la lista.
     setSelectedConcept(Math.max(items.length - 1, 0))
-    setConcepts(
-      items.map((item, index) => {
-        const raw = (item ?? {}) as Record<string, unknown>
-        return {
-          label: typeof raw.label === 'string' ? raw.label : '',
-          icon: typeof raw.icon === 'string' && DOMINO_ICON_KEYS.includes(raw.icon)
-            ? raw.icon
-            : DOMINO_ICON_KEYS[index % DOMINO_ICON_KEYS.length],
-          color: typeof raw.color === 'string' ? raw.color : DOMINO_TILE_SUGGESTED_COLORS[index % DOMINO_TILE_SUGGESTED_COLORS.length],
-        }
-      }),
-    )
+    // Carga también definition, example, application y el banco de preguntas que genera la IA.
+    setConcepts(items.map((item, index) => toConceptDraft(item, index)))
     const config = (draft.config ?? {}) as Record<string, unknown>
     if (typeof config.handSize === 'number') setHandSize(config.handSize)
   }
@@ -242,26 +227,11 @@ export function DominoGameForm({
 
   /** Valida solo los campos de la fase 3 (Contenido): el bloque repetible de conceptos. */
   function validateContentPhase(): string | null {
-    if (concepts.length < MIN_DOMINO_CONCEPTS) {
-      return `Necesitas al menos ${MIN_DOMINO_CONCEPTS} conceptos.`
-    }
-    if (concepts.length > MAX_DOMINO_CONCEPTS) {
-      return `El dominó admite como máximo ${MAX_DOMINO_CONCEPTS} conceptos.`
-    }
-    const emptyAt = concepts.findIndex((concept) => !concept.label.trim())
-    if (emptyAt !== -1) {
-      setSelectedConcept(emptyAt)
-      return 'Cada concepto necesita un nombre antes de crear el juego.'
-    }
-    const labels = concepts.map((concept) => concept.label.trim().toLowerCase())
-    const duplicateAt = labels.findIndex((label, index) => labels.indexOf(label) !== index)
-    if (duplicateAt !== -1) {
-      setSelectedConcept(duplicateAt)
-    }
-    if (new Set(labels).size !== labels.length) {
-      return 'No puede haber dos conceptos con el mismo nombre.'
-    }
-    return null
+    // Exige 1 pregunta completa por concepto (ver validateDominoConcepts); lleva al concepto con el problema.
+    const issue = validateDominoConcepts(concepts)
+    if (!issue) return null
+    if (issue.conceptIndex !== undefined) setSelectedConcept(issue.conceptIndex)
+    return issue.message
   }
 
   const VALIDATORS = [validateIdentityPhase, validateConfigPhase, validateContentPhase]
@@ -308,11 +278,7 @@ export function DominoGameForm({
         categoryId,
         organizationId: organizationId || undefined,
         theme: coverImageUrl ? { coverImageUrl } : undefined,
-        content: concepts.map((concept) => ({
-          label: concept.label.trim(),
-          icon: concept.icon,
-          color: concept.color,
-        })),
+        content: toConceptInputs(concepts),
         config: { handSize },
       })
       setCreatedGameId(game.id)
@@ -357,7 +323,7 @@ export function DominoGameForm({
       description={
         <>
           Cada mitad de una ficha es un concepto tuyo en vez de un número. Con {concepts.length}{' '}
-          conceptos el set queda en {tileCount} fichas — se juega solo contra el tablero, empatando
+          conceptos el set queda en {tileCount} fichas — se juega 1 contra 1 en una sala, empatando
           los extremos abiertos.
         </>
       }
@@ -437,7 +403,7 @@ export function DominoGameForm({
         )}
 
         {phase === 2 && (
-        <FormSection icon={Puzzle} title="Conceptos" subtitle="Cada concepto se conecta con otro en la cadena del dominó." tone={3} bare>
+        <FormSection icon={Puzzle} title="Conceptos" subtitle="Cada concepto necesita al menos una pregunta; así cada ficha queda con las dos de sus lados." tone={3} bare>
 <ItemGridEditor
           itemLabel="Concepto"
           addLabel="+ Agregar concepto"
@@ -449,7 +415,8 @@ export function DominoGameForm({
           onAdd={addConcept}
           onRemove={removeConcept}
           disabled={submitting}
-          isComplete={(index) => !!concepts[index]?.label.trim()}
+          layout="stacked"
+          isComplete={(index) => isConceptComplete(concepts[index])}
           tileText={(index) => concepts[index]?.label ?? ''}
           tileVisual={(index) => {
             const concept = concepts[index]
@@ -502,6 +469,14 @@ export function DominoGameForm({
                   onChange={(event) => updateConcept(index, 'color', event.target.value)}
                 />
               </div>
+              {concepts[index] && (
+                <DominoConceptContentEditor
+                  concept={concepts[index]}
+                  index={index}
+                  disabled={submitting}
+                  onChange={(next) => setConcepts((current) => current.map((c, i) => (i === index ? next : c)))}
+                />
+              )}
             </div>
           )}
         />

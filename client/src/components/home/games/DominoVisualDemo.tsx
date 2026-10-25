@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, ArrowRight, Check, Droplets, Hand, Leaf, Link2, PackageOpen, Sparkles, Wind, type LucideIcon } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Droplets, Hand, Layers, Leaf, Link2, PackageOpen, Sparkles, Wind, type LucideIcon } from 'lucide-react'
+import { DominoLevelCards } from './DominoLevelCards'
 
 const scenes = [
-  { title: 'Tu objetivo', text: 'Vacía tu mano antes que tu rival.', icon: Sparkles },
-  { title: 'Busca una coincidencia', text: 'Elige una ficha que tenga el mismo concepto que uno de los extremos.', icon: Hand },
-  { title: 'Conecta el concepto', text: 'Ponla en el extremo donde ambas mitades coinciden.', icon: Link2 },
-  { title: 'Si no hay coincidencia', text: 'Roba del pozo. Si está vacío, pasa el turno.', icon: PackageOpen },
+  { title: 'Tu objetivo', text: 'Vacía tu mano primero.', icon: Sparkles },
+  { title: 'Busca una coincidencia', text: 'Elige una ficha con el mismo concepto.', icon: Hand },
+  { title: 'Conecta el concepto', text: 'Ponla en el extremo que coincide.', icon: Link2 },
+  { title: 'Sin jugada', text: 'Roba del pozo o pasa el turno.', icon: PackageOpen },
+  { title: 'Elige tu nivel', text: 'Quien crea la sala escoge el nivel.', icon: Layers },
 ]
 
 const primaryButton = 'flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-[14.5px] font-semibold text-white shadow-[0_12px_24px_-12px_var(--accent)] transition-all hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-accent'
@@ -43,7 +45,6 @@ export function DominoVisualDemo({ onContinue }: { onContinue: () => void }) {
               <current.icon className="h-6 w-6" strokeWidth={2.2} aria-hidden="true" />
             </span>
             <p className="mt-3 text-[17px] font-bold leading-relaxed text-text-h">{current.text}</p>
-            {scene === 0 && <p className="mt-2 text-[13px] text-text">Cada edición puede cambiar de tema; la regla siempre es unir las mismas piezas: A con A, B con B.</p>}
           </div>
           <DominoScene scene={scene} />
         </div>
@@ -73,7 +74,9 @@ function DominoScene({ scene }: { scene: number }) {
   return (
     <div className="relative overflow-hidden rounded-2xl border border-accent/25 bg-surface p-3 shadow-[0_10px_24px_-18px_var(--accent)]">
       <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-accent/10 blur-2xl" />
-      {scene === 3 ? (
+      {scene === 4 ? (
+        <div className="relative min-h-[150px]"><DominoLevelCards /></div>
+      ) : scene === 3 ? (
         <div className="relative flex min-h-[150px] flex-col items-center justify-center gap-3 text-center">
           <div className="flex items-center gap-3" aria-label="Bolsa de fichas y ficha robada">
             <div className="relative h-[96px] w-[78px] animate-[domino-demo-well_1s_ease-in-out_both] motion-reduce:animate-none" aria-hidden="true">

@@ -1,4 +1,5 @@
 import type { GameTypeName } from '../../domain/value-objects/game-type.vo.js';
+import { DOMINO_ICON_CATALOG } from './domino-icon-catalog.js';
 
 /**
  * Ajustes de FORMA y TAMAÑO sobre lo que devuelve la IA, antes de pasarlo
@@ -264,9 +265,68 @@ function normalizeDomino(config: Record<string, unknown>, content: unknown, opti
   const items = mapObjects(content, (raw, index) => {
     const label = trimmedLabel(raw.label, 60);
     if (label === null) return null;
-    return { ...raw, label, icon: nonEmptyString(raw.icon) ?? 'star', color: validColor(raw.color, index) };
+    // Ícono: solo claves que el cliente sabe pintar; cualquier otra cosa vuelve a "star".
+    const icon = nonEmptyString(raw.icon);
+    const { question: legacyQuestion, questions: rawQuestions, definition, example, application, ...rest } = raw;
+    const questions = normalizeDominoQuestions(rawQuestions, legacyQuestion);
+    const optionalTexts: Record<string, string> = {};
+    for (const [key, value, max] of [
+      ['definition', definition, 300],
+      ['example', example, 300],
+      ['application', application, 400],
+    ] as const) {
+      const text = nonEmptyString(value);
+      if (text) optionalTexts[key] = truncate(text, max);
+    }
+    return {
+      ...rest,
+      label,
+      icon: icon && DOMINO_ICON_CATALOG.includes(icon) ? icon : 'star',
+      color: validColor(raw.color, index),
+      ...optionalTexts,
+      ...(questions.length > 0 ? { questions } : {}),
+    };
   });
   return { config: next, content: limit(options.dedupe === false ? items : dedupeBy(items, (item) => item.label), 10) };
+}
+
+/**
+ * Banco de preguntas de un concepto a partir de lo que devuelva la IA (`questions`,
+ * o `question` suelta). Descarta las preguntas que el validador rechazaría (menos de
+ * 3 opciones, índice fuera de rango, sin explicación), acota textos, quita opciones
+ * y preguntas repetidas y deja máximo 6.
+ */
+function normalizeDominoQuestions(rawQuestions: unknown, legacyQuestion: unknown): Record<string, unknown>[] {
+  const candidates = Array.isArray(rawQuestions) ? rawQuestions : legacyQuestion !== undefined ? [legacyQuestion] : [];
+  const result: Record<string, unknown>[] = [];
+  const seenTexts = new Set<string>();
+  for (const item of candidates) {
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) continue;
+    const raw = item as Record<string, unknown>;
+    const text = nonEmptyString(raw.text);
+    const explanation = nonEmptyString(raw.explanation);
+    if (!text || !explanation || !Array.isArray(raw.options)) continue;
+    const correctIndex = toNumber(raw.correctIndex);
+    if (correctIndex === null || !Number.isInteger(correctIndex) || correctIndex < 0 || correctIndex >= raw.options.length) continue;
+    // Se quitan opciones repetidas sin perder la posición de la correcta.
+    const correctOption = nonEmptyString(raw.options[correctIndex]);
+    if (!correctOption) continue;
+    const options: string[] = [];
+    for (const option of raw.options) {
+      const clean = nonEmptyString(option);
+      if (clean && !options.some((o) => o.toLowerCase() === truncate(clean, 120).toLowerCase())) options.push(truncate(clean, 120));
+    }
+    const newCorrect = options.findIndex((o) => o.toLowerCase() === truncate(correctOption, 120).toLowerCase());
+    if (options.length < 3 || newCorrect < 0) continue;
+    const finalOptions = options.slice(0, 4);
+    if (newCorrect >= finalOptions.length) continue;
+    const key = text.toLowerCase().replace(/\s+/g, ' ');
+    if (seenTexts.has(key)) continue;
+    seenTexts.add(key);
+    result.push({ text: truncate(text, 300), options: finalOptions, correctIndex: newCorrect, explanation: truncate(explanation, 400) });
+    if (result.length === 6) break;
+  }
+  return result;
 }
 
 // --- Laberinto recolector ---------------------------------------------------

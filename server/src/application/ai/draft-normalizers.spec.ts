@@ -300,6 +300,55 @@ describe('normalizeDraft — Dominó y Laberinto recolector', () => {
     expect(concepts[1]).toMatchObject({ icon: 'star', color: '#16a34a' });
   });
 
+  it('DOMINO: conserva íconos del catálogo y reemplaza los desconocidos por "star"', () => {
+    const { content } = normalizeDraft({ gameType: 'DOMINO' }, {}, [
+      { label: 'Sol', icon: 'sun', color: '#f59e0b' },
+      { label: 'Raro', icon: 'inventadoXYZ', color: '#16a34a' },
+    ]);
+    expect((content as Array<{ icon: string }>).map((c) => c.icon)).toEqual(['sun', 'star']);
+  });
+
+  describe('DOMINO: material de niveles y banco de preguntas', () => {
+    const q = (text: string, extra: Record<string, unknown> = {}) => ({
+      text,
+      options: ['A', 'B', 'C'],
+      correctIndex: 1,
+      explanation: 'Porque sí.',
+      ...extra,
+    });
+    const first = (raw: Record<string, unknown>) =>
+      (normalizeDraft({ gameType: 'DOMINO' }, {}, [{ label: 'X', color: '#22c55e', ...raw }]).content as Record<string, any>[])[0];
+
+    it('conserva definition, example y application acotados', () => {
+      const c = first({ definition: ' Def ', example: 'x'.repeat(500), application: 5 });
+      expect(c.definition).toBe('Def');
+      expect(c.example).toHaveLength(300);
+      expect(c).not.toHaveProperty('application');
+    });
+
+    it('conserva el banco válido y descarta preguntas inválidas o repetidas', () => {
+      const c = first({
+        questions: [
+          q('¿Uno?'),
+          q('  ¿UNO?  '),
+          q('Sin explicación', { explanation: '' }),
+          q('Pocas opciones', { options: ['A', 'B'] }),
+          q('Índice malo', { correctIndex: 7 }),
+          q('¿Dos?', { options: ['A', 'a', 'B', 'C'], correctIndex: 3 }),
+        ],
+      });
+      expect(c.questions.map((x: { text: string }) => x.text)).toEqual(['¿Uno?', '¿Dos?']);
+      // Al quitar la opción repetida, la correcta sigue apuntando a "C".
+      expect(c.questions[1]).toMatchObject({ options: ['A', 'B', 'C'], correctIndex: 2 });
+    });
+
+    it('convierte una question suelta en un banco de 1 y acota el banco a 6', () => {
+      expect(first({ question: q('Legada') }).questions).toHaveLength(1);
+      expect(first({ questions: Array.from({ length: 9 }, (_, i) => q(`P${i}`)) }).questions).toHaveLength(6);
+      expect(first({})).not.toHaveProperty('questions');
+    });
+  });
+
   it('DOMINO: acota handSize', () => {
     expect(normalizeDraft({ gameType: 'DOMINO' }, { handSize: 2 }, []).config).toEqual({ handSize: 3 });
     expect(normalizeDraft({ gameType: 'DOMINO' }, { handSize: 40 }, []).config).toEqual({ handSize: 12 });
