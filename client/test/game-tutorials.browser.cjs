@@ -28,6 +28,11 @@ if ('${game}'==='TF') {
   const qs=[1,2,3].map(i=>({questionId:'q'+i,statement:'Afirmación de prueba '+i+'.',answer:i%2==0,explanation:'Explicación.'}));
   el=React.createElement(TrueFalseMazeGame,{title:'Misión Galáctica',questions:qs,config:DEFAULT_TRUE_FALSE_MAZE_CONFIG,onExit:()=>{window.exited=1}});
 }
+if ('${game}'==='GUESS_WHO') {
+  const {GameInstructionsGate}=await import('/src/components/home/games/GameInstructionsGate.tsx');
+  const {GuessWhoTutorial}=await import('/src/components/home/games/tutorial/GuessWhoTutorial.tsx');
+  el=React.createElement(GameInstructionsGate,{kind:'GUESS_WHO',tutorial:(onFinish)=>React.createElement(GuessWhoTutorial,{tournament:false,onFinish})},React.createElement('p',{id:'room'},'Sala real'));
+}
 if ('${game}'==='MEMORY') {
   const {MemoryMatchGame}=await import('/src/components/home/games/MemoryMatchGame.tsx');
   // Cada imagen lleva su nombre dentro del SVG: así la prueba sabe qué cartas hacen pareja.
@@ -196,6 +201,55 @@ async function tfTutorial(browser, viewport, touch) {
   await page.close()
 }
 
+async function guessWhoTutorial(browser, viewport, touch) {
+  const tag = `${viewport.width}${touch ? '-touch' : ''}`
+  const { page, errors } = await openGame(browser, 'GUESS_WHO', viewport, touch)
+  const intro = page.locator('[data-game-instructions]')
+  await intro.waitFor()
+  for (let i = 0; i < 4; i++) await intro.getByRole('button', { name: /Siguiente/ }).click()
+  await intro.getByRole('button', { name: /Ver un acierto/ }).click()
+  const question = intro.getByRole('group', { name: '¿Deseas jugar un tutorial?' })
+  await question.waitFor()
+  const dialog = page.getByRole('dialog').last()
+  assert.equal(await dialog.evaluate((el) => el.scrollHeight <= el.clientHeight + 1), true, 'La guía no tiene scroll')
+  await page.screenshot({ path: `.scratch/tutorial-quienes-pregunta-${tag}.png` })
+  await question.getByRole('button', { name: 'Sí' }).click()
+
+  const card = page.getByRole('dialog', { name: /Tutorial de/ })
+  const next = async (n) => {
+    await card.getByText(`Parte ${n} de 4`).waitFor({ timeout: 6000 })
+    await card.getByRole('button', { name: /Siguiente/ }).click()
+  }
+  // 1. Preguntar desde el chat guiado.
+  await page.getByRole('listitem', { name: 'Preguntar: ¿Tu tarjeta vuela?' }).waitFor()
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: `.scratch/tutorial-quienes-parte1-${tag}.png` })
+  await page.getByRole('listitem', { name: 'Preguntar: ¿Tu tarjeta vuela?' }).click()
+  await next(2)
+  // 2. Descartar en el tablero (tocar una que sí vuela es un error y no la descarta).
+  const boardCard = (label) => page.locator('.guess-who-board-cards button', { hasText: label })
+  await boardCard('Búho').click()
+  await page.getByText('Búho sí vuela').waitFor()
+  for (const label of ['Pez', 'Pulpo', 'Tortuga']) await boardCard(label).click()
+  await next(3)
+  // 3. Responder la pregunta del rival (mi tarjeta es el Pez: vive en el agua).
+  await page.getByRole('button', { name: 'No', exact: true }).click()
+  await page.getByText('Esa respuesta no coincide con tu tarjeta').waitFor()
+  await page.getByRole('button', { name: 'Sí', exact: true }).click()
+  await next(4)
+  // 4. Adivinar.
+  await page.getByRole('button', { name: /¡Creo que es esta!/ }).click()
+  await page.getByRole('dialog').getByRole('button', { name: /Búho/ }).click()
+  await page.getByRole('button', { name: 'Sí, confirmar' }).click()
+  await card.getByRole('heading', { name: '¡Tutorial completado!' }).waitFor({ timeout: 6000 })
+  await page.screenshot({ path: `.scratch/tutorial-quienes-fin-${tag}.png` })
+  await card.getByRole('button', { name: /¡A jugar!/ }).click()
+  await page.locator('#room').waitFor()
+  assert.deepEqual(errors, [])
+  console.log(`PASS ${tag} Identidad Oculta: pregunta sin scroll, Sí → preguntar, descartar, responder y adivinar en la pantalla real, ¡A jugar! → sala`)
+  await page.close()
+}
+
 async function main() {
   mkdirSync('.scratch', { recursive: true })
   const browser = await chromium.launch({ channel: 'chrome', headless: true })
@@ -211,6 +265,10 @@ async function main() {
     if (!only || only === 'MEMORY') {
       await memoryTutorial(browser, { width: 1280, height: 800 }, false)
       await memoryTutorial(browser, { width: 390, height: 844 }, true)
+    }
+    if (!only || only === 'GUESS_WHO') {
+      await guessWhoTutorial(browser, { width: 1280, height: 800 }, false)
+      await guessWhoTutorial(browser, { width: 390, height: 844 }, true)
     }
   } finally {
     await browser.close()

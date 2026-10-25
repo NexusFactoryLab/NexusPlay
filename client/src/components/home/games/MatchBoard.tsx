@@ -345,12 +345,14 @@ export function TurnStatusStrip({
 }) {
   const remainingMs = useCountdown(turnDeadline)
   const secondsLeft = Math.ceil(remainingMs / 1000)
-  const urgent = secondsLeft <= 5
-  const progress = Math.max(0, Math.min(1, remainingMs / (turnDurationSeconds * 1000)))
+  // Sin plazo (el tutorial) no hay reloj: ni segundos, ni barra, ni tic-tac.
+  const timed = turnDeadline !== null
+  const urgent = timed && secondsLeft <= 5
+  const progress = timed ? Math.max(0, Math.min(1, remainingMs / (turnDurationSeconds * 1000))) : 0
 
   useEffect(() => {
-    if (secondsLeft > 0 && secondsLeft <= 5) playGuessWhoCountdownTick(secondsLeft)
-  }, [secondsLeft])
+    if (timed && secondsLeft > 0 && secondsLeft <= 5) playGuessWhoCountdownTick(secondsLeft)
+  }, [timed, secondsLeft])
 
   return (
     <div
@@ -376,14 +378,16 @@ export function TurnStatusStrip({
             {isMyTurn ? 'Pregunta, descarta o adivina.' : 'Espera: tu rival está jugando.'}
           </p>
         </div>
-        <span
-          className={`shrink-0 rounded-xl font-extrabold tabular-nums ${compact ? 'px-2.5 py-1 text-[17px]' : 'px-3 py-1.5 text-[20px]'} ${
-            urgent ? 'bg-danger text-white' : isMyTurn ? 'bg-white/20' : 'bg-border/60'
-          }`}
-          aria-label={`${secondsLeft} segundos restantes`}
-        >
-          {secondsLeft}s
-        </span>
+        {timed && (
+          <span
+            className={`shrink-0 rounded-xl font-extrabold tabular-nums ${compact ? 'px-2.5 py-1 text-[17px]' : 'px-3 py-1.5 text-[20px]'} ${
+              urgent ? 'bg-danger text-white' : isMyTurn ? 'bg-white/20' : 'bg-border/60'
+            }`}
+            aria-label={`${secondsLeft} segundos restantes`}
+          >
+            {secondsLeft}s
+          </span>
+        )}
       </div>
       <div className={`absolute inset-x-0 bottom-0 h-1 ${isMyTurn ? 'bg-white/20' : 'bg-border/50'}`} aria-hidden="true">
         <div

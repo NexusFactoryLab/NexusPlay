@@ -88,5 +88,6 @@ export function MazeCollectorTutorial({
     },
   ]
 
-  return <TutorialRunner name="el Camión Reciclador" parts={parts} onFinish={onFinish} />
+  // En celular vertical la cruceta del juego ocupa la franja de abajo: la tarea va encima.
+  return <TutorialRunner name="el Camión Reciclador" parts={parts} onFinish={onFinish} touchBannerBottom={184} />
 }

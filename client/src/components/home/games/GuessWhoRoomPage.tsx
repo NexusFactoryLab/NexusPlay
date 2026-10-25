@@ -1,4 +1,5 @@
 import { GameInstructionsGate } from './GameInstructionsGate'
+import { GuessWhoTutorial } from './tutorial/GuessWhoTutorial'
 import { MultiplayerLobby } from './MultiplayerLobby'
 import { ChatPanel } from './ChatPanel'
 import { useEffect, useRef, useState } from 'react'
@@ -26,7 +27,11 @@ const BOT_NOTICE_MS = 10_000
  * deja el Sidebar/header de HomeLayout montado detrás.
  */
 export function GuessWhoRoomPage() {
-  return <GameInstructionsGate kind="GUESS_WHO"><GuessWhoRoomSession /></GameInstructionsGate>
+  return (
+    <GameInstructionsGate kind="GUESS_WHO" tutorial={(onFinish) => <GuessWhoTutorial tournament={false} onFinish={onFinish} />}>
+      <GuessWhoRoomSession />
+    </GameInstructionsGate>
+  )
 }
 
 function GuessWhoRoomSession() {

@@ -28,6 +28,9 @@ export type TutorialPart = {
   render: (context: TutorialPartContext) => ReactNode
 }
 
+/** En celular, la tarea completa se ve unos segundos y luego queda como pastilla. */
+const BANNER_COLLAPSE_MS = 6000
+
 type Stage = { kind: 'play' } | { kind: 'between'; result: 'done' | 'failed'; message: string } | { kind: 'intro' }
 
 function useCoarsePointer() {
@@ -54,18 +57,23 @@ export function TutorialRunner({
   name,
   parts,
   onFinish,
+  touchBannerBottom = 12,
 }: {
   /** Nombre del juego ("el Camión Reciclador"). */
   name: string
   parts: TutorialPart[]
   /** Termina el tutorial (completo o saltado): sigue el juego real. */
   onFinish: () => void
+  /** En celular vertical, a qué altura va la tarea (px desde abajo): sobre la cruceta del juego si la tiene. */
+  touchBannerBottom?: number
 }) {
   const [index, setIndex] = useState(0)
   const [attempt, setAttempt] = useState(0)
   // La parte 1 arranca de una: el «Sí» que abrió el tutorial ya fue el gesto que permite la pantalla completa.
   const [stage, setStage] = useState<Stage>({ kind: 'play' })
   const [mistake, setMistake] = useState<string | null>(null)
+  // En pantallas táctiles la tarea se encoge sola a una pastilla para no tapar el juego (tocarla la vuelve a abrir).
+  const [bannerOpen, setBannerOpen] = useState(true)
   const rootRef = useRef<HTMLDivElement>(null)
   const touch = useCoarsePointer()
   const part = parts[index]
@@ -89,15 +97,23 @@ export function TutorialRunner({
 
   useEffect(() => {
     if (!mistake) return
+    setBannerOpen(true)
     const timer = window.setTimeout(() => setMistake(null), 3500)
     return () => window.clearTimeout(timer)
   }, [mistake])
+
+  useEffect(() => {
+    if (!touch || !bannerOpen || mistake || stage.kind !== 'play') return
+    const timer = window.setTimeout(() => setBannerOpen(false), BANNER_COLLAPSE_MS)
+    return () => window.clearTimeout(timer)
+  }, [touch, bannerOpen, mistake, stage.kind, index, attempt])
 
   /** Empezar o reintentar una parte (lo dispara un clic: ahí el navegador deja pedir pantalla completa). */
   function play(nextIndex: number) {
     setIndex(nextIndex)
     setAttempt((value) => value + 1)
     setMistake(null)
+    setBannerOpen(true)
     setStage({ kind: 'play' })
     enterFullscreen()
   }
@@ -129,18 +145,27 @@ export function TutorialRunner({
       )}
 
       {stage.kind === 'play' && (
-        // La tarea va abajo para no tapar el mapa ni el HUD; en celular vertical, encima de la cruceta.
+        // La tarea va abajo para no tapar el mapa ni el HUD; en celular vertical, encima de la cruceta
+        // si el juego la tiene. Los toques sobre el texto pasan al juego: solo sus botones lo capturan.
         <div
-          className={`pointer-events-none fixed inset-x-0 z-[65] flex justify-center px-3 ${touch ? 'bottom-[calc(env(safe-area-inset-bottom)+184px)] landscape:bottom-[calc(env(safe-area-inset-bottom)+10px)] landscape:pr-[190px]' : 'bottom-5'}`}
+          className={`pointer-events-none fixed inset-x-0 z-[65] flex justify-center px-3 ${touch ? 'landscape:!bottom-[calc(env(safe-area-inset-bottom)+10px)] landscape:pr-[190px]' : 'bottom-5'}`}
+          style={touch ? { bottom: `calc(env(safe-area-inset-bottom) + ${touchBannerBottom}px)` } : undefined}
         >
           <div
             role="status"
-            className="tour-step-in pointer-events-auto flex max-w-[620px] items-center gap-2.5 rounded-2xl border-2 border-amber-300/80 bg-slate-950/90 py-2 pr-2 pl-3 text-slate-100 shadow-[0_14px_34px_-12px_rgba(0,0,0,0.7)] backdrop-blur"
+            className="tour-step-in flex max-w-[620px] items-center gap-2.5 rounded-2xl border-2 border-amber-300/80 bg-slate-950/90 py-2 pr-2 pl-3 text-slate-100 shadow-[0_14px_34px_-12px_rgba(0,0,0,0.7)] backdrop-blur"
           >
-            <span className="shrink-0 rounded-lg bg-amber-300 px-2 py-0.5 text-[11px] font-black text-slate-900 uppercase">
+            <button
+              type="button"
+              onClick={() => setBannerOpen((open) => !open)}
+              aria-expanded={bannerOpen}
+              aria-label={bannerOpen ? 'Ocultar la tarea' : 'Ver la tarea'}
+              className="pointer-events-auto shrink-0 rounded-lg bg-amber-300 px-2 py-0.5 text-[11px] font-black text-slate-900 uppercase"
+            >
               Parte {index + 1} de {parts.length}
-            </span>
-            <span className="min-w-0 text-[13.5px] leading-snug font-semibold sm:text-[14.5px]">
+              {touch && !bannerOpen && <span className="ml-1 normal-case">· Ver tarea</span>}
+            </button>
+            <span className={`min-w-0 text-[13.5px] leading-snug font-semibold sm:text-[14.5px] ${touch && !bannerOpen ? 'hidden' : ''}`}>
               {mistake ? (
                 <span className="flex items-center gap-1.5 text-amber-200">
                   <TriangleAlert className="h-4 w-4 shrink-0" aria-hidden="true" /> {mistake}
@@ -154,7 +179,7 @@ export function TutorialRunner({
               onClick={exit}
               title="Salir del tutorial e ir al juego"
               aria-label="Salir del tutorial"
-              className="ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-300 hover:bg-white/10 hover:text-white"
+              className="pointer-events-auto ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-300 hover:bg-white/10 hover:text-white"
             >
               <X className="h-4 w-4" />
             </button>

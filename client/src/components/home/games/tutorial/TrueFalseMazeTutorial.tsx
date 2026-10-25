@@ -73,5 +73,6 @@ export function TrueFalseMazeTutorial({ title, onFinish }: { title: string; onFi
     },
   ]
 
-  return <TutorialRunner name="el Laberinto V/F" parts={parts} onFinish={onFinish} />
+  // En celular vertical la cruceta del juego ocupa la franja de abajo: la tarea va encima.
+  return <TutorialRunner name="el Laberinto V/F" parts={parts} onFinish={onFinish} touchBannerBottom={184} />
 }
