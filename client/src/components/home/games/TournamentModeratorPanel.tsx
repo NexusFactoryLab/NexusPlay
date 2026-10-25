@@ -5,6 +5,7 @@ type Props = {
   tournament: TournamentStateView
   error: string | null
   onClose: () => void
+  onEndRound: () => void
   onExit: () => void
 }
 
@@ -12,7 +13,7 @@ type Props = {
  * Panel en vivo del administrador durante y después del torneo (issue #102):
  * quién va ganando, métricas por persona y las partidas de la ronda en curso.
  */
-export function TournamentModeratorPanel({ tournament, error, onClose, onExit }: Props) {
+export function TournamentModeratorPanel({ tournament, error, onClose, onEndRound, onExit }: Props) {
   const ranking = [...tournament.participants].sort(
     (a, b) => b.points - a.points || a.wrongAccusations - b.wrongAccusations || a.displayName.localeCompare(b.displayName),
   )
@@ -37,6 +38,18 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onExit }:
               <LogOut className="h-4 w-4" strokeWidth={2} />
               Salir del panel
             </button>
+            {!finished && (
+              <button
+                type="button"
+                className="rounded-lg border border-border px-3 py-2 text-[13px] font-semibold text-text-h"
+                title="Termina las partidas sin acabar de esta ronda (sin puntos) y pasa a la siguiente"
+                onClick={() => {
+                  if (window.confirm('¿Cerrar la ronda ahora? Las partidas sin terminar quedan sin ganador.')) onEndRound()
+                }}
+              >
+                {tournament.currentRound >= tournament.totalRounds ? 'Terminar torneo' : 'Cerrar ronda'}
+              </button>
+            )}
             <button type="button" className="rounded-lg border border-danger/40 px-3 py-2 text-[13px] font-semibold text-danger" onClick={onClose}>
               Cerrar torneo
             </button>

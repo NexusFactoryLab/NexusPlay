@@ -111,6 +111,17 @@ describe('torneo grupal administrado', () => {
     expect(tournament.participants.reduce((sum, p) => sum + p.points, 0)).toBe(2);
   });
 
+  it('el moderador puede cerrar una ronda trabada y el torneo avanza', async () => {
+    const { gateway, admin, players, tournament } = await start(2, 2);
+    gateway.handleTournamentStart(admin);
+    expect(() => gateway.handleTournamentEndRound(players[0])).toThrow(/administrador/);
+    gateway.handleTournamentEndRound(admin);
+    expect(tournament.currentRound).toBe(2);
+    expect(tournament.matches.find((m) => m.round === 1)!.winnerUserId).toBeNull();
+    gateway.handleTournamentEndRound(admin);
+    expect(tournament.phase).toBe('FINISHED');
+  });
+
   it('el moderador cierra el torneo y deja de existir en memoria', async () => {
     const { gateway, admin, players, tournaments, tournament } = await start(2);
     expect(() => gateway.handleTournamentClose(players[0])).toThrow(/administrador/);

@@ -1651,6 +1651,29 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     this.startTournamentRound(tournament, tournament.participants.map((p) => p.userId));
   }
 
+  /**
+   * Cierra la ronda en curso aunque haya partidas sin terminar (alguien se
+   * quedó inactivo): esas partidas terminan sin ganador ni puntos y el torneo
+   * avanza a la siguiente ronda o, si era la última, termina.
+   */
+  @SubscribeMessage('tournament:end-round')
+  handleTournamentEndRound(@ConnectedSocket() socket: AuthenticatedSocket) {
+    const tournament = this.requireModeratedTournament(socket);
+    if (tournament.phase !== 'RUNNING') throw new Error('El torneo no está en curso.');
+    for (const match of tournament.matches.filter((m) => m.round === tournament.currentRound && m.phase !== 'FINISHED')) {
+      this.clearTournamentTurnTimer(match.matchCode);
+      this.tournamentBotRunner.forget(match.matchCode);
+      match.phase = 'FINISHED';
+      match.winnerUserId = null;
+      match.activePlayerUserId = null;
+      match.turnDeadline = null;
+      this.broadcastMatchState(tournament, match);
+    }
+    this.tournamentStore.set(tournament);
+    this.maybeAdvanceTournamentRound(tournament);
+    this.broadcastTournamentState(tournament);
+  }
+
   /** Cierra el torneo para todos: el registro se conserva en la BD con soft delete. */
   @SubscribeMessage('tournament:close')
   handleTournamentClose(@ConnectedSocket() socket: AuthenticatedSocket) {

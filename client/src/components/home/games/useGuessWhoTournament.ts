@@ -85,6 +85,10 @@ export function useGuessWhoTournament(token: string | null) {
     socketRef.current?.emit('tournament:start')
   }, [])
 
+  const endRound = useCallback(() => {
+    socketRef.current?.emit('tournament:end-round')
+  }, [])
+
   const closeTournament = useCallback(() => {
     socketRef.current?.emit('tournament:close')
   }, [])
@@ -148,6 +152,7 @@ export function useGuessWhoTournament(token: string | null) {
     joinTournament,
     startTournament,
     closeTournament,
+    endRound,
     closed,
     updateTurnDuration,
     leaveTournament,
