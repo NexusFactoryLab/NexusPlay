@@ -112,6 +112,10 @@ export function tabHint(concept: ConceptDraft, tab: ConceptTab): string {
 
 /** Pestaña que abre una advertencia de texto (la de niveles lleva a SU nivel; el resto, a Concepto). */
 export function tabForWarning(text: string): ConceptTab {
+  // Avisos de preguntas (opciones pocas, desbalanceadas o parecidas): se arreglan en la lista de preguntas.
+  if (/^(pocas opciones|opciones )/i.test(text)) return 'MEDIUM'
+  // Caso poco concreto (weak_case): el caso vive en la pestaña Universitario.
+  if (/^caso poco concreto/i.test(text)) return 'ADVANCED'
   if (/universitario/i.test(text)) return 'ADVANCED'
   if (/intermedio/i.test(text)) return 'MEDIUM'
   if (/ejemplo/i.test(text)) return 'EASY'

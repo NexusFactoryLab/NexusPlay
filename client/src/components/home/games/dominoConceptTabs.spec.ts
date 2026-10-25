@@ -139,7 +139,12 @@ describe('tabForWarning (nunca la misma pestaña para dos niveles)', () => {
     expect(tabForWarning('Sin caso para Universitario')).toBe('ADVANCED')
     expect(tabForWarning('Sin pregunta para Intermedio')).toBe('MEDIUM')
     expect(tabForWarning('Sin ejemplo')).toBe('EASY')
-    expect(tabForWarning('Pocas opciones')).toBe('CONCEPT')
+    expect(tabForWarning('Pocas opciones')).toBe('MEDIUM')
+    expect(tabForWarning('Opciones desbalanceadas')).toBe('MEDIUM')
+    // Un aviso de opciones parecidas no se desvía por el texto de las opciones.
+    expect(tabForWarning('Opciones parecidas: "Universitario" y "Universitaria"')).toBe('MEDIUM')
+    expect(tabForWarning('Caso poco concreto: parece una definición')).toBe('ADVANCED')
+    expect(tabForWarning('Ícono repetido')).toBe('CONCEPT')
   })
 })
 

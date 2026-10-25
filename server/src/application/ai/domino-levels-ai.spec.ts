@@ -78,7 +78,7 @@ describe('normalizeDraft DOMINO — levels', () => {
 });
 
 describe('analyzeDominoQuality — niveles', () => {
-  const full = { definition: 'd', example: 'e', application: 'a' };
+  const full = { definition: 'd', example: 'e', application: 'Una vecina deja una botella en el congelador y al otro día la encuentra rota.' };
   const q = (levels?: Array<'MEDIUM' | 'ADVANCED'>) => ({
     text: 'Q',
     options: ['uno', 'dos', 'tres', 'cuatro'],

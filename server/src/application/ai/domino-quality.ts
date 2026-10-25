@@ -1,4 +1,5 @@
-import { DOMINO_ICON_CATALOG } from './domino-icon-catalog.js';
+import { DOMINO_GENERIC_ICONS, DOMINO_ICON_CATALOG, DOMINO_RESERVE_ICONS } from './domino-icon-catalog.js';
+import { foldText, keywordIconsFor } from './domino-icon-keywords.js';
 
 /**
  * Pasada automática de calidad sobre el contenido de Dominexo generado por IA.
@@ -18,7 +19,9 @@ export type DominoWarningCode =
   | 'missing_example'
   | 'missing_application'
   | 'missing_level_medium'
-  | 'missing_level_advanced';
+  | 'missing_level_advanced'
+  | 'similar_options'
+  | 'weak_case';
 
 /** Advertencia que acompaña al borrador; nunca bloquea la generación. */
 export interface DraftWarning {
@@ -50,94 +53,55 @@ export function shuffleQuestionOptions<T extends { options: string[]; correctInd
   };
 }
 
-/** Pistas por nombre de concepto -> clave de ícono del catálogo (se prueba en orden). */
-const ICON_KEYWORDS: ReadonlyArray<readonly [string, RegExp]> = [
-  ['sun', /\b(sol|solar|estrella|luz)\b/],
-  ['moon', /\b(luna|lunar|noche|eclipse)\b/],
-  ['rocket', /\b(cohete|espacio|espacial|planeta|orbita|galaxia|nasa|satelite)\b/],
-  ['atom', /\b(atomo|atomico|quimica|molecula|nuclear|fisica)\b/],
-  ['dna', /\b(adn|genetica|gen|genoma|cromosoma|herencia)\b/],
-  ['microscope', /\b(celula|celular|bacteria|virus|microbio|biologia)\b/],
-  ['flaskConical', /\b(experimento|laboratorio|reaccion|mezcla)\b/],
-  ['leaf', /\b(hoja|planta|vegetal|fotosintesis|clorofila|bosque)\b/],
-  ['tree', /\b(arbol|selva|deforestacion|reforestacion)\b/],
-  ['flower', /\b(flor|polen|polinizacion)\b/],
-  ['droplets', /\b(agua|lluvia|rio|oceano|mar|ciclo del agua)\b/],
-  ['waves', /\b(ola|olas|marea|tsunami|oceano)\b/],
-  ['wind', /\b(viento|eolica|eolico|huracan)\b/],
-  ['thermometer', /\b(temperatura|calor|calentamiento|clima|fiebre)\b/],
-  ['cloud', /\b(nube|atmosfera|clima)\b/],
-  ['recycle', /\b(reciclaje|reciclar|residuo|residuos|reutilizar|sostenible|sostenibilidad)\b/],
-  ['zap', /\b(energia|electricidad|electrico|corriente|rayo|voltaje)\b/],
-  ['mountain', /\b(montana|volcan|cordillera|relieve)\b/],
-  ['fish', /\b(pez|peces|pesca|marino)\b/],
-  ['bird', /\b(ave|aves|pajaro)\b/],
-  ['heartPulse', /\b(corazon|salud|medicina|pulso|cardiaco)\b/],
-  ['brain', /\b(cerebro|mente|memoria|neurona|psicologia)\b/],
-  ['pill', /\b(medicamento|vacuna|farmaco|antibiotico)\b/],
-  ['apple', /\b(fruta|alimentacion|nutricion|dieta)\b/],
-  ['wheat', /\b(cultivo|agricultura|cereal|cosecha|trigo)\b/],
-  ['factory', /\b(industria|industrial|fabrica|produccion|revolucion industrial)\b/],
-  ['building', /\b(ciudad|edificio|ayuntamiento|palacio|bastilla|castillo)\b/],
-  ['home', /\b(hogar|casa|familia|vivienda)\b/],
-  ['ship', /\b(barco|navegacion|descubrimiento|conquista|colonizacion)\b/],
-  ['plane', /\b(avion|aviacion|aeropuerto)\b/],
-  ['car', /\b(auto|automovil|vehiculo|motor)\b/],
-  ['train', /\b(tren|ferrocarril)\b/],
-  ['trophy', /\b(victoria|campeonato|triunfo|guerra|batalla)\b/],
-  ['medal', /\b(heroe|logro|premio|medalla)\b/],
-  ['shieldCheck', /\b(derechos?|ley|leyes|constitucion|justicia|seguridad|declaracion)\b/],
-  ['key', /\b(clave|llave|contrasena|cifrado)\b/],
-  ['lock', /\b(privacidad|proteccion|bloqueo)\b/],
-  ['cpu', /\b(computadora|procesador|hardware|algoritmo|programacion|inteligencia artificial)\b/],
-  ['laptop', /\b(software|internet|digital|tecnologia|aplicacion|web)\b/],
-  ['database', /\b(datos|base de datos|informacion|archivo)\b/],
-  ['calculator', /\b(suma|resta|multiplicacion|division|matematica|calculo|ecuacion|fraccion)\b/],
-  ['ruler', /\b(geometria|medida|medicion|longitud|triangulo|angulo)\b/],
-  ['book', /\b(libro|literatura|lectura|novela|escritura)\b/],
-  ['graduationCap', /\b(educacion|escuela|universidad|aprendizaje|estudio)\b/],
-  ['compass', /\b(orientacion|brujula|mapa|exploracion|geografia)\b/],
-  ['mapPin', /\b(ubicacion|lugar|region|territorio|pais)\b/],
-  ['lightbulb', /\b(idea|invento|invencion|ilustracion|innovacion)\b/],
-  ['hammer', /\b(construccion|herramienta|oficio|obrero)\b/],
-  ['heart', /\b(amor|solidaridad|fraternidad|empatia)\b/],
-  ['target', /\b(objetivo|meta|estrategia|punteria)\b/],
-];
-
-const normalizeLabel = (label: string): string => label.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
-
 /** Ícono sugerido por el nombre del concepto que aún esté libre; `null` si no hay pista. */
 export function inferIconFromLabel(label: string, used: ReadonlySet<string>): string | null {
-  const text = normalizeLabel(label);
-  for (const [icon, pattern] of ICON_KEYWORDS) {
-    if (!used.has(icon) && DOMINO_ICON_CATALOG.includes(icon) && pattern.test(text)) return icon;
+  return keywordIconsFor(label).find((icon) => !used.has(icon)) ?? null;
+}
+
+/** Hash estable (djb2) para elegir de forma determinista dentro de la reserva. */
+function stableHash(text: string): number {
+  let hash = 5381;
+  for (let i = 0; i < text.length; i += 1) hash = ((hash << 5) + hash + text.charCodeAt(i)) >>> 0;
+  return hash;
+}
+
+/** Primer ícono libre de la reserva neutra, empezando por una posición que depende del nombre. */
+function reserveIconFor(label: string, used: ReadonlySet<string>): string | null {
+  const reserve = DOMINO_RESERVE_ICONS.filter((icon) => DOMINO_ICON_CATALOG.includes(icon));
+  const start = stableHash(foldText(label)) % reserve.length;
+  for (let step = 0; step < reserve.length; step += 1) {
+    const candidate = reserve[(start + step) % reserve.length];
+    if (!used.has(candidate)) return candidate;
   }
   return null;
 }
 
 /**
- * Devuelve un ícono por concepto sin repetir mientras el catálogo alcance:
- * 1) respeta la primera elección válida (distinta de "star") de cada ícono;
- * 2) al resto (repetidos o "star" de respaldo) les infiere uno por el nombre;
- * 3) si no hay pista, toma el primer ícono libre del catálogo.
+ * Devuelve un ícono por concepto, sin repetir mientras haya disponibles:
+ * 1) el que eligió el modelo si es válido, único y no genérico (star/heart/smile solo si una palabra
+ *    clave del nombre lo respalda);
+ * 2) si no, un ícono por palabra clave del nombre;
+ * 3) si no, uno neutro de la reserva (nunca star ni heart), determinista por nombre;
+ * 4) solo si todo se agotó, cualquier ícono libre del catálogo y, al final, "star".
  */
 export function assignDominoIcons(items: ReadonlyArray<{ label: string; icon: string }>): string[] {
   const used = new Set<string>();
   const result: Array<string | null> = items.map((item) => {
-    if (item.icon !== FALLBACK_ICON && DOMINO_ICON_CATALOG.includes(item.icon) && !used.has(item.icon)) {
+    const valid = DOMINO_ICON_CATALOG.includes(item.icon) && !used.has(item.icon);
+    const generic = DOMINO_GENERIC_ICONS.includes(item.icon);
+    if (valid && (!generic || keywordIconsFor(item.label).includes(item.icon))) {
       used.add(item.icon);
       return item.icon;
     }
     return null;
   });
-  const pool = DOMINO_ICON_CATALOG.filter((icon) => icon !== FALLBACK_ICON);
   return result.map((icon, index) => {
     if (icon) return icon;
+    const { label } = items[index];
     const picked =
-      inferIconFromLabel(items[index].label, used) ??
-      // Sin pista por nombre: "star" una sola vez; los demás toman el primer ícono libre.
-      (used.has(FALLBACK_ICON) ? null : FALLBACK_ICON) ??
-      pool.find((candidate) => !used.has(candidate)) ??
+      inferIconFromLabel(label, used) ??
+      reserveIconFor(label, used) ??
+      DOMINO_ICON_CATALOG.find((candidate) => !used.has(candidate) && !DOMINO_GENERIC_ICONS.includes(candidate)) ??
       FALLBACK_ICON;
     used.add(picked);
     return picked;
@@ -176,6 +140,123 @@ export function ensureLevelCoverage<T extends { levels?: QuestionLevel[] }>(ques
   return result;
 }
 
+// --- Opciones parecidas -------------------------------------------------------
+
+/** Palabras vacías y verbos "comodín" que no distinguen una opción de otra ("se vuelve", "se convierte"). */
+const FILLER_WORDS = new Set([
+  'el', 'la', 'los', 'las', 'de', 'del', 'que', 'se', 'un', 'una', 'unos', 'unas', 'y', 'o', 'en', 'a', 'al', 'lo', 'con',
+  'por', 'para', 'es', 'son', 'su', 'sus', 'como', 'mas', 'muy',
+  'vuelve', 'vuelven', 'convierte', 'convierten', 'transforma', 'transforman', 'pasa', 'pasan', 'hace', 'hacen',
+  'estado', 'forma', 'proceso', 'cambia', 'cambian', 'queda', 'quedan',
+]);
+
+/**
+ * Equivalencias por raíz semántica común: palabras distintas que significan lo mismo en este contexto
+ * (p. ej. "se congela" ≈ "se vuelve hielo"). Cada grupo comparte una etiqueta.
+ */
+const SEMANTIC_GROUPS: ReadonlyArray<readonly [string, readonly string[]]> = [
+  ['ICE', ['cong', 'hiel', 'solidif', 'escarch', 'helad', 'nieve']],
+  ['VAPOR', ['evapor', 'vapor', 'gasific', 'hierv', 'ebull']],
+  ['LIQUID', ['licu', 'liquid', 'derrit', 'fund', 'fusion']],
+  ['RAIN', ['lluvi', 'precipit', 'llover', 'llueve']],
+  ['GROW', ['crece', 'crecim', 'aument', 'increment', 'sube']],
+  ['FALL', ['dismin', 'reduc', 'baja', 'descen', 'cae']],
+  ['BEGIN', ['inicia', 'comienz', 'empie', 'origin']],
+  ['END', ['termin', 'final', 'conclu', 'acab']],
+];
+
+function tokensOf(option: string): string[] {
+  return foldText(option)
+    .replace(/[^a-z0-9ñ\s]/g, ' ')
+    .split(/\s+/)
+    .filter((word) => word.length > 0 && !FILLER_WORDS.has(word));
+}
+
+/** Raíz o grupo semántico de una palabra: lo que se compara entre opciones. */
+function stemOf(word: string): string {
+  if (/\d/.test(word)) return word; // números y fechas se comparan completos
+  for (const [label, roots] of SEMANTIC_GROUPS) {
+    if (roots.some((root) => word.startsWith(root))) return label;
+  }
+  return word.slice(0, 6);
+}
+
+const jaccard = (a: ReadonlySet<string>, b: ReadonlySet<string>): number => {
+  const intersection = [...a].filter((x) => b.has(x)).length;
+  const union = new Set([...a, ...b]).size;
+  return union === 0 ? 0 : intersection / union;
+};
+
+function bigrams(text: string): string[] {
+  const flat = text.replace(/\s+/g, ' ');
+  return flat.length < 2 ? [] : Array.from({ length: flat.length - 1 }, (_, i) => flat.slice(i, i + 2));
+}
+
+/** Coeficiente de Dice sobre bigramas de caracteres. */
+function dice(a: string, b: string): number {
+  const x = bigrams(a);
+  const y = bigrams(b);
+  if (x.length === 0 || y.length === 0) return 0;
+  const pool = [...y];
+  let shared = 0;
+  for (const gram of x) {
+    const at = pool.indexOf(gram);
+    if (at >= 0) {
+      shared += 1;
+      pool.splice(at, 1);
+    }
+  }
+  return (2 * shared) / (x.length + y.length);
+}
+
+const JACCARD_THRESHOLD = 0.67;
+const DICE_THRESHOLD = 0.82;
+const MIN_DICE_LENGTH = 8;
+
+/**
+ * ¿Dos opciones se parecen demasiado para ser distractores distintos? Compara por raíz/grupo semántico
+ * (Jaccard) y, en opciones largas, por bigramas de caracteres (Dice). Opciones cortas o numéricas
+ * distintas ("A"/"B", 1789/1799) nunca se marcan.
+ */
+export function areOptionsSimilar(first: string, second: string): boolean {
+  const a = tokensOf(first);
+  const b = tokensOf(second);
+  if (a.length === 0 || b.length === 0) return false;
+  if (a.every((t) => /\d/.test(t)) || b.every((t) => /\d/.test(t))) return a.join(' ') === b.join(' ');
+  const stemsA = new Set(a.map(stemOf));
+  const stemsB = new Set(b.map(stemOf));
+  if (jaccard(stemsA, stemsB) >= JACCARD_THRESHOLD) return true;
+  const textA = a.join(' ');
+  const textB = b.join(' ');
+  return textA.length >= MIN_DICE_LENGTH && textB.length >= MIN_DICE_LENGTH && dice(textA, textB) >= DICE_THRESHOLD;
+}
+
+/** Primer par de opciones parecidas de una pregunta, o `null`. */
+export function findSimilarOptions(options: readonly string[]): [string, string] | null {
+  for (let i = 0; i < options.length; i += 1) {
+    for (let j = i + 1; j < options.length; j += 1) {
+      if (areOptionsSimilar(options[i], options[j])) return [options[i], options[j]];
+    }
+  }
+  return null;
+}
+
+// --- Caso de aplicación débil -------------------------------------------------
+
+const DEFINITION_START = /^(es (el|la|lo|un|una)\b|son (los|las)\b|se (define|denomina|llama|conoce)\b|proceso (por el cual|mediante)|conjunto de\b|termino (que|para)|concepto (que|de)\b)/;
+const ABSTRACT_START = /^en (la|el|los|las) (modelacion|ciencia|fisica|quimica|biologia|geografia|industria|ingenieria|meteorologia|ecologia|tecnologia|economia|medicina|matematica|astronomia|climatologia|agricultura|historia|politica|sociedad)\b/;
+/** Señales de una situación concreta: personas o lugares, o conectores de un hecho puntual. */
+const SITUATION_HINTS = /\b(agricultor|campesin|ingenier|estudiante|profesor|maestro|medico|doctor|ciudad|comunidad|escuela|colegio|familia|empresa|fabrica|granja|finca|pueblo|barrio|gobierno|nino|nina|jovenes|habitantes|cientific|investigador|piloto|cocinero|pescador|alcalde|persona|vecinos|trabajador|obrero|ciudadan|poblacion|region|pais|lider|rey|general|soldad|comerciante|artesano|arquitecto|paciente|maria|juan|cuando|si\b|durante|tras\b|mientras|despues|antes de|porque)/;
+const WEAK_CASE_MIN_LENGTH = 60;
+
+/** ¿El caso suena a definición o generalidad en vez de a una situación concreta? (heurística conservadora) */
+export function isWeakCase(application: string): boolean {
+  const text = foldText(application).replace(/\s+/g, ' ');
+  if (text.length === 0) return false; // un caso ausente ya lo avisa missing_application
+  const looksGeneric = text.length < WEAK_CASE_MIN_LENGTH || DEFINITION_START.test(text) || ABSTRACT_START.test(text);
+  return looksGeneric && !SITUATION_HINTS.test(text);
+}
+
 const UNBALANCED_RATIO = 2.5;
 const UNBALANCED_MIN_GAP = 25;
 
@@ -185,6 +266,8 @@ function isUnbalanced(options: string[]): boolean {
   const shortest = Math.max(1, Math.min(...lengths));
   return longest - shortest >= UNBALANCED_MIN_GAP && longest / shortest >= UNBALANCED_RATIO;
 }
+
+const shorten = (text: string): string => (text.length > 40 ? `${text.slice(0, 39).trimEnd()}…` : text);
 
 /** Revisa el contenido ya validado de Dominexo y devuelve las advertencias (sin bloquear nada). */
 export function analyzeDominoQuality(content: unknown): DraftWarning[] {
@@ -220,7 +303,12 @@ export function analyzeDominoQuality(content: unknown): DraftWarning[] {
       const texts = options.filter((o): o is string => typeof o === 'string');
       if (texts.length < 4) add('few_options', 'Pocas opciones', questionIndex);
       else if (isUnbalanced(texts)) add('unbalanced_options', 'Opciones desbalanceadas', questionIndex);
+      const similar = findSimilarOptions(texts);
+      if (similar) add('similar_options', `Opciones parecidas: "${shorten(similar[0])}" y "${shorten(similar[1])}"`, questionIndex);
     });
+    if (typeof concept.application === 'string' && isWeakCase(concept.application)) {
+      add('weak_case', 'Caso poco concreto: parece una definición');
+    }
     // Niveles: cada concepto necesita una pregunta usable por Intermedio y otra por Universitario.
     const typed = questions as Array<{ levels?: QuestionLevel[] }>;
     if (!typed.some((q) => servesLevel(q ?? {}, 'MEDIUM'))) add('missing_level_medium', 'Sin pregunta para Intermedio');

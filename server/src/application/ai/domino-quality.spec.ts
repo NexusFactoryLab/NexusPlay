@@ -143,7 +143,7 @@ describe('analyzeDominoQuality', () => {
   const full = {
     definition: 'd',
     example: 'e',
-    application: 'a',
+    application: 'Una vecina deja una botella en el congelador y al otro día la encuentra rota.',
   };
   const q4 = { text: 'Q', options: ['uno', 'dos', 'tres', 'cuatro'], correctIndex: 0, explanation: 'x' };
 
