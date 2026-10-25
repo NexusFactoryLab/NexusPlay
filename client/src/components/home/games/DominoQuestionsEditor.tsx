@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { Check, Plus, Trash2 } from 'lucide-react'
-import { DOMINO_LIMITS, emptyQuestion, type ConceptDraft, type QuestionDraft } from './dominoContentDraft'
+import { DOMINO_LIMITS, emptyQuestion, questionIssue, type ConceptDraft, type QuestionDraft } from './dominoContentDraft'
 
 const fieldClass =
   'w-full rounded-lg border border-border bg-bg px-3 py-2.5 text-[16px] leading-snug text-text-h outline-none transition-colors focus:border-accent disabled:opacity-60'
@@ -15,12 +16,15 @@ type Props = {
 }
 
 /**
- * Banco de preguntas de un concepto como tarjetas numeradas. La primera es obligatoria;
+ * Banco de preguntas de un concepto, una pregunta a la vez: pestañas "Pregunta 1", "Pregunta 2"…
+ * muestran solo el contenido de la elegida para no alargar el panel. La primera es obligatoria;
  * las demás son opcionales (hasta 6) y evitan que a quien robe del pozo le salga siempre la misma.
  * Cada opción es una fila con un botón redondo para marcarla como correcta.
  */
 export function DominoQuestionsEditor({ concept, index, disabled, onChange }: Props) {
   const id = (name: string) => `domino-${name}-${index}`
+  const [active, setActive] = useState(0)
+  const current = Math.min(active, concept.questions.length - 1)
 
   function updateQuestion(qIndex: number, patch: Partial<QuestionDraft>) {
     onChange({ ...concept, questions: concept.questions.map((q, i) => (i === qIndex ? { ...q, ...patch } : q)) })
@@ -45,12 +49,15 @@ export function DominoQuestionsEditor({ concept, index, disabled, onChange }: Pr
   }
 
   function addQuestion() {
-    if (concept.questions.length < DOMINO_LIMITS.maxQuestions) onChange({ ...concept, questions: [...concept.questions, emptyQuestion()] })
+    if (concept.questions.length >= DOMINO_LIMITS.maxQuestions) return
+    onChange({ ...concept, questions: [...concept.questions, emptyQuestion()] })
+    setActive(concept.questions.length)
   }
 
   function removeQuestion(qIndex: number) {
     if (qIndex === 0) return
     onChange({ ...concept, questions: concept.questions.filter((_, i) => i !== qIndex) })
+    setActive(qIndex - 1)
   }
 
   return (
@@ -59,9 +66,50 @@ export function DominoQuestionsEditor({ concept, index, disabled, onChange }: Pr
         Cada ficha tiene dos conceptos, uno por lado: con una pregunta por concepto, cada ficha queda con sus dos preguntas.
       </p>
 
-      {concept.questions.map((question, qIndex) => (
+      <div role="tablist" aria-label="Preguntas del concepto" className="flex flex-wrap items-center gap-2">
+        {concept.questions.map((question, qIndex) => {
+          const selected = qIndex === current
+          const complete = questionIssue(question) === null
+          return (
+            <button
+              key={qIndex}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              aria-controls={id(`q${qIndex}-panel`)}
+              onClick={() => setActive(qIndex)}
+              className={`inline-flex min-h-[44px] items-center gap-2 rounded-full border-2 px-4 text-[16px] font-semibold transition-all duration-200 focus-visible:outline-2 focus-visible:outline-accent active:scale-95 motion-reduce:transition-none motion-reduce:active:scale-100 ${
+                selected ? 'border-accent bg-accent/15 text-accent' : 'border-border text-text-h hover:border-accent/50'
+              }`}
+            >
+              Pregunta {qIndex + 1}
+              <span
+                className={`h-2.5 w-2.5 rounded-full ${complete ? 'bg-emerald-500' : 'bg-amber-400'}`}
+                role="img"
+                aria-label={complete ? 'completa' : 'incompleta'}
+              />
+            </button>
+          )
+        })}
+        {concept.questions.length < DOMINO_LIMITS.maxQuestions && (
+          <button
+            type="button"
+            className={`${ghostButton} rounded-full border-dashed`}
+            disabled={disabled}
+            onClick={addQuestion}
+            aria-label="Añadir otra pregunta (opcional)"
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Añadir otra
+          </button>
+        )}
+      </div>
+
+      {concept.questions.map((question, qIndex) => qIndex !== current ? null : (
         <div
           key={qIndex}
+          id={id(`q${qIndex}-panel`)}
+          role="tabpanel"
           className="flex animate-[fade-in-up_0.25s_ease-out] flex-col gap-3 rounded-2xl border border-border bg-surface p-4 motion-reduce:animate-none"
           data-domino-question={qIndex}
         >
@@ -147,12 +195,9 @@ export function DominoQuestionsEditor({ concept, index, disabled, onChange }: Pr
         </div>
       ))}
 
-      {concept.questions.length < DOMINO_LIMITS.maxQuestions && (
-        <button type="button" className={`${ghostButton} self-start border-dashed`} disabled={disabled} onClick={addQuestion}>
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          Añadir otra pregunta (opcional) · {concept.questions.length} de {DOMINO_LIMITS.maxQuestions}
-        </button>
-      )}
+      <p className="text-[16px] leading-snug text-text">
+        {concept.questions.length} de {DOMINO_LIMITS.maxQuestions} preguntas. Solo la primera es obligatoria.
+      </p>
     </section>
   )
 }

@@ -168,7 +168,7 @@ export function DominoConceptPanel({ concept, index, disabled, onChange, onAppro
             </div>
           </div>
         )}
-        {tab === 'questions' && <DominoQuestionsEditor concept={concept} index={index} disabled={disabled} onChange={onChange} />}
+        {tab === 'questions' && <DominoQuestionsEditor key={index} concept={concept} index={index} disabled={disabled} onChange={onChange} />}
         {tab === 'extras' && <DominoExtrasEditor concept={concept} index={index} disabled={disabled} onChange={onChange} />}
       </div>
     </div>
