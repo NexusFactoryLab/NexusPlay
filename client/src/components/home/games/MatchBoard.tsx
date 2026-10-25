@@ -322,6 +322,12 @@ type MatchBoardProps = {
    * disponible sin scroll: las tarjetas se encogen para caber (issue #80).
    */
   fitHeight?: boolean
+  /** Tutorial (issue #93): tocar tu tarjeta secreta («Tú eres…»). */
+  onSecretCardClick?: () => void
+  /** Tutorial: se abrió la selección para adivinar. */
+  onAccuseOpen?: () => void
+  /** Tutorial: la selección para adivinar arranca abierta. */
+  startAccusing?: boolean
 }
 
 /**
@@ -419,8 +425,11 @@ export function MatchBoard({
   onAccuse,
   onPassTurn,
   fitHeight = false,
+  onSecretCardClick,
+  onAccuseOpen,
+  startAccusing = false,
 }: MatchBoardProps) {
-  const [accusing, setAccusing] = useState(false)
+  const [accusing, setAccusing] = useState(startAccusing)
   const [showHelp, setShowHelp] = useState(false)
   const secretCard = cards.find((card) => card.cardId === self.secretCardId)
   const discardsMissing = Math.max(0, MIN_DISCARDS_TO_ACCUSE - self.discardedCardIds.length)
@@ -457,7 +466,12 @@ export function MatchBoard({
         <div className="guess-who-board-actions flex shrink-0 flex-col gap-3 sm:w-[210px]">
           <div
             key={self.secretCardId}
-            className="rounded-xl border border-accent/60 bg-gradient-to-br from-accent/20 via-surface to-accent-2/10 p-3.5 shadow-[0_10px_28px_-18px_var(--accent)] animate-[secret-card-reveal_0.72s_cubic-bezier(0.16,1,0.3,1)_both] motion-reduce:animate-none"
+            role={onSecretCardClick ? 'button' : undefined}
+            tabIndex={onSecretCardClick ? 0 : undefined}
+            aria-label={onSecretCardClick ? 'Tu tarjeta secreta' : undefined}
+            onClick={onSecretCardClick}
+            onKeyDown={onSecretCardClick ? (event) => (event.key === 'Enter' || event.key === ' ') && onSecretCardClick() : undefined}
+            className={`rounded-xl border border-accent/60 bg-gradient-to-br from-accent/20 via-surface to-accent-2/10 p-3.5 shadow-[0_10px_28px_-18px_var(--accent)] animate-[secret-card-reveal_0.72s_cubic-bezier(0.16,1,0.3,1)_both] motion-reduce:animate-none ${onSecretCardClick ? 'cursor-pointer ring-2 ring-amber-300 ring-offset-2 ring-offset-transparent' : ''}`}
           >
             <div className="flex items-center gap-1.5 text-accent">
               <Sparkles className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden="true" />
@@ -488,7 +502,10 @@ export function MatchBoard({
               className={`flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl border border-accent bg-accent px-3 py-3 text-[13px] font-bold text-white transition-transform hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 ${
                 guessAvailable && !accusing ? 'animate-[result-glow-pulse_1s_ease-in-out_2] motion-reduce:animate-none' : ''
               }`}
-              onClick={() => setAccusing((current) => !current)}
+              onClick={() => {
+                if (!accusing) onAccuseOpen?.()
+                setAccusing((current) => !current)
+              }}
             >
               <Sparkles className="h-4 w-4 shrink-0" aria-hidden="true" />
               {accusing ? 'Cancelar selección' : '¡Creo que es esta!'}

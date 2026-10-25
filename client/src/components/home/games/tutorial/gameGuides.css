@@ -1,0 +1,105 @@
+/*
+ * Animaciones de las guías visuales de Identidad Oculta y MatchMente
+ * (mismo estilo que las del Laberinto V/F: tfg-*). Todas son bucles suaves
+ * de CSS puro; con «reducir movimiento» quedan quietas.
+ */
+
+@keyframes gg-pop {
+  0%, 12% { transform: scale(0.4); opacity: 0; }
+  22% { transform: scale(1.12); opacity: 1; }
+  30%, 88% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(0.9); opacity: 0; }
+}
+
+@keyframes gg-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5%); }
+}
+
+/* Una tarjeta que se apaga (descartada): gris, achicada y con una X. */
+@keyframes gg-discard {
+  0%, 38% { filter: none; opacity: 1; transform: scale(1); }
+  48%, 90% { filter: grayscale(1); opacity: 0.35; transform: scale(0.9); }
+  100% { filter: none; opacity: 1; transform: scale(1); }
+}
+
+@keyframes gg-x {
+  0%, 38% { opacity: 0; transform: scale(0.3) rotate(-20deg); }
+  48%, 90% { opacity: 1; transform: scale(1) rotate(0); }
+  100% { opacity: 0; }
+}
+
+/* Carta que se voltea: del reverso a la cara y de vuelta. */
+@keyframes gg-flip {
+  0%, 12% { transform: rotateY(0deg); }
+  24%, 70% { transform: rotateY(180deg); }
+  84%, 100% { transform: rotateY(0deg); }
+}
+
+@keyframes gg-flip-late {
+  0%, 30% { transform: rotateY(0deg); }
+  42%, 76% { transform: rotateY(180deg); }
+  88%, 100% { transform: rotateY(0deg); }
+}
+
+@keyframes gg-glow {
+  0%, 45% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+  55%, 80% { box-shadow: 0 0 0 0.9cqw rgba(52, 211, 153, 0.9), 0 0 5cqw rgba(52, 211, 153, 0.6); }
+  100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+}
+
+@keyframes gg-tick {
+  0%, 50% { opacity: 0; transform: scale(0.2); }
+  58% { opacity: 1; transform: scale(1.25); }
+  66%, 82% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; }
+}
+
+/* Un botón o una burbuja que «late» para llamar la atención. */
+@keyframes gg-pulse {
+  0%, 100% { transform: scale(1); filter: brightness(1); }
+  50% { transform: scale(1.08); filter: brightness(1.25); }
+}
+
+@keyframes gg-slide-in {
+  0%, 8% { transform: translateX(-14%); opacity: 0; }
+  20%, 86% { transform: none; opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes gg-slide-in-right {
+  0%, 8% { transform: translateX(14%); opacity: 0; }
+  20%, 86% { transform: none; opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes gg-clock {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes gg-grow {
+  0%, 8% { transform: scaleX(0.08); }
+  80%, 100% { transform: scaleX(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [style*='gg-'] {
+    animation: none !important;
+  }
+}
+
+/* Personajes que se desplazan por la escena (sus 4 frames ya se animan solos). */
+@keyframes gg-run-right {
+  0%, 10% { transform: translateX(0); }
+  80%, 100% { transform: translateX(46cqw); }
+}
+
+@keyframes gg-run-left {
+  0%, 10% { transform: translateX(0); }
+  80%, 100% { transform: translateX(-30cqw); }
+}
+
+@keyframes gg-patrol {
+  0%, 100% { transform: translateX(10cqw); }
+  50% { transform: translateX(-12cqw); }
+}

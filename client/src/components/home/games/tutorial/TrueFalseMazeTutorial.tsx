@@ -1,4 +1,6 @@
 import { useRef } from 'react'
+import type { ReactNode } from 'react'
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Footprints, KeyRound, Lightbulb, LightbulbOff, Pointer, Shield, ShieldAlert, Wind, Zap } from 'lucide-react'
 import { TrueFalseMazeGame } from '../true-false-maze/TrueFalseMazeGame'
 import { parseShipMap } from '../true-false-maze/spaceshipMap'
 import type { ShipMap } from '../true-false-maze/spaceshipMap'
@@ -8,6 +10,7 @@ import type { TrueFalseMazeConfig, TrueFalseMazeQuestion } from '../true-false-m
 import type { CellPosition } from '../mazeCollectorTypes'
 import { TutorialRunner } from './TutorialRunner'
 import type { TutorialPart, TutorialPartContext } from './TutorialRunner'
+import { ArtTfAnswer, ArtTfCore, ArtTfCorridor, ArtTfDark, ArtTfMove, ArtTfVent } from './tutorialArt'
 
 /*
  * Tutorial del Laberinto Verdadero o Falso: naves chicas armadas con los
@@ -21,11 +24,13 @@ import type { TutorialPart, TutorialPartContext } from './TutorialRunner'
  * de "llegar" se marca con la puerta dibujada en el muro de al lado.
  */
 
-function ship(ascii: string[], options: { doors?: CellPosition[]; patrol?: CellPosition[] } = {}): ShipMap {
+function ship(ascii: string[], options: { door?: CellPosition; patrol?: CellPosition[] } = {}): ShipMap {
   return parseShipMap(ascii, {
     rooms: [],
     patrolPoints: options.patrol ?? [{ row: 2, col: Math.floor(ascii[0].length / 2) }],
-    decor: { terminals: { row: 0, centerCol: 0, widthCells: 0 }, cameras: [], doors: options.doors ?? [] },
+    decor: { terminals: { row: 0, centerCol: 0, widthCells: 0 }, cameras: [], doors: [] },
+    // La puerta está DENTRO del tablero, en una casilla de piso: se abre cuando el robot llega.
+    goalDoor: options.door,
   })
 }
 
@@ -33,7 +38,7 @@ function ship(ascii: string[], options: { doors?: CellPosition[]; patrol?: CellP
 const MOVE = ship(['#########', '#,,,,,,,#', '#,,,P,,,#', '#,,,,,,,#', '#########'])
 
 const CORRIDOR = ship(['#########', '#,,,N,,,#', '#P,,,,,,#', '#,,,,,,,#', '#########'], {
-  doors: [{ row: 2, col: 8 }],
+  door: { row: 2, col: 7 },
   patrol: [{ row: 2, col: 4 }],
 })
 
@@ -45,7 +50,7 @@ const VENT = ship(['#########', '#,,,#,,1#', '#P,,#,,,#', '#1,,#,c,#', '########
 
 /** Pasillos en zigzag: a oscuras hay que ir doblando sin ver más allá del robot. */
 const DARK = ship(['#########', '#P,,,,,,#', '######,##', '#,,,,,,,#', '#,#######', '#,,,,,,,#', '#########'], {
-  doors: [{ row: 5, col: 8 }],
+  door: { row: 5, col: 7 },
 })
 
 const ANSWER = ship(['#########', '#A,,,,,A#', '#,,,P,,,#', '#,b,,,c,#', '#########'])
@@ -64,7 +69,61 @@ const CALM: TrueFalseMazeConfig = {
 /** Una pregunta de relleno para las tareas (no se ve: en las tareas no hay salas ni afirmación). */
 const FILLER: TrueFalseMazeQuestion[] = [{ questionId: 'tarea', statement: 'Tarea del tutorial.', answer: true }]
 
-const reached = (state: TfState, goal: CellPosition) => state.player.pos.row === goal.row && state.player.pos.col === goal.col
+/** Cuánto se queda la puerta abierta antes de pasar a la parte siguiente (se ve cómo se abre). */
+const DOOR_OPEN_MS = 700
+
+type Memo = Record<string, unknown>
+
+/** Llegó a la puerta: se abre y, un momento después, la parte se da por lograda. */
+function openedDoor(state: TfState, door: CellPosition, memo: Memo): boolean {
+  const here = state.player.pos.row === door.row && state.player.pos.col === door.col
+  if (!here) {
+    memo.arrivedAt = undefined
+    return false
+  }
+  memo.arrivedAt ??= state.worldTime
+  return state.worldTime - (memo.arrivedAt as number) >= DOOR_OPEN_MS
+}
+
+const DIRECTIONS = [
+  { key: 'UP', Icon: ArrowUp, label: 'Arriba' },
+  { key: 'LEFT', Icon: ArrowLeft, label: 'Izquierda' },
+  { key: 'DOWN', Icon: ArrowDown, label: 'Abajo' },
+  { key: 'RIGHT', Icon: ArrowRight, label: 'Derecha' },
+] as const
+
+/** Las cuatro flechas: se encienden a medida que el robot se mueve en cada dirección. */
+function DirectionProgress({ used }: { used: ReadonlySet<string> }) {
+  return (
+    <>
+      {DIRECTIONS.map(({ key, Icon, label }) => (
+        <span
+          key={key}
+          title={label}
+          className={`flex h-7 w-7 items-center justify-center rounded-md border-2 transition-colors ${used.has(key) ? 'border-emerald-300 bg-emerald-500 text-white' : 'border-white/30 bg-white/10 text-slate-300'}`}
+        >
+          <Icon className="h-4 w-4" strokeWidth={3} aria-label={label} />
+        </span>
+      ))}
+    </>
+  )
+}
+
+/** Mover el robot: hay que usar las CUATRO direcciones (arriba, abajo, izquierda y derecha). */
+function movedEveryWay(state: TfState, memo: Memo, setStatus: (status: ReactNode) => void): boolean {
+  const used = (memo.used ??= new Set<string>()) as Set<string>
+  const last = memo.last as CellPosition | undefined
+  const here = state.player.pos
+  if (last && (last.row !== here.row || last.col !== here.col)) {
+    const dir = here.row < last.row ? 'UP' : here.row > last.row ? 'DOWN' : here.col < last.col ? 'LEFT' : 'RIGHT'
+    if (!used.has(dir)) {
+      used.add(dir)
+      setStatus(<DirectionProgress used={new Set(used)} />)
+    }
+  }
+  memo.last = { row: here.row, col: here.col }
+  return used.size === DIRECTIONS.length
+}
 
 /** Una tarea en una nave chica: `check` dice, cuadro a cuadro, si ya se logró. */
 function TaskPart({
@@ -74,17 +133,20 @@ function TaskPart({
   check,
   setup,
   context,
+  initialStatus,
 }: {
   title: string
   map: ShipMap
   config: TrueFalseMazeConfig
-  check: (state: TfState, events: TfEvent[]) => boolean
+  check: (state: TfState, events: TfEvent[], memo: Memo, context: TutorialPartContext) => boolean
   setup?: (state: TfState) => void
   context: TutorialPartContext
+  initialStatus?: ReactNode
 }) {
   // Marcas que duran toda la parte (no cada render): preparar una vez y avisar el logro una sola vez.
   const ready = useRef(false)
   const done = useRef(false)
+  const memo = useRef<Memo>({})
   return (
     <TrueFalseMazeGame
       title={title}
@@ -97,9 +159,10 @@ function TaskPart({
         onFrame: (state, events) => {
           if (!ready.current && state.phase === 'playing') {
             ready.current = true
+            if (initialStatus) context.setStatus(initialStatus)
             setup?.(state)
           }
-          if (!done.current && state.phase === 'playing' && check(state, events)) {
+          if (!done.current && state.phase === 'playing' && check(state, events, memo.current, context)) {
             done.current = true
             context.onDone()
           }
@@ -113,8 +176,14 @@ function TaskPart({
 
 export function TrueFalseMazeTutorial({ title, onFinish }: { title: string; onFinish: () => void }) {
   const task =
-    (map: ShipMap, config: TrueFalseMazeConfig, check: (state: TfState, events: TfEvent[]) => boolean, setup?: (state: TfState) => void): TutorialPart['render'] =>
-    (context) => <TaskPart title={title} map={map} config={config} check={check} setup={setup} context={context} />
+    (
+      map: ShipMap,
+      config: TrueFalseMazeConfig,
+      check: (state: TfState, events: TfEvent[], memo: Memo, context: TutorialPartContext) => boolean,
+      setup?: (state: TfState) => void,
+      initialStatus?: ReactNode,
+    ): TutorialPart['render'] =>
+    (context) => <TaskPart title={title} map={map} config={config} check={check} setup={setup} context={context} initialStatus={initialStatus} />
 
   const parts: TutorialPart[] = [
     {
@@ -123,20 +192,35 @@ export function TrueFalseMazeTutorial({ title, onFinish }: { title: string; onFi
       taskTouch: 'Mueve el robot con la cruceta o deslizando el dedo.',
       explain: 'Este es tu robot. Se mueve por los pasillos de la nave y sigue andando hasta que lo hagas girar.',
       success: '¡Así se mueve el robot!',
-      render: task(MOVE, CALM, (state) => state.player.pos.row !== MOVE.playerStart.row || state.player.pos.col !== MOVE.playerStart.col),
+      art: <ArtTfMove />,
+      points: [
+        { icon: <Footprints className="h-4 w-4" />, tone: 'cyan', text: <>Prueba las <b className="text-white">cuatro direcciones</b>: arriba, abajo, izquierda y derecha.</> },
+        { icon: <Pointer className="h-4 w-4" />, tone: 'violet', text: <>En el celular, usa la <b className="text-white">cruceta</b> o desliza el dedo.</> },
+      ],
+      render: task(MOVE, CALM, (state, _events, memo, context) => movedEveryWay(state, memo, context.setStatus), undefined, <DirectionProgress used={new Set()} />),
     },
     {
       title: 'Esquiva a la medusa',
       task: 'Cruza de izquierda a derecha hasta la puerta sin que la medusa te toque.',
       explain: 'Las medusas galácticas recorren la nave. Si te tocan, pierdes una batería. Mira hacia dónde va y pasa cuando se aleje.',
       success: '¡Cruzaste sin que te atrapara!',
-      render: task(CORRIDOR, { ...CALM, enemyCount: 1 }, (state) => reached(state, { row: 2, col: 7 })),
+      art: <ArtTfCorridor />,
+      points: [
+        { icon: <ShieldAlert className="h-4 w-4" />, tone: 'rose', text: <>Si la medusa te toca, <b className="text-white">pierdes una batería</b>.</> },
+        { icon: <KeyRound className="h-4 w-4" />, tone: 'emerald', text: <>Llega a la <b className="text-white">puerta</b>: se abre apenas estés ahí.</> },
+      ],
+      render: task(CORRIDOR, { ...CALM, enemyCount: 1 }, (state, _events, memo) => openedDoor(state, { row: 2, col: 7 }, memo)),
     },
     {
       title: 'Aturde a la medusa',
       task: 'Toma el núcleo de energía (la esfera brillante) y luego toca a la medusa mientras está aturdida.',
       explain: 'Los núcleos de energía lanzan un pulso: por unos segundos las medusas quedan aturdidas y si las tocas, vuelven a su nido y ganas puntos.',
       success: '¡Medusa aturdida y de vuelta a su nido!',
+      art: <ArtTfCore />,
+      points: [
+        { icon: <Zap className="h-4 w-4" />, tone: 'cyan', text: <>El <b className="text-white">núcleo de energía</b> lanza un pulso que aturde a las medusas.</> },
+        { icon: <Shield className="h-4 w-4" />, tone: 'amber', text: <>Aturdidas, <b className="text-white">tócalas</b>: vuelven a su nido y sumas puntos.</> },
+      ],
       render: task(CORE, { ...CALM, enemyCount: 1 }, (_state, events) => events.some((event) => event.type === 'zap')),
     },
     {
@@ -144,6 +228,11 @@ export function TrueFalseMazeTutorial({ title, onFinish }: { title: string; onFi
       task: 'Entra a la rejilla de ventilación para pasar al otro lado del muro.',
       explain: 'Las rejillas están conectadas de dos en dos: entras por una y sales por la otra. Sirven para escapar o llegar más rápido.',
       success: '¡Atravesaste la nave por la rejilla!',
+      art: <ArtTfVent />,
+      points: [
+        { icon: <Wind className="h-4 w-4" />, tone: 'cyan', text: <>Las rejillas vienen <b className="text-white">de dos en dos</b>: entras por una y sales por la otra.</> },
+        { icon: <Zap className="h-4 w-4" />, tone: 'violet', text: <>Sirven para <b className="text-white">escapar</b> o llegar más rápido.</> },
+      ],
       render: task(VENT, CALM, (_state, events) => events.some((event) => event.type === 'vent')),
     },
     {
@@ -151,11 +240,16 @@ export function TrueFalseMazeTutorial({ title, onFinish }: { title: string; onFi
       task: 'Se apagan las luces: recorre los pasillos hasta la puerta de abajo a la derecha.',
       explain: 'A veces hay un apagón y solo ves alrededor del robot. Avanza con calma: las luces vuelven en unos segundos.',
       success: '¡Llegaste a oscuras!',
+      art: <ArtTfDark />,
+      points: [
+        { icon: <LightbulbOff className="h-4 w-4" />, tone: 'amber', text: <>En un <b className="text-white">sabotaje</b> solo ves cerca del robot.</> },
+        { icon: <Lightbulb className="h-4 w-4" />, tone: 'cyan', text: <>Avanza con calma: <b className="text-white">las luces vuelven</b> en unos segundos.</> },
+      ],
       // El apagón se fuerza enseguida (en el juego llega cuando menos lo esperas).
       render: task(
         DARK,
         { ...CALM, lightsOut: true },
-        (state) => reached(state, { row: 5, col: 7 }),
+        (state, _events, memo) => openedDoor(state, { row: 5, col: 7 }, memo),
         (state) => {
           state.nextLightsOutAt = state.worldTime + 400
         },
@@ -166,6 +260,11 @@ export function TrueFalseMazeTutorial({ title, onFinish }: { title: string; onFi
       task: 'Lee la afirmación de arriba y lleva al robot a la sala VERDADERO o FALSO.',
       explain: 'Así se responde en el juego: lees la afirmación y entras a la sala VERDADERO si es cierta, o a la FALSO si no lo es.',
       success: '¡Correcto! Ya sabes todo lo necesario para la nave.',
+      art: <ArtTfAnswer />,
+      points: [
+        { icon: <Zap className="h-4 w-4" />, tone: 'emerald', text: <>Si la afirmación es verdad, ve a <b className="text-emerald-300">VERDADERO</b>; si no, a <b className="text-rose-300">FALSO</b>.</> },
+        { icon: <Lightbulb className="h-4 w-4" />, tone: 'amber', text: <>Una respuesta equivocada cuesta <b className="text-white">una batería</b>.</> },
+      ],
       render: (context) => (
         <TrueFalseMazeGame
           title={title}
@@ -184,5 +283,5 @@ export function TrueFalseMazeTutorial({ title, onFinish }: { title: string; onFi
     },
   ]
 
-  return <TutorialRunner name="el Laberinto V/F" parts={parts} onFinish={onFinish} />
+  return <TutorialRunner name="el Laberinto V/F" parts={parts} accent="violet" onFinish={onFinish} />
 }

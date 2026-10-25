@@ -4,6 +4,8 @@ import type { MazeCollectorConfig, MazeCollectorItem } from '../mazeCollectorTyp
 import type { MazeScenario } from '../useMazeCollectorGame'
 import { TutorialRunner } from './TutorialRunner'
 import type { TutorialPart } from './TutorialRunner'
+import { ArtTruckBottles, ArtTruckCloud, ArtTruckDrive, ArtTruckPower } from './tutorialArt'
+import { Flag, MousePointerClick, Navigation, Shield, Sparkles, Target, Zap } from 'lucide-react'
 
 /** Zonas de la Ciudad Sostenible (en celdas del mapa real) donde ocurre cada parte. */
 const NORTH = { row: 1, col: 0, rows: 6, cols: 11 }
@@ -58,6 +60,11 @@ export function MazeCollectorTutorial({
       taskTouch: 'Lleva el camión hasta la bandera 🏁 con la cruceta o deslizando el dedo.',
       explain: 'El camión recorre las calles de la ciudad. Lo mueves con las flechas del teclado o W A S D; en el celular, con la cruceta o deslizando el dedo.',
       success: '¡Así se maneja el camión! Sigue derecho hasta que lo hagas girar.',
+      art: <ArtTruckDrive />,
+      points: [
+        { icon: <Navigation className="h-4 w-4" />, tone: 'emerald', text: <>El camión <b className="text-white">sigue andando</b> hasta que lo hagas girar.</> },
+        { icon: <Flag className="h-4 w-4" />, tone: 'amber', text: <>Llega a la <b className="text-white">bandera</b> para pasar a lo siguiente.</> },
+      ],
       render: scene({ playerStart: { row: 1, col: 1 }, pickups: [], ghostSpawns: [], goal: { row: 6, col: 9 }, objective: 'reach' }, NORTH),
     },
     {
@@ -65,6 +72,11 @@ export function MazeCollectorTutorial({
       task: 'Recoge las 4 botellas PET de esta zona.',
       explain: 'Para limpiar la ciudad hay que recoger todas las botellas PET: basta con pasar por encima. En el juego, al recogerlas todas pasas de nivel.',
       success: '¡Calles limpias! Cada botella suma puntos.',
+      art: <ArtTruckBottles />,
+      points: [
+        { icon: <Target className="h-4 w-4" />, tone: 'emerald', text: <>Recoge <b className="text-white">todas las botellas PET</b> para limpiar la ciudad.</> },
+        { icon: <MousePointerClick className="h-4 w-4" />, tone: 'cyan', text: <>Basta con <b className="text-white">pasar por encima</b>: no hay que frenar.</> },
+      ],
       render: scene({ playerStart: { row: 1, col: 1 }, pickups: [pet(1, 5), pet(4, 5), pet(6, 2), pet(6, 8)], ghostSpawns: [], objective: 'collect' }, NORTH),
     },
     {
@@ -72,6 +84,11 @@ export function MazeCollectorTutorial({
       task: 'Recoge las 3 botellas sin que la nube de contaminación te toque.',
       explain: 'Las nubes de contaminación recorren las calles. Si una te toca, pierdes una vida: busca otro camino o espera a que pase.',
       success: '¡Buen manejo! La esquivaste.',
+      art: <ArtTruckCloud />,
+      points: [
+        { icon: <Shield className="h-4 w-4" />, tone: 'rose', text: <>Las <b className="text-white">nubes de contaminación</b> te persiguen por las calles.</> },
+        { icon: <Zap className="h-4 w-4" />, tone: 'amber', text: <>Si una te toca, <b className="text-white">pierdes una vida</b>: busca otro camino.</> },
+      ],
       render: scene(
         { playerStart: { row: 6, col: 0 }, pickups: [pet(6, 11), pet(10, 11), pet(10, 0)], ghostSpawns: [{ row: 10, col: 6 }], ghostPersonality: 'PATROLLER', objective: 'collect' },
         CENTER,
@@ -82,6 +99,11 @@ export function MazeCollectorTutorial({
       task: 'Toma la caneca de energía ⚡ y atrapa la nube mientras está asustada.',
       explain: 'La caneca de energía activa el purificador: por unos segundos las nubes se asustan (se ven azules) y puedes atraparlas para ganar puntos extra.',
       success: '¡Purificaste la nube!',
+      art: <ArtTruckPower />,
+      points: [
+        { icon: <Zap className="h-4 w-4" />, tone: 'amber', text: <>La <b className="text-white">caneca de energía</b> activa el purificador unos segundos.</> },
+        { icon: <Sparkles className="h-4 w-4" />, tone: 'emerald', text: <>Con las nubes <b className="text-white">asustadas (azules)</b>, tócalas: ¡puntos extra!</> },
+      ],
       render: scene(
         { playerStart: { row: 6, col: 0 }, pickups: [{ pos: { row: 1, col: 0 }, kind: 'POWER' }], ghostSpawns: [{ row: 1, col: 6 }], ghostPersonality: 'PATROLLER', objective: 'catch' },
         NORTH,
@@ -89,5 +111,5 @@ export function MazeCollectorTutorial({
     },
   ]
 
-  return <TutorialRunner name="el Camión Reciclador" parts={parts} onFinish={onFinish} />
+  return <TutorialRunner name="el Camión Reciclador" parts={parts} accent="emerald" onFinish={onFinish} />
 }

@@ -48,12 +48,12 @@ type TrueFalseMazeGuideProps = {
 type Step = { id: string; title: string; art: ReactNode; body: ReactNode }
 
 /** Variables CSS personalizadas (`--tfg-key`...) que React no tipa en `CSSProperties`. */
-type VarStyle = CSSProperties & Record<`--${string}`, string>
+export type VarStyle = CSSProperties & Record<`--${string}`, string>
 
 // ==================== piezas de las escenas ====================
 
 /** Recuadro de escena: se ajusta al espacio disponible conservando su proporción. */
-function Scene({ aspect = 1.6, children }: { aspect?: number; children: ReactNode }) {
+export function Scene({ aspect = 1.6, children }: { aspect?: number; children: ReactNode }) {
   return (
     <div className="flex h-full w-full items-center justify-center" style={{ containerType: 'size' }}>
       <div className="tfg-scene" style={{ width: `min(100cqw, ${aspect * 100}cqh)`, aspectRatio: String(aspect) }}>
@@ -63,12 +63,12 @@ function Scene({ aspect = 1.6, children }: { aspect?: number; children: ReactNod
   )
 }
 
-function Floor() {
+export function Floor() {
   return <div className="tfg-floor" style={{ backgroundImage: `url(${floorTile})` }} />
 }
 
 /** Elemento posicionado dentro de la escena (en %, para que la escena escale entera). */
-function At({ children, style, className = '' }: { children?: ReactNode; style: CSSProperties; className?: string }) {
+export function At({ children, style, className = '' }: { children?: ReactNode; style: CSSProperties; className?: string }) {
   return (
     <div className={`tfg-abs ${className}`} style={style}>
       {children}
@@ -76,11 +76,11 @@ function At({ children, style, className = '' }: { children?: ReactNode; style: 
   )
 }
 
-function Sprite({ src, alt = '', style, className = '' }: { src: string; alt?: string; style?: CSSProperties; className?: string }) {
+export function Sprite({ src, alt = '', style, className = '' }: { src: string; alt?: string; style?: CSSProperties; className?: string }) {
   return <img src={src} alt={alt} draggable={false} className={`tfg-sprite ${className}`} style={style} />
 }
 
-function Tag({ tone, children, style }: { tone: 'true' | 'false' | 'info'; children: ReactNode; style?: CSSProperties }) {
+export function Tag({ tone, children, style }: { tone: 'true' | 'false' | 'info'; children: ReactNode; style?: CSSProperties }) {
   const colors = {
     true: 'border-emerald-400/60 bg-emerald-950/85 text-emerald-200',
     false: 'border-rose-400/60 bg-rose-950/85 text-rose-200',
@@ -96,7 +96,7 @@ function Tag({ tone, children, style }: { tone: 'true' | 'false' | 'info'; child
   )
 }
 
-function KeyCap({ children, className = '', label }: { children: ReactNode; className?: string; label?: string }) {
+export function KeyCap({ children, className = '', label }: { children: ReactNode; className?: string; label?: string }) {
   return (
     <span className={`tfg-key ${className}`} aria-label={label}>
       {children}
@@ -105,7 +105,7 @@ function KeyCap({ children, className = '', label }: { children: ReactNode; clas
 }
 
 /** Las cuatro flechas del teclado en "T" invertida. `animated` enciende ← y → siguiendo la escena de movimiento. */
-function ArrowKeys({ size, animated = false }: { size: string; animated?: boolean }) {
+export function ArrowKeys({ size, animated = false }: { size: string; animated?: boolean }) {
   const style: VarStyle = { '--tfg-key': size }
   return (
     <div className="tfg-key-cluster" style={style} role="img" aria-label="Flechas del teclado: arriba, izquierda, abajo y derecha">
@@ -419,7 +419,7 @@ function SceneExtras() {
 
 // ==================== texto de cada paso ====================
 
-function Item({ icon, children, tone = 'cyan' }: { icon: ReactNode; children: ReactNode; tone?: 'cyan' | 'violet' | 'amber' | 'emerald' | 'rose' }) {
+export function Item({ icon, children, tone = 'cyan' }: { icon: ReactNode; children: ReactNode; tone?: 'cyan' | 'violet' | 'amber' | 'emerald' | 'rose' }) {
   const colors = {
     cyan: 'bg-cyan-400/15 text-cyan-300',
     violet: 'bg-violet-400/15 text-violet-300',
@@ -435,7 +435,7 @@ function Item({ icon, children, tone = 'cyan' }: { icon: ReactNode; children: Re
   )
 }
 
-const strong = (color: string) => `font-bold ${color}`
+export const strong = (color: string) => `font-bold ${color}`
 
 const STEPS: Step[] = [
   {

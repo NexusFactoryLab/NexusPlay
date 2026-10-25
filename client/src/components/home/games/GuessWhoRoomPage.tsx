@@ -1,4 +1,5 @@
 import { GameInstructionsGate } from './GameInstructionsGate'
+import { GameThemeBackdrop } from './GameThemeBackdrop'
 import { GuessWhoTutorial } from './tutorial/GuessWhoTutorial'
 import { MultiplayerLobby } from './MultiplayerLobby'
 import { ChatPanel } from './ChatPanel'
@@ -249,6 +250,7 @@ function GuessWhoRoomSession() {
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-bg">
+      <GameThemeBackdrop />
       {dealing && <DealCountdownOverlay remainingMs={dealRemainingMs} />}
 
       <div className="guess-who-play-shell">

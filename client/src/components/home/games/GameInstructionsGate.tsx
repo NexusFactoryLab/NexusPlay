@@ -4,11 +4,10 @@ import { Check, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { Modal } from './Modal'
 import { gameInstructions, type InstructionKind } from './gameInstructions'
-import { GuessWhoVisualDemo } from './GuessWhoVisualDemo'
-import { flagsDemoExample, type GuessWhoDemoExample } from './guessWhoDemoExamples'
 import { DominoVisualDemo } from './DominoVisualDemo'
-import { MemoryMatchDemo } from './MemoryMatchFlash'
 import { TutorialQuestion } from './tutorial/TutorialQuestion'
+import { GameGuide } from './tutorial/GameGuide'
+import { guessWhoGuideSteps, memoryGuideSteps, tournamentGuideSteps } from './tutorial/guideSteps'
 
 const SEEN_KEY_PREFIX = 'nexusplay:guia-vista:'
 
@@ -40,12 +39,10 @@ function markSeen(kind: InstructionKind): void {
 export function GameInstructionsGate({
   kind,
   children,
-  guessWhoExample = flagsDemoExample,
   tutorial,
 }: {
   kind: InstructionKind
   children: ReactNode
-  guessWhoExample?: GuessWhoDemoExample
   /**
    * Tutorial jugable sobre el juego real (issue #93). Si viene, la guía
    * termina preguntando «¿Deseas jugar un tutorial?»: Sí lo abre y, al
@@ -64,13 +61,27 @@ export function GameInstructionsGate({
   }
   if (inTutorial && tutorial) return tutorial(onContinue)
   const onTutorial = tutorial ? () => setInTutorial(true) : undefined
-  const isGuessWho = kind === 'GUESS_WHO' || kind === 'GUESS_WHO_GROUP'
+  // Identidad Oculta (1 contra 1 y torneo) y MatchMente usan la guía visual del
+  // Laberinto V/F: pantalla oscura, escena animada por paso y la pregunta del
+  // tutorial abajo a la derecha, sin scroll.
+  if (kind === 'GUESS_WHO' || kind === 'GUESS_WHO_GROUP' || kind === 'PAIRS' || kind === 'OPPOSITES') {
+    const steps = kind === 'GUESS_WHO' ? guessWhoGuideSteps() : kind === 'GUESS_WHO_GROUP' ? tournamentGuideSteps() : memoryGuideSteps(kind === 'OPPOSITES')
+    return (
+      <GameGuide
+        steps={steps}
+        label={kind === 'GUESS_WHO_GROUP' ? 'Guía del torneo' : 'Guía rápida'}
+        ariaLabel={kind === 'GUESS_WHO_GROUP' ? 'Guía del torneo de Identidad Oculta' : kind === 'GUESS_WHO' ? 'Guía de Identidad Oculta' : 'Guía de MatchMente'}
+        dataAttr={kind}
+        accent={kind === 'GUESS_WHO_GROUP' ? 'amber' : 'violet'}
+        onClose={onContinue}
+        onTutorial={onTutorial}
+      />
+    )
+  }
   const isDomino = kind === 'DOMINO'
-  const hasVisualDemo = isGuessWho || isDomino
-  // MatchMente: demostración animada en vez de párrafo (issue #30).
-  const isMemory = kind === 'PAIRS' || kind === 'OPPOSITES'
+  const hasVisualDemo = isDomino
   return (
-    <Modal onClose={onContinue} fitContent maxWidthClassName={hasVisualDemo ? 'max-w-[1120px]' : 'max-w-[520px]'} maxHeightClassName="max-h-[calc(100dvh-40px)]" ariaLabel={isGuessWho ? 'Cómo jugar a Identidad Oculta' : isDomino ? 'Cómo jugar a Dominexo' : undefined}>
+    <Modal onClose={onContinue} fitContent maxWidthClassName={hasVisualDemo ? 'max-w-[1120px]' : 'max-w-[520px]'} maxHeightClassName="max-h-[calc(100dvh-40px)]" ariaLabel={isDomino ? 'Cómo jugar a Dominexo' : undefined}>
       <div className="space-y-4" data-game-instructions={kind}>
         <div className="flex items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-accent/12 via-accent/5 to-transparent px-4 py-3">
           <div>
@@ -87,8 +98,8 @@ export function GameInstructionsGate({
             <X className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden="true" />
           </button>
         </div>
-        {isGuessWho ? <GuessWhoVisualDemo example={guessWhoExample} onContinue={onContinue} onTutorial={onTutorial} /> : isDomino ? <DominoVisualDemo onContinue={onContinue} /> : <>
-        {isMemory ? <MemoryMatchDemo opposites={kind === 'OPPOSITES'} /> : <>
+        {isDomino ? <DominoVisualDemo onContinue={onContinue} /> : <>
+        {<>
         <p className="text-[13.5px] leading-relaxed text-text">{content.text}</p>
         <div className="rounded-2xl border border-border bg-code-bg p-4">
           <p className="mb-3 text-[12px] font-semibold uppercase tracking-wide text-accent">{content.exampleTitle}</p>

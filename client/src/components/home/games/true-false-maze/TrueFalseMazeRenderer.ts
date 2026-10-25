@@ -474,6 +474,33 @@ export class TrueFalseMazeRenderer {
     ctx.drawImage(sprite, cx - width / 2, bottom - height, width, height)
   }
 
+  /** 0 = puerta cerrada, 1 = abierta del todo (se desliza al llegar el robot). */
+  private doorOpen = 0
+
+  /**
+   * Puerta del tutorial, dentro del tablero: cerrada y con un aro que pulsa
+   * mientras el robot no llega; al pisar su casilla se desliza y deja ver
+   * la luz de detrás.
+   */
+  private drawGoalDoor(ctx: CanvasRenderingContext2D, state: TfState, dt: number) {
+    const cell = this.map.goalDoor
+    if (!cell) return
+    const here = state.player.pos.row === cell.row && state.player.pos.col === cell.col
+    this.doorOpen += ((here ? 1 : 0) - this.doorOpen) * Math.min(1, dt / 110)
+    const open = this.doorOpen
+    const cx = (cell.col + 0.5) * CELL
+    const bottom = (cell.row + 1) * CELL - 2
+    const pulse = 0.55 + 0.45 * Math.sin(state.now / 260)
+    ctx.save()
+    // Luz detrás de la puerta (se ve cuando se abre) y aro que invita a llegar.
+    this.drawGlow(ctx, cx, bottom - CELL * 0.45, CELL * (0.7 + open * 0.5), open > 0.3 ? '#67e8f9' : '#38bdf8', 0.35 + open * 0.55 + (here ? 0 : pulse * 0.2))
+    ctx.translate(cx, 0)
+    ctx.scale(Math.max(0.12, 1 - open * 0.88), 1)
+    ctx.translate(-cx, 0)
+    this.drawSpriteFit(ctx, this.assets.decor.door, cx, bottom, CELL * 0.9)
+    ctx.restore()
+  }
+
   private drawFloorDecals(ctx: CanvasRenderingContext2D) {
     const { decor } = this.assets
     for (const cell of this.map.decor.grates) {
@@ -1073,6 +1100,7 @@ export class TrueFalseMazeRenderer {
     const zones = this.zoneVisuals(state)
     this.drawZoneFloors(ctx, state, zones)
     this.drawShadows(ctx, state)
+    this.drawGoalDoor(ctx, state, dt)
     this.drawDepthSorted(ctx, state, zones)
     // Las partículas van bajo el apagón (el vapor no debe brillar en la
     // oscuridad); los textos flotantes encima, para que siempre se lean.
