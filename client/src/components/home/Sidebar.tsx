@@ -198,7 +198,7 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
         <SidebarItem
           tourTarget="nav-own-games"
           emoji="🔒"
-          label="Mis actividades"
+          label="Mis juegos"
           collapsed={collapsed}
           active={location.pathname.startsWith('/mis-juegos')}
           onClick={() => navigate('/mis-juegos')}

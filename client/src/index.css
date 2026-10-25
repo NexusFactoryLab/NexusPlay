@@ -266,6 +266,15 @@
  * siempre; solo asoma en los huecos del contenido, igual que antes con las
  * manchas, pero ahora es el mismo dibujo que el modo niños de verdad.
  */
+/* Barra de scroll acorde al sistema: delgada, sin pista visible y con el
+ * pulgar teñido del acento del tema activo (claro, oscuro, Fantasía, Pradera).
+ * Va con `*` (especificidad 0) para que los scrolls con estilo propio —el
+ * carrusel, las fichas de Dominexo— conserven el suyo. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--accent) 45%, transparent) transparent;
+}
+
 [data-theme='kids'] body {
   background-image: url('./assets/kids/kids-bg.svg');
   background-size: cover;

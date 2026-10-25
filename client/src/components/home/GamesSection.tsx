@@ -1059,13 +1059,13 @@ export function GamesSection({
             <h2 className="mb-1 text-[22px] tracking-tight text-text-h">
               {mode === 'community'
                 ? 'Juegos de la comunidad'
-                : 'Mis actividades'}
+                : 'Mis juegos'}
             </h2>
             <p className="text-[14px] text-text">
               {mode === 'community'
                 ? 'Juegos que otros usuarios crearon y decidieron publicar. Filtra por tipo de juego con el panel de filtros.'
                 : isTeacher
-                  ? 'Crea, organiza y administra tus actividades.'
+                  ? 'Crea, organiza y administra tus juegos.'
                   : 'Solo tú los ves. Comparte el código de la sala para que otros se unan.'}
             </p>
           </div>
@@ -1138,9 +1138,9 @@ export function GamesSection({
                 : mode === 'community'
                   ? 'Aún nadie ha publicado juegos en la comunidad.'
                   : mode === 'my-games' && isTeacher
-                      ? 'Aún no has creado actividades'
+                      ? 'Aún no has creado juegos'
                       : mode === 'my-games'
-                        ? 'Aún no tienes actividades.'
+                        ? 'Aún no tienes juegos.'
                         : 'Aún no hay juegos disponibles.'}
             </p>
             <p className="mt-1 max-w-[320px] text-[13px] text-text">

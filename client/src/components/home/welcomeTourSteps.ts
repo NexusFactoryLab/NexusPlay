@@ -42,10 +42,10 @@ export function getWelcomeSteps(role: string, isKids: boolean, options: WelcomeO
   steps.push({
     title: 'Todo tiene su lugar',
     text: role === 'TEACHER'
-      ? 'El menú tiene tres partes: Explorar (Áreas y Comunidad), Mi espacio (Mis clases y Mis actividades) y, si tienes acceso, Administración.'
+      ? 'El menú tiene tres partes: Explorar (Áreas y Comunidad), Mi espacio (Mis clases y Mis juegos) y, si tienes acceso, Administración.'
       : role === 'ADMIN'
-        ? 'El menú tiene tres partes: Explorar (Áreas y Comunidad), Mi espacio (Mis actividades) y Administración (Usuarios, Tipos de juego, Proveedores de IA y Organización).'
-        : 'El menú tiene dos partes: Explorar (Áreas y Comunidad) para encontrar juegos y Mi espacio para lo tuyo, como Mis actividades.',
+        ? 'El menú tiene tres partes: Explorar (Áreas y Comunidad), Mi espacio (Mis juegos) y Administración (Usuarios, Tipos de juego, Proveedores de IA y Organización).'
+        : 'El menú tiene dos partes: Explorar (Áreas y Comunidad) para encontrar juegos y Mi espacio para lo tuyo, como Mis juegos.',
     target: 'navigation', icon: 'explore',
   })
   steps.push(
@@ -57,7 +57,7 @@ export function getWelcomeSteps(role: string, isKids: boolean, options: WelcomeO
   })
   steps.push(
     { title: 'Descubre la Comunidad', text: 'Explora los juegos que otras personas comparten en Comunidad y usa el filtro para ver solo un tipo de juego.', target: 'nav-community', icon: 'play', action: 'Explorar comunidad' },
-    { title: 'Encuentra tus actividades', text: role === 'TEACHER' ? 'En Mis actividades encuentras tus creaciones para consultarlas y seguir trabajando en ellas.' : 'En Mis actividades encuentras tus juegos que no están publicados para la comunidad.', target: 'nav-own-games', icon: 'create', action: 'Ver mis actividades' },
+    { title: 'Encuentra tus juegos', text: role === 'TEACHER' ? 'En Mis juegos encuentras tus creaciones para consultarlas y seguir trabajando en ellas.' : 'En Mis juegos encuentras los juegos que creaste y que no están publicados para la comunidad.', target: 'nav-own-games', icon: 'create', action: 'Ver mis juegos' },
   )
   if (role === 'ADMIN') steps.push(
     { title: 'Gestiona los usuarios', text: 'En Usuarios puedes consultar y administrar las cuentas de NexusPlay.', target: 'nav-users', icon: 'profile', action: 'Ver usuarios' },

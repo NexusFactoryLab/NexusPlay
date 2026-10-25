@@ -56,7 +56,7 @@ export function SaveVisibilityModal({ onChoose, onDone }: SaveVisibilityModalPro
           </span>
           <span>
             <span className="block text-[14px] font-semibold text-text-h">
-              {submitting === 'private' ? 'Guardando…' : 'Guardar en Mis actividades'}
+              {submitting === 'private' ? 'Guardando…' : 'Guardar en Mis juegos'}
             </span>
             <span className="text-[12px] text-text">Solo tú lo ves; compartes el código para jugar.</span>
           </span>
