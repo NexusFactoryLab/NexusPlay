@@ -23,8 +23,6 @@ export function FeaturedGamesPanel() {
   useEffect(() => {
     if (!token) return
     let cancelled = false
-    setLoading(true)
-    setError(null)
     listGames(token, { community: true, pageSize: 200 })
       .then((result) => {
         if (!cancelled) setGames(result.items)
