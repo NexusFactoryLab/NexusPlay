@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react'
-import { ArrowLeft, BookOpen, Bot, Building2, ChevronLeft, Compass, FolderOpen, Globe, GraduationCap, House, KeyRound, LayoutGrid, Lock, LogOut, Palette, Plus, Search, Settings, UserRound, Users, Users2, Zap } from 'lucide-react'
+import { ArrowLeft, BookOpen, Bot, Building2, ChevronLeft, Compass, FolderOpen, Globe, GraduationCap, House, KeyRound, Lock, LogOut, Palette, Plus, Search, Settings, SquarePen, Star, UserRound, Users, Users2, Zap } from 'lucide-react'
 
 /** Duración de cada bucle: el dedo va al elemento, lo toca y se ve el resultado. */
 const LOOP = '4s'
@@ -14,13 +14,13 @@ const NAV: NavItem[] = [
   { target: 'nav-classes', label: 'Mis clases', icon: GraduationCap },
   { target: 'nav-own-games', label: 'Mis juegos', icon: FolderOpen },
   { target: 'nav-users', label: 'Usuarios', icon: Users },
-  { target: 'nav-game-types', label: 'Tipos de juego', icon: LayoutGrid },
+  { target: 'nav-edition', label: 'Edición', icon: SquarePen },
   { target: 'nav-ai-providers', label: 'Proveedores de IA', icon: Bot },
   { target: 'nav-organization', label: 'Organización', icon: Building2 },
 ]
 
 /** Solo las cuentas administrativas ven estos pasos (ver getWelcomeSteps). */
-const ADMIN_TARGETS = ['nav-users', 'nav-game-types', 'nav-ai-providers', 'nav-organization']
+const ADMIN_TARGETS = ['nav-users', 'nav-edition', 'nav-ai-providers', 'nav-organization']
 
 const GAMES = [
   { emoji: '🧠', name: 'MatchMente', color: '#a78bfa' },
@@ -277,7 +277,7 @@ const SECTION_TITLES: Record<string, string> = {
   'nav-community': 'Comunidad',
   'nav-own-games': 'Mis juegos',
   'nav-users': 'Usuarios',
-  'nav-game-types': 'Tipos de juego',
+  'nav-edition': 'Edición',
   'nav-ai-providers': 'Proveedores de IA',
   'nav-organization': 'Organización',
 }
@@ -317,7 +317,7 @@ const AI_REQUESTS = [
 ]
 const SCHOOLS = [['🏫', 'Colegio San José', '#06b6d4'], ['🎓', 'Liceo Nacional', '#a78bfa'], ['📚', 'Instituto Andino', '#ff7a1a'], ['🌱', 'Escuela Nueva Era', '#22c55e']]
 const SUBJECTS = [['🔢', 'Matemáticas', '#ff7a1a'], ['🔬', 'Ciencias', '#22c55e'], ['🌎', 'Sociales', '#06b6d4'], ['📖', 'Lenguaje', '#a78bfa'], ['🎨', 'Arte', '#ff4d6d'], ['🎵', 'Música', '#ffcc4d']]
-const GAME_TYPES = [['MatchMente', 'Activo', '#22c55e'], ['Dominexo', 'Activo', '#22c55e'], ['Laberinto recolector', 'Activo', '#22c55e'], ['Escaleras y serpientes', 'Archivado', '#f59e0b']]
+const FEATURED: [string, boolean][] = [['MatchMente', true], ['Dominexo', true], ['Laberinto recolector', false], ['Escaleras y serpientes', false]]
 const CLASSES = [['5°A', 'Matemáticas', '28', '#ff7a1a'], ['6°B', 'Ciencias', '31', '#22c55e'], ['7°A', 'Inglés', '25', '#a78bfa']]
 
 /** Contenido de cada sección en miniatura. Usuarios, IA y Organización solo salen en cuentas administrativas. */
@@ -370,14 +370,17 @@ function SectionBody({ target }: { target: string }) {
       </div>
     )
   }
-  if (target === 'nav-game-types') {
+  if (target === 'nav-edition') {
     return (
       <div className="flex flex-col gap-[3px]">
-        {GAME_TYPES.map(([name, status, color], i) => (
+        <span className="flex gap-0.5 text-[5px] font-semibold">
+          <span className="rounded-full bg-accent px-1.5 py-[1px] text-white">Destacados</span>
+          <span className="rounded-full px-1.5 py-[1px] text-text/70">Tipos de juego</span>
+        </span>
+        {FEATURED.map(([name, on], i) => (
           <span key={name} className="flex items-center gap-1 rounded-md border border-border bg-surface px-1 py-[2px]" style={rowIn(i, 0.1)}>
-            <LayoutGrid className="h-2 w-2 shrink-0 text-accent" />
             <span className="flex-1 truncate text-[6px] font-semibold text-text-h">{name}</span>
-            <span className={CHIP} style={{ background: tint(color), color }}>{status}</span>
+            <Star className={`h-2 w-2 shrink-0 ${on ? 'text-accent' : 'text-text/40'}`} fill={on ? 'currentColor' : 'none'} />
           </span>
         ))}
       </div>

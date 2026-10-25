@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { BarChart3, BookOpen, Bot, Building2, ChevronLeft, FolderOpen, Globe, GraduationCap, House, LayoutGrid, Plus, Users, Zap } from 'lucide-react'
+import { BarChart3, BookOpen, Bot, Building2, ChevronLeft, FolderOpen, Globe, GraduationCap, House, Plus, SquarePen, Users, Zap } from 'lucide-react'
 import type { AuthUser } from '../../services/auth.service'
 import { ProfileMenu } from './ProfileMenu'
 
@@ -220,13 +220,13 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
             )}
             {canManageUsers && (
               <SidebarItem
-                tourTarget="nav-game-types"
-                emoji="🎲"
-                label="Tipos de juego"
+                tourTarget="nav-edition"
+                emoji="✏️"
+                label="Edición"
                 collapsed={collapsed}
-                active={location.pathname.startsWith('/tipos-de-juego')}
-                onClick={() => navigate('/tipos-de-juego')}
-                icon={<LayoutGrid className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />}
+                active={location.pathname.startsWith('/edicion')}
+                onClick={() => navigate('/edicion')}
+                icon={<SquarePen className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />}
               />
             )}
             {canManageUsers && (

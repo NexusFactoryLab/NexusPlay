@@ -214,8 +214,8 @@ export function GamesSection({
       onlyMine: mode === 'my-games' || undefined,
       status: mode === 'my-games' ? 'DRAFT' : undefined,
       community: mode === 'community' || undefined,
-      // El Inicio solo muestra los demos; lo creado por usuarios va a Comunidad.
-      demos: mode === 'all' || undefined,
+      // El Inicio solo muestra los destacados que fija un ADMIN; Comunidad lo muestra todo.
+      featured: mode === 'all' || undefined,
       pageSize: 40,
     })
       .then((result) => setGames(result.items))
@@ -1141,14 +1141,18 @@ export function GamesSection({
                       ? 'Aún no has creado juegos'
                       : mode === 'my-games'
                         ? 'Aún no tienes juegos.'
-                        : 'Aún no hay juegos disponibles.'}
+                        : mode === 'all'
+                          ? 'Aún no hay juegos destacados.'
+                          : 'Aún no hay juegos disponibles.'}
             </p>
             <p className="mt-1 max-w-[320px] text-[13px] text-text">
               {searchQuery
                 ? 'Prueba con otro término de búsqueda.'
                   : mode === 'my-games' && isTeacher
                     ? 'Crea tu primera actividad para comenzar a jugar con tus estudiantes.'
-                    : 'Sé la primera persona en crear uno.'}
+                    : mode === 'all'
+                      ? 'Mientras tanto, explora los juegos de la Comunidad desde el menú.'
+                      : 'Sé la primera persona en crear uno.'}
             </p>
               {!searchQuery && mode === 'my-games' && isTeacher && (
                 <button

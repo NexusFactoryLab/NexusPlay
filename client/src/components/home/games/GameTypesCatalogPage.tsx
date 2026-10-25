@@ -53,7 +53,7 @@ const PAGE_SIZE = 6
  * (GET /game-types?page&pageSize) y se avanza con una flecha animada, en vez
  * de traer y renderizar el catálogo completo de una sola vez.
  */
-export function GameTypesCatalogPage() {
+export function GameTypesCatalogPage({ embedded = false }: { embedded?: boolean } = {}) {
   const navigate = useNavigate()
   const { user, token } = useAuth()
   const { onSectionViewed } = useHomeSearch()
@@ -149,10 +149,14 @@ export function GameTypesCatalogPage() {
   if (!isAdmin) return <Navigate to="/comunidad" replace />
 
   return (
-    <div className="mx-auto -mt-6 max-w-[1100px] px-4 sm:-mt-8">
+    <div className={embedded ? '' : 'mx-auto -mt-6 max-w-[1100px] px-4 sm:-mt-8'}>
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="mb-1 text-[22px] tracking-tight text-text-h">Tipos de juego</h1>
+          {embedded ? (
+            <h2 className="mb-1 text-[18px] tracking-tight text-text-h">Tipos de juego</h2>
+          ) : (
+            <h1 className="mb-1 text-[22px] tracking-tight text-text-h">Tipos de juego</h1>
+          )}
           <p className="text-[14px] text-text">Archiva y renombra los tipos de juego. Toca uno para ver sus juegos en Comunidad.</p>
         </div>
 
