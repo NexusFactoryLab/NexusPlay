@@ -14,7 +14,7 @@ export type GameTypeChoice =
   | 'TRUE_FALSE_MAZE'
 
 /** Tipo de juego real (`GameType`) que corresponde a cada opción del picker. */
-const GAME_TYPE_BY_CHOICE: Record<GameTypeChoice, string> = {
+export const GAME_TYPE_BY_CHOICE: Record<GameTypeChoice, string> = {
   CARDS: 'MEMORY_MATCH',
   GUESS_WHO: 'GUESS_WHO',
   DOMINO: 'DOMINO',
@@ -35,6 +35,12 @@ type GameTypePickerProps = {
    * bloquea su creación para todos.
    */
   archivedGameTypes?: Set<string>
+  /**
+   * Oculta los tipos archivados en vez de mostrarlos deshabilitados (issue
+   * #100): quien no es ADMIN no debe ver una opción que no puede usar. El
+   * ADMIN los sigue viendo marcados como "Archivado temporalmente".
+   */
+  hideArchived?: boolean
   /** Abre la lista de borradores de creación (issue #69). */
   onViewDrafts?: () => void
 }
@@ -87,7 +93,11 @@ const TYPE_OPTIONS: Array<{
 ]
 
 /** Primer paso al crear un juego: elegir la mecánica base. */
-export function GameTypePicker({ onClose, onSelect, displayNames, archivedGameTypes, onViewDrafts }: GameTypePickerProps) {
+export function GameTypePicker({ onClose, onSelect, displayNames, archivedGameTypes, hideArchived = false, onViewDrafts }: GameTypePickerProps) {
+  const visibleOptions = TYPE_OPTIONS.filter(
+    ({ choice }) => !(hideArchived && archivedGameTypes?.has(GAME_TYPE_BY_CHOICE[choice])),
+  )
+
   return (
     <div className="mx-auto max-w-[900px] p-5 sm:p-8">
       <button type="button" className="nx-back inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-[13px] font-semibold text-text-h shadow-sm hover:border-accent hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent mb-4" onClick={onClose}>
@@ -109,8 +119,12 @@ export function GameTypePicker({ onClose, onSelect, displayNames, archivedGameTy
       </div>
       <p className="mb-5 text-[13px] text-text">Elige qué tipo de juego quieres crear.</p>
 
+      {visibleOptions.length === 0 && (
+        <p className="text-[13px] text-text">No hay tipos de juego disponibles por ahora.</p>
+      )}
+
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-        {TYPE_OPTIONS.map(({ choice, description, icon: Icon }, index) => {
+        {visibleOptions.map(({ choice, description, icon: Icon }, index) => {
           const gameType = GAME_TYPE_BY_CHOICE[choice]
           const title = resolveGameTypeDisplayName(gameType, displayNames?.get(gameType))
           const isArchived = archivedGameTypes?.has(gameType) ?? false
