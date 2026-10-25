@@ -474,7 +474,7 @@ function DominoRoomPageSession() {
     isHost={Boolean(self?.isHost)} connecting={connecting} error={error}
     turnDurationSeconds={room.turnDurationSeconds} onUpdateTurnDuration={updateTurnDuration}
     large
-    settingsPanel={<DominoSettingsPanel level={level} turnDurationSeconds={room.turnDurationSeconds} isHost={Boolean(self?.isHost)} disabled={connecting} onChangeLevel={updateLevel} onUpdateTurnDuration={updateTurnDuration} />}
+    settingsPanel={<DominoSettingsPanel level={level} turnDurationSeconds={room.turnDurationSeconds} isHost={Boolean(self?.isHost)} disabled={connecting} onChangeLevel={updateLevel} onUpdateTurnDuration={updateTurnDuration} availableLevels={room.availableLevels} />}
     onReady={setReady} onExit={handleExit} messages={messages} onSend={sendChatMessage}
   >{dealCountdownMs !== null && <DealCountdownOverlay remainingMs={dealCountdownMs} />}</MultiplayerLobby>
 

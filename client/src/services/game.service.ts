@@ -113,6 +113,8 @@ export type DominoQuestionInput = {
   options: string[]
   correctIndex: number
   explanation: string
+  /** Niveles en los que sale la pregunta; ausente = Intermedio y Universitario. */
+  levels?: Array<'MEDIUM' | 'ADVANCED'>
 }
 
 export type GuessWhoCardInput = {

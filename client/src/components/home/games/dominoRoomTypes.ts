@@ -49,6 +49,8 @@ export type DominoRoomStateView = {
   turnDurationSeconds: number
   /** Servidores anteriores no lo envían: se asume Fácil. */
   level?: DominoLevel
+  /** Qué niveles ofrece el contenido y, si no, el motivo corto. Servidores anteriores no lo envían: todos disponibles. */
+  availableLevels?: Partial<Record<DominoLevel, { available: boolean; reason: string | null }>>
   /** Pregunta de Intermedio en curso: quién responde y de qué concepto (sin la respuesta correcta). */
   pendingQuestion?: {
     userId: string

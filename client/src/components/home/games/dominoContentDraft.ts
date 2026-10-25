@@ -21,6 +21,8 @@ export type QuestionDraft = {
   options: string[]
   correctIndex: number | null
   explanation: string
+  /** Niveles en los que sale la pregunta; ausente = Intermedio y Universitario (borradores y juegos anteriores). */
+  levels?: Array<'MEDIUM' | 'ADVANCED'>
 }
 
 export type ConceptDraft = {
@@ -70,7 +72,15 @@ function toQuestionDraft(raw: unknown): QuestionDraft | null {
     typeof q.correctIndex === 'number' && Number.isInteger(q.correctIndex) && q.correctIndex >= 0 && q.correctIndex < options.length
       ? q.correctIndex
       : null
-  return { text: asText(q.text), options, correctIndex: correct, explanation: asText(q.explanation) }
+  // Solo valores válidos; vacío o los dos niveles equivale a "ausente" (sirve para ambos).
+  const levels = (['MEDIUM', 'ADVANCED'] as const).filter((l) => Array.isArray(q.levels) && q.levels.includes(l))
+  return {
+    text: asText(q.text),
+    options,
+    correctIndex: correct,
+    explanation: asText(q.explanation),
+    ...(levels.length === 1 ? { levels: [...levels] } : {}),
+  }
 }
 
 /**
@@ -182,6 +192,8 @@ export function toConceptInputs(concepts: ConceptDraft[]): DominoConceptInput[] 
       options: q.options.map((o) => o.trim()),
       correctIndex: q.correctIndex as number,
       explanation: q.explanation.trim(),
+      // Solo se manda cuando la pregunta se limita a un nivel; ausente = ambos.
+      ...(q.levels && q.levels.length === 1 ? { levels: q.levels } : {}),
     })),
   }))
 }
