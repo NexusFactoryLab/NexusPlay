@@ -92,40 +92,50 @@ export function FeaturedGamesPanel() {
         <p className="text-[13px] text-text">{search ? 'Ningún juego coincide con la búsqueda.' : 'No hay juegos publicados.'}</p>
       )}
 
-      <ul className="flex flex-col gap-2">
+      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
         {visible.map((game) => (
           <li
             key={game.id}
-            className="flex items-center gap-3 rounded-xl border border-border bg-surface p-3"
+            className={`flex flex-col overflow-hidden rounded-xl border bg-surface transition-colors ${
+              game.featured ? 'border-accent shadow-[0_8px_20px_-14px_var(--accent)]' : 'border-border'
+            }`}
           >
-            <span
-              className="h-10 w-10 shrink-0 rounded-lg bg-cover bg-center"
+            <div
+              className="relative aspect-[16/10] w-full bg-cover bg-center"
               style={{
                 backgroundColor: game.theme.primaryColor,
                 backgroundImage: game.theme.coverImageUrl ? `url(${game.theme.coverImageUrl})` : undefined,
               }}
-              aria-hidden="true"
-            />
-            <span className="flex min-w-0 flex-1 flex-col leading-tight">
-              <span className="truncate text-[14px] font-semibold text-text-h">{game.title}</span>
-              <span className="truncate text-[12px] text-text">
+              role="img"
+              aria-label={`Portada de ${game.title}`}
+            >
+              {game.featured && (
+                <span className="absolute top-1.5 left-1.5 flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-[10.5px] font-semibold text-white">
+                  <Star className="h-3 w-3" fill="currentColor" strokeWidth={0} />
+                  Destacado
+                </span>
+              )}
+            </div>
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5 px-2.5 pt-2 leading-tight">
+              <span className="truncate text-[13px] font-semibold text-text-h" title={game.title}>{game.title}</span>
+              <span className="truncate text-[11.5px] text-text">
                 {resolveGameTypeDisplayName(game.gameType)}
                 {game.creatorDisplayName ? ` · ${game.creatorDisplayName}` : ''}
               </span>
-            </span>
+            </div>
             <button
               type="button"
               aria-pressed={game.featured}
               disabled={pendingId !== null}
               onClick={() => toggle(game)}
-              className={`flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[12.5px] font-medium transition-colors disabled:opacity-60 ${
+              className={`m-2.5 mt-2 flex items-center justify-center gap-1.5 rounded-lg border px-2 py-1.5 text-[12px] font-medium transition-colors disabled:opacity-60 ${
                 game.featured
-                  ? 'border-accent bg-accent/10 text-accent'
+                  ? 'border-accent bg-accent/10 text-accent hover:bg-accent/15'
                   : 'border-border text-text hover:bg-code-bg hover:text-text-h'
               }`}
             >
-              <Star className="h-4 w-4" fill={game.featured ? 'currentColor' : 'none'} strokeWidth={2} />
-              {game.featured ? 'Destacado' : 'Destacar'}
+              <Star className="h-3.5 w-3.5" fill={game.featured ? 'currentColor' : 'none'} strokeWidth={2} />
+              {game.featured ? 'Quitar' : 'Destacar'}
             </button>
           </li>
         ))}
