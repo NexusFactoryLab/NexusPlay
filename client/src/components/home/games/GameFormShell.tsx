@@ -125,6 +125,8 @@ type GameFormShellProps = {
   descriptionDetail?: string
   /** El panel de <AiGameAssistantPanel /> ya configurado por el formulario. */
   aiPanel: ReactNode
+  /** Tarjeta opcional alineada a la derecha del encabezado (p. ej. revisión y niveles de Dominexo). */
+  headerAside?: ReactNode
   /** Ancho máximo de la columna del formulario manual (centrada). */
   formMaxWidthClassName?: string
   /**
@@ -159,6 +161,7 @@ export function GameFormShell({
   description,
   descriptionDetail,
   aiPanel,
+  headerAside,
   formMaxWidthClassName = 'max-w-none',
   draftId,
   resumingDraft,
@@ -827,17 +830,23 @@ export function GameFormShell({
             </span>
           </button>
         )}
-        <h2 ref={headingRef} tabIndex={-1} className="mb-1 text-[20px] tracking-tight text-text-h outline-none">
-          {title}
-        </h2>
-        <p className="mb-5 flex max-w-[640px] items-start gap-1.5 text-[13px] text-text">
-          <span>{description}</span>
-          {descriptionDetail && (
-            <span title={descriptionDetail} aria-label={descriptionDetail} role="img" className="mt-0.5 shrink-0">
-              <Info className="h-3.5 w-3.5" strokeWidth={2.2} />
-            </span>
-          )}
-        </p>
+        {/* Con `headerAside`, la tarjeta ocupa la esquina superior derecha junto al encabezado; sin ella el layout no cambia. */}
+        <div className={headerAside ? 'mb-5 flex flex-wrap items-start justify-between gap-x-6 gap-y-3' : undefined}>
+          <div className="min-w-0 flex-1">
+            <h2 ref={headingRef} tabIndex={-1} className="mb-1 text-[20px] tracking-tight text-text-h outline-none">
+              {title}
+            </h2>
+            <p className={`${headerAside ? '' : 'mb-5 '}flex max-w-[640px] items-start gap-1.5 text-[13px] text-text`}>
+              <span>{description}</span>
+              {descriptionDetail && (
+                <span title={descriptionDetail} aria-label={descriptionDetail} role="img" className="mt-0.5 shrink-0">
+                  <Info className="h-3.5 w-3.5" strokeWidth={2.2} />
+                </span>
+              )}
+            </p>
+          </div>
+          {headerAside && <div className="relative z-20 w-full shrink-0 sm:w-auto sm:max-w-[560px]">{headerAside}</div>}
+        </div>
 
         <div
           className={

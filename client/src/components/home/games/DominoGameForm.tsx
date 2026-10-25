@@ -392,6 +392,10 @@ export function DominoGameForm({
           los extremos abiertos.
         </>
       }
+      headerAside={
+        // Solo en la fase de Contenido: revisión de IA y niveles en la esquina superior derecha.
+        phase === 2 ? <DominoContentBar concepts={concepts} onJump={jumpTo} onNextPending={goToNextPending} /> : undefined
+      }
       aiPanel={
         <AiGameAssistantPanel
           gameType="DOMINO"
@@ -490,8 +494,7 @@ export function DominoGameForm({
         )}
 
         {phase === 2 && (
-        <FormSection icon={Puzzle} title="Conceptos" subtitle="Cada nivel pide algo distinto: usa las pestañas de cada concepto y la franja de niveles." tone={3} bare>
-<DominoContentBar concepts={concepts} onJump={jumpTo} onNextPending={goToNextPending} />
+        <FormSection icon={Puzzle} title="Conceptos" subtitle="Una pestaña por nivel en cada concepto." tone={3} bare>
 <ItemGridEditor
           itemLabel="Concepto"
           addLabel="+ Agregar concepto"

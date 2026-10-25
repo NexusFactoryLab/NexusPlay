@@ -35,14 +35,14 @@ export function DominoContentBar({ concepts, onJump, onNextPending }: Props) {
   const percent = review.total === 0 ? 0 : Math.round((review.reviewed / review.total) * 100)
 
   return (
-    <section className="mb-3 flex flex-col gap-2" aria-label="Revisión y niveles" data-domino-content-bar>
-      <div className="flex min-h-[48px] flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-border bg-surface px-3 py-1.5">
+    <section className="relative" aria-label="Revisión y niveles" data-domino-content-bar>
+      <div className="flex min-h-[48px] flex-col gap-1.5 rounded-2xl border border-border bg-surface px-3 py-1.5 shadow-sm sm:items-end">
         {review.total > 0 && (
-          <div className="flex min-w-0 flex-1 items-center gap-2 text-[16px] text-text-h" role="region" aria-label="Revisión del contenido de IA">
+          <div className="flex min-w-0 flex-wrap items-center gap-2 text-[16px] text-text-h" role="region" aria-label="Revisión del contenido de IA">
             <ClipboardCheck className="h-5 w-5 shrink-0" aria-hidden="true" />
             <span className="shrink-0 font-semibold" aria-live="polite">{review.reviewed} de {review.total} revisados</span>
             <div
-              className="hidden h-2 w-16 shrink-0 overflow-hidden rounded-full bg-border sm:block"
+              className="h-2 w-16 shrink-0 overflow-hidden rounded-full bg-border"
               role="progressbar"
               aria-label="Avance de la revisión"
               aria-valuemin={0}
@@ -55,7 +55,7 @@ export function DominoContentBar({ concepts, onJump, onNextPending }: Props) {
               <span className="truncate text-text">Todo revisado</span>
             ) : (
               <>
-                <span className="hidden truncate text-text lg:inline">La IA puede equivocarse: revisa los datos antes de publicar.</span>
+                <span className="text-text">La IA puede equivocarse: revisa los datos antes de publicar.</span>
                 <button
                   type="button"
                   onClick={onNextPending}
@@ -68,7 +68,7 @@ export function DominoContentBar({ concepts, onJump, onNextPending }: Props) {
           </div>
         )}
 
-        <ul className="ml-auto flex flex-wrap items-center gap-2" aria-label="Niveles disponibles">
+        <ul className="flex flex-nowrap items-center gap-2 overflow-x-auto" aria-label="Niveles disponibles">
           {chips.map((chip) => {
             const { color } = DOMINO_LEVEL_INFO[chip.level]
             const expanded = open === chip.level
@@ -79,7 +79,7 @@ export function DominoContentBar({ concepts, onJump, onNextPending }: Props) {
                   aria-expanded={expanded}
                   aria-controls={`domino-level-detail-${chip.level}`}
                   onClick={() => setOpen(expanded ? null : chip.level)}
-                  className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full border-2 px-3 text-[16px] font-semibold text-text-h transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-accent motion-reduce:transition-none"
+                  className="inline-flex min-h-[44px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border-2 px-3 text-[16px] font-semibold text-text-h transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-accent motion-reduce:transition-none"
                   style={{ borderColor: color, background: `color-mix(in srgb, ${color} ${chip.ok ? 14 : 5}%, var(--surface))` }}
                 >
                   {chip.text}
@@ -91,14 +91,16 @@ export function DominoContentBar({ concepts, onJump, onNextPending }: Props) {
         </ul>
       </div>
 
-      {/* Detalle colapsado: grid-rows 0fr→1fr anima la altura sin medirla. */}
-      <div
-        className={`grid transition-[grid-template-rows,opacity] duration-300 motion-reduce:transition-none ${open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}
-        aria-hidden={!open}
-      >
-        <div className="min-h-0 overflow-hidden">
+      {/* Detalle como popover flotante anclado a la tarjeta: no empuja el contenido. */}
+      <div>
+        <div>
           {open && (
-            <div id={`domino-level-detail-${open}`} className="flex flex-col gap-2 rounded-2xl border border-border bg-surface p-3 text-[16px] leading-snug text-text-h">
+            <div
+              id={`domino-level-detail-${open}`}
+              role="dialog"
+              aria-label={`Detalle de ${DOMINO_LEVEL_INFO[open].label}`}
+              className="absolute right-0 top-full z-30 mt-2 flex w-[min(92vw,440px)] animate-[fade-in-up_0.2s_ease-out] flex-col gap-2 rounded-2xl border border-border bg-surface p-3 text-[16px] leading-snug text-text-h shadow-lg motion-reduce:animate-none"
+            >
               <p><strong>{DOMINO_LEVEL_INFO[open].label}:</strong> <span className="text-text">{NEEDS[open]}</span></p>
               {open !== 'EASY' && !statuses[open].available && (
                 <>
@@ -108,7 +110,10 @@ export function DominoContentBar({ concepts, onJump, onNextPending }: Props) {
                       <li key={conceptIndex}>
                         <button
                           type="button"
-                          onClick={() => onJump(conceptIndex, open)}
+                          onClick={() => {
+                            onJump(conceptIndex, open)
+                            setOpen(null)
+                          }}
                           className="min-h-[44px] rounded-lg border border-border px-3 text-[16px] font-semibold text-text-h transition-colors duration-200 hover:border-accent hover:text-accent focus-visible:outline-2 focus-visible:outline-accent motion-reduce:transition-none"
                         >
                           {concepts[conceptIndex].label.trim() || `Concepto ${conceptIndex + 1}`}
