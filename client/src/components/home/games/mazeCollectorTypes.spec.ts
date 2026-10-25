@@ -56,17 +56,17 @@ describe('MAZE_LAYOUTS — puertas de teletransporte', () => {
     }
   })
 
-  it('el mapa de Ciudad Sostenible tiene puerta en las 5 avenidas del SVG (y=50/180/300/420/550)', () => {
-    // Cada avenida del SVG mide entre 35 y 40px de alto — según cómo caiga
-    // sobre la cuadrícula de 20px, puede rasterizarse en 1 o 2 filas
-    // contiguas (no siempre 1:1), así que se verifica que exista AL MENOS
-    // una fila de túnel cerca del centro esperado de cada avenida, no un
-    // conteo total exacto.
-    const avenueCentersY = [50, 180, 300, 420, 550]
-    for (const centerY of avenueCentersY) {
-      const expectedRow = Math.floor(centerY / 20)
-      const hasNearbyTunnelRow = MAZE_LAYOUTS.CITY.tunnelRows.some((row) => Math.abs(row - expectedRow) <= 1)
-      expect(hasNearbyTunnelRow).toBe(true)
+  it('el mapa de Ciudad Sostenible tiene puerta en sus 5 avenidas (una fila cada una, como el fondo en sprites)', () => {
+    expect(MAZE_LAYOUTS.CITY.tunnelRows).toEqual([1, 6, 10, 13, 17])
+  })
+
+  it('en Ciudad Sostenible cada calle mide una sola celda (nunca dos filas o columnas de calle seguidas dentro de la ciudad)', () => {
+    const { grid, rows, cols } = MAZE_LAYOUTS.CITY
+    for (let row = 1; row < rows - 2; row++) {
+      for (let col = 1; col < cols - 2; col++) {
+        const square = [grid[row][col], grid[row + 1][col], grid[row][col + 1], grid[row + 1][col + 1]]
+        expect(square.some((cell) => cell === 1)).toBe(true)
+      }
     }
   })
 
