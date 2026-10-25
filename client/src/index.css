@@ -2483,6 +2483,30 @@ code {
   100% { transform: scale(1); }
 }
 
+/* Demostración de la guía de MatchMente: carta A, luego carta B, brillo y ✓. */
+@keyframes memory-demo-flip-a {
+  0%, 10% { transform: rotateY(0deg); }
+  20%, 85% { transform: rotateY(180deg); }
+  95%, 100% { transform: rotateY(0deg); }
+}
+@keyframes memory-demo-flip-b {
+  0%, 30% { transform: rotateY(0deg); }
+  40%, 85% { transform: rotateY(180deg); }
+  95%, 100% { transform: rotateY(0deg); }
+}
+@keyframes memory-demo-glow {
+  0%, 45% { box-shadow: none; }
+  55%, 80% { box-shadow: 0 0 0 4px #22c55e; }
+  90%, 100% { box-shadow: none; }
+}
+@keyframes memory-demo-check {
+  0%, 48% { opacity: 0; transform: scale(0.3); }
+  56% { opacity: 1; transform: scale(1.2); }
+  62%, 80% { opacity: 1; transform: scale(1); }
+  90%, 100% { opacity: 0; transform: scale(0.3); }
+}
+
+
 /* MatchMente en Opuestos: la explicación entra y se queda hasta "¡Seguir!". */
 @keyframes match-flash-in {
   0% { opacity: 0; transform: scale(0.7); }

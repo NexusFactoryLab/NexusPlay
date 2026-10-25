@@ -1,19 +1,617 @@
-import { InGameTutorial } from './tutorials/InGameTutorial'
-
-type MazeCollectorGuideProps = { onClose: () => void }
+import { useCallback, useEffect, useState } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Footprints,
+  Heart,
+  Lightbulb,
+  Maximize,
+  Pause,
+  Route,
+  Snail,
+  X,
+  Zap,
+} from 'lucide-react'
+import { FitScale } from './true-false-maze/FitScale'
+import { SpriteStrip, mazeSpriteUrl } from './mazeSpriteStrip'
+import { COMBO_POINTS, POINTS_BONUS, POINTS_PET, POWER_MODE_MS } from './mazeEngine'
+import './true-false-maze/trueFalseMazeGuide.css'
+import './mazeCollectorGuide.css'
 
 /**
- * Guía del Camión Reciclador: un mini tutorial jugable (mover el camión,
- * recoger botellas, esquivar la nube, usar la caneca de energía). Sale antes
- * de jugar y se vuelve a abrir desde el botón de ayuda.
+ * Guía previa al Camión Reciclador (issue #82): la MISMA estructura que la
+ * guía del Laberinto Verdadero o Falso — 5 pasos con escenas animadas hechas
+ * con los sprites del juego, sin scroll, navegable con los botones o con las
+ * flechas ← → del teclado, y que se puede saltar en cualquier momento —
+ * contada con la temática de la ciudad: recoger botellas PET y esquivar las
+ * nubes de contaminación.
  */
-export function MazeCollectorGuide({ onClose }: MazeCollectorGuideProps) {
+
+type MazeCollectorGuideProps = {
+  /** Se llama al terminar (último paso) o al saltar la guía. */
+  onClose: () => void
+}
+
+type Step = { id: string; title: string; art: ReactNode; body: ReactNode }
+
+/** Variables CSS personalizadas (`--tfg-key`, `--mcg-drive`...) que React no tipa en `CSSProperties`. */
+type VarStyle = CSSProperties & Record<`--${string}`, string>
+
+// ==================== piezas de las escenas ====================
+
+/** Recuadro de escena: se ajusta al espacio disponible conservando su proporción. */
+function Scene({ aspect = 1.6, children }: { aspect?: number; children: ReactNode }) {
   return (
-    <InGameTutorial
-      kind="MAZE_COLLECTOR"
-      title="Camión Reciclador"
-      accent="linear-gradient(90deg, #10b981, #14b8a6)"
-      onClose={onClose}
-    />
+    <div className="flex h-full w-full items-center justify-center" style={{ containerType: 'size' }}>
+      <div className="mcg-scene" style={{ width: `min(100cqw, ${aspect * 100}cqh)`, aspectRatio: String(aspect) }}>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function City() {
+  return <div className="mcg-city" style={{ backgroundImage: `url(${mazeSpriteUrl('city-map')})` }} />
+}
+
+/** Elemento posicionado dentro de la escena (en %/cqw, para que la escena escale entera). */
+function At({ children, style, className = '' }: { children?: ReactNode; style: CSSProperties; className?: string }) {
+  return (
+    <div className={`tfg-abs ${className}`} style={style}>
+      {children}
+    </div>
+  )
+}
+
+function Tag({ tone, children, style }: { tone: 'good' | 'bad' | 'info'; children: ReactNode; style?: CSSProperties }) {
+  const colors = {
+    good: 'border-emerald-400/60 bg-emerald-950/85 text-emerald-200',
+    bad: 'border-rose-400/60 bg-rose-950/85 text-rose-200',
+    info: 'border-amber-300/60 bg-slate-900/85 text-amber-100',
+  }[tone]
+  return (
+    <span
+      className={`tfg-abs inline-flex items-center justify-center whitespace-nowrap rounded-full border font-bold ${colors}`}
+      style={{ fontSize: '3.1cqw', padding: '0.5cqw 2.2cqw', ...style }}
+    >
+      {children}
+    </span>
+  )
+}
+
+/** Las cuatro flechas del teclado en "T" invertida; `lit` resalta la tecla que se está usando en la escena. */
+function ArrowKeys({ size, lit }: { size: string; lit?: 'RIGHT' }) {
+  const style: VarStyle = { '--tfg-key': size }
+  return (
+    <div className="tfg-key-cluster" style={style} role="img" aria-label="Flechas del teclado: arriba, izquierda, abajo y derecha">
+      <span />
+      <span className="tfg-key">
+        <ArrowUp className="h-[60%] w-[60%]" strokeWidth={3} />
+      </span>
+      <span />
+      <span className="tfg-key">
+        <ArrowLeft className="h-[60%] w-[60%]" strokeWidth={3} />
+      </span>
+      <span className="tfg-key">
+        <ArrowDown className="h-[60%] w-[60%]" strokeWidth={3} />
+      </span>
+      <span className={`tfg-key ${lit === 'RIGHT' ? 'tfg-key--lit' : ''}`}>
+        <ArrowRight className="h-[60%] w-[60%]" strokeWidth={3} />
+      </span>
+    </div>
+  )
+}
+
+// ==================== escenas ====================
+
+function SceneMission() {
+  return (
+    <Scene>
+      <City />
+      <div className="mcg-road" style={{ left: 0, right: 0, top: '41%', height: '18cqw' }} />
+      {[14, 26, 38].map((left) => (
+        <At key={left} style={{ left: `${left}%`, top: '47%' }}>
+          <SpriteStrip name="item-pet" frames={4} size="7cqw" durationMs={1200} />
+        </At>
+      ))}
+      <At style={{ left: '50%', top: '33%', transform: 'translateX(-50%)' }}>
+        <SpriteStrip name="truck-drive" frames={4} size="26cqw" durationMs={640} style={{ transform: 'rotate(90deg)' }} />
+      </At>
+      <At className="tfg-float" style={{ right: '6%', top: '38%' }}>
+        <SpriteStrip name="cloud-chaser" frames={4} size="17cqw" durationMs={900} />
+      </At>
+      <At className="tfg-float" style={{ right: '22%', top: '6%', animationDelay: '-1.4s' }}>
+        <SpriteStrip name="cloud-ambusher" frames={4} size="13cqw" durationMs={900} />
+      </At>
+      <At style={{ left: '5%', top: '8%' }}>
+        <SpriteStrip name="item-power" frames={4} size="12cqw" durationMs={800} />
+      </At>
+      <Tag tone="good" style={{ left: '50%', bottom: '6%', transform: 'translateX(-50%)' }}>
+        ♻ ¡Limpia la ciudad!
+      </Tag>
+    </Scene>
+  )
+}
+
+function SceneCollect() {
+  const drive: VarStyle = { '--mcg-drive': '66cqw' }
+  return (
+    <Scene aspect={16 / 11}>
+      <City />
+      <div className="mcg-road" style={{ left: 0, right: 0, top: '20cqw', height: '18cqw' }} />
+      {/* Botellas en la calle: el asfalto "limpio" avanza detrás del camión y las va tapando. */}
+      {[22, 34, 46, 58, 70, 82].map((left) => (
+        <At key={left} style={{ left: `${left}cqw`, top: '25.5cqw' }}>
+          <SpriteStrip name="item-pet" frames={4} size="7cqw" durationMs={1200} />
+        </At>
+      ))}
+      <div
+        className="tfg-abs"
+        style={{ left: '14cqw', top: '24cqw', height: '10cqw', background: '#3a4b5f', animation: 'mcg-clean 6s linear infinite', ...drive }}
+      />
+      <At style={{ left: '6cqw', top: '18cqw', animation: 'mcg-drive 6s linear infinite', ...drive }}>
+        <SpriteStrip name="truck-drive" frames={4} size="22cqw" durationMs={640} style={{ transform: 'rotate(90deg)' }} />
+      </At>
+      <Tag tone="good" style={{ right: '5cqw', top: '6cqw', opacity: 0, animation: 'mcg-points 6s linear infinite' }}>
+        +{POINTS_PET} por botella
+      </Tag>
+      <At style={{ left: '50%', top: '44cqw', transform: 'translateX(-50%)' }}>
+        <ArrowKeys size="6cqw" lit="RIGHT" />
+      </At>
+    </Scene>
+  )
+}
+
+const CLOUDS: Array<{ strip: string; left: string; top: string; delay: string }> = [
+  { strip: 'cloud-chaser', left: '64%', top: '30%', delay: '0s' },
+  { strip: 'cloud-ambusher', left: '6%', top: '58%', delay: '-0.7s' },
+  { strip: 'cloud-patroller', left: '40%', top: '62%', delay: '-1.5s' },
+  { strip: 'cloud-random', left: '78%', top: '64%', delay: '-2.2s' },
+]
+
+function SceneClouds() {
+  return (
+    <Scene>
+      <City />
+      <At className="flex items-center gap-[1.2cqw]" style={{ left: '50%', top: '4%', transform: 'translateX(-50%)' }}>
+        {[0, 1, 2].map((index) => (
+          <img
+            key={index}
+            src={mazeSpriteUrl('ui-life')}
+            alt=""
+            className="tfg-sprite"
+            style={{ width: '8cqw', animation: index === 2 ? 'mcg-life-lose 6s linear infinite' : undefined }}
+          />
+        ))}
+      </At>
+
+      <At style={{ left: '14%', top: '24%' }}>
+        <div style={{ animation: 'mcg-hit 6s linear infinite' }}>
+          <SpriteStrip name="truck-drive" frames={4} size="20cqw" durationMs={640} style={{ transform: 'rotate(90deg)' }} />
+        </div>
+      </At>
+
+      {CLOUDS.map((cloud, index) => (
+        <At key={cloud.strip} style={{ left: cloud.left, top: cloud.top }}>
+          <div style={index === 0 ? { animation: 'mcg-chase 6s ease-in-out infinite' } : undefined}>
+            {index === 0 && (
+              <div
+                className="tfg-abs rounded-full border-[0.6cqw] border-rose-400/70"
+                style={{ inset: '-1cqw', animation: 'mcg-danger-ring 1.8s ease-in-out infinite' }}
+              />
+            )}
+            <div className="tfg-float" style={{ animationDelay: cloud.delay }}>
+              <SpriteStrip name={cloud.strip} frames={4} size={index === 0 ? '17cqw' : '13cqw'} durationMs={900} />
+            </div>
+          </div>
+        </At>
+      ))}
+
+      <Tag tone="bad" style={{ left: '50%', top: '44%', transform: 'translateX(-50%)', opacity: 0, animation: 'mcg-warn 6s linear infinite' }}>
+        ¡−1 vida!
+      </Tag>
+    </Scene>
+  )
+}
+
+/** Nube que se asusta (azul) cuando el camión toma la Caneca de Energía. */
+function ScaredCloud({ strip, left, top, size, delay }: { strip: string; left: string; top: string; size: string; delay: string }) {
+  return (
+    <At style={{ left, top }}>
+      <div className="tfg-float relative" style={{ animationDelay: delay }}>
+        <div style={{ animation: 'mcg-cloud-normal 6s linear infinite' }}>
+          <SpriteStrip name={strip} frames={4} size={size} durationMs={900} />
+        </div>
+        <div className="absolute inset-0 opacity-0" style={{ animation: 'mcg-cloud-scared 6s linear infinite' }}>
+          <SpriteStrip name="cloud-frightened" frames={2} size={size} durationMs={500} />
+        </div>
+      </div>
+    </At>
+  )
+}
+
+function ScenePower() {
+  return (
+    <Scene>
+      <City />
+      {[0, 1.2].map((delay) => (
+        <div
+          key={delay}
+          className="tfg-abs rounded-full border-[0.6cqw] border-emerald-300"
+          style={{ left: '50%', top: '52%', width: '110cqw', height: '110cqw', opacity: 0, animation: `mcg-power-ring 2.4s ease-out ${delay}s infinite` }}
+        />
+      ))}
+      <At style={{ left: '50%', top: '52%', transform: 'translate(-50%, -50%)' }}>
+        <SpriteStrip name="truck-energized" frames={4} size="26cqw" durationMs={480} style={{ transform: 'rotate(270deg)' }} />
+      </At>
+      <At style={{ left: '50%', top: '6%', transform: 'translateX(-50%)' }}>
+        <SpriteStrip name="item-power" frames={4} size="13cqw" durationMs={800} />
+      </At>
+
+      <ScaredCloud strip="cloud-chaser" left="6%" top="16%" size="16cqw" delay="-0.4s" />
+      <ScaredCloud strip="cloud-patroller" left="76%" top="12%" size="16cqw" delay="-1.6s" />
+      <ScaredCloud strip="cloud-random" left="10%" top="62%" size="15cqw" delay="-2.4s" />
+      <ScaredCloud strip="cloud-ambusher" left="76%" top="62%" size="15cqw" delay="-1s" />
+
+      <Tag tone="info" style={{ left: '50%', top: '80%', transform: 'translateX(-50%)', opacity: 0, animation: 'mcg-score-rise 6s linear infinite' }}>
+        +{COMBO_POINTS[0]}
+      </Tag>
+    </Scene>
+  )
+}
+
+function SceneCard({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="tfg-abs overflow-hidden rounded-[2.4cqw] border border-white/20 bg-slate-900/75" style={{ top: '7%', width: '29cqw', height: '86%' }}>
+      {children}
+      <span
+        className="absolute inset-x-0 bottom-0 bg-slate-950/90 text-center font-bold uppercase text-emerald-200"
+        style={{ fontSize: '2.6cqw', letterSpacing: '0.1em', padding: '1.4cqw 0' }}
+      >
+        {label}
+      </span>
+    </div>
+  )
+}
+
+function SceneExtras() {
+  return (
+    <Scene>
+      <City />
+      {/* Bolsa negra: el camión se pone gris y va más lento un momento. */}
+      <div className="tfg-abs" style={{ left: '2%', top: 0, width: '29cqw', height: '100%' }}>
+        <SceneCard label="Bolsa negra">
+          <At style={{ left: '50%', top: '3cqw', transform: 'translateX(-50%)' }}>
+            <SpriteStrip name="item-bag" frames={4} size="11cqw" durationMs={500} />
+          </At>
+          <At style={{ left: '50%', top: '15cqw', transform: 'translateX(-50%)', animation: 'mcg-slow 1.6s ease-in-out infinite' }}>
+            <SpriteStrip name="truck-slowed" frames={1} size="18cqw" />
+          </At>
+          <At style={{ left: '50%', top: '35cqw', transform: 'translateX(-50%)' }}>
+            <Snail style={{ width: '6cqw', height: '6cqw', color: '#fbbf24' }} strokeWidth={2.2} />
+          </At>
+        </SceneCard>
+      </div>
+
+      {/* Celular e-waste: bonus de puntos y un dato curioso. */}
+      <div className="tfg-abs" style={{ left: '35.5%', top: 0, width: '29cqw', height: '100%' }}>
+        <SceneCard label="E-waste">
+          <At style={{ left: '50%', top: '7cqw', transform: 'translateX(-50%)' }}>
+            <SpriteStrip name="item-bonus" frames={4} size="17cqw" durationMs={600} />
+          </At>
+          <Tag tone="info" style={{ left: '50%', top: '27cqw', transform: 'translateX(-50%)' }}>
+            +{POINTS_BONUS}
+          </Tag>
+          <At style={{ left: '50%', top: '35cqw', transform: 'translateX(-50%)' }}>
+            <Lightbulb style={{ width: '6cqw', height: '6cqw', color: '#fde68a' }} strokeWidth={2.2} />
+          </At>
+        </SceneCard>
+      </div>
+
+      {/* Túneles: sales por un borde de la avenida y entras por el otro. */}
+      <div className="tfg-abs" style={{ left: '69%', top: 0, width: '29cqw', height: '100%' }}>
+        <SceneCard label="Túneles">
+          <div className="mcg-road" style={{ left: 0, right: 0, top: '17cqw', height: '11cqw' }} />
+          {(['left', 'right'] as const).map((side) => (
+            <div
+              key={side}
+              className="tfg-abs rounded-full border-[0.8cqw] border-emerald-400"
+              style={{ [side]: '-4cqw', top: '16.5cqw', width: '8cqw', height: '12cqw', background: '#0c1622' }}
+            />
+          ))}
+          <At style={{ left: '6cqw', top: '16cqw', animation: 'mcg-tunnel-out 4s linear infinite' }}>
+            <SpriteStrip name="truck-drive" frames={4} size="13cqw" durationMs={640} />
+          </At>
+          <At style={{ left: '22cqw', top: '16cqw', opacity: 0, animation: 'mcg-tunnel-in 4s linear infinite' }}>
+            <SpriteStrip name="truck-drive" frames={4} size="13cqw" durationMs={640} />
+          </At>
+          <At style={{ left: '50%', top: '4cqw', transform: 'translateX(-50%)' }}>
+            <Route style={{ width: '7cqw', height: '7cqw', color: '#6ee7b7' }} strokeWidth={2.2} />
+          </At>
+        </SceneCard>
+      </div>
+    </Scene>
+  )
+}
+
+// ==================== texto de cada paso ====================
+
+function Item({ icon, children, tone = 'emerald' }: { icon: ReactNode; children: ReactNode; tone?: 'emerald' | 'teal' | 'amber' | 'sky' | 'rose' }) {
+  const colors = {
+    emerald: 'bg-emerald-400/15 text-emerald-300',
+    teal: 'bg-teal-400/15 text-teal-300',
+    amber: 'bg-amber-400/15 text-amber-300',
+    sky: 'bg-sky-400/15 text-sky-300',
+    rose: 'bg-rose-400/15 text-rose-300',
+  }[tone]
+  return (
+    <li className="flex items-start gap-2.5">
+      <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${colors}`}>{icon}</span>
+      <span className="min-w-0">{children}</span>
+    </li>
+  )
+}
+
+function CloudName({ strip, children }: { strip: string; children: ReactNode }) {
+  return (
+    <li className="flex items-center gap-2">
+      <SpriteStrip name={strip} frames={4} size={26} frame={0} className="shrink-0" />
+      <span className="min-w-0">{children}</span>
+    </li>
+  )
+}
+
+const STEPS: Step[] = [
+  {
+    id: 'mision',
+    title: 'Misión: ¡limpia la ciudad!',
+    art: <SceneMission />,
+    body: (
+      <>
+        <p>
+          Conduces el <b className="text-emerald-300">camión reciclador</b> por las calles de la Ciudad Sostenible. Recoge todas las{' '}
+          <b className="text-sky-300">botellas PET</b> y esquiva las <b className="text-rose-300">nubes de contaminación</b>.
+        </p>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-emerald-300/25 bg-emerald-400/[0.07] p-3">
+          <ArrowKeys size="clamp(1.9rem, 5.2dvh, 2.7rem)" />
+          <div className="min-w-0 flex-1 basis-[9rem]">
+            <p className="font-bold text-white">Muévete con las flechas del teclado</p>
+            <p className="text-slate-300">
+              También sirven <b className="text-white">W A S D</b>. En el celular, usa la cruceta de la pantalla.
+            </p>
+          </div>
+        </div>
+        <p className="flex items-center gap-2">
+          <span className="flex h-7 shrink-0 items-center gap-1 rounded-lg border border-emerald-300/50 bg-emerald-500/20 px-2 text-[0.8em] font-bold text-white">
+            <Pause className="h-3.5 w-3.5" fill="currentColor" strokeWidth={1.5} /> Pausa
+          </span>
+          <span>
+            ¿Necesitas un respiro? Toca <b className="text-white">Pausa</b>, arriba a la izquierda, o presiona{' '}
+            <b className="text-white">Esc</b> o <b className="text-white">P</b>.
+          </span>
+        </p>
+        {/* En celular horizontal no cabe otro renglón sin encoger el texto: ahí la pantalla completa se ofrece al empezar. */}
+        <p className="flex items-center gap-2 [@media(orientation:landscape)_and_(max-height:520px)]:hidden">
+          <span className="flex h-7 shrink-0 items-center gap-1 rounded-lg border border-white/25 bg-white/10 px-2 text-[0.8em] font-bold text-white">
+            <Maximize className="h-3.5 w-3.5" /> Completa
+          </span>
+          <span>
+            Para ver <b className="text-white">toda la ciudad</b> en grande, juega en <b className="text-white">pantalla completa</b>: se activa al empezar
+            (o con la tecla <b className="text-white">F</b>).
+          </span>
+        </p>
+      </>
+    ),
+  },
+  {
+    id: 'recoger',
+    title: 'Recoge las botellas PET',
+    art: <SceneCollect />,
+    body: (
+      <ul className="flex flex-col gap-2.5">
+        <Item icon={<Footprints className="h-4 w-4" />} tone="emerald">
+          <b className="text-white">Elige una dirección con las flechas.</b> El camión sigue avanzando solo hasta que gires o choques con una manzana.
+        </Item>
+        <Item icon={<span className="text-[12px] font-bold">PET</span>} tone="sky">
+          <b className="text-white">Pasa por encima de las botellas</b> para recogerlas: +{POINTS_PET} puntos cada una.
+        </Item>
+        <Item icon={<Check className="h-4 w-4" strokeWidth={3} />} tone="teal">
+          <b className="text-white">Cuando no quede ninguna, subes de nivel</b> y la ciudad se llena otra vez… con nubes más rápidas.
+        </Item>
+      </ul>
+    ),
+  },
+  {
+    id: 'nubes',
+    title: 'Esquiva las nubes de contaminación',
+    art: <SceneClouds />,
+    body: (
+      <>
+        <p>
+          Si una nube te toca, <b className="text-white">pierdes una vida</b> <Heart className="inline h-4 w-4 text-emerald-300" />. Sin vidas, la partida termina. Cada
+          nube tiene su propia forma de perseguirte:
+        </p>
+        <ul className="flex flex-col gap-1.5">
+          <CloudName strip="cloud-chaser">
+            <b className="text-white">Smog Gris</b> te persigue directo.
+          </CloudName>
+          <CloudName strip="cloud-ambusher">
+            <b className="text-white">Gas Tóxico</b> se adelanta para cerrarte el paso.
+          </CloudName>
+          <CloudName strip="cloud-patroller">
+            <b className="text-white">Polución Industrial</b> vigila su zona y ataca si te acercas.
+          </CloudName>
+          <CloudName strip="cloud-random">
+            <b className="text-white">Lluvia Ácida</b> se mueve sin rumbo fijo.
+          </CloudName>
+        </ul>
+      </>
+    ),
+  },
+  {
+    id: 'caneca',
+    title: 'Caneca de Energía',
+    art: <ScenePower />,
+    body: (
+      <>
+        <p>
+          Las <b className="text-emerald-300">canecas con un rayo</b> encienden el <b className="text-white">purificador</b> durante {POWER_MODE_MS / 1000} segundos: el
+          camión brilla y las nubes se asustan y se ponen azules.
+        </p>
+        <ul className="flex flex-col gap-2.5">
+          <Item icon={<Zap className="h-4 w-4" />} tone="emerald">
+            ¡Atrápalas asustadas para ganar{' '}
+            <b className="text-white">
+              +{COMBO_POINTS.slice(0, 3).join(', +')}…
+            </b>{' '}
+            puntos seguidos!
+          </Item>
+          <Item icon={<span className="text-[13px] font-bold">!</span>} tone="amber">
+            Cuando parpadean en blanco, el purificador está por acabarse: aléjate.
+          </Item>
+          <Item icon={<span className="text-[15px] font-bold leading-none">👀</span>} tone="sky">
+            Una nube atrapada vuelve a su esquina como dos ojitos y regresa a perseguirte.
+          </Item>
+        </ul>
+      </>
+    ),
+  },
+  {
+    id: 'sorpresas',
+    title: 'Atajos y sorpresas',
+    art: <SceneExtras />,
+    body: (
+      <ul className="flex flex-col gap-2.5">
+        <Item icon={<Snail className="h-4 w-4" />} tone="amber">
+          <b className="text-white">Bolsa negra:</b> si la pisas, el camión va más lento por un momento. ¡Esquívala!
+        </Item>
+        <Item icon={<Lightbulb className="h-4 w-4" />} tone="sky">
+          <b className="text-white">Celular e-waste:</b> aparece de vez en cuando en el centro. Recógelo rápido para ganar +{POINTS_BONUS} y un dato curioso.
+        </Item>
+        <Item icon={<Route className="h-4 w-4" />} tone="emerald">
+          <b className="text-white">Túneles:</b> en las avenidas, sal por un borde de la ciudad y apareces por el otro. ¡Ideal para escapar!
+        </Item>
+      </ul>
+    ),
+  },
+]
+
+// ==================== guía ====================
+
+export function MazeCollectorGuide({ onClose }: MazeCollectorGuideProps) {
+  const [index, setIndex] = useState(0)
+  const last = index === STEPS.length - 1
+  const step = STEPS[index]
+
+  const next = useCallback(() => {
+    if (last) onClose()
+    else setIndex((current) => current + 1)
+  }, [last, onClose])
+  const back = useCallback(() => setIndex((current) => Math.max(0, current - 1)), [])
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      // Un botón con foco ya reacciona a Enter/Espacio por su cuenta.
+      const onButton = event.target instanceof HTMLButtonElement
+      if (event.key === 'ArrowRight') {
+        event.preventDefault()
+        next()
+      } else if (event.key === 'ArrowLeft') {
+        event.preventDefault()
+        back()
+      } else if ((event.key === 'Enter' || event.key === ' ') && !onButton) {
+        event.preventDefault()
+        next()
+      } else if (event.key === 'Escape') {
+        event.preventDefault()
+        onClose()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [next, back, onClose])
+
+  return (
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center overflow-hidden bg-[#050b12]/90 p-2 text-slate-100 backdrop-blur-md sm:p-5"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Guía del Camión Reciclador"
+      data-game-guide="MAZE_COLLECTOR"
+    >
+      <div
+        className="relative flex max-h-full min-h-0 w-full max-w-[1080px] flex-col overflow-hidden rounded-[28px] border border-white/15 bg-gradient-to-b from-slate-900/95 to-[#08131c] shadow-[0_40px_120px_-30px_rgba(16,185,129,0.6)]"
+        style={{ height: 'min(100%, 680px)' }}
+      >
+        <header className="flex shrink-0 items-center gap-3 px-4 pt-3 sm:px-6 sm:pt-4">
+          <p className="min-w-0 flex-1 truncate text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-300/90">
+            Guía rápida · Paso {index + 1} de {STEPS.length}
+          </p>
+          <button
+            type="button"
+            className="flex items-center gap-1 rounded-xl border border-white/12 bg-white/5 px-3 py-1.5 text-[12.5px] font-medium text-slate-200 transition-colors hover:bg-white/10"
+            onClick={onClose}
+          >
+            Saltar guía <X className="h-3.5 w-3.5" />
+          </button>
+        </header>
+
+        <div
+          key={step.id}
+          className="tfg-step-in grid min-h-0 flex-1 grid-rows-[minmax(0,38%)_minmax(0,1fr)] gap-3 px-4 py-3 sm:px-6 landscape:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] landscape:grid-rows-1 landscape:gap-6"
+        >
+          <div className="min-h-0 min-w-0">{step.art}</div>
+          {/* El texto se ajusta solo al espacio: en pantallas chicas se reduce en vez de recortarse o hacer scroll. */}
+          <FitScale
+            className="h-full"
+            fitKey={step.id}
+            minScale={0.55}
+            contentClassName="flex flex-col gap-3 text-[clamp(0.8rem,1.9dvh+0.25vw,1.02rem)] leading-snug text-slate-300"
+          >
+            <h2 className="font-heading text-[clamp(1.15rem,3.4dvh+0.6vw,1.9rem)] font-bold leading-tight tracking-tight text-white">{step.title}</h2>
+            {step.body}
+          </FitScale>
+        </div>
+
+        <footer className="flex shrink-0 items-center gap-2 border-t border-white/10 px-3 py-3 sm:gap-3 sm:px-6">
+          <button
+            type="button"
+            disabled={index === 0}
+            aria-label="Paso anterior"
+            className="flex items-center gap-1 rounded-xl border border-white/12 px-2.5 py-2 text-[13px] font-semibold text-slate-200 transition-colors hover:bg-white/8 disabled:invisible sm:px-3.5"
+            onClick={back}
+          >
+            <ChevronLeft className="h-4 w-4" /> <span className="max-sm:hidden">Atrás</span>
+          </button>
+          <div className="flex min-w-0 flex-1 items-center justify-center gap-1.5 sm:gap-2" role="tablist" aria-label="Pasos de la guía">
+            {STEPS.map((item, i) => (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                aria-selected={i === index}
+                aria-label={`Paso ${i + 1}: ${item.title}`}
+                className={`h-2.5 rounded-full transition-all ${i === index ? 'w-6 bg-emerald-300' : 'w-2.5 bg-white/25 hover:bg-white/45'}`}
+                onClick={() => setIndex(i)}
+              />
+            ))}
+          </div>
+          <button
+            type="button"
+            autoFocus
+            className="flex shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-2 text-[13.5px] font-bold text-white shadow-[0_10px_26px_-10px_rgba(52,211,153,0.8)] transition-transform hover:-translate-y-0.5 sm:px-5"
+            onClick={next}
+          >
+            {last ? '¡A jugar!' : 'Siguiente'} {!last && <ChevronRight className="h-4 w-4" />}
+          </button>
+        </footer>
+      </div>
+    </div>
   )
 }

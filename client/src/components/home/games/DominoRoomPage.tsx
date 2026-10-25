@@ -1066,7 +1066,7 @@ export function EndDropZone({
 /** Fichas de mano notablemente más grandes que en el modo un-jugador, y con
  * borde/fondo tintados por concepto para que cada una se distinga a simple
  * vista sin tener que leer la etiqueta. */
-export function HandTileView({
+function HandTileView({
   tile,
   selected,
   state,

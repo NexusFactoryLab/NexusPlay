@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { connectorPoints } from './DominoChainConnector'
+import { demoTileHalfPresentation } from './DominoVisualDemo'
 import {
   BOARD_TILE_CONTENT,
   boardConceptAccessibility,
@@ -39,6 +40,10 @@ describe('primitivas visuales de cadena Dominexo', () => {
     })
   })
 
+  it('mantiene la misma diferencia de contexto en el tutorial', () => {
+    expect(demoTileHalfPresentation('hand', 'A')).toMatchObject({ showLabel: true, ariaLabel: 'Concepto A' })
+    expect(demoTileHalfPresentation('board', 'A')).toMatchObject({ showLabel: false, ariaLabel: 'Concepto A' })
+  })
 
   it('serializa conectores rectos y de giro usando exactamente sus coordenadas', () => {
     expect(connectorPoints([{ x: 2, y: 3 }, { x: 8, y: 3 }])).toBe('2,3 8,3')
