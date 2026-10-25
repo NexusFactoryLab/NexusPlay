@@ -49,6 +49,8 @@ import {
   type ConceptDraft,
 } from './dominoContentDraft'
 import { DominoConceptPanel } from './DominoConceptPanel'
+import { DominoLevelsSummary, DominoLevelNotice } from './DominoLevelsSummary'
+import { creationLevelNotice } from './dominoLevelsDraft'
 import { AiIdentityBadges, useAiIdentity } from './useAiIdentity'
 import {
   approveConcept,
@@ -118,6 +120,8 @@ export function DominoGameForm({
   const [createdGameId, setCreatedGameId] = useState<string | null>(null)
   const [phase, setPhase] = useState(0)
   const [selectedConcept, setSelectedConcept] = useState(0)
+  // Aviso previo a crear: visible cuando el profesor pulsó "Crear juego" y algún nivel quedaría sin contenido.
+  const [levelNoticeOpen, setLevelNoticeOpen] = useState(false)
   const { setSubPhase } = useCreateGameProgress()
 
   // Informa al header del wizard (CreateGameLayout) en qué fase va este
@@ -298,6 +302,20 @@ export function DominoGameForm({
       }
     }
 
+    // Aviso previo: si algún nivel no quedará disponible, no se crea todavía; el profesor decide
+    // completar ahora o crear de todos modos (el bloqueo de revisión de IA ya se aplicó arriba).
+    if (creationLevelNotice(concepts)) {
+      setError(null)
+      setLevelNoticeOpen(true)
+      return
+    }
+    await createNow()
+  }
+
+  /** Crea el juego (ya validado y, si hacía falta, confirmado el aviso de niveles). */
+  async function createNow() {
+    if (!token) return
+    setLevelNoticeOpen(false)
     setSubmitting(true)
     setError(null)
     try {
@@ -342,6 +360,7 @@ export function DominoGameForm({
 
   const tileCount = (concepts.length * (concepts.length + 1)) / 2
   const reviewSummary = reviewProgress(concepts)
+  const levelNotice = creationLevelNotice(concepts)
 
   return (
     <GameFormShell
@@ -458,7 +477,7 @@ export function DominoGameForm({
         )}
 
         {phase === 2 && (
-        <FormSection icon={Puzzle} title="Conceptos" subtitle="Cada concepto necesita al menos una pregunta; así cada ficha queda con las dos de sus lados." tone={3} bare>
+        <FormSection icon={Puzzle} title="Conceptos" subtitle="Cada nivel pide algo distinto: mira el resumen de abajo para saber qué completar." tone={3} bare>
 {reviewSummary.total > 0 && (
           <div
             className="mb-4 flex animate-[fade-in-up_0.25s_ease-out] flex-col gap-3 rounded-2xl border border-border px-4 py-3 text-[16px] text-text-h motion-reduce:animate-none"
@@ -508,6 +527,7 @@ export function DominoGameForm({
             </div>
           </div>
         )}
+<DominoLevelsSummary concepts={concepts} onJump={setSelectedConcept} />
 <ItemGridEditor
           itemLabel="Concepto"
           addLabel="+ Agregar concepto"
@@ -547,6 +567,19 @@ export function DominoGameForm({
           }
         />
 </FormSection>
+        )}
+
+        {levelNoticeOpen && levelNotice && (
+          <DominoLevelNotice
+            notice={levelNotice}
+            disabled={submitting}
+            onComplete={() => {
+              setLevelNoticeOpen(false)
+              setPhase(2)
+              setSelectedConcept(levelNotice.firstConceptIndex)
+            }}
+            onCreateAnyway={createNow}
+          />
         )}
 
         {error && (

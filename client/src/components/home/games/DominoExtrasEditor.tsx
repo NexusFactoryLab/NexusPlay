@@ -1,4 +1,5 @@
 import { DOMINO_LIMITS, type ConceptDraft } from './dominoContentDraft'
+import { DOMINO_LEVEL_INFO } from './dominoLevels'
 
 const fieldClass =
   'w-full rounded-lg border border-border bg-bg px-3 py-2.5 text-[16px] leading-snug text-text-h outline-none transition-colors focus:border-accent disabled:opacity-60'
@@ -11,26 +12,30 @@ type Props = {
 }
 
 const EXTRAS = [
-  { field: 'definition', title: 'Definición', level: 'Todos los niveles', rows: 2, max: DOMINO_LIMITS.definition, help: 'Una frase que explica el concepto. Aparece como retroalimentación al colocar la ficha.' },
-  { field: 'example', title: 'Ejemplo cotidiano', level: 'Nivel Fácil', rows: 2, max: DOMINO_LIMITS.example, help: 'Un ejemplo sencillo, pensado para niños.' },
-  { field: 'application', title: 'Caso de aplicación', level: 'Nivel Universitario', rows: 3, max: DOMINO_LIMITS.application, help: 'Una situación real donde se aplica el concepto.' },
+  { field: 'definition', title: 'Definición', levelKey: 'EASY', level: 'Fácil', rows: 2, max: DOMINO_LIMITS.definition, help: 'Una frase que explica el concepto. Aparece como retroalimentación al colocar la ficha (en todos los niveles).' },
+  { field: 'example', title: 'Ejemplo cotidiano', levelKey: 'EASY', level: 'Fácil', rows: 2, max: DOMINO_LIMITS.example, help: 'Un ejemplo sencillo, pensado para niños.' },
+  { field: 'application', title: 'Caso de aplicación', levelKey: 'ADVANCED', level: 'Universitario', rows: 3, max: DOMINO_LIMITS.application, help: 'Una situación real donde se aplica el concepto. Sin caso, el nivel Universitario no queda disponible.' },
 ] as const
 
 /** Material opcional por nivel: cada campo indica en qué nivel del juego se usa. */
 export function DominoExtrasEditor({ concept, index, disabled, onChange }: Props) {
   return (
     <div className="flex flex-col gap-4">
-      {EXTRAS.map(({ field, title, level, rows, max, help }) => (
-        <div key={field} className="flex flex-col gap-1.5 rounded-2xl border border-border bg-surface p-4">
+      {EXTRAS.map(({ field, title, level, levelKey, rows, max, help }) => (
+        <div
+          key={field}
+          className="flex flex-col gap-1.5 rounded-2xl border border-border border-l-[6px] bg-surface p-4"
+          style={{ borderLeftColor: DOMINO_LEVEL_INFO[levelKey].color }}
+        >
           <div className="flex flex-wrap items-center justify-between gap-2">
             <label className="text-[16px] font-semibold text-text-h" htmlFor={`domino-${field}-${index}`}>
               {title} <span className="font-normal text-text">(opcional)</span>
             </label>
             <span
               className="rounded-full px-3 py-0.5 text-[16px] font-medium text-text-h"
-              style={{ background: 'color-mix(in srgb, var(--accent) 14%, var(--surface))' }}
+              style={{ background: `color-mix(in srgb, ${DOMINO_LEVEL_INFO[levelKey].color} 20%, var(--surface))` }}
             >
-              {level}
+              Nivel {level}
             </span>
           </div>
           <textarea

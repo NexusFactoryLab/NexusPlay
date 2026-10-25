@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Check, Plus, Trash2 } from 'lucide-react'
 import { DOMINO_LIMITS, emptyQuestion, questionIssue, type ConceptDraft, type QuestionDraft } from './dominoContentDraft'
+import { QUESTION_LEVELS, serves, toggleQuestionLevel, type QuestionLevel } from './dominoLevelsDraft'
+import { DOMINO_LEVEL_INFO } from './dominoLevels'
 
 const fieldClass =
   'w-full rounded-lg border border-border bg-bg px-3 py-2.5 text-[16px] leading-snug text-text-h outline-none transition-colors focus:border-accent disabled:opacity-60'
@@ -28,6 +30,10 @@ export function DominoQuestionsEditor({ concept, index, disabled, onChange }: Pr
 
   function updateQuestion(qIndex: number, patch: Partial<QuestionDraft>) {
     onChange({ ...concept, questions: concept.questions.map((q, i) => (i === qIndex ? { ...q, ...patch } : q)) })
+  }
+
+  function toggleLevel(qIndex: number, level: QuestionLevel) {
+    onChange({ ...concept, questions: concept.questions.map((q, i) => (i === qIndex ? toggleQuestionLevel(q, level) : q)) })
   }
 
   function updateOption(qIndex: number, oIndex: number, value: string) {
@@ -63,7 +69,7 @@ export function DominoQuestionsEditor({ concept, index, disabled, onChange }: Pr
   return (
     <section aria-label="Preguntas del concepto" className="flex flex-col gap-4">
       <p className="text-[16px] leading-snug text-text">
-        Cada ficha tiene dos conceptos, uno por lado: con una pregunta por concepto, cada ficha queda con sus dos preguntas.
+        En Intermedio y Universitario se responde una pregunta del concepto antes de colocar la ficha. Marca en qué nivel sale cada una; cada nivel necesita al menos una por concepto.
       </p>
 
       <div role="tablist" aria-label="Preguntas del concepto" className="flex flex-wrap items-center gap-2">
@@ -131,6 +137,38 @@ export function DominoQuestionsEditor({ concept, index, disabled, onChange }: Pr
               </button>
             )}
           </div>
+
+          <fieldset className="flex flex-col gap-2">
+            <legend className={labelClass}>Sale en</legend>
+            <div className="flex flex-wrap gap-2">
+              {QUESTION_LEVELS.map((level) => {
+                const on = serves(question, level)
+                const { color } = DOMINO_LEVEL_INFO[level]
+                return (
+                  <button
+                    key={level}
+                    type="button"
+                    aria-pressed={on}
+                    disabled={disabled}
+                    onClick={() => toggleLevel(qIndex, level)}
+                    className="inline-flex min-h-[44px] items-center gap-2 rounded-full border-2 px-4 text-[16px] font-semibold text-text-h transition-all duration-200 focus-visible:outline-2 focus-visible:outline-accent active:scale-95 disabled:opacity-50 motion-reduce:transition-none motion-reduce:active:scale-100"
+                    style={{
+                      borderColor: on ? color : 'var(--border)',
+                      background: on ? `color-mix(in srgb, ${color} 16%, var(--surface))` : 'transparent',
+                    }}
+                  >
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full border-2" style={{ borderColor: color, background: on ? color : 'transparent' }} aria-hidden="true">
+                      {on && <Check className="h-3 w-3 text-white" strokeWidth={4} />}
+                    </span>
+                    {DOMINO_LEVEL_INFO[level].label}
+                  </button>
+                )
+              })}
+            </div>
+            <p className="text-[16px] leading-snug text-text">
+              Intermedio = comprensión directa del concepto. Universitario = aplicación al caso (se muestra sobre la pregunta). Marca al menos uno.
+            </p>
+          </fieldset>
 
           <div>
             <label className={labelClass} htmlFor={id(`q${qIndex}-text`)}>Texto de la pregunta</label>

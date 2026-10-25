@@ -1,5 +1,6 @@
 import { MIN_DOMINO_CONCEPTS } from './dominoTypes'
 import type { ConceptDraft, ContentIssue } from './dominoContentDraft'
+import { conceptLevelWarnings } from './dominoLevelsDraft'
 
 /**
  * Lógica de la revisión del contenido de Dominexo generado por IA (funciones puras).
@@ -36,7 +37,9 @@ export function tileReviewState(concept: ConceptDraft | undefined): 'pending' | 
   const status = reviewStatusOf(concept)
   if (status === 'none') return null
   if (status === 'approved') return 'reviewed'
-  return concept?.aiWarnings && concept.aiWarnings.length > 0 ? 'warning' : 'pending'
+  // Advertencias del servidor o niveles que el concepto aún no cubre.
+  const hasWarning = (concept?.aiWarnings?.length ?? 0) > 0 || (concept ? conceptLevelWarnings(concept).length > 0 : false)
+  return hasWarning ? 'warning' : 'pending'
 }
 
 /**

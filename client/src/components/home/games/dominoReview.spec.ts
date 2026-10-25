@@ -134,9 +134,17 @@ describe('bloqueo de creación', () => {
 
 describe('tileReviewState (estado visible de la celda)', () => {
   it('pendiente, con advertencia, revisado y sin revisión', () => {
-    const [a, b] = markAsAiGenerated(concepts(2), [{ conceptIndex: 1, message: 'Pocas opciones' }])
+    // Concepto que cubre todos los niveles (caso + pregunta) para aislar el efecto de las advertencias.
+    const covered = concepts(2).map((c) => ({
+      ...c,
+      application: 'Un caso real.',
+      questions: [{ text: 't', options: ['a', 'b', 'c'], correctIndex: 0, explanation: 'e' }],
+    }))
+    const [a, b] = markAsAiGenerated(covered, [{ conceptIndex: 1, message: 'Pocas opciones' }])
     expect(tileReviewState(a)).toBe('pending')
     expect(tileReviewState(b)).toBe('warning')
+    // Sin caso de aplicación, aunque el servidor no avise, la celda marca advertencia de niveles.
+    expect(tileReviewState(markAsAiGenerated(concepts(1))[0])).toBe('warning')
     expect(tileReviewState(approveConcept([a], 0)[0])).toBe('reviewed')
     expect(tileReviewState(concepts(1)[0])).toBeNull()
     expect(tileReviewState(undefined)).toBeNull()

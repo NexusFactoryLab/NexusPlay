@@ -6,6 +6,8 @@ import { DominoQuestionsEditor } from './DominoQuestionsEditor'
 import { DominoExtrasEditor } from './DominoExtrasEditor'
 import { DOMINO_ICON_LABELS } from './dominoTypes'
 import { reviewStatusOf } from './dominoReview'
+import { conceptLevelGaps, conceptLevelWarnings } from './dominoLevelsDraft'
+import { DOMINO_LEVEL_INFO } from './dominoLevels'
 import { questionIssue, type ConceptDraft } from './dominoContentDraft'
 
 const TABS = [
@@ -14,6 +16,25 @@ const TABS = [
   { key: 'extras', label: 'Extras por nivel', Icon: Sparkles },
 ] as const
 type TabKey = (typeof TABS)[number]['key']
+
+const LEVEL_ROWS = [
+  { level: 'EASY', hint: 'Definición y ejemplo' },
+  { level: 'MEDIUM', hint: 'Preguntas marcadas' },
+  { level: 'ADVANCED', hint: 'Caso y preguntas' },
+] as const
+
+/** Qué falta en este concepto para cada nivel (Fácil solo sugiere definición/ejemplo, no bloquea nada). */
+function levelMissing(concept: ConceptDraft): Record<'EASY' | 'MEDIUM' | 'ADVANCED', string[]> {
+  const gaps = conceptLevelGaps(concept)
+  return {
+    EASY: [
+      ...(concept.definition.trim() ? [] : ['definición']),
+      ...(concept.example.trim() ? [] : ['ejemplo']),
+    ],
+    MEDIUM: gaps.noMediumQuestion ? ['una pregunta de Intermedio'] : [],
+    ADVANCED: [...(gaps.missingCase ? ['caso'] : []), ...(gaps.noAdvancedQuestion ? ['una pregunta de Universitario'] : [])],
+  }
+}
 
 type Props = {
   concept: ConceptDraft
@@ -33,7 +54,9 @@ type Props = {
 export function DominoConceptPanel({ concept, index, disabled, onChange, onApprove }: Props) {
   const [tab, setTab] = useState<TabKey>('concept')
   const status = reviewStatusOf(concept)
-  const questionProblems = concept.questions.filter((q) => questionIssue(q) !== null).length
+  // Advertencias del servidor + niveles que el concepto aún no cubre (se recalculan al editar).
+  const allWarnings = [...new Set([...(concept.aiWarnings ?? []), ...conceptLevelWarnings(concept)])]
+  const questionProblems =concept.questions.filter((q) => questionIssue(q) !== null).length
 
   return (
     <div className="flex flex-col gap-4">
@@ -72,9 +95,9 @@ export function DominoConceptPanel({ concept, index, disabled, onChange, onAppro
               </button>
             )}
           </div>
-          {concept.aiWarnings && concept.aiWarnings.length > 0 && (
+          {allWarnings.length > 0 && (
             <ul className="flex flex-wrap gap-2" aria-label="Advertencias automáticas">
-              {concept.aiWarnings.map((warning) => (
+              {allWarnings.map((warning) => (
                 <li
                   key={warning}
                   className="inline-flex min-h-[32px] items-center gap-1.5 rounded-full px-3 text-[16px] font-medium text-text-h"
@@ -89,6 +112,30 @@ export function DominoConceptPanel({ concept, index, disabled, onChange, onAppro
           <p className="text-[16px] leading-snug text-text">La IA puede equivocarse: revisa los datos. Editar el concepto también lo marca como revisado.</p>
         </div>
       )}
+
+      <ul className="grid grid-cols-1 gap-2 sm:grid-cols-3" aria-label="Qué hay que completar por nivel">
+        {LEVEL_ROWS.map(({ level, hint }) => {
+          const missing = levelMissing(concept)[level]
+          const { color, label } = DOMINO_LEVEL_INFO[level]
+          return (
+            <li key={level}>
+              <button
+                type="button"
+                // Lleva a donde se arregla: el caso vive en Extras; las preguntas, en Preguntas.
+                onClick={() => setTab(level === 'EASY' || missing.includes('caso') ? 'extras' : 'questions')}
+                className="flex min-h-[44px] w-full flex-col items-start gap-0.5 rounded-xl border px-3 py-2 text-left text-[16px] leading-snug text-text-h transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-accent motion-reduce:transition-none"
+                style={{ borderColor: color, background: `color-mix(in srgb, ${color} ${missing.length ? 6 : 14}%, var(--surface))` }}
+              >
+                <span className="flex items-center gap-1.5 font-semibold">
+                  {missing.length === 0 ? <CheckCircle2 className="h-5 w-5" style={{ color }} aria-label="Listo" /> : <AlertTriangle className="h-5 w-5" style={{ color }} aria-label="Falta algo" />}
+                  {label}
+                </span>
+                <span className="text-text">{missing.length === 0 ? hint : `Falta: ${missing.join(' y ')}`}</span>
+              </button>
+            </li>
+          )
+        })}
+      </ul>
 
       <div role="tablist" aria-label="Secciones del concepto" className="flex flex-wrap gap-2">
         {TABS.map(({ key, label, Icon }) => {
