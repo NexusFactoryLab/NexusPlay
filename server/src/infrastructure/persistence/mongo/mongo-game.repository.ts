@@ -75,7 +75,13 @@ export class MongoGameRepository implements GameRepository, OnModuleInit {
   async save(game: Game, expectedVersion?: number): Promise<void> {
     const doc = GameMapper.toPersistence(game);
     const filter: Record<string, unknown> = { _id: doc._id };
-    if (expectedVersion !== undefined) filter.version = expectedVersion;
+    if (expectedVersion !== undefined) {
+      // Los juegos anteriores al control de versiones (y los sembrados) no
+      // tienen el campo `version`: el mapper los lee como 0, pero `{ version: 0 }`
+      // no encuentra un documento sin ese campo y toda edición fallaba con
+      // "modificado por otra operación". Ese `$set` ya escribe `version`.
+      filter.version = expectedVersion === 0 ? { $in: [0, null] } : expectedVersion;
+    }
 
     try {
       const result = await this.collection.updateOne(
