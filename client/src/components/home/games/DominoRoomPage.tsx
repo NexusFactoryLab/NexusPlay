@@ -35,6 +35,8 @@ import {
 } from './dominoBoardCamera'
 import { DealCountdownOverlay, TurnBanner, TurnPopBanner, useCountdown } from './MatchBoard'
 import { Modal } from './Modal'
+import { DominoScenery, dominoSceneForTheme } from './DominoScenery'
+import { useTheme } from '../../../hooks/useTheme'
 
 /**
  * Sala de Dominó 1v1 en tiempo real: página propia (ruta `/domino/sala/:code?`,
@@ -53,6 +55,8 @@ function DominoRoomPageSession() {
   const gameIdToCreate = searchParams.get('gameId')
   const navigate = useNavigate()
   const { token, user } = useAuth()
+  const { theme } = useTheme()
+  const scene = dominoSceneForTheme(theme)
   const {
     room,
     error,
@@ -474,7 +478,8 @@ function DominoRoomPageSession() {
   >{dealCountdownMs !== null && <DealCountdownOverlay remainingMs={dealCountdownMs} />}</MultiplayerLobby>
 
   return (
-    <div className="domino-premium-room fixed inset-0 z-50 overflow-y-auto bg-[#080F24]">
+    <div className={`domino-premium-room domino-room--${scene} fixed inset-0 z-50 overflow-y-auto bg-[#080F24]`}>
+      <DominoScenery scene={scene} />
       {dealCountdownMs !== null && <DealCountdownOverlay remainingMs={dealCountdownMs} />}
 
       {room?.phase === 'PLAYING' && questionConcept && questionToShow && (
@@ -501,7 +506,7 @@ function DominoRoomPageSession() {
         </div>
       )}
 
-      <div className="domino-premium-shell mx-auto flex min-h-full w-full max-w-[1600px] flex-col p-3 sm:h-full sm:p-5">
+      <div className="domino-premium-shell relative z-10 mx-auto flex min-h-full w-full max-w-[1600px] flex-col p-3 sm:h-full sm:p-5">
         <header className={`domino-premium-header ${room?.phase === 'PLAYING' ? 'domino-premium-header--playing' : ''} mb-1.5 flex flex-wrap items-center justify-between gap-2 rounded-2xl border px-3 py-1.5 sm:flex-nowrap`}>
           {room?.phase === 'PLAYING' ? (
             <span className="sr-only">{room.gameTitle ?? 'Dominexo'}, sala en vivo. {isMyTurn ? 'Es tu turno.' : 'Es el turno del rival.'}</span>

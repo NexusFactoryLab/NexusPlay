@@ -700,6 +700,112 @@ code {
     linear-gradient(145deg, #6472bb 0%, var(--domino-room-indigo) 47%, #3d4d8d 100%);
 }
 
+/* Fondo de la sala (DominoScenery.tsx): pradera de día (Claro) o fantasía de noche (Oscuro),
+ * detrás de todo el contenido. El paisaje es fijo: no se mueve al desplazar la sala. */
+.domino-scenery {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  isolation: isolate;
+}
+
+.domino-scenery--meadow {
+  background: linear-gradient(180deg, #8ec8f0 0%, #b9def6 45%, #e3f1fb 100%), #bfe0f7;
+}
+
+.domino-scenery--fantasy {
+  background-color: #17123a;
+  background-image:
+    radial-gradient(1.6px 1.6px at 24px 36px, rgba(255, 255, 255, 0.95) 50%, transparent 52%),
+    radial-gradient(1.2px 1.2px at 140px 90px, rgba(255, 255, 255, 0.8) 50%, transparent 52%),
+    radial-gradient(1px 1px at 210px 190px, rgba(255, 236, 170, 0.9) 50%, transparent 52%),
+    radial-gradient(1.4px 1.4px at 80px 230px, rgba(255, 255, 255, 0.7) 50%, transparent 52%),
+    radial-gradient(1px 1px at 60px 120px, rgba(196, 180, 255, 0.9) 50%, transparent 52%),
+    radial-gradient(1.2px 1.2px at 300px 60px, rgba(255, 255, 255, 0.85) 50%, transparent 52%),
+    linear-gradient(180deg, #120d33 0%, #1e1656 55%, #2d2170 100%);
+  background-size: 260px 260px, 260px 260px, 260px 260px, 260px 260px, 340px 340px, 340px 340px, 100% 100%;
+  background-repeat: repeat, repeat, repeat, repeat, repeat, repeat, no-repeat;
+}
+
+.domino-aurora {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.5;
+  animation: domino-aurora-drift 22s ease-in-out infinite alternate;
+}
+
+.domino-aurora--violet { top: -12%; right: 6%; width: 52vw; height: 46vh; background: radial-gradient(closest-side, rgba(160, 110, 255, 0.75), transparent); }
+.domino-aurora--teal { top: 24%; left: -8%; width: 44vw; height: 40vh; background: radial-gradient(closest-side, rgba(23, 185, 187, 0.5), transparent); animation-duration: 28s; }
+.domino-aurora--rose { bottom: -10%; left: 30%; width: 50vw; height: 38vh; background: radial-gradient(closest-side, rgba(255, 61, 160, 0.32), transparent); animation-duration: 34s; }
+
+.domino-moon {
+  position: absolute;
+  top: 9%;
+  right: 12%;
+  width: clamp(56px, 7vw, 96px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 36% 34%, #fffbe8 0%, #f6e9b4 55%, #e2cf8a 100%);
+  box-shadow: 0 0 40px 10px rgba(255, 240, 180, 0.35), 0 0 120px 40px rgba(180, 150, 255, 0.25);
+  opacity: 0.92;
+}
+
+.domino-twinkle {
+  position: absolute;
+  color: #fff3b8;
+  text-shadow: 0 0 10px rgba(255, 240, 180, 0.9);
+  animation: domino-twinkle 3.6s ease-in-out infinite;
+}
+
+.domino-twinkle--1 { top: 12%; left: 14%; font-size: 18px; }
+.domino-twinkle--2 { top: 22%; left: 62%; font-size: 14px; animation-delay: -1.2s; }
+.domino-twinkle--3 { top: 38%; left: 82%; font-size: 20px; animation-delay: -2.4s; }
+.domino-twinkle--4 { top: 56%; left: 8%; font-size: 12px; animation-delay: -0.6s; }
+.domino-twinkle--5 { top: 18%; left: 38%; font-size: 16px; animation-delay: -1.8s; }
+.domino-twinkle--6 { top: 66%; left: 70%; font-size: 14px; animation-delay: -3s; }
+
+/* Siluetas de colinas oscuras al fondo. */
+.domino-ridge {
+  position: absolute;
+  left: -5%;
+  right: -5%;
+  bottom: 0;
+}
+
+.domino-ridge--back {
+  height: 26%;
+  background: #241a63;
+  clip-path: polygon(0 100%, 0 55%, 14% 38%, 30% 58%, 46% 30%, 63% 52%, 80% 34%, 100% 56%, 100% 100%);
+  opacity: 0.85;
+}
+
+.domino-ridge--front {
+  height: 17%;
+  background: #1a1250;
+  clip-path: polygon(0 100%, 0 62%, 18% 44%, 38% 66%, 58% 40%, 78% 62%, 100% 46%, 100% 100%);
+}
+
+@keyframes domino-aurora-drift {
+  from { transform: translate3d(-3%, 0, 0) scale(1); }
+  to { transform: translate3d(4%, 5%, 0) scale(1.12); }
+}
+
+@keyframes domino-twinkle {
+  0%, 100% { opacity: 0.25; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+/* Sobre la pradera clara, los paneles de vidrio se tiñen de azul profundo para seguir
+ * leyéndose y combinar con el cielo. */
+.domino-room--meadow {
+  --domino-room-surface: rgba(30, 68, 112, 0.82);
+  --domino-room-surface-raised: rgba(42, 86, 138, 0.86);
+  --domino-room-border: rgba(214, 232, 255, 0.34);
+}
+
 .domino-premium-shell { min-height: 100%; }
 
 @media (min-width: 1024px) {
