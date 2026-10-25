@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Rocket, SlidersHorizontal, Puzzle, ClipboardCheck } from 'lucide-react'
+import { Rocket, SlidersHorizontal, Puzzle } from 'lucide-react'
 import type { FormEvent } from 'react'
 import { TextField } from '../../TextField'
 import { SaveVisibilityModal } from './SaveVisibilityModal'
@@ -48,9 +48,11 @@ import {
   validateDominoConcepts,
   type ConceptDraft,
 } from './dominoContentDraft'
-import { DominoConceptPanel } from './DominoConceptPanel'
-import { DominoLevelsSummary, DominoLevelNotice } from './DominoLevelsSummary'
-import { creationLevelNotice } from './dominoLevelsDraft'
+import { DominoConceptTabsPanel } from './DominoConceptTabsPanel'
+import { DominoContentBar } from './DominoContentBar'
+import { DominoLevelNotice } from './DominoLevelNotice'
+import { creationLevelNotice, firstGapIndex, serves } from './dominoLevelsDraft'
+import type { ConceptTab } from './dominoConceptTabs'
 import { AiIdentityBadges, useAiIdentity } from './useAiIdentity'
 import {
   approveConcept,
@@ -59,7 +61,6 @@ import {
   markAsAiGenerated,
   nextPendingIndex,
   reviewBlockIssue,
-  reviewProgress,
   tileReviewState,
 } from './dominoReview'
 
@@ -120,6 +121,8 @@ export function DominoGameForm({
   const [createdGameId, setCreatedGameId] = useState<string | null>(null)
   const [phase, setPhase] = useState(0)
   const [selectedConcept, setSelectedConcept] = useState(0)
+  // Pestaña abierta del panel del concepto (se mantiene al cambiar de concepto).
+  const [conceptTab, setConceptTab] = useState<ConceptTab>('CONCEPT')
   // Aviso previo a crear: visible cuando el profesor pulsó "Crear juego" y algún nivel quedaría sin contenido.
   const [levelNoticeOpen, setLevelNoticeOpen] = useState(false)
   const { setSubPhase } = useCreateGameProgress()
@@ -221,6 +224,12 @@ export function DominoGameForm({
     if (next !== null) setSelectedConcept(next)
   }
 
+  /** Lleva a un concepto y abre la pestaña indicada (resumen, aviso previo y advertencias la usan). */
+  function jumpTo(conceptIndex: number, tab: ConceptTab) {
+    setSelectedConcept(conceptIndex)
+    setConceptTab(tab)
+  }
+
   function addConcept() {
     setConcepts((current) =>
       current.length < MAX_DOMINO_CONCEPTS ? [...current, emptyConcept(current.length)] : current,
@@ -266,7 +275,12 @@ export function DominoGameForm({
     // Exige 1 pregunta completa por concepto (ver validateDominoConcepts); lleva al concepto con el problema.
     const issue = validateDominoConcepts(concepts)
     if (!issue) return null
-    if (issue.conceptIndex !== undefined) setSelectedConcept(issue.conceptIndex)
+    if (issue.conceptIndex !== undefined) {
+      setSelectedConcept(issue.conceptIndex)
+      // Si el problema es de una pregunta, abre la pestaña del nivel donde sale.
+      const bad = issue.questionIndex !== undefined ? concepts[issue.conceptIndex]?.questions[issue.questionIndex] : undefined
+      if (bad) setConceptTab(serves(bad, 'MEDIUM') ? 'MEDIUM' : 'ADVANCED')
+    }
     return issue.message
   }
 
@@ -359,7 +373,6 @@ export function DominoGameForm({
   }
 
   const tileCount = (concepts.length * (concepts.length + 1)) / 2
-  const reviewSummary = reviewProgress(concepts)
   const levelNotice = creationLevelNotice(concepts)
 
   return (
@@ -477,57 +490,8 @@ export function DominoGameForm({
         )}
 
         {phase === 2 && (
-        <FormSection icon={Puzzle} title="Conceptos" subtitle="Cada nivel pide algo distinto: mira el resumen de abajo para saber qué completar." tone={3} bare>
-{reviewSummary.total > 0 && (
-          <div
-            className="mb-4 flex animate-[fade-in-up_0.25s_ease-out] flex-col gap-3 rounded-2xl border border-border px-4 py-3 text-[16px] text-text-h motion-reduce:animate-none"
-            style={{
-              background: reviewSummary.complete
-                ? 'color-mix(in srgb, var(--nx-ok) 12%, var(--surface))'
-                : 'color-mix(in srgb, #f59e0b 14%, var(--surface))',
-            }}
-            role="region"
-            aria-label="Revisión del contenido de IA"
-          >
-            <div className="flex flex-wrap items-center gap-3">
-              <ClipboardCheck className="h-5 w-5 shrink-0" aria-hidden="true" />
-              <p className="min-w-0 flex-1 font-semibold" aria-live="polite">
-                {reviewSummary.reviewed} de {reviewSummary.total} revisados
-                <span className="font-normal">
-                  {' · '}
-                  {reviewSummary.complete ? 'todo listo para crear el juego.' : 'La IA puede equivocarse: revisa los datos antes de publicar.'}
-                </span>
-              </p>
-              {!reviewSummary.complete && (
-                <button
-                  type="button"
-                  className="nx-btn nx-btn-secondary min-h-[44px] border border-border text-[16px] text-text-h"
-                  onClick={goToNextPending}
-                  disabled={submitting}
-                >
-                  Ir al siguiente pendiente
-                </button>
-              )}
-            </div>
-            <div
-              className="h-2.5 overflow-hidden rounded-full bg-border"
-              role="progressbar"
-              aria-label="Avance de la revisión"
-              aria-valuemin={0}
-              aria-valuemax={reviewSummary.total}
-              aria-valuenow={reviewSummary.reviewed}
-            >
-              <div
-                className="h-full rounded-full transition-[width] duration-300 ease-out motion-reduce:transition-none"
-                style={{
-                  width: `${Math.round((reviewSummary.reviewed / reviewSummary.total) * 100)}%`,
-                  background: 'linear-gradient(90deg, var(--accent), var(--accent-2))',
-                }}
-              />
-            </div>
-          </div>
-        )}
-<DominoLevelsSummary concepts={concepts} onJump={setSelectedConcept} />
+        <FormSection icon={Puzzle} title="Conceptos" subtitle="Cada nivel pide algo distinto: usa las pestañas de cada concepto y la franja de niveles." tone={3} bare>
+<DominoContentBar concepts={concepts} onJump={jumpTo} onNextPending={goToNextPending} />
 <ItemGridEditor
           itemLabel="Concepto"
           addLabel="+ Agregar concepto"
@@ -555,10 +519,12 @@ export function DominoGameForm({
           }}
           renderEditor={(index) =>
             concepts[index] ? (
-              <DominoConceptPanel
+              <DominoConceptTabsPanel
                 concept={concepts[index]}
                 index={index}
                 disabled={submitting}
+                tab={conceptTab}
+                onTabChange={setConceptTab}
                 // Editar un concepto de IA cuenta como revisarlo.
                 onChange={(next) => setConcepts((current) => editConcept(current, index, next))}
                 onApprove={() => setConcepts((current) => approveConcept(current, index))}
@@ -576,7 +542,9 @@ export function DominoGameForm({
             onComplete={() => {
               setLevelNoticeOpen(false)
               setPhase(2)
-              setSelectedConcept(levelNotice.firstConceptIndex)
+              // Abre la pestaña del primer nivel que faltaba (Intermedio o Universitario), nunca la misma para ambos.
+              const level = levelNotice.missing[0]
+              jumpTo(firstGapIndex(concepts, level) ?? levelNotice.firstConceptIndex, level)
             }}
             onCreateAnyway={createNow}
           />
