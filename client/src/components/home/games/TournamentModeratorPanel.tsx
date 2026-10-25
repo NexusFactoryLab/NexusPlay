@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Bot, Crown, LogOut, Medal, Radio, Swords, Trophy } from 'lucide-react'
 import { useFlip } from '../../../hooks/useFlip'
 import type { TournamentStateView } from './guessWhoTypes'
+import { TOURNAMENT_LEVEL_INFO } from './tournamentLevels'
 
 type Props = {
   tournament: TournamentStateView
@@ -44,6 +45,8 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
   const roundsDone = finished ? tournament.totalRounds : Math.max(0, tournament.currentRound - 1)
   const progress = Math.round((roundsDone / tournament.totalRounds) * 100)
   const rowsRef = useFlip<HTMLDivElement>()
+  const roundGame = tournament.games[(Math.max(1, tournament.currentRound) - 1) % tournament.games.length]
+  const roundInfo = TOURNAMENT_LEVEL_INFO[roundGame.level]
 
   return (
     <div className="page-fade fixed inset-0 z-50 overflow-y-auto bg-bg">
@@ -63,6 +66,9 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
                 <span className="inline-flex items-center gap-1.5">
                   <span className="live-dot" aria-hidden="true" />
                   Ronda {tournament.currentRound} de {tournament.totalRounds} · {playing} en juego
+                  <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${roundInfo.tone}`}>
+                    {roundGame.title} · {roundInfo.label} ({roundInfo.audience})
+                  </span>
                 </span>
               )}
             </p>

@@ -4,6 +4,25 @@ export const TOURNAMENT_STORE = Symbol('TOURNAMENT_STORE');
 
 export type TournamentPhase = 'WAITING' | 'RUNNING' | 'FINISHED';
 
+/** Complejidad de un juego dentro del torneo (issue #102): cambia el tablero, el tiempo por turno y el bot. */
+export type TournamentLevel = 'EASY' | 'MEDIUM' | 'HARD';
+
+export const TOURNAMENT_LEVELS: Record<
+  TournamentLevel,
+  { boardSize: number; turnSeconds: number; botDifficulty: BotDifficulty }
+> = {
+  // Niños: tablero corto, mucho tiempo y un bot que se equivoca.
+  EASY: { boardSize: 12, turnSeconds: 45, botDifficulty: 'EASY' },
+  // Adolescentes.
+  MEDIUM: { boardSize: 18, turnSeconds: 30, botDifficulty: 'MEDIUM' },
+  // Universitarios: tablero completo, poco tiempo y el bot más fuerte.
+  HARD: { boardSize: 24, turnSeconds: 20, botDifficulty: 'HARD' },
+};
+
+export function isTournamentLevel(value: unknown): value is TournamentLevel {
+  return value === 'EASY' || value === 'MEDIUM' || value === 'HARD';
+}
+
 export interface TournamentParticipant {
   socketId: string;
   /** Confirmación individual para el lobby actual. */
@@ -46,6 +65,9 @@ export interface TournamentMatch {
   /** Juego de este match: con varios juegos por torneo cada ronda usa uno distinto. */
   gameId?: string;
   gameTitle?: string;
+  level?: TournamentLevel;
+  /** Segundos por turno de este match (los fija la complejidad del juego de la ronda). */
+  turnDurationSeconds?: number;
   phase: 'WAITING' | 'PLAYING' | 'FINISHED';
   cards: { cardId: string; imageUrl: string; label: string; audioUrl: string | null; traits?: { id: string; question: string }[] }[];
   players: {
@@ -73,7 +95,7 @@ export interface TournamentState {
   phase: TournamentPhase;
   participants: TournamentParticipant[];
   /** Juegos del torneo, en orden: la ronda N usa el juego (N-1) % cantidad. Vacío = solo `gameId`. */
-  games?: { gameId: string; title: string }[];
+  games?: { gameId: string; title: string; level: TournamentLevel }[];
   /** Administrador que modera el torneo: no juega ni entra al emparejamiento. */
   creatorUserId: string;
   /** Socket del moderador, para enviarle el panel en vivo (null si se desconectó). */

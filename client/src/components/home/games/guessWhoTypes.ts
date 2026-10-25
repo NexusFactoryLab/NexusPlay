@@ -86,6 +86,8 @@ export type GuessWhoChatMessage = {
 
 // --- Modo grupo (torneo eliminatorio) ---
 
+import type { TournamentLevel } from './tournamentLevels'
+
 export type TournamentPhase = 'WAITING' | 'RUNNING' | 'FINISHED'
 
 export type TournamentParticipantView = {
@@ -133,6 +135,7 @@ export type TournamentMatchStateView = GuidedChatState & {
   round: number
   isBye: boolean
   gameTitle: string
+  level: TournamentLevel
   cards: GuessWhoCard[]
   maxAccusationCount: number
   turnDurationSeconds: number
@@ -146,8 +149,8 @@ export type TournamentMatchStateView = GuidedChatState & {
 export type TournamentStateView = {
   code: string
   gameTitle: string
-  /** Un título por juego del torneo; la ronda N usa el juego N, rotando. */
-  gameTitles: string[]
+  /** Juegos del torneo con su complejidad; la ronda N usa el juego N, rotando. */
+  games: { title: string; level: TournamentLevel }[]
   maxParticipants: number
   turnDurationSeconds: number
   phase: TournamentPhase

@@ -1,7 +1,8 @@
-import { GameInstructionsGate } from './GameInstructionsGate'
 import { ChatPanel } from './ChatPanel'
 import { TournamentLobby } from './TournamentLobby'
 import { TournamentModeratorPanel } from './TournamentModeratorPanel'
+import { TournamentCodeEntry } from './TournamentCodeEntry'
+import { TournamentSetupForm } from './TournamentSetupForm'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Bot, Crown, LogOut, Swords, Trophy } from 'lucide-react'
@@ -11,21 +12,19 @@ import { Modal } from './Modal'
 import { MatchBoard } from './MatchBoard'
 import { MIN_DISCARDS_TO_ACCUSE } from './guessWhoTypes'
 import { listGames, type GameSummary } from '../../../services/game.service'
-
-/** Debe coincidir con TOURNAMENT_MAX_PARTICIPANTS del gateway. */
-const MAX_PARTICIPANTS_LIMIT = 40
-const MIN_PARTICIPANTS_LIMIT = 2
-const DEFAULT_ROUNDS = 3
-const MAX_ROUNDS = 10
+import { TOURNAMENT_LEVEL_INFO } from './tournamentLevels'
 
 /**
  * Sala de torneo por puntos, moderado por un administrador ("¿Quién Es?" grupal) en página propia (ruta
  * `/quien-es/torneo/:code?`, ver App.tsx), mismo criterio que
  * GuessWhoRoomPage/DominoRoomPage: reconecta al torneo en curso vía el
  * código en la URL, y no deja el Sidebar/header de HomeLayout montado detrás.
+ *
+ * Entrar es de un solo paso (código o enlace): la guía de cómo jugar ya no se
+ * antepone, se abre a demanda desde la sala de espera.
  */
 export function TournamentRoomPage() {
-  return <GameInstructionsGate kind={'GUESS_WHO_GROUP'}><TournamentSession /></GameInstructionsGate>
+  return <TournamentSession />
 }
 
 function TournamentSession() {
@@ -37,6 +36,7 @@ function TournamentSession() {
   const {
     tournament,
     error,
+    clearError,
     connecting,
     pairingAnnouncement,
     clearPairingAnnouncement,
@@ -51,7 +51,6 @@ function TournamentSession() {
     sendMatchMessage,
     askQuestion,
     answerQuestion,
-    updateTurnDuration,
     leaveTournament,
     discardMatchCard,
     accuseMatchCard,
@@ -60,19 +59,18 @@ function TournamentSession() {
 
   const startedRef = useRef(false)
   const [joinCodeInput, setJoinCodeInput] = useState('')
-  const [maxParticipantsText, setMaxParticipantsText] = useState('40')
-  const [roundsText, setRoundsText] = useState(String(DEFAULT_ROUNDS))
-  // Juegos del torneo (uno por ronda, rotando): los que el administrador tiene habilitados.
+  // Juegos con el torneo habilitado, para armar el torneo (solo el administrador llega a este formulario).
   const [enabledGames, setEnabledGames] = useState<GameSummary[]>([])
-  const [selectedGameIds, setSelectedGameIds] = useState<string[]>(gameIdToCreate ? [gameIdToCreate] : [])
+  const [loadingGames, setLoadingGames] = useState(Boolean(gameIdToCreate))
+  const [showPairingOverlay, setShowPairingOverlay] = useState(false)
+
   useEffect(() => {
     if (!token || !gameIdToCreate) return
     listGames(token, { tournamentEnabled: true, pageSize: 50 })
       .then((result) => setEnabledGames(result.items))
       .catch(() => setEnabledGames([]))
+      .finally(() => setLoadingGames(false))
   }, [token, gameIdToCreate])
-  const [maxParticipantsWarning, setMaxParticipantsWarning] = useState<string | null>(null)
-  const [showPairingOverlay, setShowPairingOverlay] = useState(false)
 
   // Arranque de la sala: si la URL trae un código en el path, se une a esa
   // sala — mismo patrón de reconexión que Dominó/Escaleras/GuessWho.
@@ -98,7 +96,7 @@ function TournamentSession() {
     const timeout = setTimeout(() => {
       setShowPairingOverlay(false)
       clearPairingAnnouncement()
-    }, 2800)
+    }, 3200)
     return () => clearTimeout(timeout)
   }, [pairingAnnouncement, clearPairingAnnouncement])
 
@@ -113,22 +111,19 @@ function TournamentSession() {
     navigate('/')
   }
 
-  function handleJoinSubmit() {
-    const code = joinCodeInput.trim().toUpperCase()
-    if (!code) return
+  function handleJoin(code: string) {
+    clearError()
     startedRef.current = true
     joinTournament(code)
   }
 
-  function handleCreateSubmit() {
-    const parsed = Number(maxParticipantsText)
-    const safeValue = Number.isInteger(parsed)
-      ? Math.min(MAX_PARTICIPANTS_LIMIT, Math.max(MIN_PARTICIPANTS_LIMIT, parsed))
-      : MIN_PARTICIPANTS_LIMIT
-    const parsedRounds = Number(roundsText)
-    const safeRounds = Number.isInteger(parsedRounds) ? Math.min(MAX_ROUNDS, Math.max(1, parsedRounds)) : DEFAULT_ROUNDS
-    startedRef.current = true
-    createTournament(selectedGameIds.length ? selectedGameIds : [gameIdToCreate ?? ''], safeValue, safeRounds)
+  // Un código que no entró (no existe, ya inició, cupo lleno): se vuelve a la
+  // casilla de código con el aviso, en vez de dejar al usuario atrapado.
+  function handleRetry() {
+    clearError()
+    startedRef.current = false
+    setJoinCodeInput('')
+    navigate('/quien-es/torneo', { replace: true })
   }
 
   // El administrador cerró el torneo.
@@ -150,28 +145,23 @@ function TournamentSession() {
   // partida" en el detalle del juego).
   if (!codeFromUrl && !gameIdToCreate && !connecting && !tournament) {
     return (
-      <div className="fixed inset-0 z-50 overflow-y-auto bg-bg">
-        <div className="mx-auto flex min-h-full max-w-[420px] flex-col justify-center p-5 sm:p-8">
-          <div className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-6">
-            <p className="text-[14px] text-text-h">Ingresa el código de un torneo de Identidad Oculta para unirte:</p>
-            <input
-              value={joinCodeInput}
-              onChange={(event) => setJoinCodeInput(event.target.value)}
-              placeholder="Código de sala"
-              className="rounded-lg border border-border bg-bg px-3.5 py-2.5 text-[14px] tracking-widest uppercase text-text-h"
-              maxLength={6}
-            />
-            <button
-              type="button"
-              className="rounded-lg px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)]"
+      <div className="page-fade fixed inset-0 z-50 overflow-y-auto bg-bg">
+        <div className="mx-auto flex min-h-full max-w-[460px] flex-col justify-center p-5 sm:p-8">
+          <div className="stagger-in flex flex-col items-center gap-5 rounded-2xl border border-border bg-surface p-6 text-center shadow-[var(--shadow)]">
+            <span
+              className="flex h-12 w-12 items-center justify-center rounded-full text-white"
               style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
-              onClick={handleJoinSubmit}
             >
-              Unirme
-            </button>
+              <Swords className="h-6 w-6" strokeWidth={2} />
+            </span>
+            <div>
+              <h2 className="text-[20px] font-bold tracking-tight text-text-h">Entrar al torneo</h2>
+              <p className="mt-1 text-[13px] text-text">Escribe el código de 6 caracteres que te dio el administrador.</p>
+            </div>
+            <TournamentCodeEntry value={joinCodeInput} onChange={setJoinCodeInput} onComplete={handleJoin} />
             <button
               type="button"
-              className="rounded-lg border border-border px-4 py-2.5 text-[14px] font-medium text-text-h"
+              className="w-full rounded-lg border border-border px-4 py-2.5 text-[14px] font-medium text-text-h transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/50"
               onClick={() => navigate('/')}
             >
               Cancelar
@@ -183,115 +173,56 @@ function TournamentSession() {
   }
 
   // Con gameId (viene de "Crear una partida" en el detalle del juego, ya
-  // decidido el formato de grupo) pero sin código todavía: se pide el cupo
-  // máximo antes de crear la sala — no aplica cuando ya se está uniendo por
-  // código de un link compartido.
+  // decidido el formato de grupo) pero sin código todavía: el administrador
+  // arma el torneo — no aplica cuando ya se está uniendo por código.
   if (gameIdToCreate && !codeFromUrl && !tournament && !connecting && !startedRef.current) {
     return (
-      <Modal onClose={handleExit} maxWidthClassName="max-w-[420px]">
-        <div className="flex flex-col gap-4">
-          <h2 className="mb-1 text-[19px] tracking-tight text-text-h">Modo grupo</h2>
-          <div className="rounded-xl border border-border p-4">
-            <label className="mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="max-participants-input-2">
-              Cupo máximo (hasta 40)
-            </label>
-            <input
-              id="max-participants-input-2"
-              type="number"
-              min={MIN_PARTICIPANTS_LIMIT}
-              max={MAX_PARTICIPANTS_LIMIT}
-              className="w-full rounded-lg border border-border bg-bg px-[13px] py-2 text-[14px] text-text-h outline-none focus:border-accent"
-              value={maxParticipantsText}
-              onChange={(event) => {
-                const raw = event.target.value
-                const parsed = Number(raw)
-                if (raw.trim() !== '' && Number.isInteger(parsed) && parsed > MAX_PARTICIPANTS_LIMIT) {
-                  setMaxParticipantsText(String(MAX_PARTICIPANTS_LIMIT))
-                  setMaxParticipantsWarning(`El máximo son ${MAX_PARTICIPANTS_LIMIT} jugadores.`)
-                  return
-                }
-                setMaxParticipantsText(raw)
-                setMaxParticipantsWarning(null)
-              }}
-            />
-            {maxParticipantsWarning && (
-              <p className="mt-1.5 text-[12px] font-medium text-danger" role="alert">
-                {maxParticipantsWarning}
-              </p>
-            )}
-          </div>
-          {enabledGames.length > 1 && (
-            <div className="rounded-xl border border-border p-4">
-              <p className="mb-1.5 text-[13px] font-medium text-text-h">Juegos del torneo (uno por ronda, en orden)</p>
-              <div className="flex max-h-[160px] flex-col gap-1 overflow-y-auto">
-                {enabledGames.map((game) => (
-                  <label key={game.id} className="flex items-center gap-2 text-[13px] text-text-h">
-                    <input
-                      type="checkbox"
-                      checked={selectedGameIds.includes(game.id)}
-                      onChange={(event) => {
-                        const next = event.target.checked
-                          ? [...selectedGameIds, game.id]
-                          : selectedGameIds.filter((id) => id !== game.id)
-                        if (next.length === 0) return
-                        setSelectedGameIds(next)
-                        setRoundsText(String(Math.max(DEFAULT_ROUNDS, next.length)))
-                      }}
-                    />
-                    {game.title}
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-          <div className="rounded-xl border border-border p-4">
-            <label className="mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="rounds-input">
-              Rondas (1 a {MAX_ROUNDS})
-            </label>
-            <input
-              id="rounds-input"
-              type="number"
-              min={1}
-              max={MAX_ROUNDS}
-              className="w-full rounded-lg border border-border bg-bg px-[13px] py-2 text-[14px] text-text-h outline-none focus:border-accent"
-              value={roundsText}
-              onChange={(event) => setRoundsText(event.target.value)}
-            />
-            <p className="mt-1.5 text-[12px] text-text">
-              Todos juegan todas las rondas; cada ronda se empareja al azar y quien quede impar juega contra el bot.
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              className="flex-1 rounded-lg border border-border px-4 py-2.5 text-[14px] font-medium text-text-h transition-transform hover:-translate-y-0.5"
-              onClick={handleExit}
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              className="flex-1 rounded-lg px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)] transition-transform hover:-translate-y-0.5"
-              style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
-              onClick={handleCreateSubmit}
-            >
-              Crear sala
-            </button>
-          </div>
-        </div>
-      </Modal>
+      <TournamentSetupForm
+        games={enabledGames}
+        loading={loadingGames}
+        initialGameId={gameIdToCreate}
+        onCancel={handleExit}
+        onSubmit={(setup) => {
+          startedRef.current = true
+          createTournament(setup.games, setup.maxParticipants, setup.totalRounds)
+        }}
+      />
     )
   }
 
   if (connecting || !tournament) {
+    // Intentó entrar y el servidor lo rechazó: explicación clara y salida directa.
+    if (error && !connecting) {
+      return (
+        <Modal onClose={handleExit} maxWidthClassName="max-w-[420px]">
+          <div className="flex flex-col items-center gap-4 text-center">
+            <p className="text-[16px] font-semibold text-text-h">No pudimos entrar al torneo</p>
+            <p className="text-[13.5px] text-danger" role="alert">
+              {error}
+            </p>
+            <div className="flex w-full gap-2">
+              <button type="button" className="flex-1 rounded-lg border border-border px-4 py-2.5 text-[14px] font-medium text-text-h transition-all duration-200 hover:-translate-y-0.5" onClick={handleExit}>
+                Volver al inicio
+              </button>
+              <button
+                type="button"
+                className="flex-1 rounded-lg px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)] transition-all duration-200 hover:-translate-y-0.5"
+                style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
+                onClick={handleRetry}
+              >
+                Probar otro código
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )
+    }
     return (
       <Modal onClose={handleExit}>
-        <p className="text-[14px] text-text">{codeFromUrl ? 'Uniéndote a la sala…' : 'Creando la sala…'}</p>
-        {error && (
-          <p className="mt-3 text-[13px] text-danger" role="alert">
-            {error}
-          </p>
-        )}
+        <p className="flex items-center justify-center gap-2.5 py-2 text-[14px] text-text">
+          <span className="live-dot" aria-hidden="true" />
+          {codeFromUrl ? 'Uniéndote a la sala…' : 'Creando la sala…'}
+        </p>
       </Modal>
     )
   }
@@ -304,7 +235,6 @@ function TournamentSession() {
       <TournamentLobby
         tournament={tournament}
         error={error}
-        onUpdateTurnDuration={updateTurnDuration}
         onStart={startTournament}
         onClose={closeTournament}
         onExit={handleExit}
@@ -326,7 +256,14 @@ function TournamentSession() {
       <div className={tournament.myMatch?.phase === 'PLAYING' ? 'guess-who-play-shell' : 'mx-auto flex min-h-full max-w-[1560px] flex-col p-5 sm:p-8'}>
         <div className="mb-5 flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-[19px] tracking-tight text-text-h">{tournament.gameTitle} — Grupo</h2>
+            <h2 className="flex flex-wrap items-center gap-2 text-[19px] tracking-tight text-text-h">
+              {tournament.myMatch?.gameTitle ?? tournament.gameTitle}
+              {tournament.myMatch && (
+                <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${TOURNAMENT_LEVEL_INFO[tournament.myMatch.level].tone}`}>
+                  {TOURNAMENT_LEVEL_INFO[tournament.myMatch.level].label}
+                </span>
+              )}
+            </h2>
             {tournament.phase === 'RUNNING' && (
               <div className="mt-1.5 flex items-center gap-3">
                 <p className="text-[12.5px] text-text">

@@ -1,6 +1,7 @@
 import type { GuessWhoChatMessage } from './guessWhoTypes'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { io, type Socket } from 'socket.io-client'
+import type { TournamentLevel } from './tournamentLevels'
 import type { TournamentMatchStateView, TournamentPairingAnnouncement, TournamentStateView } from './guessWhoTypes'
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:3000'
@@ -77,9 +78,14 @@ export function useGuessWhoTournament(token: string | null) {
     }
   }, [token])
 
-  const createTournament = useCallback((gameIds: string[], maxParticipants: number, totalRounds: number) => {
-    socketRef.current?.emit('tournament:create', { gameIds, maxParticipants, totalRounds })
-  }, [])
+  const createTournament = useCallback(
+    (games: { gameId: string; level: TournamentLevel }[], maxParticipants: number, totalRounds: number) => {
+      socketRef.current?.emit('tournament:create', { games, maxParticipants, totalRounds })
+    },
+    [],
+  )
+
+  const clearError = useCallback(() => setError(null), [])
 
   const startTournament = useCallback(() => {
     socketRef.current?.emit('tournament:start')
@@ -149,6 +155,7 @@ export function useGuessWhoTournament(token: string | null) {
     matchAccusationFailedMessage,
     clearMatchAccusationFailedMessage: () => setMatchAccusationFailedMessage(null),
     createTournament,
+    clearError,
     joinTournament,
     startTournament,
     closeTournament,

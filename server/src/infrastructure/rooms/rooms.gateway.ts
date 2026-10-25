@@ -19,6 +19,9 @@ import {
   type TournamentStore,
   type TournamentState,
   type TournamentMatch,
+  type TournamentLevel,
+  TOURNAMENT_LEVELS,
+  isTournamentLevel,
 } from '../../domain/ports/tournament-store.port.js';
 import type { GuessWhoCard } from '../../application/content-validators/guess-who.content-validator.js';
 import { dominoQuestionBank } from '../../application/content-validators/domino-question-bank.js';
@@ -143,7 +146,6 @@ const TOURNAMENT_MAX_PARTICIPANTS = 40;
 const TOURNAMENT_DEFAULT_ROUNDS = 3;
 const TOURNAMENT_MAX_ROUNDS = 10;
 const TOURNAMENT_MAX_GAMES = 5;
-const TOURNAMENT_BOT_DIFFICULTY: BotDifficulty = 'MEDIUM';
 
 /** Vista del match como si fuera una sala 1v1, para que el bot existente lo juegue sin duplicar su lógica. */
 function asBotRoom(match: TournamentMatch): RoomState {
@@ -173,7 +175,10 @@ function toTournamentClientView(tournament: TournamentState, forUserId: string) 
   return {
     code: tournament.code,
     gameTitle: tournament.gameTitle,
-    gameTitles: (tournament.games ?? [{ title: tournament.gameTitle }]).map((g) => g.title),
+    games: (tournament.games ?? [{ title: tournament.gameTitle, level: 'MEDIUM' as TournamentLevel }]).map((g) => ({
+      title: g.title,
+      level: g.level,
+    })),
     maxParticipants: tournament.maxParticipants,
     turnDurationSeconds: tournament.turnDurationSeconds,
     phase: tournament.phase,
@@ -271,9 +276,10 @@ function toMatchClientView(match: TournamentMatch, tournament: TournamentState, 
     round: match.round,
     isBye: match.isBye,
     gameTitle: match.gameTitle ?? tournament.gameTitle,
+    level: match.level ?? 'MEDIUM',
     cards: match.cards,
     maxAccusationCount: tournament.maxAccusationCount,
-    turnDurationSeconds: tournament.turnDurationSeconds,
+    turnDurationSeconds: match.turnDurationSeconds ?? tournament.turnDurationSeconds,
     phase: match.phase,
     winnerUserId: match.winnerUserId,
     activePlayerUserId: match.activePlayerUserId,
@@ -1505,14 +1511,31 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   @SubscribeMessage('tournament:create')
   async handleTournamentCreate(
     @ConnectedSocket() socket: AuthenticatedSocket,
-    @MessageBody() body: { gameId?: string; gameIds?: string[]; maxParticipants: number; totalRounds?: number },
+    @MessageBody()
+    body: {
+      gameId?: string;
+      gameIds?: string[];
+      /** Cada juego con su complejidad; si falta, se usa `gameIds`/`gameId` en nivel medio. */
+      games?: { gameId: string; level?: TournamentLevel }[];
+      maxParticipants: number;
+      totalRounds?: number;
+    },
   ) {
     // Solo el administrador de la plataforma crea y modera torneos (issue #102).
     const requester = await this.userRepository.findById(socket.data.userId);
     if (!requester?.isAdmin()) throw new Error('Solo un administrador puede crear torneos.');
 
     // Varios juegos por torneo (issue #102): la ronda N usa el juego N, rotando.
-    const gameIds = [...new Set(body.gameIds?.length ? body.gameIds : body.gameId ? [body.gameId] : [])];
+    const requested: { gameId: string; level?: TournamentLevel }[] = body.games?.length
+      ? body.games
+      : (body.gameIds?.length ? body.gameIds : body.gameId ? [body.gameId] : []).map((gameId) => ({ gameId }));
+    const picks: { gameId: string; level: TournamentLevel }[] = [];
+    for (const pick of requested) {
+      const level = pick.level ?? 'MEDIUM';
+      if (!isTournamentLevel(level)) throw new Error('La complejidad debe ser EASY, MEDIUM o HARD.');
+      if (!picks.some((p) => p.gameId === pick.gameId)) picks.push({ gameId: pick.gameId, level });
+    }
+    const gameIds = picks.map((p) => p.gameId);
     if (gameIds.length === 0 || gameIds.length > TOURNAMENT_MAX_GAMES) {
       throw new Error(`Elige entre 1 y ${TOURNAMENT_MAX_GAMES} juegos para el torneo.`);
     }
@@ -1542,7 +1565,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       code,
       gameId: game.id,
       gameTitle: games.map((g) => g.title).join(' + '),
-      games: games.map((g) => ({ gameId: g.id, title: g.title })),
+      games: games.map((g, index) => ({ gameId: g.id, title: g.title, level: picks[index].level })),
       maxParticipants,
       totalRounds,
       maxAccusationCount: (game.config.maxAccusationCount as number | undefined) ?? 6,
@@ -1790,9 +1813,10 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     const botUserId = `bot:${matchCode}`;
     const match = this.buildDealtMatch(tournament, matchCode, round, [humanUserId, botUserId]);
     match.vsBot = true;
-    match.players[1].displayName = BOT_DISPLAY_NAMES[TOURNAMENT_BOT_DIFFICULTY];
+    const botDifficulty = TOURNAMENT_LEVELS[match.level ?? 'MEDIUM'].botDifficulty;
+    match.players[1].displayName = BOT_DISPLAY_NAMES[botDifficulty];
     match.players[1].socketId = `bot:${matchCode}`;
-    match.players[1].bot = { difficulty: TOURNAMENT_BOT_DIFFICULTY };
+    match.players[1].bot = { difficulty: botDifficulty };
     this.tournamentBotRooms.set(matchCode, asBotRoom(match));
     return match;
   }
@@ -1805,12 +1829,16 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     playerUserIds: [string, string],
   ): TournamentMatch {
     const roundGame = this.gameForRound(tournament, round);
-    const shuffled = shuffle(this.lastCreatedGameCards.get(roundGame.gameId) ?? []);
+    const preset = TOURNAMENT_LEVELS[roundGame.level];
+    // La complejidad achica el tablero: se juega con un subconjunto al azar de las tarjetas del juego.
+    const shuffled = shuffle(this.lastCreatedGameCards.get(roundGame.gameId) ?? []).slice(0, preset.boardSize);
     return {
       matchCode,
       round,
       gameId: roundGame.gameId,
       gameTitle: roundGame.title,
+      level: roundGame.level,
+      turnDurationSeconds: preset.turnSeconds,
       playerUserIds,
       isBye: false,
       phase: 'PLAYING',
@@ -1838,8 +1866,13 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   }
 
   /** Set de cartas del torneo: se resuelve desde el juego una vez y se reutiliza (barajado distinto) por match. */
-  private gameForRound(tournament: TournamentState, round: number): { gameId: string; title: string } {
-    const games = tournament.games?.length ? tournament.games : [{ gameId: tournament.gameId, title: tournament.gameTitle }];
+  private gameForRound(
+    tournament: TournamentState,
+    round: number,
+  ): { gameId: string; title: string; level: TournamentLevel } {
+    const games = tournament.games?.length
+      ? tournament.games
+      : [{ gameId: tournament.gameId, title: tournament.gameTitle, level: 'MEDIUM' as TournamentLevel }];
     return games[(round - 1) % games.length];
   }
 
@@ -1853,7 +1886,8 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   private startTournamentMatchTurn(tournament: TournamentState, match: TournamentMatch, userId: string) {
     match.pendingQuestion = null;
     match.activePlayerUserId = userId;
-    match.turnDeadline = Date.now() + tournament.turnDurationSeconds * 1000;
+    const turnSeconds = match.turnDurationSeconds ?? tournament.turnDurationSeconds;
+    match.turnDeadline = Date.now() + turnSeconds * 1000;
     this.tournamentStore.set(tournament);
     this.broadcastMatchState(tournament, match);
 
@@ -1865,7 +1899,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
         return;
       }
       this.advanceTournamentMatchTurn(current, currentMatch);
-    }, tournament.turnDurationSeconds * 1000);
+    }, turnSeconds * 1000);
     this.tournamentTurnTimers.set(match.matchCode, timer);
   }
 

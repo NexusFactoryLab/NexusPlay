@@ -30,7 +30,7 @@ function setup() {
     gameType: { getName: () => 'GUESS_WHO' },
     config: { turnDurationSeconds: 30 },
     tournamentEnabled: true,
-    content: Array.from({ length: 6 }, (_, i) => ({ cardId: `c${i}`, label: `C${i}`, imageUrl: '', audioUrl: null, info: null, traits: [] })),
+    content: Array.from({ length: 30 }, (_, i) => ({ cardId: `c${i}`, label: `C${i}`, imageUrl: '', audioUrl: null, info: null, traits: [] })),
   };
   const users = { findById: async (id: string) => ({ isAdmin: () => id === 'admin' }) } as unknown as UserRepository;
   const gateway = new RoomsGateway(
@@ -171,6 +171,48 @@ describe('varios juegos y reparto del bot', () => {
       priv.maybeAdvanceTournamentRound(tournament);
     }
     expect(tournament.participants.map((p) => p.botMatches)).toEqual([1, 1, 1]);
+  });
+});
+
+describe('complejidad por juego', () => {
+  async function startWithLevels(levels: ('EASY' | 'MEDIUM' | 'HARD')[], playerCount: number) {
+    const h = setup();
+    const admin = client('admin');
+    const ids = ['g', 'g2', 'g3'].slice(0, levels.length);
+    await h.gateway.handleTournamentCreate(admin, {
+      games: ids.map((gameId, i) => ({ gameId, level: levels[i] })),
+      maxParticipants: 8,
+      totalRounds: levels.length,
+    });
+    const tournament = h.tournaments.findBySocketId('admin')!;
+    for (let i = 0; i < playerCount; i++) h.gateway.handleTournamentJoin(client(`p${i}`), { code: tournament.code });
+    h.gateway.handleTournamentStart(admin);
+    return { ...h, tournament };
+  }
+
+  it('cada nivel fija el tamaño del tablero y los segundos por turno de su ronda', async () => {
+    const { tournament, gateway } = await startWithLevels(['EASY', 'HARD'], 2);
+    const easy = tournament.matches.find((m) => m.round === 1)!;
+    expect(easy.cards).toHaveLength(12);
+    expect(easy.turnDurationSeconds).toBe(45);
+    tournament.matches.forEach((m) => (m.phase = 'FINISHED'));
+    (gateway as unknown as { maybeAdvanceTournamentRound: (t: unknown) => void }).maybeAdvanceTournamentRound(tournament);
+    const hard = tournament.matches.find((m) => m.round === 2)!;
+    expect(hard.cards).toHaveLength(24);
+    expect(hard.turnDurationSeconds).toBe(20);
+  });
+
+  it('el bot adopta la dificultad del nivel', async () => {
+    const { tournament } = await startWithLevels(['HARD'], 3);
+    const botMatch = tournament.matches.find((m) => m.vsBot)!;
+    expect(botMatch.players.find((p) => p.bot)!.bot!.difficulty).toBe('HARD');
+  });
+
+  it('rechaza una complejidad inválida', async () => {
+    const h = setup();
+    await expect(
+      h.gateway.handleTournamentCreate(client('admin'), { games: [{ gameId: 'g', level: 'EXTREME' as never }], maxParticipants: 8 }),
+    ).rejects.toThrow(/complejidad/);
   });
 });
 

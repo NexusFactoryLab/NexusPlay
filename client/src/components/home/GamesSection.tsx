@@ -31,6 +31,7 @@ import { parseCreatedKind } from './games/create/justCreatedRedirect'
 import { GameDetailModal } from './games/GameDetailModal'
 import { Modal } from './games/Modal'
 import { JoinByCodeModal } from './games/JoinByCodeModal'
+import { TournamentCodeModal } from './games/TournamentCodeModal'
 import { resolveRoomCode, LIVE_ROOM_ROUTES, type ResolvedRoom } from './games/resolveRoomCode'
 import { GuessWhoRoom } from './games/GuessWhoRoom'
 import { GameFiltersPanel, type GameTypeFilterOption } from './games/GameFiltersPanel'
@@ -180,6 +181,7 @@ export function GamesSection({
   const [joinByCodeOpen, setJoinByCodeOpen] = useState(false)
   // Acceso temporal al torneo (issue #102): solo existe mientras un ADMIN tenga algún torneo habilitado.
   const [tournamentOpen, setTournamentOpen] = useState(false)
+  const [tournamentCodeOpen, setTournamentCodeOpen] = useState(false)
   useEffect(() => {
     if (!token) return
     let cancelled = false
@@ -1070,7 +1072,7 @@ export function GamesSection({
                   <button
                     type="button"
                     className="tournament-cta relative flex items-center gap-2 rounded-xl border-2 border-accent-2 bg-surface px-5 py-3 text-[14px] font-bold text-accent-2"
-                    onClick={() => navigate('/quien-es/torneo')}
+                    onClick={() => setTournamentCodeOpen(true)}
                   >
                     <Swords className="h-[18px] w-[18px]" strokeWidth={2.5} />
                     Entrar al torneo
@@ -1298,6 +1300,8 @@ export function GamesSection({
           }}
         />
       )}
+
+      {tournamentCodeOpen && <TournamentCodeModal onClose={() => setTournamentCodeOpen(false)} />}
 
       {renderGameOverlays()}
     </section>

@@ -1,13 +1,14 @@
-import { useState } from 'react'
-import { Copy, Link, LogOut, Play, Users } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { CircleHelp, Copy, Link, LogOut, Play, Users } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Modal } from './Modal'
 import type { TournamentStateView } from './guessWhoTypes'
+import { GameInstructionsGate } from './GameInstructionsGate'
+import { TOURNAMENT_LEVEL_INFO } from './tournamentLevels'
 
 type Props = {
   tournament: TournamentStateView
   error: string | null
-  onUpdateTurnDuration: (seconds: number) => void
   onStart: () => void
   onClose: () => void
   onExit: () => void
@@ -18,14 +19,9 @@ type Props = {
  * código, el enlace y el QR para repartirlos, elige los segundos por turno y
  * decide cuándo arrancar; los participantes solo ven quién ya entró y esperan.
  */
-export function TournamentLobby({ tournament, error, onUpdateTurnDuration, onStart, onClose, onExit }: Props) {
+export function TournamentLobby({ tournament, error, onStart, onClose, onExit }: Props) {
   const [copied, setCopied] = useState<string | null>(null)
-  const [turnText, setTurnText] = useState(String(tournament.turnDurationSeconds))
-  const [seenTurn, setSeenTurn] = useState(tournament.turnDurationSeconds)
-  if (seenTurn !== tournament.turnDurationSeconds) {
-    setSeenTurn(tournament.turnDurationSeconds)
-    setTurnText(String(tournament.turnDurationSeconds))
-  }
+  const [showGuide, setShowGuide] = useState(false)
 
   const invitationUrl = new URL(`/quien-es/torneo/${encodeURIComponent(tournament.code)}`, window.location.origin).href
   const canStart = tournament.participants.length >= 2
@@ -40,12 +36,6 @@ export function TournamentLobby({ tournament, error, onUpdateTurnDuration, onSta
     setTimeout(() => setCopied(null), 1800)
   }
 
-  function commitTurn() {
-    const parsed = Number(turnText)
-    if (Number.isInteger(parsed) && parsed >= 5 && parsed <= 120) onUpdateTurnDuration(parsed)
-    else setTurnText(String(tournament.turnDurationSeconds))
-  }
-
   return (
     <Modal onClose={tournament.isModerator ? onClose : onExit} maxWidthClassName="max-w-[760px]" ariaLabel="Sala de espera del torneo">
       <div className="flex flex-col gap-4">
@@ -55,10 +45,7 @@ export function TournamentLobby({ tournament, error, onUpdateTurnDuration, onSta
               {tournament.isModerator ? 'Torneo · Administrador' : 'Torneo'}
             </p>
             <h2 className="mt-1 text-[22px] font-bold tracking-tight text-text-h">{tournament.gameTitle}</h2>
-            <p className="text-[12.5px] text-text">
-              {tournament.totalRounds} rondas · puntos por partida ganada
-              {tournament.gameTitles.length > 1 ? ` · un juego por ronda: ${tournament.gameTitles.join(' → ')}` : ''}
-            </p>
+            <p className="text-[12.5px] text-text">{tournament.totalRounds} rondas · 1 punto por partida ganada</p>
           </div>
           <button
             type="button"
@@ -86,19 +73,6 @@ export function TournamentLobby({ tournament, error, onUpdateTurnDuration, onSta
                 </button>
               </div>
               <p className="truncate text-[12px] text-text">{invitationUrl}</p>
-              <label className="flex items-center gap-2 text-[13px] text-text-h">
-                Segundos por turno
-                <input
-                  type="number"
-                  min={5}
-                  max={120}
-                  value={turnText}
-                  onChange={(event) => setTurnText(event.target.value)}
-                  onBlur={commitTurn}
-                  onKeyDown={(event) => event.key === 'Enter' && commitTurn()}
-                  className="w-20 rounded-lg border border-border bg-bg px-2 py-1 text-[14px] text-text-h outline-none transition-colors duration-200 focus:border-accent"
-                />
-              </label>
               <p className={`h-4 text-[12px] font-medium text-accent transition-opacity duration-300 ${copied ? 'opacity-100' : 'opacity-0'}`} role="status">{copied ?? ''}</p>
             </div>
             <div className="rounded-xl bg-white p-2 shadow-[0_8px_24px_-12px_var(--accent)] transition-transform duration-300 hover:scale-105">
@@ -132,6 +106,25 @@ export function TournamentLobby({ tournament, error, onUpdateTurnDuration, onSta
           )}
         </div>
 
+        <div className="stagger-in rounded-2xl border border-border p-4" style={{ '--stagger': 3 } as React.CSSProperties}>
+          <p className="mb-2 text-[13px] font-semibold text-text-h">Rondas del torneo</p>
+          <ol className="flex flex-col gap-1.5">
+            {Array.from({ length: tournament.totalRounds }, (_, round) => {
+              const game = tournament.games[round % tournament.games.length]
+              const info = TOURNAMENT_LEVEL_INFO[game.level]
+              return (
+                <li key={round} className="flex items-center gap-2 text-[12.5px] text-text-h">
+                  <span className="w-14 shrink-0 text-text">Ronda {round + 1}</span>
+                  <span className="min-w-0 flex-1 truncate font-medium">{game.title}</span>
+                  <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${info.tone}`}>
+                    {info.label} · {info.audience}
+                  </span>
+                </li>
+              )
+            })}
+          </ol>
+        </div>
+
         {error && (
           <p className="rounded-lg border border-danger/35 bg-danger/10 px-3 py-2 text-sm text-danger" role="alert">
             {error}
@@ -155,12 +148,36 @@ export function TournamentLobby({ tournament, error, onUpdateTurnDuration, onSta
             </button>
           </div>
         ) : (
-          <p className="flex items-center justify-center gap-2.5 text-center text-[14px] font-medium text-text-h">
-            <span className="live-dot" aria-hidden="true" />
-            Esperando a que el administrador inicie el torneo…
-          </p>
+          <div className="flex flex-col items-center gap-3">
+            <p className="flex items-center justify-center gap-2.5 text-center text-[14px] font-medium text-text-h">
+              <span className="live-dot" aria-hidden="true" />
+              Esperando a que el administrador inicie el torneo…
+            </p>
+            <button
+              type="button"
+              className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-[13px] font-medium text-text-h transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/50 hover:text-accent"
+              onClick={() => setShowGuide(true)}
+            >
+              <CircleHelp className="h-4 w-4" strokeWidth={2} />
+              ¿Cómo se juega?
+            </button>
+          </div>
         )}
       </div>
+      {showGuide && (
+        <GameInstructionsGate kind="GUESS_WHO_GROUP">
+          <CloseGuide onDone={() => setShowGuide(false)} />
+        </GameInstructionsGate>
+      )}
     </Modal>
   )
+}
+
+/** La guía se muestra hasta que la persona continúa; entonces se cierra sola. */
+function CloseGuide({ onDone }: { onDone: () => void }) {
+  useEffect(() => {
+    onDone()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  return null
 }
