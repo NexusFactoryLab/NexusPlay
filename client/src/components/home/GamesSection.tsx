@@ -1081,7 +1081,7 @@ export function GamesSection({
             </h2>
             <p className="text-[14px] text-text">
               {mode === 'community'
-                ? 'Juegos que otros usuarios crearon y decidieron publicar. Filtra por tipo de juego con el panel de filtros.'
+                ? 'Juegos que otros usuarios crearon y decidieron publicar. Filtra por tipo, jugadores o área.'
                 : isTeacher
                   ? 'Crea, organiza y administra tus juegos.'
                   : 'Solo tú los ves. Comparte el código de la sala para que otros se unan.'}

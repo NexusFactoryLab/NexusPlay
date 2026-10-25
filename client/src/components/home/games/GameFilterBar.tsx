@@ -1,11 +1,6 @@
-import type { ReactNode } from 'react'
-import { User, Users, X } from 'lucide-react'
-import {
-  MULTI_MODE_COLOR,
-  SOLO_MODE_COLOR,
-  modeColorForGameType,
-  type GameModeFilter,
-} from './gameModeVisuals'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { Check, ChevronDown, User, Users, X } from 'lucide-react'
+import { MULTI_MODE_COLOR, SOLO_MODE_COLOR, type GameModeFilter } from './gameModeVisuals'
 import type { GameTypeFilterOption } from './GameFiltersPanel'
 
 export type GameAreaFilterOption = {
@@ -62,69 +57,59 @@ export function GameFilterBar({
   const showAreas = areaOptions.length > 1
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-3.5" role="search" aria-label="Filtrar juegos">
+    <div className="flex flex-col gap-2.5" role="search" aria-label="Filtrar juegos">
       {typeOptions.length > 1 && (
-        <div className="flex flex-col gap-1.5">
-          <span className="text-[12px] font-semibold text-text/70">Tipo de juego</span>
-          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Tipo de juego">
-            <Chip active={activeTypes.size === 0} onClick={onClearTypes}>
-              Todos <Count>{total}</Count>
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Tipo de juego">
+          <Chip active={activeTypes.size === 0} onClick={onClearTypes}>
+            Todos
+          </Chip>
+          {typeOptions.map((option) => (
+            <Chip
+              key={option.gameType}
+              active={activeTypes.has(option.gameType)}
+              onClick={() => onToggleType(option.gameType)}
+            >
+              {option.label}
             </Chip>
-            {typeOptions.map((option) => (
-              <Chip
-                key={option.gameType}
-                active={activeTypes.has(option.gameType)}
-                onClick={() => onToggleType(option.gameType)}
-              >
-                <span
-                  className="h-2 w-2 shrink-0 rounded-full"
-                  style={{ background: modeColorForGameType(option.gameType) }}
-                  aria-hidden="true"
-                />
-                {option.label} <Count>{option.count}</Count>
-              </Chip>
-            ))}
-          </div>
+          ))}
         </div>
       )}
 
       <div className="flex flex-wrap items-end justify-between gap-x-5 gap-y-3">
-        <div className="flex flex-wrap items-end gap-x-5 gap-y-3">
+        <div className="flex flex-wrap items-center gap-2">
           {showModes && (
-            <div className="flex flex-col gap-1.5">
-              <span className="text-[12px] font-semibold text-text/70">Cuántos juegan</span>
-              <div className="flex gap-1 rounded-lg border border-border p-1" role="group" aria-label="Cuántos juegan">
-                <Segment active={activeMode === null} onClick={() => onModeChange(null)}>
-                  Todos
-                </Segment>
-                <Segment active={activeMode === 'SOLO'} onClick={() => onModeChange('SOLO')}>
-                  <User className="h-3.5 w-3.5" strokeWidth={2.5} style={{ color: activeMode === 'SOLO' ? undefined : SOLO_MODE_COLOR }} />
-                  1 jugador
-                </Segment>
-                <Segment active={activeMode === 'MULTI'} onClick={() => onModeChange('MULTI')}>
-                  <Users className="h-3.5 w-3.5" strokeWidth={2.5} style={{ color: activeMode === 'MULTI' ? undefined : MULTI_MODE_COLOR }} />
-                  Multijugador
-                </Segment>
-              </div>
-            </div>
+            <FilterDropdown
+              label="Jugadores"
+              value={activeMode ?? ''}
+              onChange={(value) => onModeChange(value === 'SOLO' || value === 'MULTI' ? value : null)}
+              options={[
+                { value: '', label: 'Todos' },
+                {
+                  value: 'SOLO',
+                  label: '1 jugador',
+                  count: soloCount,
+                  icon: <User className="h-3.5 w-3.5" strokeWidth={2.5} style={{ color: SOLO_MODE_COLOR }} />,
+                },
+                {
+                  value: 'MULTI',
+                  label: 'Multijugador',
+                  count: multiCount,
+                  icon: <Users className="h-3.5 w-3.5" strokeWidth={2.5} style={{ color: MULTI_MODE_COLOR }} />,
+                },
+              ]}
+            />
           )}
 
           {showAreas && (
-            <label className="flex flex-col gap-1.5">
-              <span className="text-[12px] font-semibold text-text/70">Área</span>
-              <select
-                value={activeAreaId ?? ''}
-                onChange={(event) => onAreaChange(event.target.value || null)}
-                className="min-w-[180px] rounded-lg border border-border bg-surface px-3 py-[7px] text-[13px] text-text-h focus:border-accent focus:outline-none"
-              >
-                <option value="">Todas las áreas</option>
-                {areaOptions.map((area) => (
-                  <option key={area.id} value={area.id}>
-                    {area.name} ({area.count})
-                  </option>
-                ))}
-              </select>
-            </label>
+            <FilterDropdown
+              label="Área"
+              value={activeAreaId ?? ''}
+              onChange={(value) => onAreaChange(value || null)}
+              options={[
+                { value: '', label: 'Todas' },
+                ...areaOptions.map((area) => ({ value: area.id, label: area.name, count: area.count })),
+              ]}
+            />
           )}
         </div>
 
@@ -155,10 +140,8 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-[12.5px] font-medium transition-colors ${
-        active
-          ? 'border-accent bg-accent text-white'
-          : 'border-border bg-surface text-text-h hover:border-accent'
+      className={`rounded-full px-3 py-1 text-[12.5px] font-medium transition-colors ${
+        active ? 'bg-accent text-white' : 'bg-code-bg text-text-h hover:bg-border'
       }`}
     >
       {children}
@@ -166,21 +149,92 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
   )
 }
 
-function Segment({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+type DropdownOption = { value: string; label: string; count?: number; icon?: ReactNode }
+
+/**
+ * Desplegable propio (no el <select> nativo, que no sigue el diseño): mismo
+ * aspecto que el menú del perfil. Cierra con Escape o al tocar fuera.
+ */
+function FilterDropdown({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string
+  value: string
+  options: DropdownOption[]
+  onChange: (value: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const selected = options.find((option) => option.value === value) ?? options[0]
+  const isFiltering = value !== ''
+
+  useEffect(() => {
+    if (!open) return
+    function handleClickOutside(event: MouseEvent) {
+      if (!containerRef.current?.contains(event.target as Node)) setOpen(false)
+    }
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [open])
+
   return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-[12.5px] font-medium transition-colors ${
-        active ? 'bg-accent text-white' : 'text-text hover:bg-code-bg hover:text-text-h'
-      }`}
-    >
-      {children}
-    </button>
-  )
-}
+    <div className="relative" ref={containerRef}>
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[12.5px] font-medium transition-colors ${
+          isFiltering ? 'bg-accent/10 text-accent' : 'bg-code-bg text-text-h hover:bg-border'
+        }`}
+      >
+        <span className={isFiltering ? '' : 'text-text/70'}>{label}:</span>
+        {selected.icon}
+        <span className="max-w-[140px] truncate">{selected.label}</span>
+        <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} strokeWidth={2.5} />
+      </button>
 
-function Count({ children }: { children: ReactNode }) {
-  return <span className="text-[11.5px] opacity-70">{children}</span>
+      {open && (
+        <div
+          role="listbox"
+          aria-label={label}
+          className="absolute left-0 z-30 mt-2 max-h-[280px] min-w-[200px] overflow-y-auto rounded-xl border border-border bg-surface py-1 shadow-[var(--shadow)]"
+        >
+          {options.map((option) => {
+            const isSelected = option.value === value
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="option"
+                aria-selected={isSelected}
+                onClick={() => {
+                  onChange(option.value)
+                  setOpen(false)
+                }}
+                className={`flex w-full items-center gap-2 px-3.5 py-2 text-left text-[13px] hover:bg-code-bg ${
+                  isSelected ? 'font-semibold text-accent' : 'text-text-h'
+                }`}
+              >
+                {option.icon}
+                <span className="flex-1 truncate">{option.label}</span>
+                {option.count !== undefined && <span className="text-[12px] text-text/60">{option.count}</span>}
+                {isSelected && <Check className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} />}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
 }
