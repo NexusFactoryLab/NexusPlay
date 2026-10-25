@@ -31,7 +31,7 @@ export const DOMINO_LEVEL_INFO: Record<DominoLevel, LevelInfo> = {
   ADVANCED: {
     label: 'Universitario',
     short: 'Casos y aplicaciones',
-    description: 'Razonamiento con casos y aplicaciones de cada concepto.',
+    description: 'Razonamiento con casos reales: se responde una pregunta con su caso antes de colocar cada ficha.',
     icon: GraduationCap,
     color: '#7c3aed',
   },

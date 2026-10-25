@@ -1648,15 +1648,16 @@ code {
   pointer-events: none;
 }
 
-.domino-hand-tile:not(.domino-tile--waiting) {
+/* La ficha flota junto con sus nubecitas: la animación va en el contenedor (.domino-hand-wrap). */
+.domino-hand-wrap:has(.domino-hand-tile:not(.domino-tile--waiting)) {
   animation: domino-hand-float 2.6s ease-in-out infinite;
 }
 
-.domino-hand-tile:not(.domino-tile--waiting):nth-child(2n) {
+.domino-hand-wrap:has(.domino-hand-tile:not(.domino-tile--waiting)):nth-child(2n) {
   animation-delay: -0.65s;
 }
 
-.domino-hand-tile:not(.domino-tile--waiting):nth-child(3n) {
+.domino-hand-wrap:has(.domino-hand-tile:not(.domino-tile--waiting)):nth-child(3n) {
   animation-delay: -1.3s;
 }
 

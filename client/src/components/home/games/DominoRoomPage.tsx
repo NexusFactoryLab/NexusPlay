@@ -36,6 +36,7 @@ import {
 import { DealCountdownOverlay, TurnBanner, TurnPopBanner, useCountdown } from './MatchBoard'
 import { Modal } from './Modal'
 import { DominoScenery, dominoSceneForTheme } from './DominoScenery'
+import { DominoInfoCloud } from './DominoInfoCloud'
 import { useTheme } from '../../../hooks/useTheme'
 
 /**
@@ -486,6 +487,7 @@ function DominoRoomPageSession() {
         <DominoQuestionModal
           concept={questionConcept}
           question={questionToShow}
+          scenario={level === 'ADVANCED' ? questionConcept.application : undefined}
           isSelf={questionIsSelf}
           answeringDisplayName={room.players.find((p) => p.userId === pendingQuestion?.userId)?.displayName ?? 'tu rival'}
           result={answerResult}
@@ -906,7 +908,7 @@ function DominoLearningSummary({ room, level }: { room: DominoRoomStateView; lev
           </li>
         ))}
       </ul>
-      {level === 'MEDIUM' && missed.length > 0 && (
+      {level !== 'EASY' && missed.length > 0 && (
         <>
           <p className="mb-2 mt-4 text-[13px] font-semibold text-rose-600">Para repasar (preguntas falladas)</p>
           <ul className="space-y-2 text-[12.5px] text-text">
@@ -952,15 +954,14 @@ export function boardConceptAccessibility(label: string) {
   return { ariaLabel: `Concepto: ${label}` }
 }
 
-function ConceptHalf({ concept, size = 'md', level, selected = false }: { concept: DominoConcept; size?: DominoConceptTileSize; level?: DominoLevel; selected?: boolean }) {
+function ConceptHalf({ concept, size = 'md', level }: { concept: DominoConcept; size?: DominoConceptTileSize; level?: DominoLevel }) {
   if (size === 'board') return <BoardConceptHalf concept={concept} />
 
   const Icon = iconForConcept(concept.icon)
   const categoryInk = dominoTileCategoryInk(concept.color)
   const presentation = dominoConceptHalfPresentation(size)
-  // Fácil: texto más grande y ejemplo en la ficha seleccionada. Universitario: caso o situación del concepto.
+  // Fácil: texto más grande. La explicación del concepto no va en la ficha: está en la nubecita (DominoInfoCloud).
   const textSize = level === 'EASY' ? 'text-[13px]' : presentation.textSize
-  const detail = level === 'EASY' ? (selected ? concept.example : undefined) : level === 'ADVANCED' ? concept.application : undefined
 
   return (
     <div
@@ -969,7 +970,6 @@ function ConceptHalf({ concept, size = 'md', level, selected = false }: { concep
     >
       <Icon className={presentation.iconSize} style={{ color: categoryInk }} strokeWidth={2} aria-hidden="true" focusable="false" />
       {presentation.showLabel && <span className={`domino-tile-label w-full text-center font-semibold text-text-h leading-tight ${textSize}`}>{concept.label}</span>}
-      {detail && <span className="domino-tile-label w-full text-center text-[8.5px] font-normal italic leading-tight text-text-h">{detail}</span>}
     </div>
   )
 }
@@ -1210,24 +1210,29 @@ function HandTileView({
   }[state]
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      draggable={state !== 'waiting' && state !== 'unavailable'}
-      onDragStart={(event) => {
-        onDragStart()
-        event.dataTransfer.effectAllowed = 'move'
-        event.dataTransfer.setData('text/plain', tile.id)
-      }}
-      onDragEnd={() => {
-        // The board keeps the click selection when a drag is cancelled.
-      }}
-      aria-pressed={selected}
-      className={`domino-premium-tile domino-hand-tile flex ${level === 'EASY' || level === 'ADVANCED' ? 'min-h-[104px] w-[220px]' : 'h-[104px] w-[196px]'} shrink-0 overflow-hidden rounded-xl border-[3px] transition-all duration-200 ${stateStyles}`}
-    >
-      <ConceptHalf concept={a} size="lg" level={level} selected={selected} />
-      <div className="domino-tile-divider w-[3px] self-stretch" style={{ background: `linear-gradient(${a.color}, ${b.color})` }} />
-      <ConceptHalf concept={b} size="lg" level={level} selected={selected} />
-    </button>
+    <div className="domino-hand-wrap relative shrink-0">
+      <button
+        type="button"
+        onClick={onClick}
+        draggable={state !== 'waiting' && state !== 'unavailable'}
+        onDragStart={(event) => {
+          onDragStart()
+          event.dataTransfer.effectAllowed = 'move'
+          event.dataTransfer.setData('text/plain', tile.id)
+        }}
+        onDragEnd={() => {
+          // The board keeps the click selection when a drag is cancelled.
+        }}
+        aria-pressed={selected}
+        className={`domino-premium-tile domino-hand-tile flex h-[104px] w-[196px] shrink-0 overflow-hidden rounded-xl border-[3px] transition-all duration-200 ${stateStyles}`}
+      >
+        <ConceptHalf concept={a} size="lg" level={level} />
+        <div className="domino-tile-divider w-[3px] self-stretch" style={{ background: `linear-gradient(${a.color}, ${b.color})` }} />
+        <ConceptHalf concept={b} size="lg" level={level} />
+      </button>
+      {/* La explicación vive en una nubecita por lado, fuera del botón de la ficha (no se anidan botones). */}
+      <DominoInfoCloud concept={a} level={level} className="absolute left-1.5 top-1.5 z-20" />
+      <DominoInfoCloud concept={b} level={level} className="absolute right-1.5 top-1.5 z-20" />
+    </div>
   )
 }

@@ -269,7 +269,7 @@ function dominoHasValidMove(hand: DominoTile[], board: DominoPlacedTile[]): bool
 }
 
 /** Segundos por turno que se sugieren al elegir cada nivel (el anfitrión puede ajustarlos después). */
-export const DOMINO_LEVEL_TURN_SECONDS: Record<DominoLevel, number> = { EASY: 30, MEDIUM: 25, ADVANCED: 15 };
+export const DOMINO_LEVEL_TURN_SECONDS: Record<DominoLevel, number> = { EASY: 30, MEDIUM: 25, ADVANCED: 30 };
 
 /**
  * Concepto tal como viaja al cliente: la pregunta se envía sin `correctIndex`
@@ -2057,11 +2057,13 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
 
     const placed = buildDominoPlacement(room, tile, side, player.userId);
 
-    // Intermedio: antes de colocar, se responde la pregunta del concepto del extremo que empata.
-    // Un concepto sin preguntas (juegos viejos) se coloca directo.
+    // Intermedio y Universitario: antes de colocar, se responde la pregunta del concepto del extremo que empata
+    // (en Universitario el cliente la acompaña con el caso de aplicación del concepto).
+    // Fácil, y un concepto sin preguntas (juegos viejos), se coloca directo.
     const conceptIndex = dominoMatchedConceptIndex(room, side);
     const bankSize = conceptIndex === null ? 0 : dominoQuestionBank(room.concepts[conceptIndex]).length;
-    if ((room.level ?? 'EASY') === 'MEDIUM' && conceptIndex !== null && bankSize > 0) {
+    const level = room.level ?? 'EASY';
+    if ((level === 'MEDIUM' || level === 'ADVANCED') && conceptIndex !== null && bankSize > 0) {
       // Rotación: una pregunta del banco que aún no se hizo en la sala (robar y volver a jugar el mismo concepto no la repite).
       const pick = pickDominoQuestion(bankSize, room.askedQuestions?.[conceptIndex] ?? [], room.lastQuestion?.[conceptIndex], this.dominoQuestionRng)!;
       room.askedQuestions = { ...room.askedQuestions, [conceptIndex]: pick.asked };

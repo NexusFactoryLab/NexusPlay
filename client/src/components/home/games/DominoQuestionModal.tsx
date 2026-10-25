@@ -8,6 +8,8 @@ type Props = {
   concept: DominoConcept
   /** Pregunta elegida por el servidor (del banco del concepto); sin respuesta correcta ni explicación. */
   question: { text: string; options: string[] }
+  /** Universitario: caso o situación del concepto, mostrado como contexto sobre la pregunta. */
+  scenario?: string
   /** true si la pregunta la responde quien mira esta pantalla; false = modo espectador. */
   isSelf: boolean
   answeringDisplayName: string
@@ -23,7 +25,7 @@ type Props = {
  * feedback (acierto/error + explicación) llega solo después de que el
  * servidor corrige — nunca se conoce la respuesta correcta antes.
  */
-export function DominoQuestionModal({ concept, question, isSelf, answeringDisplayName, result, onAnswer, onClose }: Props) {
+export function DominoQuestionModal({ concept, question, scenario, isSelf, answeringDisplayName, result, onAnswer, onClose }: Props) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
 
   // Una pregunta nueva (aunque sea del mismo concepto) reinicia la selección.
@@ -46,6 +48,12 @@ export function DominoQuestionModal({ concept, question, isSelf, answeringDispla
     >
       <div className="w-full max-w-[560px] rounded-3xl border border-border bg-surface p-7 shadow-[var(--shadow)] animate-[domino-q-panel-in_0.45s_cubic-bezier(0.16,1,0.3,1)] motion-reduce:animate-none">
         <p className="mb-2 text-[0.9375rem] font-semibold text-accent">Concepto: {concept.label}</p>
+        {scenario && (
+          <div className="mb-4 rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3 text-[1rem] leading-snug text-text">
+            <strong className="text-accent">Caso: </strong>
+            {scenario}
+          </div>
+        )}
         <h2 className="mb-5 text-[1.375rem] font-bold leading-snug text-text-h">{question.text}</h2>
 
         <div className="flex flex-col gap-3">
