@@ -14,6 +14,8 @@ export interface GameSummaryDto {
   organizationId: string | null;
   /** Id del juego del que se adaptó este (issue #8); `null` si se creó desde cero. */
   sourceGameId: string | null;
+  /** Destacado por un ADMIN: es lo que muestra el Inicio. */
+  featured: boolean;
   /** Solo se llena en el listado de "Comunidad", donde se muestra quién creó cada juego. */
   creatorDisplayName?: string;
   createdAt: Date;
@@ -38,6 +40,7 @@ export function toGameSummaryDto(game: Game): GameSummaryDto {
     creatorUserId: game.creatorUserId,
     organizationId: game.organizationId,
     sourceGameId: game.sourceGameId,
+    featured: game.featured,
     createdAt: game.createdAt,
     updatedAt: game.updatedAt,
   };

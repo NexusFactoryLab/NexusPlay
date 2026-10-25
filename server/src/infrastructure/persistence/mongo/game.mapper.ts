@@ -23,6 +23,11 @@ export interface GameDocument {
   updatedAt: Date;
   /** Ausente en documentos previos al control de concurrencia optimista = versión 0. */
   version?: number;
+  /**
+   * Ausente = no destacado. Solo lo escribe `MongoGameRepository.setFeatured`;
+   * `toPersistence` no lo incluye a propósito (ver `GameProps.featured`).
+   */
+  featured?: boolean;
 }
 
 export class GameMapper {
@@ -44,10 +49,11 @@ export class GameMapper {
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
       version: doc.version ?? 0,
+      featured: doc.featured ?? false,
     });
   }
 
-  static toPersistence(game: Game): GameDocument {
+  static toPersistence(game: Game): Omit<GameDocument, 'featured'> {
     const props = game.toPersistence();
 
     return {

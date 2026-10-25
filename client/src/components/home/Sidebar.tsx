@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { BarChart3, BookOpen, Bot, Building2, ChevronLeft, Gamepad2, LayoutGrid, Lock, Plus, Users, Users2, Zap } from 'lucide-react'
+import { BarChart3, BookOpen, Bot, Building2, ChevronLeft, FolderOpen, Globe, GraduationCap, House, Plus, SquarePen, Users, Zap } from 'lucide-react'
 import type { AuthUser } from '../../services/auth.service'
 import { ProfileMenu } from './ProfileMenu'
 
@@ -149,8 +149,10 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
           collapsed={collapsed}
           active={location.pathname === '/'}
           onClick={() => navigate('/')}
-          icon={<Gamepad2 className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />}
+          icon={<House className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />}
         />
+
+        <SidebarSectionLabel collapsed={collapsed}>Explorar</SidebarSectionLabel>
         <SidebarItem
           tourTarget="nav-subjects"
           emoji="📕"
@@ -161,14 +163,16 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
           icon={<BookOpen className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />}
         />
         <SidebarItem
-          tourTarget="nav-game-types"
-          emoji="🎲"
-          label="Tipos de juego"
+          tourTarget="nav-community"
+          emoji="🧑‍🤝‍🧑"
+          label="Comunidad"
           collapsed={collapsed}
-          active={location.pathname.startsWith('/tipos-de-juego')}
-          onClick={() => navigate('/tipos-de-juego')}
-          icon={<LayoutGrid className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />}
+          active={location.pathname.startsWith('/comunidad')}
+          onClick={() => navigate('/comunidad')}
+          icon={<Globe className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />}
         />
+
+        <SidebarSectionLabel collapsed={collapsed}>Mi espacio</SidebarSectionLabel>
         {userRole.toUpperCase() === 'TEACHER' && (
           <SidebarItem
             tourTarget="nav-classes"
@@ -177,7 +181,7 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
             collapsed={collapsed}
             active={location.pathname.startsWith('/mis-clases')}
             onClick={() => navigate('/mis-clases')}
-            icon={<Users2 className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />}
+            icon={<GraduationCap className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />}
           />
         )}
         {userRole.toUpperCase() === 'STUDENT' && (
@@ -192,30 +196,17 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
           />
         )}
         <SidebarItem
-          tourTarget="nav-community"
-          emoji="🧑‍🤝‍🧑"
-          label="Comunidad"
-          collapsed={collapsed}
-          active={location.pathname === '/comunidad'}
-          onClick={() => navigate('/comunidad')}
-          icon={<Users2 className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />}
-        />
-        <SidebarItem
           tourTarget="nav-own-games"
           emoji="🔒"
-          label={userRole.toUpperCase() === 'TEACHER' ? 'Mis actividades' : 'Mis juegos privados'}
+          label="Mis juegos"
           collapsed={collapsed}
-          active={location.pathname === '/mis-juegos'}
+          active={location.pathname.startsWith('/mis-juegos')}
           onClick={() => navigate('/mis-juegos')}
-          icon={<Lock className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />}
+          icon={<FolderOpen className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />}
         />
         {(canManageUsers || canAccessOrganization) && (
           <>
-            {!collapsed && (
-              <p className="sidebar-section-label mt-4 mb-1 px-3.5 text-[11px] font-semibold tracking-wide text-text/60 uppercase">
-                Administración
-              </p>
-            )}
+            <SidebarSectionLabel collapsed={collapsed}>Administración</SidebarSectionLabel>
             {canManageUsers && (
               <SidebarItem
                 tourTarget="nav-users"
@@ -229,9 +220,20 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
             )}
             {canManageUsers && (
               <SidebarItem
+                tourTarget="nav-edition"
+                emoji="✏️"
+                label="Edición"
+                collapsed={collapsed}
+                active={location.pathname.startsWith('/edicion')}
+                onClick={() => navigate('/edicion')}
+                icon={<SquarePen className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />}
+              />
+            )}
+            {canManageUsers && (
+              <SidebarItem
                 tourTarget="nav-ai-providers"
                 emoji="🤖"
-                label="IA"
+                label="Proveedores de IA"
                 collapsed={collapsed}
                 active={location.pathname === '/ia'}
                 onClick={() => navigate('/ia')}
@@ -254,6 +256,16 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
       </nav>
     </aside>
     </>
+  )
+}
+
+/** Título de sección; con el menú contraído (sin espacio para el texto) queda una línea divisoria. */
+function SidebarSectionLabel({ collapsed, children }: { collapsed: boolean; children: ReactNode }) {
+  if (collapsed) return <hr className="sidebar-section-divider my-2 border-t border-border" aria-hidden="true" />
+  return (
+    <p className="sidebar-section-label mt-4 mb-1 px-3.5 text-[11px] font-semibold tracking-wide text-text/60 uppercase">
+      {children}
+    </p>
   )
 }
 
