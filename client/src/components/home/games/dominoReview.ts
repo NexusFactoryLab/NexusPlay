@@ -31,6 +31,14 @@ export function reviewStatusOf(concept: ConceptDraft | undefined): ReviewStatus 
   return concept.review
 }
 
+/** Estado visible de la celda en la cuadrícula; `null` si el concepto no pasa por revisión. */
+export function tileReviewState(concept: ConceptDraft | undefined): 'pending' | 'warning' | 'reviewed' | null {
+  const status = reviewStatusOf(concept)
+  if (status === 'none') return null
+  if (status === 'approved') return 'reviewed'
+  return concept?.aiWarnings && concept.aiWarnings.length > 0 ? 'warning' : 'pending'
+}
+
 /**
  * Marca como pendientes los conceptos recién generados por IA y les adjunta sus
  * advertencias (casadas por posición y, si el servidor mandó el nombre, también por nombre).

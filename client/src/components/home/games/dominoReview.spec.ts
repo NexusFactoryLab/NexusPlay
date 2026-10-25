@@ -11,6 +11,7 @@ import {
   reviewBlockIssue,
   reviewProgress,
   reviewStatusOf,
+  tileReviewState,
 } from './dominoReview'
 
 function concepts(count: number): ConceptDraft[] {
@@ -128,6 +129,17 @@ describe('bloqueo de creación', () => {
     let list = markAsAiGenerated(concepts(6))
     for (let i = 0; i < 6; i += 1) list = approveConcept(list, i)
     expect(reviewBlockIssue(list)).toBeNull()
+  })
+})
+
+describe('tileReviewState (estado visible de la celda)', () => {
+  it('pendiente, con advertencia, revisado y sin revisión', () => {
+    const [a, b] = markAsAiGenerated(concepts(2), [{ conceptIndex: 1, message: 'Pocas opciones' }])
+    expect(tileReviewState(a)).toBe('pending')
+    expect(tileReviewState(b)).toBe('warning')
+    expect(tileReviewState(approveConcept([a], 0)[0])).toBe('reviewed')
+    expect(tileReviewState(concepts(1)[0])).toBeNull()
+    expect(tileReviewState(undefined)).toBeNull()
   })
 })
 

@@ -4,7 +4,6 @@ import type { FormEvent } from 'react'
 import { TextField } from '../../TextField'
 import { SaveVisibilityModal } from './SaveVisibilityModal'
 import { ImageUploadField } from './ImageUploadField'
-import { IconPickerField } from './IconPickerField'
 import { AiGameAssistantPanel } from './AiGameAssistantPanel'
 import { useReportCreateSummary } from './aiDraftContext'
 import { useCreationDraftId } from './useCreationDraftId'
@@ -37,7 +36,6 @@ import { listMyOrganizations, type OrganizationWithMyRole } from '../../../servi
 import { ApiError } from '../../../utils/http'
 import {
   DEFAULT_DOMINO_CONFIG,
-  DOMINO_ICON_LABELS,
   MAX_DOMINO_CONCEPTS,
   MIN_DOMINO_CONCEPTS,
   iconForConcept,
@@ -50,9 +48,18 @@ import {
   validateDominoConcepts,
   type ConceptDraft,
 } from './dominoContentDraft'
-import { DominoConceptContentEditor } from './DominoConceptContentEditor'
-import { DominoReviewModal } from './DominoReviewModal'
-import { markAsAiGenerated, reviewBlockIssue, reviewProgress } from './dominoReview'
+import { DominoConceptPanel } from './DominoConceptPanel'
+import { AiIdentityBadges, useAiIdentity } from './useAiIdentity'
+import {
+  approveConcept,
+  discardConcept,
+  editConcept,
+  markAsAiGenerated,
+  nextPendingIndex,
+  reviewBlockIssue,
+  reviewProgress,
+  tileReviewState,
+} from './dominoReview'
 
 
 /**
@@ -111,8 +118,6 @@ export function DominoGameForm({
   const [createdGameId, setCreatedGameId] = useState<string | null>(null)
   const [phase, setPhase] = useState(0)
   const [selectedConcept, setSelectedConcept] = useState(0)
-  // Pantalla de revisión del contenido de IA: índice del concepto con el que abre, o null si está cerrada.
-  const [reviewIndex, setReviewIndex] = useState<number | null>(null)
   const { setSubPhase } = useCreateGameProgress()
 
   // Informa al header del wizard (CreateGameLayout) en qué fase va este
@@ -178,12 +183,24 @@ export function DominoGameForm({
     applyAiDraft(adapted)
   })
 
+  // La IA también sugiere título, descripción y área: se aplican sin pisar lo que escribió el usuario.
+  const aiIdentity = useAiIdentity({
+    title,
+    description,
+    categoryId,
+    categoryIds: categories.map((category) => category.id),
+    setTitle,
+    setDescription,
+    setCategoryId,
+    goToIdentity: () => setPhase(0),
+  })
+
   /**
    * Carga un borrador en el formulario. Con `ai` (generado por la IA) los conceptos quedan
-   * pendientes de revisión con sus advertencias, y al llegar el borrador completo (`final`)
-   * se abre la pantalla de revisión. La adaptación desde otro juego no pasa por revisión.
+   * pendientes de revisión (con sus advertencias) y se revisan en la propia cuadrícula.
+   * La adaptación desde otro juego no pasa por revisión.
    */
-  function applyAiDraft(draft: GameDraft, options?: { ai?: boolean; final?: boolean }) {
+  function applyAiDraft(draft: GameDraft, options?: { ai?: boolean }) {
     const items = Array.isArray(draft.content) ? draft.content : []
     // El panel sigue al concepto más reciente mientras la IA llena la lista.
     setSelectedConcept(Math.max(items.length - 1, 0))
@@ -192,13 +209,12 @@ export function DominoGameForm({
     setConcepts(options?.ai ? markAsAiGenerated(loaded, draft.warnings) : loaded)
     const config = (draft.config ?? {}) as Record<string, unknown>
     if (typeof config.handSize === 'number') setHandSize(config.handSize)
-    if (options?.ai && options.final && loaded.length > 0) setReviewIndex(0)
   }
 
-  function updateConcept<K extends keyof ConceptDraft>(index: number, field: K, value: ConceptDraft[K]) {
-    setConcepts((current) =>
-      current.map((concept, i) => (i === index ? { ...concept, [field]: value } : concept)),
-    )
+  /** Salta al siguiente concepto de IA sin revisar (con vuelta al inicio). */
+  function goToNextPending() {
+    const next = nextPendingIndex(concepts, selectedConcept)
+    if (next !== null) setSelectedConcept(next)
   }
 
   function addConcept() {
@@ -208,9 +224,8 @@ export function DominoGameForm({
   }
 
   function removeConcept(index: number) {
-    setConcepts((current) =>
-      current.length > MIN_DOMINO_CONCEPTS ? current.filter((_, i) => i !== index) : current,
-    )
+    // Descartar respeta el mínimo de conceptos (ver dominoReview.discardConcept).
+    setConcepts((current) => discardConcept(current, index).concepts)
     setSelectedConcept((current) => Math.max(0, Math.min(current, concepts.length - 2)))
   }
 
@@ -238,13 +253,10 @@ export function DominoGameForm({
 
   /** Valida solo los campos de la fase 3 (Contenido): el bloque repetible de conceptos. */
   function validateContentPhase(): string | null {
-    // Antes que nada: los conceptos de IA deben estar revisados; abre la revisión en el primero pendiente.
+    // Antes que nada: los conceptos de IA deben estar revisados; lleva al primero pendiente.
     const pendingReview = reviewBlockIssue(concepts)
     if (pendingReview) {
-      if (pendingReview.conceptIndex !== undefined) {
-        setSelectedConcept(pendingReview.conceptIndex)
-        setReviewIndex(pendingReview.conceptIndex)
-      }
+      if (pendingReview.conceptIndex !== undefined) setSelectedConcept(pendingReview.conceptIndex)
       return pendingReview.message
     }
     // Exige 1 pregunta completa por concepto (ver validateDominoConcepts); lleva al concepto con el problema.
@@ -348,21 +360,23 @@ export function DominoGameForm({
           los extremos abiertos.
         </>
       }
-      aiPanel={<AiGameAssistantPanel gameType="DOMINO" disabled={submitting} onDraftReady={(draft, meta) => applyAiDraft(draft, { ai: true, final: meta?.final })} />}
-    >
-      {reviewIndex !== null && (
-        <DominoReviewModal
-          concepts={concepts}
-          initialIndex={reviewIndex}
-          onChange={setConcepts}
-          onClose={() => setReviewIndex(null)}
+      aiPanel={
+        <AiGameAssistantPanel
+          gameType="DOMINO"
+          disabled={submitting}
+          onDraftReady={(draft, meta) => {
+            applyAiDraft(draft, { ai: true })
+            aiIdentity.onDraft(draft, meta)
+          }}
         />
-      )}
+      }
+    >
       <form className="flex flex-col gap-[16px]" onSubmit={handleSubmit} noValidate>
         <PhaseLabel phase={phase + 1} total={TOTAL_PHASES} label={PHASES[phase].label} />
 
         {phase === 0 && (
           <FormSection icon={Rocket} title="Cuéntanos de tu juego" subtitle="Nombre, portada y el lugar donde vivirá." tone={1}>
+            <AiIdentityBadges ai={aiIdentity} />
             <TextField
               label="Título del juego"
               type="text"
@@ -412,21 +426,33 @@ export function DominoGameForm({
 
         {phase === 1 && (
           <FormSection icon={SlidersHorizontal} title="Reglas del juego" subtitle="Ajusta cómo se juega; los valores por defecto funcionan bien." tone={2}>
-            <div>
-              <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="domino-hand-size">
-                Fichas que recibe el jugador
-              </label>
+            <div className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-4">
+              <div className="flex items-center justify-between gap-3">
+                <label className="text-[16px] font-semibold text-text-h" htmlFor="domino-hand-size">
+                  Fichas que recibe el jugador
+                </label>
+                <span
+                  className="flex h-11 min-w-[44px] items-center justify-center rounded-full px-3 text-[18px] font-bold text-white"
+                  style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
+                  aria-live="polite"
+                >
+                  {handSize}
+                </span>
+              </div>
               <input
                 id="domino-hand-size"
-                type="number"
+                type="range"
                 min={3}
                 max={12}
-                className="w-full rounded-lg border border-border bg-bg px-[13px] py-[11px] text-[15px] text-text-h outline-none focus:border-accent"
-                value={handSize}
+                step={1}
+                className="h-11 w-full cursor-pointer accent-[var(--accent)]"
+                value={Number.isInteger(handSize) ? handSize : DEFAULT_DOMINO_CONFIG.handSize}
                 disabled={submitting}
                 onChange={(event) => setHandSize(Number(event.target.value))}
               />
-              <p className="nx-hint mt-1 text-[11.5px] text-text">Entre 3 y 12 fichas; el resto queda en el pozo.</p>
+              <p className="text-[16px] leading-snug text-text">
+                Entre 3 y 12 fichas; el resto queda en el pozo. Con {concepts.length} conceptos el set tiene {tileCount} fichas.
+              </p>
             </div>
           </FormSection>
         )}
@@ -435,22 +461,51 @@ export function DominoGameForm({
         <FormSection icon={Puzzle} title="Conceptos" subtitle="Cada concepto necesita al menos una pregunta; así cada ficha queda con las dos de sus lados." tone={3} bare>
 {reviewSummary.total > 0 && (
           <div
-            className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-border px-4 py-3 text-[16px] text-text-h"
-            style={{ background: 'color-mix(in srgb, #f59e0b 14%, var(--surface))' }}
+            className="mb-4 flex animate-[fade-in-up_0.25s_ease-out] flex-col gap-3 rounded-2xl border border-border px-4 py-3 text-[16px] text-text-h motion-reduce:animate-none"
+            style={{
+              background: reviewSummary.complete
+                ? 'color-mix(in srgb, var(--nx-ok) 12%, var(--surface))'
+                : 'color-mix(in srgb, #f59e0b 14%, var(--surface))',
+            }}
+            role="region"
+            aria-label="Revisión del contenido de IA"
           >
-            <ClipboardCheck className="h-5 w-5 shrink-0" aria-hidden="true" />
-            <p className="min-w-0 flex-1" aria-live="polite">
-              {reviewSummary.reviewed} de {reviewSummary.total} conceptos de IA revisados.{' '}
-              {reviewSummary.complete ? 'Todo listo para crear el juego.' : 'La IA puede equivocarse: revísalos antes de crear el juego.'}
-            </p>
-            <button
-              type="button"
-              className="nx-btn nx-btn-secondary min-h-[44px] border border-border text-[16px] text-text-h"
-              onClick={() => setReviewIndex(Math.max(0, concepts.findIndex((c) => c.review === 'pending')))}
-              disabled={submitting}
+            <div className="flex flex-wrap items-center gap-3">
+              <ClipboardCheck className="h-5 w-5 shrink-0" aria-hidden="true" />
+              <p className="min-w-0 flex-1 font-semibold" aria-live="polite">
+                {reviewSummary.reviewed} de {reviewSummary.total} revisados
+                <span className="font-normal">
+                  {' · '}
+                  {reviewSummary.complete ? 'todo listo para crear el juego.' : 'La IA puede equivocarse: revisa los datos antes de publicar.'}
+                </span>
+              </p>
+              {!reviewSummary.complete && (
+                <button
+                  type="button"
+                  className="nx-btn nx-btn-secondary min-h-[44px] border border-border text-[16px] text-text-h"
+                  onClick={goToNextPending}
+                  disabled={submitting}
+                >
+                  Ir al siguiente pendiente
+                </button>
+              )}
+            </div>
+            <div
+              className="h-2.5 overflow-hidden rounded-full bg-border"
+              role="progressbar"
+              aria-label="Avance de la revisión"
+              aria-valuemin={0}
+              aria-valuemax={reviewSummary.total}
+              aria-valuenow={reviewSummary.reviewed}
             >
-              {reviewSummary.complete ? 'Ver revisión' : 'Revisar contenido de IA'}
-            </button>
+              <div
+                className="h-full rounded-full transition-[width] duration-300 ease-out motion-reduce:transition-none"
+                style={{
+                  width: `${Math.round((reviewSummary.reviewed / reviewSummary.total) * 100)}%`,
+                  background: 'linear-gradient(90deg, var(--accent), var(--accent-2))',
+                }}
+              />
+            </div>
           </div>
         )}
 <ItemGridEditor
@@ -464,7 +519,8 @@ export function DominoGameForm({
           onAdd={addConcept}
           onRemove={removeConcept}
           disabled={submitting}
-          layout="stacked"
+          layout="split"
+          tileReview={(index) => tileReviewState(concepts[index])}
           isComplete={(index) => isConceptComplete(concepts[index]) && concepts[index]?.review !== 'pending'}
           tileText={(index) => concepts[index]?.label ?? ''}
           tileVisual={(index) => {
@@ -477,57 +533,18 @@ export function DominoGameForm({
               </span>
             )
           }}
-          renderEditor={(index) => (
-            <div className="flex flex-col gap-3">
-              <TextField
-                label="Nombre"
-                type="text"
-                value={concepts[index]?.label ?? ''}
+          renderEditor={(index) =>
+            concepts[index] ? (
+              <DominoConceptPanel
+                concept={concepts[index]}
+                index={index}
                 disabled={submitting}
-                onChange={(value) => updateConcept(index, 'label', value)}
-                onBlur={() => {}}
+                // Editar un concepto de IA cuenta como revisarlo.
+                onChange={(next) => setConcepts((current) => editConcept(current, index, next))}
+                onApprove={() => setConcepts((current) => approveConcept(current, index))}
               />
-              <div>
-                <label
-                  className="nx-label mb-1.5 block text-[13px] font-medium text-text-h"
-                  htmlFor={`concept-icon-${index}`}
-                >
-                  Ícono
-                </label>
-                <IconPickerField
-                  id={`concept-icon-${index}`}
-                  value={concepts[index]?.icon ?? ''}
-                  labels={DOMINO_ICON_LABELS}
-                  disabled={submitting}
-                  onChange={(key) => updateConcept(index, 'icon', key)}
-                />
-              </div>
-              <div>
-                <label
-                  className="nx-label mb-1.5 block text-[13px] font-medium text-text-h"
-                  htmlFor={`concept-color-${index}`}
-                >
-                  Color
-                </label>
-                <input
-                  id={`concept-color-${index}`}
-                  type="color"
-                  className="h-[45px] w-full cursor-pointer rounded-lg border border-border bg-bg px-2 py-1.5 outline-none focus:border-accent"
-                  value={concepts[index]?.color ?? '#888888'}
-                  disabled={submitting}
-                  onChange={(event) => updateConcept(index, 'color', event.target.value)}
-                />
-              </div>
-              {concepts[index] && (
-                <DominoConceptContentEditor
-                  concept={concepts[index]}
-                  index={index}
-                  disabled={submitting}
-                  onChange={(next) => setConcepts((current) => current.map((c, i) => (i === index ? next : c)))}
-                />
-              )}
-            </div>
-          )}
+            ) : null
+          }
         />
 </FormSection>
         )}
