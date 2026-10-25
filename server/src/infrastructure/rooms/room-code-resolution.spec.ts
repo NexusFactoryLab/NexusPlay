@@ -45,6 +45,7 @@ describe('RoomsGateway room code registry', () => {
         id: 'game-guess-who',
         title: 'Quién Es Demo',
         gameType: { getName: () => 'GUESS_WHO' },
+        tournamentEnabled: true,
         config: {},
         content: Array.from({ length: 6 }, (_, i) => ({
           cardId: `c${i}`,

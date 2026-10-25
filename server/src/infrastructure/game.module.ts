@@ -35,6 +35,7 @@ import { UpdateGameUseCase } from '../application/use-cases/update-game.use-case
 import { PublishGameUseCase } from '../application/use-cases/publish-game.use-case.js';
 import { UnpublishGameUseCase } from '../application/use-cases/unpublish-game.use-case.js';
 import { SetGameFeaturedUseCase } from '../application/use-cases/set-game-featured.use-case.js';
+import { SetGameTournamentEnabledUseCase } from '../application/use-cases/set-game-tournament-enabled.use-case.js';
 import { DeleteGameUseCase } from '../application/use-cases/delete-game.use-case.js';
 import { DonateGameToOrganizationUseCase } from '../application/use-cases/donate-game-to-organization.use-case.js';
 import { ImportGamesBatchUseCase } from '../application/use-cases/import-games-batch.use-case.js';
@@ -135,6 +136,7 @@ import { AiProviderAttemptsController } from './http/controllers/ai-provider-att
     PublishGameUseCase,
     UnpublishGameUseCase,
     SetGameFeaturedUseCase,
+    SetGameTournamentEnabledUseCase,
     DeleteGameUseCase,
     DonateGameToOrganizationUseCase,
     ImportGamesBatchUseCase,

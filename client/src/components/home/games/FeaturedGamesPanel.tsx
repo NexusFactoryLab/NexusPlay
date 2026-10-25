@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Search, Star } from 'lucide-react'
+import { Search, Star, Swords } from 'lucide-react'
 import { useAuth } from '../../../hooks/useAuth'
 import { useToast } from '../../../hooks/useToast'
-import { listGames, setGameFeatured, type GameSummary } from '../../../services/game.service'
+import { listGames, setGameFeatured, setGameTournamentEnabled, type GameSummary } from '../../../services/game.service'
 import { ApiError } from '../../../utils/http'
 import { resolveGameTypeDisplayName } from './gameTypePublicNames'
 
@@ -57,6 +57,22 @@ export function FeaturedGamesPanel() {
       showToast(next ? `"${game.title}" ahora sale en el Inicio.` : `"${game.title}" ya no sale en el Inicio.`, 'success')
     } catch (err: unknown) {
       showToast(err instanceof ApiError ? err.message : 'No se pudo actualizar el destacado.', 'error')
+    } finally {
+      setPendingId(null)
+    }
+  }
+
+  // Torneos grupales (issue #102): mientras esté habilitado, el Inicio muestra a todos el acceso por código.
+  async function toggleTournament(game: GameSummary) {
+    if (!token || pendingId) return
+    const next = !game.tournamentEnabled
+    setPendingId(game.id)
+    try {
+      await setGameTournamentEnabled(token, game.id, next)
+      setGames((current) => current.map((item) => (item.id === game.id ? { ...item, tournamentEnabled: next } : item)))
+      showToast(next ? `Torneo habilitado para "${game.title}".` : `Torneo deshabilitado para "${game.title}".`, 'success')
+    } catch (err: unknown) {
+      showToast(err instanceof ApiError ? err.message : 'No se pudo actualizar el torneo.', 'error')
     } finally {
       setPendingId(null)
     }
@@ -135,6 +151,22 @@ export function FeaturedGamesPanel() {
               <Star className="h-3.5 w-3.5" fill={game.featured ? 'currentColor' : 'none'} strokeWidth={2} />
               {game.featured ? 'Quitar' : 'Destacar'}
             </button>
+            {game.gameType === 'GUESS_WHO' && (
+              <button
+                type="button"
+                aria-pressed={game.tournamentEnabled}
+                disabled={pendingId !== null}
+                onClick={() => toggleTournament(game)}
+                className={`mx-2.5 mb-2.5 flex items-center justify-center gap-1.5 rounded-lg border px-2 py-1.5 text-[12px] font-medium transition-colors disabled:opacity-60 ${
+                  game.tournamentEnabled
+                    ? 'border-accent-2 bg-accent-2/10 text-accent-2 hover:bg-accent-2/15'
+                    : 'border-border text-text hover:bg-code-bg hover:text-text-h'
+                }`}
+              >
+                <Swords className="h-3.5 w-3.5" strokeWidth={2} />
+                {game.tournamentEnabled ? 'Torneo habilitado' : 'Habilitar torneo'}
+              </button>
+            )}
           </li>
         ))}
       </ul>

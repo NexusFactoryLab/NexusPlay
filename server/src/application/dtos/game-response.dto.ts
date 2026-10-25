@@ -16,6 +16,8 @@ export interface GameSummaryDto {
   sourceGameId: string | null;
   /** Destacado por un ADMIN: es lo que muestra el Inicio. */
   featured: boolean;
+  /** Torneos habilitados por un ADMIN para este juego (issue #102). */
+  tournamentEnabled: boolean;
   /** Solo se llena en el listado de "Comunidad", donde se muestra quién creó cada juego. */
   creatorDisplayName?: string;
   createdAt: Date;
@@ -41,6 +43,7 @@ export function toGameSummaryDto(game: Game): GameSummaryDto {
     organizationId: game.organizationId,
     sourceGameId: game.sourceGameId,
     featured: game.featured,
+    tournamentEnabled: game.tournamentEnabled,
     createdAt: game.createdAt,
     updatedAt: game.updatedAt,
   };

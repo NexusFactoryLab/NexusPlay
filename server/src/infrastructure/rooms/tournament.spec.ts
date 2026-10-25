@@ -29,6 +29,7 @@ function setup() {
     title: 'Banderas',
     gameType: { getName: () => 'GUESS_WHO' },
     config: { turnDurationSeconds: 30 },
+    tournamentEnabled: true,
     content: Array.from({ length: 6 }, (_, i) => ({ cardId: `c${i}`, label: `C${i}`, imageUrl: '', audioUrl: null, info: null, traits: [] })),
   };
   const users = { findById: async (id: string) => ({ isAdmin: () => id === 'admin' }) } as unknown as UserRepository;
@@ -119,5 +120,15 @@ describe('torneo grupal administrado', () => {
     };
     gateway.handleTournamentClose(admin);
     expect(tournaments.get(tournament.code)).toBeUndefined();
+  });
+});
+
+describe('torneo habilitado desde Edición', () => {
+  it('no se puede crear si el administrador no habilitó el torneo del juego', async () => {
+    const h = setup();
+    (h.gateway as unknown as { gameRepository: { findById: () => Promise<unknown> } }).gameRepository = {
+      findById: async () => ({ id: 'g', title: 'Banderas', gameType: { getName: () => 'GUESS_WHO' }, config: {}, content: [], tournamentEnabled: false }),
+    };
+    await expect(h.gateway.handleTournamentCreate(client('admin'), { gameId: 'g', maxParticipants: 8 })).rejects.toThrow(/habilitado/);
   });
 });

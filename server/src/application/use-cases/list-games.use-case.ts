@@ -24,6 +24,8 @@ export interface ListGamesInput {
   onlyMine?: boolean;
   /** Solo los juegos destacados por un ADMIN: el Inicio muestra únicamente estos. */
   onlyFeatured?: boolean;
+  /** Solo los juegos con torneo habilitado (issue #102): el Inicio decide con esto si muestra el acceso al torneo. */
+  onlyTournamentEnabled?: boolean;
   /** Resuelve y adjunta el nombre visible del creador de cada juego (para "Comunidad"). */
   includeCreatorNames?: boolean;
   search?: string;
@@ -85,6 +87,7 @@ export class ListGamesUseCase implements UseCase<ListGamesInput, ListGamesOutput
       status,
       creatorUserId: input.onlyMine ? input.requestingUserId : undefined,
       featured: input.onlyFeatured,
+      tournamentEnabled: input.onlyTournamentEnabled,
       categoryId: input.categoryId,
       organizationId: input.organizationId,
       gameType: input.gameType,

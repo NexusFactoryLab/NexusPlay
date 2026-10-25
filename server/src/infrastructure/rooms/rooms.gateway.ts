@@ -1513,6 +1513,8 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     if (!game || game.gameType.getName() !== 'GUESS_WHO') {
       throw new Error('Juego no encontrado o no es de tipo "¿Quién Es?".');
     }
+    // El administrador lo habilita antes desde Edición (issue #102).
+    if (!game.tournamentEnabled) throw new Error('El torneo no está habilitado para este juego.');
 
     const maxParticipants = body.maxParticipants;
     if (!Number.isInteger(maxParticipants) || maxParticipants < 2 || maxParticipants > TOURNAMENT_MAX_PARTICIPANTS) {
