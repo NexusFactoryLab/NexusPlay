@@ -1,25 +1,26 @@
 import type { CSSProperties, ReactNode } from 'react'
-import { ArrowLeft, BookOpen, Bot, Building2, ChevronLeft, Compass, Gamepad2, KeyRound, Lock, LogOut, Palette, Plus, Search, Settings, UserRound, Users, Users2, Zap } from 'lucide-react'
+import { ArrowLeft, BookOpen, Bot, Building2, ChevronLeft, Compass, FolderOpen, Globe, GraduationCap, House, KeyRound, LayoutGrid, Lock, LogOut, Palette, Plus, Search, Settings, UserRound, Users, Users2, Zap } from 'lucide-react'
 
 /** Duración de cada bucle: el dedo va al elemento, lo toca y se ve el resultado. */
 const LOOP = '4s'
 
-type NavItem = { target: string; label: string; icon: typeof Gamepad2 }
+type NavItem = { target: string; label: string; icon: typeof House }
 
-/** Los mismos ítems, íconos y nombres del menú real (Sidebar.tsx). */
+/** Los mismos ítems, íconos, nombres y orden del menú real (Sidebar.tsx). */
 const NAV: NavItem[] = [
-  { target: 'nav-home', label: 'Inicio', icon: Gamepad2 },
+  { target: 'nav-home', label: 'Inicio', icon: House },
   { target: 'nav-subjects', label: 'Áreas', icon: BookOpen },
-  { target: 'nav-classes', label: 'Mis clases', icon: Users2 },
-  { target: 'nav-community', label: 'Comunidad', icon: Users2 },
-  { target: 'nav-own-games', label: 'Mis juegos', icon: Lock },
+  { target: 'nav-community', label: 'Comunidad', icon: Globe },
+  { target: 'nav-classes', label: 'Mis clases', icon: GraduationCap },
+  { target: 'nav-own-games', label: 'Mis actividades', icon: FolderOpen },
   { target: 'nav-users', label: 'Usuarios', icon: Users },
-  { target: 'nav-ai-providers', label: 'IA', icon: Bot },
+  { target: 'nav-game-types', label: 'Tipos de juego', icon: LayoutGrid },
+  { target: 'nav-ai-providers', label: 'Proveedores de IA', icon: Bot },
   { target: 'nav-organization', label: 'Organización', icon: Building2 },
 ]
 
 /** Solo las cuentas administrativas ven estos pasos (ver getWelcomeSteps). */
-const ADMIN_TARGETS = ['nav-users', 'nav-ai-providers', 'nav-organization']
+const ADMIN_TARGETS = ['nav-users', 'nav-game-types', 'nav-ai-providers', 'nav-organization']
 
 const GAMES = [
   { emoji: '🧠', name: 'MatchMente', color: '#a78bfa' },
@@ -274,8 +275,9 @@ const SECTION_TITLES: Record<string, string> = {
   'nav-subjects': 'Áreas',
   'nav-classes': 'Mis clases',
   'nav-community': 'Comunidad',
-  'nav-own-games': 'Mis juegos privados',
+  'nav-own-games': 'Mis actividades',
   'nav-users': 'Usuarios',
+  'nav-game-types': 'Tipos de juego',
   'nav-ai-providers': 'Proveedores de IA',
   'nav-organization': 'Organización',
 }
@@ -315,6 +317,7 @@ const AI_REQUESTS = [
 ]
 const SCHOOLS = [['🏫', 'Colegio San José', '#06b6d4'], ['🎓', 'Liceo Nacional', '#a78bfa'], ['📚', 'Instituto Andino', '#ff7a1a'], ['🌱', 'Escuela Nueva Era', '#22c55e']]
 const SUBJECTS = [['🔢', 'Matemáticas', '#ff7a1a'], ['🔬', 'Ciencias', '#22c55e'], ['🌎', 'Sociales', '#06b6d4'], ['📖', 'Lenguaje', '#a78bfa'], ['🎨', 'Arte', '#ff4d6d'], ['🎵', 'Música', '#ffcc4d']]
+const GAME_TYPES = [['MatchMente', 'Activo', '#22c55e'], ['Dominexo', 'Activo', '#22c55e'], ['Laberinto recolector', 'Activo', '#22c55e'], ['Escaleras y serpientes', 'Archivado', '#f59e0b']]
 const CLASSES = [['5°A', 'Matemáticas', '28', '#ff7a1a'], ['6°B', 'Ciencias', '31', '#22c55e'], ['7°A', 'Inglés', '25', '#a78bfa']]
 
 /** Contenido de cada sección en miniatura. Usuarios, IA y Organización solo salen en cuentas administrativas. */
@@ -362,6 +365,19 @@ function SectionBody({ target }: { target: string }) {
               <span className="truncate text-[6px] font-bold text-text-h">{name}</span>
               <span className="text-[5px] text-text/60">{12 + i * 7} miembros</span>
             </span>
+          </span>
+        ))}
+      </div>
+    )
+  }
+  if (target === 'nav-game-types') {
+    return (
+      <div className="flex flex-col gap-[3px]">
+        {GAME_TYPES.map(([name, status, color], i) => (
+          <span key={name} className="flex items-center gap-1 rounded-md border border-border bg-surface px-1 py-[2px]" style={rowIn(i, 0.1)}>
+            <LayoutGrid className="h-2 w-2 shrink-0 text-accent" />
+            <span className="flex-1 truncate text-[6px] font-semibold text-text-h">{name}</span>
+            <span className={CHIP} style={{ background: tint(color), color }}>{status}</span>
           </span>
         ))}
       </div>
