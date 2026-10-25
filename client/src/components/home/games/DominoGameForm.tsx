@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Rocket, SlidersHorizontal, Puzzle } from 'lucide-react'
+import { Rocket, SlidersHorizontal, Puzzle, ClipboardCheck } from 'lucide-react'
 import type { FormEvent } from 'react'
 import { TextField } from '../../TextField'
 import { SaveVisibilityModal } from './SaveVisibilityModal'
@@ -51,6 +51,8 @@ import {
   type ConceptDraft,
 } from './dominoContentDraft'
 import { DominoConceptContentEditor } from './DominoConceptContentEditor'
+import { DominoReviewModal } from './DominoReviewModal'
+import { markAsAiGenerated, reviewBlockIssue, reviewProgress } from './dominoReview'
 
 
 /**
@@ -109,6 +111,8 @@ export function DominoGameForm({
   const [createdGameId, setCreatedGameId] = useState<string | null>(null)
   const [phase, setPhase] = useState(0)
   const [selectedConcept, setSelectedConcept] = useState(0)
+  // Pantalla de revisión del contenido de IA: índice del concepto con el que abre, o null si está cerrada.
+  const [reviewIndex, setReviewIndex] = useState<number | null>(null)
   const { setSubPhase } = useCreateGameProgress()
 
   // Informa al header del wizard (CreateGameLayout) en qué fase va este
@@ -174,14 +178,21 @@ export function DominoGameForm({
     applyAiDraft(adapted)
   })
 
-  function applyAiDraft(draft: GameDraft) {
+  /**
+   * Carga un borrador en el formulario. Con `ai` (generado por la IA) los conceptos quedan
+   * pendientes de revisión con sus advertencias, y al llegar el borrador completo (`final`)
+   * se abre la pantalla de revisión. La adaptación desde otro juego no pasa por revisión.
+   */
+  function applyAiDraft(draft: GameDraft, options?: { ai?: boolean; final?: boolean }) {
     const items = Array.isArray(draft.content) ? draft.content : []
     // El panel sigue al concepto más reciente mientras la IA llena la lista.
     setSelectedConcept(Math.max(items.length - 1, 0))
     // Carga también definition, example, application y el banco de preguntas que genera la IA.
-    setConcepts(items.map((item, index) => toConceptDraft(item, index)))
+    const loaded = items.map((item, index) => toConceptDraft(item, index))
+    setConcepts(options?.ai ? markAsAiGenerated(loaded, draft.warnings) : loaded)
     const config = (draft.config ?? {}) as Record<string, unknown>
     if (typeof config.handSize === 'number') setHandSize(config.handSize)
+    if (options?.ai && options.final && loaded.length > 0) setReviewIndex(0)
   }
 
   function updateConcept<K extends keyof ConceptDraft>(index: number, field: K, value: ConceptDraft[K]) {
@@ -227,6 +238,15 @@ export function DominoGameForm({
 
   /** Valida solo los campos de la fase 3 (Contenido): el bloque repetible de conceptos. */
   function validateContentPhase(): string | null {
+    // Antes que nada: los conceptos de IA deben estar revisados; abre la revisión en el primero pendiente.
+    const pendingReview = reviewBlockIssue(concepts)
+    if (pendingReview) {
+      if (pendingReview.conceptIndex !== undefined) {
+        setSelectedConcept(pendingReview.conceptIndex)
+        setReviewIndex(pendingReview.conceptIndex)
+      }
+      return pendingReview.message
+    }
     // Exige 1 pregunta completa por concepto (ver validateDominoConcepts); lleva al concepto con el problema.
     const issue = validateDominoConcepts(concepts)
     if (!issue) return null
@@ -309,6 +329,7 @@ export function DominoGameForm({
   }
 
   const tileCount = (concepts.length * (concepts.length + 1)) / 2
+  const reviewSummary = reviewProgress(concepts)
 
   return (
     <GameFormShell
@@ -327,8 +348,16 @@ export function DominoGameForm({
           los extremos abiertos.
         </>
       }
-      aiPanel={<AiGameAssistantPanel gameType="DOMINO" disabled={submitting} onDraftReady={applyAiDraft} />}
+      aiPanel={<AiGameAssistantPanel gameType="DOMINO" disabled={submitting} onDraftReady={(draft, meta) => applyAiDraft(draft, { ai: true, final: meta?.final })} />}
     >
+      {reviewIndex !== null && (
+        <DominoReviewModal
+          concepts={concepts}
+          initialIndex={reviewIndex}
+          onChange={setConcepts}
+          onClose={() => setReviewIndex(null)}
+        />
+      )}
       <form className="flex flex-col gap-[16px]" onSubmit={handleSubmit} noValidate>
         <PhaseLabel phase={phase + 1} total={TOTAL_PHASES} label={PHASES[phase].label} />
 
@@ -404,6 +433,26 @@ export function DominoGameForm({
 
         {phase === 2 && (
         <FormSection icon={Puzzle} title="Conceptos" subtitle="Cada concepto necesita al menos una pregunta; así cada ficha queda con las dos de sus lados." tone={3} bare>
+{reviewSummary.total > 0 && (
+          <div
+            className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-border px-4 py-3 text-[16px] text-text-h"
+            style={{ background: 'color-mix(in srgb, #f59e0b 14%, var(--surface))' }}
+          >
+            <ClipboardCheck className="h-5 w-5 shrink-0" aria-hidden="true" />
+            <p className="min-w-0 flex-1" aria-live="polite">
+              {reviewSummary.reviewed} de {reviewSummary.total} conceptos de IA revisados.{' '}
+              {reviewSummary.complete ? 'Todo listo para crear el juego.' : 'La IA puede equivocarse: revísalos antes de crear el juego.'}
+            </p>
+            <button
+              type="button"
+              className="nx-btn nx-btn-secondary min-h-[44px] border border-border text-[16px] text-text-h"
+              onClick={() => setReviewIndex(Math.max(0, concepts.findIndex((c) => c.review === 'pending')))}
+              disabled={submitting}
+            >
+              {reviewSummary.complete ? 'Ver revisión' : 'Revisar contenido de IA'}
+            </button>
+          </div>
+        )}
 <ItemGridEditor
           itemLabel="Concepto"
           addLabel="+ Agregar concepto"
@@ -416,7 +465,7 @@ export function DominoGameForm({
           onRemove={removeConcept}
           disabled={submitting}
           layout="stacked"
-          isComplete={(index) => isConceptComplete(concepts[index])}
+          isComplete={(index) => isConceptComplete(concepts[index]) && concepts[index]?.review !== 'pending'}
           tileText={(index) => concepts[index]?.label ?? ''}
           tileVisual={(index) => {
             const concept = concepts[index]

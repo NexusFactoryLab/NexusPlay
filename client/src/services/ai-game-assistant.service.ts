@@ -7,6 +7,16 @@ export type GameDraft = {
   content: unknown[]
   /** Aviso para el usuario (p. ej. cuántas imágenes consiguió la IA y cuántas faltan). */
   notice?: string
+  /** Advertencias automáticas de calidad por concepto (solo Dominexo); no bloquean nada. */
+  warnings?: DraftWarning[]
+}
+
+export type DraftWarning = {
+  conceptIndex: number
+  label: string
+  code: string
+  message: string
+  questionIndex?: number
 }
 
 /**

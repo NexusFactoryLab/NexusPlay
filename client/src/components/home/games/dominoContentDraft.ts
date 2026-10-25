@@ -33,6 +33,13 @@ export type ConceptDraft = {
   application: string
   /** La primera pregunta es obligatoria; hasta 6 en total. */
   questions: QuestionDraft[]
+  /**
+   * Revisión del contenido generado por IA (ver dominoReview.ts). Ausente = el concepto
+   * no pasa por revisión (escrito a mano, adaptado o de un borrador anterior a la revisión).
+   */
+  review?: 'pending' | 'approved'
+  /** Advertencias automáticas del servidor para mostrar en la tarjeta de revisión. */
+  aiWarnings?: string[]
 }
 
 export function emptyQuestion(): QuestionDraft {
@@ -88,6 +95,11 @@ export function toConceptDraft(raw: unknown, index: number): ConceptDraft {
     example: asText(r.example),
     application: asText(r.application),
     questions: questions.length > 0 ? questions : [emptyQuestion()],
+    // Un borrador viejo no trae estas claves: queda sin revisión pendiente (no se bloquea).
+    ...(r.review === 'pending' || r.review === 'approved' ? { review: r.review } : {}),
+    ...(Array.isArray(r.aiWarnings) && r.aiWarnings.some((w) => typeof w === 'string')
+      ? { aiWarnings: r.aiWarnings.filter((w): w is string => typeof w === 'string') }
+      : {}),
   }
 }
 

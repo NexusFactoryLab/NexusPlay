@@ -98,7 +98,12 @@ type AiGameAssistantPanelProps = {
    * después. Por defecto (`undefined`) sí bloquea, como antes.
    */
   imagesRequired?: { min: number; max: number; enforceMinimum?: boolean }
-  onDraftReady: (draft: GameDraft) => void
+  /**
+   * Se llama varias veces mientras la IA "llena" el formulario con animación (borradores
+   * parciales) y una última con `final: true` con el borrador completo; los formularios
+   * que no lo necesitan ignoran el segundo parámetro.
+   */
+  onDraftReady: (draft: GameDraft, meta?: { final: boolean }) => void
 }
 
 /**
@@ -273,7 +278,7 @@ export function AiGameAssistantPanel({
           await wait(stepDelay)
         }
       }
-      onDraftReady(draft)
+      onDraftReady(draft, { final: true })
       await wait(40)
       fillStep?.(items.length)
       showToast(

@@ -10,6 +10,7 @@ import type { UseCase } from '../ports/use-case.port.js';
 import { ContentValidatorRegistry } from '../content-validators/content-validator.registry.js';
 import { resolveGamePromptSpec, type GamePromptSpec } from '../ai/game-prompt-catalog.js';
 import { normalizeDraft } from '../ai/draft-normalizers.js';
+import { analyzeDominoQuality, type DraftWarning } from '../ai/domino-quality.js';
 import { ContentImageResolver, describeImageResolution } from '../services/content-image-resolver.service.js';
 import { ContentImageFiller } from '../services/content-image-filler.service.js';
 import {
@@ -54,6 +55,8 @@ export interface GenerateGameDraftOutput {
    * dónde salió cada imagen, o qué archivos la IA no pudo leer).
    */
   notice?: string;
+  /** Advertencias de calidad por concepto (solo Dominó): se muestran en la revisión, no bloquean. */
+  warnings?: DraftWarning[];
 }
 
 const MAX_FILES = 65;
@@ -226,6 +229,12 @@ export class GenerateGameDraftUseCase
     });
 
     const notices = [unreadableNotice(extraction.unreadable), truncatedNotice(generation.sourceTruncated)];
+    if (gameTypeName === 'DOMINO') {
+      // Advertencias de calidad para la pantalla de revisión; no bloquean nada.
+      const warnings = analyzeDominoQuality(generation.draft.content);
+      const output = withNotice(generation.draft, notices);
+      return warnings.length > 0 ? { ...output, warnings } : output;
+    }
     if (!spec.fillsMissingImages) return withNotice(generation.draft, notices);
     // Opuestos: las imágenes son opcionales, pero se completan solas (issue #75).
     const images = await this.fillMissingImages(gameTypeName, mode, generation.draft, generation.prepared.content);

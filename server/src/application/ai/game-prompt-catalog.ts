@@ -90,10 +90,20 @@ Además, cada concepto lleva material para los tres niveles del juego:
 - "application": un caso o situación real donde se aplica, para nivel universitario (máximo 400 caracteres).
 - "questions": entre 1 y 3 preguntas distintas sobre ESE concepto (nunca más de 6; la primera es obligatoria).
   Varía el tipo: una conceptual, una de identificación y una de aplicación simple. Cada pregunta tiene
-  "text" (máximo 300 caracteres), "options" (3 o 4 opciones distintas, máximo 120 caracteres cada una),
-  "correctIndex" (posición 0 a 3 de la opción correcta; varía la posición entre preguntas, no pongas
-  siempre la primera) y "explanation" (por qué es correcta, máximo 400 caracteres). Solo hechos
-  verificables a partir del texto fuente o de conocimiento bien establecido; nada dudoso.`,
+  "text" (máximo 300 caracteres), "options" (SIEMPRE 4 opciones distintas, máximo 120 caracteres cada una),
+  "correctIndex" (posición 0 a 3 de la opción correcta; el servidor mezcla las opciones después) y
+  "explanation" (por qué es correcta, máximo 400 caracteres).
+  Calidad de las preguntas:
+  - Los distractores deben ser plausibles y del mismo tipo que la respuesta (si la correcta es una fecha, todas
+    son fechas; si es un personaje, todos son personajes), con longitud parecida. Evita opciones absurdas
+    como "Luna / Marte / Satélite" para "¿Cuál orbita alrededor del Sol?".
+  - La explicación debe confirmar la opción correcta y nunca contradecirla ni a la pregunta.
+  - Si el mensaje del usuario indica un nivel (primaria, colegio, universidad), ajusta la dificultad y el
+    vocabulario de las preguntas a ese nivel.
+  - No inventes fuentes, citas, cifras ni fechas. Si no estás seguro de un dato, prefiere una pregunta
+    conceptual en vez de una de datos exactos. Solo hechos verificables a partir del texto fuente o de
+    conocimiento bien establecido; nada dudoso.
+Elige un ícono DISTINTO para cada concepto; usa "star" solo si ningún otro encaja.`,
   jsonShapeExample: `{
   "config": { "handSize": 7 },
   "content": [
@@ -103,12 +113,12 @@ Además, cada concepto lleva material para los tres niveles del juego:
       "example": "Una planta en la ventana que crece gracias a la luz del sol.",
       "application": "Un invernadero ajusta la luz y el CO2 para aumentar la producción de lechuga.",
       "questions": [
-        { "text": "¿Qué gas liberan las plantas durante la fotosíntesis?", "options": ["Oxígeno", "Nitrógeno", "Metano"], "correctIndex": 0, "explanation": "La fotosíntesis produce azúcar y libera oxígeno." },
+        { "text": "¿Qué gas liberan las plantas durante la fotosíntesis?", "options": ["Oxígeno", "Nitrógeno", "Metano", "Helio"], "correctIndex": 0, "explanation": "La fotosíntesis produce azúcar y libera oxígeno." },
         { "text": "¿Cuál de estas es una condición necesaria para la fotosíntesis?", "options": ["Oscuridad total", "Luz", "Aceite", "Sal"], "correctIndex": 1, "explanation": "La luz aporta la energía que impulsa el proceso." }
       ]
     },
     { "label": "Clorofila", "icon": "leaf", "color": "#16a34a", "questions": [
-      { "text": "¿Qué pigmento da el color verde a las hojas?", "options": ["Clorofila", "Hemoglobina", "Melanina"], "correctIndex": 0, "explanation": "La clorofila absorbe la luz y refleja el verde." }
+      { "text": "¿Qué pigmento da el color verde a las hojas?", "options": ["Clorofila", "Hemoglobina", "Melanina", "Queratina"], "correctIndex": 0, "explanation": "La clorofila absorbe la luz y refleja el verde." }
     ] }
   ]
 }`,
