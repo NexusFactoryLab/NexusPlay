@@ -7,6 +7,9 @@ export type TournamentPhase = 'WAITING' | 'RUNNING' | 'FINISHED';
 /** Complejidad de un juego dentro del torneo (issue #102): cambia el tablero, el tiempo por turno y el bot. */
 export type TournamentLevel = 'EASY' | 'MEDIUM' | 'HARD';
 
+/** Juegos con motor de torneo. */
+export type TournamentGameType = 'GUESS_WHO' | 'DOMINO';
+
 export const TOURNAMENT_LEVELS: Record<
   TournamentLevel,
   { boardSize: number; turnSeconds: number; botDifficulty: BotDifficulty }
@@ -66,6 +69,9 @@ export interface TournamentMatch {
   gameId?: string;
   gameTitle?: string;
   level?: TournamentLevel;
+  /** Tipo de juego del match; ausente = ¿Quién Es?. En Dominó el match vive en una sala de dominó real (`dominoRoomCode`). */
+  gameType?: TournamentGameType;
+  dominoRoomCode?: string;
   /** Segundos por turno de este match (los fija la complejidad del juego de la ronda). */
   turnDurationSeconds?: number;
   phase: 'WAITING' | 'PLAYING' | 'FINISHED';
@@ -95,7 +101,7 @@ export interface TournamentState {
   phase: TournamentPhase;
   participants: TournamentParticipant[];
   /** Juegos del torneo, en orden: la ronda N usa el juego (N-1) % cantidad. Vacío = solo `gameId`. */
-  games?: { gameId: string; title: string; level: TournamentLevel }[];
+  games?: { gameId: string; title: string; level: TournamentLevel; gameType?: TournamentGameType }[];
   /** Administrador que modera el torneo: no juega ni entra al emparejamiento. */
   creatorUserId: string;
   /** Socket del moderador, para enviarle el panel en vivo (null si se desconectó). */

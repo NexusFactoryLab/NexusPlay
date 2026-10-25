@@ -221,7 +221,10 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
                       <p className="mt-0.5 flex items-center gap-1.5 text-[11.5px] text-text">
                         <Radio className="h-3 w-3 text-accent" strokeWidth={2} />
                         <span className="truncate">
-                          Turno de {active?.displayName ?? '—'} · descartes {match.players.map((p) => `${p.discardedCount}/${match.totalCards}`).join(' · ')}
+                          Turno de {active?.displayName ?? '—'} ·{' '}
+                          {match.gameType === 'DOMINO'
+                            ? `fichas en mano ${match.players.map((p) => p.handCount ?? '—').join(' · ')}`
+                            : `descartes ${match.players.map((p) => `${p.discardedCount}/${match.totalCards}`).join(' · ')}`}
                         </span>
                       </p>
                     )}

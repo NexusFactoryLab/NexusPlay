@@ -73,6 +73,9 @@ export interface DominoRoomState {
   seenConceptIndexes?: number[];
   /** Conceptos cuya pregunta se falló (o se agotó el tiempo) en la partida actual. */
   missedConceptIndexes?: number[];
+  /** Si la sala es una partida de un torneo (issue #102): sin revancha ni desarme al desconectarse, y su resultado suma al torneo. */
+  tournamentCode?: string;
+  tournamentMatchCode?: string;
   /** Preguntas falladas (concepto + posición en su banco), para el repaso de la pantalla de cierre. */
   missedQuestions?: Array<{ conceptIndex: number; questionIndex: number }>;
   /** Por concepto, índices del banco ya preguntados en esta sala; base de la rotación sin repetir. */

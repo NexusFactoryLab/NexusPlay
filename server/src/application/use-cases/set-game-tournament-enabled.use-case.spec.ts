@@ -57,7 +57,13 @@ describe('SetGameTournamentEnabledUseCase', () => {
     await draft.useCase.execute({ gameId: 'game-1', enabled: false, requestingUserId: 'admin' });
     expect(draft.setTournamentEnabled).toHaveBeenCalledWith('game-1', false);
 
-    const domino = build({ game: buildGame({ type: 'DOMINO' }) });
-    await expect(domino.useCase.execute({ gameId: 'game-1', enabled: true, requestingUserId: 'admin' })).rejects.toBeInstanceOf(InvalidGameStateError);
+    const other = build({ game: buildGame({ type: 'SNAKES_LADDERS' }) });
+    await expect(other.useCase.execute({ gameId: 'game-1', enabled: true, requestingUserId: 'admin' })).rejects.toBeInstanceOf(InvalidGameStateError);
+  });
+
+  it('también habilita el torneo de un Dominó', async () => {
+    const { useCase, setTournamentEnabled } = build({ game: buildGame({ type: 'DOMINO' }) });
+    await useCase.execute({ gameId: 'game-1', enabled: true, requestingUserId: 'admin' });
+    expect(setTournamentEnabled).toHaveBeenCalledWith('game-1', true);
   });
 });

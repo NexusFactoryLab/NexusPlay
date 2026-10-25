@@ -20,6 +20,7 @@ import {
   type TournamentState,
   type TournamentMatch,
   type TournamentLevel,
+  type TournamentGameType,
   TOURNAMENT_LEVELS,
   isTournamentLevel,
 } from '../../domain/ports/tournament-store.port.js';
@@ -146,6 +147,16 @@ const TOURNAMENT_MAX_PARTICIPANTS = 40;
 const TOURNAMENT_DEFAULT_ROUNDS = 3;
 const TOURNAMENT_MAX_ROUNDS = 10;
 const TOURNAMENT_MAX_GAMES = 5;
+/** Espera antes de repartir una partida de dominó del torneo: es lo que dura el anuncio del duelo. */
+const TOURNAMENT_DOMINO_DEAL_DELAY_MS = 2800;
+
+/** Nivel de dominó para una complejidad del torneo; si el contenido no puede ofrecerlo, baja al más alto disponible. */
+export function resolveTournamentDominoLevel(concepts: DominoConcept[], level: TournamentLevel): DominoLevel {
+  const available = dominoAvailableLevels(concepts);
+  if (level === 'HARD' && available.ADVANCED.available) return 'ADVANCED';
+  if (level !== 'EASY' && available.MEDIUM.available) return 'MEDIUM';
+  return 'EASY';
+}
 
 /** Vista del match como si fuera una sala 1v1, para que el bot existente lo juegue sin duplicar su lógica. */
 function asBotRoom(match: TournamentMatch): RoomState {
@@ -171,13 +182,18 @@ function keepBotsReady(players: { ready?: boolean; bot?: unknown }[]) {
 }
 
 /** Vista pública del torneo que se envía a un participante dado. */
-function toTournamentClientView(tournament: TournamentState, forUserId: string) {
+function toTournamentClientView(
+  tournament: TournamentState,
+  forUserId: string,
+  dominoLookup?: (code: string) => DominoRoomState | undefined,
+) {
   return {
     code: tournament.code,
     gameTitle: tournament.gameTitle,
     games: (tournament.games ?? [{ title: tournament.gameTitle, level: 'MEDIUM' as TournamentLevel }]).map((g) => ({
       title: g.title,
       level: g.level,
+      gameType: ('gameType' in g && g.gameType) || 'GUESS_WHO',
     })),
     maxParticipants: tournament.maxParticipants,
     turnDurationSeconds: tournament.turnDurationSeconds,
@@ -202,7 +218,7 @@ function toTournamentClientView(tournament: TournamentState, forUserId: string) 
       questionsAsked: participant.questionsAsked ?? 0,
       wrongAccusations: participant.wrongAccusations ?? 0,
     })),
-    liveMatches: tournament.creatorUserId === forUserId ? buildLiveMatches(tournament) : [],
+    liveMatches: tournament.creatorUserId === forUserId ? buildLiveMatches(tournament, dominoLookup) : [],
     // Rondas ya jugadas o en curso, para armar el ranking/progreso del
     // torneo en el cliente (pantalla de eliminado y pantalla de fin).
     rounds: buildRoundsSummary(tournament),
@@ -237,7 +253,7 @@ function buildRoundsSummary(tournament: TournamentState) {
 }
 
 /** Partidas de la ronda actual para el panel del moderador: quién juega, de quién es el turno y cómo va. */
-function buildLiveMatches(tournament: TournamentState) {
+function buildLiveMatches(tournament: TournamentState, dominoLookup?: (code: string) => DominoRoomState | undefined) {
   const nameOf = (userId: string) =>
     tournament.participants.find((p) => p.userId === userId)?.displayName ??
     tournament.matches.flatMap((m) => m.players).find((p) => p.userId === userId)?.displayName ??
@@ -254,7 +270,12 @@ function buildLiveMatches(tournament: TournamentState) {
         userId: player.userId,
         displayName: nameOf(player.userId),
         discardedCount: player.discardedCardIds.length,
+        // Dominó: fichas que le quedan en la mano (se ve cómo va la partida).
+        handCount: match.dominoRoomCode
+          ? dominoLookup?.(match.dominoRoomCode)?.players.find((p) => p.userId === player.userId)?.hand.length ?? null
+          : null,
       })),
+      gameType: match.gameType ?? 'GUESS_WHO',
       totalCards: match.cards.length,
     }));
 }
@@ -277,6 +298,8 @@ function toMatchClientView(match: TournamentMatch, tournament: TournamentState, 
     isBye: match.isBye,
     gameTitle: match.gameTitle ?? tournament.gameTitle,
     level: match.level ?? 'MEDIUM',
+    gameType: match.gameType ?? 'GUESS_WHO',
+    dominoRoomCode: match.dominoRoomCode ?? null,
     cards: match.cards,
     maxAccusationCount: tournament.maxAccusationCount,
     turnDurationSeconds: match.turnDurationSeconds ?? tournament.turnDurationSeconds,
@@ -841,7 +864,13 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     }
 
     const dominoRoom = this.dominoRoomStore.findBySocketId(socket.id);
-    if (dominoRoom) {
+    if (dominoRoom?.tournamentCode) {
+      // Partida de torneo: la persona puede volver (salió a la pantalla del torneo o se le cayó la red).
+      // La sala no se desarma; su turno, si le toca, lo resuelve el reloj.
+      const leaving = dominoRoom.players.find((p) => p.socketId === socket.id);
+      if (leaving) leaving.socketId = `pending:${leaving.userId}`;
+      this.dominoRoomStore.set(dominoRoom);
+    } else if (dominoRoom) {
       const wasWaiting = dominoRoom.phase === 'WAITING';
       this.cancelDealCountdown('domino:' + dominoRoom.code);
       this.clearDominoTurnTimer(dominoRoom.code);
@@ -1541,8 +1570,9 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     }
     const loaded = await Promise.all(gameIds.map((id) => this.gameRepository.findById(id)));
     for (const candidate of loaded) {
-      if (!candidate || candidate.gameType.getName() !== 'GUESS_WHO') {
-        throw new Error('Juego no encontrado o no es de tipo "¿Quién Es?".');
+      const type = candidate?.gameType.getName();
+      if (!candidate || (type !== 'GUESS_WHO' && type !== 'DOMINO')) {
+        throw new Error('Juego no encontrado o sin torneo: solo "¿Quién Es?" y Dominó lo admiten.');
       }
       // El administrador lo habilita antes desde Edición (issue #102).
       if (!candidate.tournamentEnabled) throw new Error(`El torneo no está habilitado para "${candidate.title}".`);
@@ -1565,7 +1595,12 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       code,
       gameId: game.id,
       gameTitle: games.map((g) => g.title).join(' + '),
-      games: games.map((g, index) => ({ gameId: g.id, title: g.title, level: picks[index].level })),
+      games: games.map((g, index) => ({
+        gameId: g.id,
+        title: g.title,
+        level: picks[index].level,
+        gameType: g.gameType.getName() as TournamentGameType,
+      })),
       maxParticipants,
       totalRounds,
       maxAccusationCount: (game.config.maxAccusationCount as number | undefined) ?? 6,
@@ -1581,10 +1616,19 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       participants: [],
     };
 
-    for (const g of games) this.lastCreatedGameCards.set(g.id, g.content as GuessWhoCard[]);
+    for (const g of games) {
+      if (g.gameType.getName() === 'DOMINO') {
+        this.tournamentDominoGames.set(g.id, {
+          concepts: g.content as DominoConcept[],
+          handSize: (g.config.handSize as number | undefined) ?? 7,
+        });
+      } else {
+        this.lastCreatedGameCards.set(g.id, g.content as GuessWhoCard[]);
+      }
+    }
     this.tournamentStore.create(tournament);
     socket.join(`tournament:${code}`);
-    socket.emit('tournament:state', toTournamentClientView(tournament, socket.data.userId));
+    socket.emit('tournament:state', toTournamentClientView(tournament, socket.data.userId, (c) => this.dominoRoomStore.get(c)));
 
     void this.analyticsTracker.track({
       type: 'room_created',
@@ -1702,6 +1746,12 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       match.winnerUserId = null;
       match.activePlayerUserId = null;
       match.turnDeadline = null;
+      const dominoRoom = match.dominoRoomCode ? this.dominoRoomStore.get(match.dominoRoomCode) : undefined;
+      if (dominoRoom && dominoRoom.phase !== 'FINISHED') {
+        // La sala termina sin ganador; como el match ya figura cerrado, no suma puntos.
+        this.cancelDealCountdown('domino:' + dominoRoom.code);
+        this.finishDominoGame(dominoRoom, null, false);
+      }
       this.broadcastMatchState(tournament, match);
     }
     this.tournamentStore.set(tournament);
@@ -1718,6 +1768,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       this.tournamentBotRunner.forget(match.matchCode);
       this.tournamentBotRooms.delete(match.matchCode);
     }
+    this.disposeTournamentDominoRooms(tournament);
     this.server.to(`tournament:${tournament.code}`).emit('tournament:closed', { code: tournament.code });
     this.server.in(`tournament:${tournament.code}`).socketsLeave(`tournament:${tournament.code}`);
     this.tournamentStore.delete(tournament.code);
@@ -1754,7 +1805,10 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
    */
   private startTournamentRound(tournament: TournamentState, userIds: string[]) {
     tournament.currentRound += 1;
+    // Las salas de dominó de la ronda anterior ya cumplieron: se liberan.
+    this.disposeTournamentDominoRooms(tournament, tournament.currentRound - 1);
     const shuffledIds = shuffle(userIds);
+    const isDominoRound = this.gameForRound(tournament, tournament.currentRound).gameType === 'DOMINO';
 
     // Con número impar, quien sobra juega contra el bot en vez de esperar (issue #102).
     // Se reparte parejo: entre los candidatos, el que menos veces ha jugado contra el bot (desempata el azar).
@@ -1769,13 +1823,20 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     for (let i = 0; i < shuffledIds.length; i += 2) {
       const [userIdA, userIdB] = [shuffledIds[i], shuffledIds[i + 1]];
       const matchCode = `${tournament.code}-R${tournament.currentRound}-M${newMatches.length + 1}`;
-      const match = this.buildDealtMatch(tournament, matchCode, tournament.currentRound, [userIdA, userIdB]);
-      newMatches.push(match);
+      newMatches.push(
+        isDominoRound
+          ? this.buildDominoMatch(tournament, matchCode, tournament.currentRound, [userIdA, userIdB], false)
+          : this.buildDealtMatch(tournament, matchCode, tournament.currentRound, [userIdA, userIdB]),
+      );
     }
 
     if (botUserId) {
       const matchCode = `${tournament.code}-R${tournament.currentRound}-BOT`;
-      newMatches.push(this.buildBotMatch(tournament, matchCode, tournament.currentRound, botUserId));
+      newMatches.push(
+        isDominoRound
+          ? this.buildDominoMatch(tournament, matchCode, tournament.currentRound, [botUserId], true)
+          : this.buildBotMatch(tournament, matchCode, tournament.currentRound, botUserId),
+      );
       const participant = tournament.participants.find((p) => p.userId === botUserId);
       if (participant) participant.botMatches = (participant.botMatches ?? 0) + 1;
     }
@@ -1802,10 +1863,231 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
           pairing,
         });
       }
+      // Dominó lleva sus propios turnos dentro de su sala; ¿Quién Es? los lleva el torneo.
+      if (match.gameType === 'DOMINO') continue;
       this.startTournamentMatchTurn(tournament, match, match.players[Math.floor(Math.random() * match.players.length)].userId);
     }
 
     this.broadcastTournamentState(tournament);
+  }
+
+  /**
+   * Match de Dominó: una sala de dominó real (con todo su motor: fichas,
+   * preguntas por nivel, turnos) creada ya con las dos personas —o la persona
+   * impar y el bot— y repartida a los pocos segundos, mientras se ve el
+   * anuncio del duelo. Los jugadores entran a ella desde el torneo.
+   */
+  private buildDominoMatch(
+    tournament: TournamentState,
+    matchCode: string,
+    round: number,
+    humanIds: string[],
+    vsBot: boolean,
+  ): TournamentMatch {
+    const roundGame = this.gameForRound(tournament, round);
+    const data = this.tournamentDominoGames.get(roundGame.gameId);
+    if (!data) throw new Error('No se encontró el contenido del juego de Dominó del torneo.');
+    const level = resolveTournamentDominoLevel(data.concepts, roundGame.level);
+    const botDifficulty = TOURNAMENT_LEVELS[roundGame.level].botDifficulty;
+    const botUserId = `bot:${matchCode}`;
+    const userIds = vsBot ? [humanIds[0], botUserId] : humanIds;
+    const nameOf = (userId: string) => tournament.participants.find((p) => p.userId === userId)?.displayName ?? '???';
+
+    const room: DominoRoomState = {
+      code: matchCode,
+      gameId: roundGame.gameId,
+      gameTitle: roundGame.title,
+      concepts: data.concepts,
+      handSize: data.handSize,
+      hostUserId: humanIds[0],
+      turnDurationSeconds: DOMINO_LEVEL_TURN_SECONDS[level],
+      phase: 'WAITING',
+      // Las personas entran con su propia conexión de la sala: hasta entonces su socket es un marcador que nunca coincide.
+      players: userIds.map((userId) =>
+        userId === botUserId
+          ? { socketId: `bot:${matchCode}`, userId, displayName: BOT_DISPLAY_NAMES[botDifficulty], ready: true, hand: [] }
+          : { socketId: `pending:${userId}`, userId, displayName: nameOf(userId), ready: false, hand: [] },
+      ),
+      boneyard: [],
+      board: [],
+      openingTileId: null,
+      activePlayerUserId: null,
+      turnDeadline: null,
+      winnerUserId: null,
+      endedByBlock: false,
+      createdAt: Date.now(),
+      rematchVotes: {},
+      consecutivePasses: 0,
+      level,
+      pendingQuestion: null,
+      seenConceptIndexes: [],
+      missedConceptIndexes: [],
+      tournamentCode: tournament.code,
+      tournamentMatchCode: matchCode,
+    };
+    this.dominoRoomStore.create(room);
+
+    // Se reparte tras el anuncio del duelo, para que nadie pierda tiempo de turno mirándolo.
+    const key = 'domino:' + matchCode;
+    this.cancelDealCountdown(key);
+    this.dealTimers.set(
+      key,
+      setTimeout(() => {
+        this.dealTimers.delete(key);
+        const current = this.dominoRoomStore.get(matchCode);
+        if (current && current.phase === 'WAITING' && current.players.length === 2) this.dealNewDominoGame(current);
+      }, TOURNAMENT_DOMINO_DEAL_DELAY_MS),
+    );
+
+    return {
+      matchCode,
+      round,
+      playerUserIds: userIds as [string, string] | [string],
+      isBye: false,
+      vsBot,
+      gameId: roundGame.gameId,
+      gameTitle: roundGame.title,
+      level: roundGame.level,
+      gameType: 'DOMINO',
+      dominoRoomCode: matchCode,
+      phase: 'PLAYING',
+      cards: [],
+      players: room.players.map((player) => ({
+        userId: player.userId,
+        secretCardId: null,
+        discardedCardIds: [],
+        ...(player.userId === botUserId ? { displayName: player.displayName, socketId: player.socketId } : {}),
+      })),
+      winnerUserId: null,
+      activePlayerUserId: null,
+      turnDeadline: null,
+    };
+  }
+
+  /** Libera las salas de dominó de un torneo (de una ronda, o de todas si no se indica). */
+  private disposeTournamentDominoRooms(tournament: TournamentState, round?: number) {
+    for (const match of tournament.matches) {
+      if (!match.dominoRoomCode || (round !== undefined && match.round !== round)) continue;
+      this.cancelDealCountdown('domino:' + match.dominoRoomCode);
+      this.clearDominoTurnTimer(match.dominoRoomCode);
+      this.clearDominoBotTimer(match.dominoRoomCode);
+      this.dominoRoomStore.delete(match.dominoRoomCode);
+    }
+  }
+
+  /** Una sala de dominó de torneo terminó: el resultado suma puntos y puede cerrar la ronda. */
+  private onTournamentDominoFinished(room: DominoRoomState) {
+    if (!room.tournamentCode) return;
+    const tournament = this.tournamentStore.get(room.tournamentCode);
+    const match = tournament?.matches.find((m) => m.matchCode === room.tournamentMatchCode);
+    if (!tournament || !match || match.phase === 'FINISHED') return;
+
+    match.phase = 'FINISHED';
+    match.winnerUserId = room.winnerUserId;
+    // Empate (bloqueo con las mismas fichas): nadie suma ni pierde.
+    if (room.winnerUserId) {
+      const winner = tournament.participants.find((p) => p.userId === room.winnerUserId);
+      const loserId = match.playerUserIds.find((id) => id !== room.winnerUserId);
+      const loser = tournament.participants.find((p) => p.userId === loserId);
+      if (winner) {
+        winner.points += 1;
+        winner.wins = (winner.wins ?? 0) + 1;
+      }
+      if (loser) loser.losses = (loser.losses ?? 0) + 1;
+    }
+    this.tournamentStore.set(tournament);
+    this.broadcastTournamentState(tournament);
+    this.maybeAdvanceTournamentRound(tournament);
+  }
+
+  private readonly dominoBotTimers = new Map<string, { key: string; timer: NodeJS.Timeout }>();
+
+  private clearDominoBotTimer(code: string) {
+    const entry = this.dominoBotTimers.get(code);
+    if (entry) clearTimeout(entry.timer);
+    this.dominoBotTimers.delete(code);
+  }
+
+  /** Programa la jugada del bot de dominó cuando es su turno (una vez por situación de la mesa). */
+  private driveDominoBot(room: DominoRoomState) {
+    const bot = room.players.find((p) => p.socketId.startsWith('bot:'));
+    if (!bot) return;
+    if (room.phase !== 'PLAYING' || room.activePlayerUserId !== bot.userId) {
+      this.clearDominoBotTimer(room.code);
+      return;
+    }
+    const key = `${room.turnDeadline}:${bot.hand.length}:${room.board.length}:${room.pendingQuestion ? 1 : 0}`;
+    const existing = this.dominoBotTimers.get(room.code);
+    if (existing?.key === key) return;
+    this.clearDominoBotTimer(room.code);
+    // Piensa como una persona, y siempre cabe dentro de su turno.
+    const delay = Math.min(1200 + Math.random() * 1800, room.turnDurationSeconds * 500);
+    const timer = setTimeout(() => {
+      this.dominoBotTimers.delete(room.code);
+      try {
+        this.playDominoBotTurn(room.code);
+      } catch (error) {
+        this.logger.warn(`El bot de dominó ${room.code} no pudo jugar: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }, delay);
+    this.dominoBotTimers.set(room.code, { key, timer });
+  }
+
+  /**
+   * Juega por el bot con las mismas acciones (y validaciones) que una persona:
+   * responde la pregunta pendiente (acierta según el nivel), coloca una ficha,
+   * roba o pasa. El socket es un marcador: los handlers solo lo usan para ubicar al jugador.
+   */
+  private playDominoBotTurn(code: string) {
+    const room = this.dominoRoomStore.get(code);
+    const bot = room?.players.find((p) => p.socketId.startsWith('bot:'));
+    if (!room || !bot || room.phase !== 'PLAYING' || room.activePlayerUserId !== bot.userId) return;
+    const socket = {
+      id: bot.socketId,
+      data: { userId: bot.userId, displayName: bot.displayName },
+      join: () => {},
+      leave: () => {},
+      emit: () => {},
+      disconnect: () => {},
+    } as unknown as AuthenticatedSocket;
+    const level = room.level ?? 'EASY';
+
+    if (room.pendingQuestion) {
+      const question = dominoQuestionBank(room.concepts[room.pendingQuestion.conceptIndex])[room.pendingQuestion.questionIndex];
+      if (!question) return;
+      const accuracy = level === 'ADVANCED' ? 0.8 : 0.6;
+      const wrongOptions = question.options.map((_, index) => index).filter((index) => index !== question.correctIndex);
+      const optionIndex = Math.random() < accuracy || wrongOptions.length === 0
+        ? question.correctIndex
+        : wrongOptions[Math.floor(Math.random() * wrongOptions.length)];
+      this.handleDominoAnswer(socket, { optionIndex });
+      return;
+    }
+
+    const moves: { tile: DominoTile; side: 'left' | 'right' }[] = [];
+    if (room.board.length === 0) {
+      for (const tile of bot.hand) moves.push({ tile, side: 'left' });
+    } else {
+      const { left, right } = dominoBoardEnds(room.board);
+      for (const tile of bot.hand) {
+        if (dominoTileMatchesEnd(tile, left)) moves.push({ tile, side: 'left' });
+        else if (dominoTileMatchesEnd(tile, right)) moves.push({ tile, side: 'right' });
+      }
+    }
+    if (moves.length > 0) {
+      // Fácil juega al azar; los demás niveles sueltan primero las fichas más "pesadas" (dobles y altas).
+      const choice =
+        level === 'EASY'
+          ? moves[Math.floor(Math.random() * moves.length)]
+          : moves.reduce((best, move) => (move.tile.a + move.tile.b > best.tile.a + best.tile.b ? move : best));
+      this.handleDominoPlay(socket, { tileId: choice.tile.id, side: choice.side });
+      return;
+    }
+    if (room.boneyard.length > 0) {
+      this.handleDominoDraw(socket);
+      return;
+    }
+    this.handleDominoPass(socket);
   }
 
   /** Match de la persona impar de la ronda contra el bot: el bot es un jugador más del match, sin socket. */
@@ -1869,10 +2151,12 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   private gameForRound(
     tournament: TournamentState,
     round: number,
-  ): { gameId: string; title: string; level: TournamentLevel } {
-    const games = tournament.games?.length
-      ? tournament.games
-      : [{ gameId: tournament.gameId, title: tournament.gameTitle, level: 'MEDIUM' as TournamentLevel }];
+  ): { gameId: string; title: string; level: TournamentLevel; gameType: TournamentGameType } {
+    const games = (
+      tournament.games?.length
+        ? tournament.games
+        : [{ gameId: tournament.gameId, title: tournament.gameTitle, level: 'MEDIUM' as TournamentLevel }]
+    ).map((g) => ({ ...g, gameType: ('gameType' in g && g.gameType) || ('GUESS_WHO' as TournamentGameType) }));
     return games[(round - 1) % games.length];
   }
 
@@ -1882,6 +2166,9 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
    * repositorio de juegos por cada match nuevo de cada ronda.
    */
   private readonly lastCreatedGameCards = new Map<string, GuessWhoCard[]>();
+
+  /** Contenido de los juegos de Dominó del torneo, por gameId (se arma al crear). */
+  private readonly tournamentDominoGames = new Map<string, { concepts: DominoConcept[]; handSize: number }>();
 
   private startTournamentMatchTurn(tournament: TournamentState, match: TournamentMatch, userId: string) {
     match.pendingQuestion = null;
@@ -2002,6 +2289,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
         (a, b) => b.points - a.points || (a.wrongAccusations ?? 0) - (b.wrongAccusations ?? 0),
       );
       tournament.phase = 'FINISHED';
+      this.disposeTournamentDominoRooms(tournament);
       tournament.winnerUserId = ranking[0]?.userId ?? null;
       this.tournamentStore.set(tournament);
       this.broadcastTournamentState(tournament);
@@ -2019,7 +2307,11 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     const tournament = this.tournamentStore.findBySocketId(socket.id);
     if (!tournament) throw new Error('No estás en ninguna sala grupal.');
     const match = tournament.matches.find(
-      (m) => m.round === tournament.currentRound && m.playerUserIds.includes(socket.data.userId) && m.phase === 'PLAYING',
+      (m) =>
+        m.round === tournament.currentRound &&
+        m.gameType !== 'DOMINO' &&
+        m.playerUserIds.includes(socket.data.userId) &&
+        m.phase === 'PLAYING',
     );
     if (!match) throw new Error('No tienes una partida activa en esta ronda.');
     return { tournament, match };
@@ -2042,12 +2334,12 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     for (const participant of tournament.participants) {
       this.server
         .to(participant.socketId)
-        .emit('tournament:state', toTournamentClientView(tournament, participant.userId));
+        .emit('tournament:state', toTournamentClientView(tournament, participant.userId, (c) => this.dominoRoomStore.get(c)));
     }
     if (tournament.moderatorSocketId) {
       this.server
         .to(tournament.moderatorSocketId)
-        .emit('tournament:state', toTournamentClientView(tournament, tournament.creatorUserId));
+        .emit('tournament:state', toTournamentClientView(tournament, tournament.creatorUserId, (c) => this.dominoRoomStore.get(c)));
     }
   }
 
@@ -2475,6 +2767,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   ) {
     const room = this.dominoRoomStore.findBySocketId(socket.id);
     if (!room || room.phase !== 'FINISHED') throw new Error('No hay una partida terminada para votar revancha.');
+    if (room.tournamentCode) throw new Error('En un torneo no hay revancha: vuelve al torneo para la siguiente ronda.');
 
     const voter = room.players.find((p) => p.socketId === socket.id);
     if (!voter) throw new Error('No estás en esta sala.');
@@ -2507,7 +2800,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   @SubscribeMessage('domino:leave')
   handleDominoLeave(@ConnectedSocket() socket: AuthenticatedSocket) {
     const room = this.dominoRoomStore.findBySocketId(socket.id);
-    if (room?.phase === 'FINISHED') {
+    if (room?.phase === 'FINISHED' && !room.tournamentCode) {
       const player = room.players.find((candidate) => candidate.socketId === socket.id);
       const opponent = room.players.find((candidate) => candidate.socketId !== socket.id);
       if (player && opponent) {
@@ -2532,6 +2825,8 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
 
     this.dominoRoomStore.set(room);
     this.broadcastDominoState(room);
+    // Partida de un torneo: el resultado suma al torneo.
+    if (room.tournamentCode) this.onTournamentDominoFinished(room);
   }
 
   private setActiveDominoTurn(room: DominoRoomState, userId: string) {
@@ -2591,6 +2886,8 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     for (const player of room.players) {
       this.server.to(player.socketId).emit('domino:state', toDominoClientView(room, player.socketId));
     }
+    // Bot del torneo: reacciona a cada cambio de la mesa.
+    this.driveDominoBot(room);
   }
 
   // ---------------------------------------------------------------------

@@ -86,7 +86,7 @@ export type GuessWhoChatMessage = {
 
 // --- Modo grupo (torneo eliminatorio) ---
 
-import type { TournamentLevel } from './tournamentLevels'
+import type { TournamentGameType, TournamentLevel } from './tournamentLevels'
 
 export type TournamentPhase = 'WAITING' | 'RUNNING' | 'FINISHED'
 
@@ -111,7 +111,8 @@ export type TournamentLiveMatch = {
   vsBot: boolean
   activePlayerUserId: string | null
   winnerUserId: string | null
-  players: { userId: string; displayName: string; discardedCount: number }[]
+  players: { userId: string; displayName: string; discardedCount: number; handCount: number | null }[]
+  gameType: TournamentGameType
   totalCards: number
 }
 
@@ -136,6 +137,9 @@ export type TournamentMatchStateView = GuidedChatState & {
   isBye: boolean
   gameTitle: string
   level: TournamentLevel
+  /** En Dominó el match se juega en una sala de dominó (`dominoRoomCode`), no en el tablero de este torneo. */
+  gameType: TournamentGameType
+  dominoRoomCode: string | null
   cards: GuessWhoCard[]
   maxAccusationCount: number
   turnDurationSeconds: number
@@ -150,7 +154,7 @@ export type TournamentStateView = {
   code: string
   gameTitle: string
   /** Juegos del torneo con su complejidad; la ronda N usa el juego N, rotando. */
-  games: { title: string; level: TournamentLevel }[]
+  games: { title: string; level: TournamentLevel; gameType: TournamentGameType }[]
   maxParticipants: number
   turnDurationSeconds: number
   phase: TournamentPhase

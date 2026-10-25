@@ -100,6 +100,18 @@ function TournamentSession() {
     return () => clearTimeout(timeout)
   }, [pairingAnnouncement, clearPairingAnnouncement])
 
+  // Dominó: cada partida del torneo es una sala de dominó real. Se muestra el anuncio del duelo y se entra
+  // a ella; al terminar, la pantalla del torneo vuelve a recibir a la persona.
+  const dominoMatch =
+    tournament?.myMatch?.gameType === 'DOMINO' && tournament.myMatch.phase === 'PLAYING' ? tournament.myMatch : null
+  useEffect(() => {
+    if (!dominoMatch?.dominoRoomCode || !tournament) return
+    const target = `/domino/sala/${encodeURIComponent(dominoMatch.dominoRoomCode)}?torneo=${encodeURIComponent(tournament.code)}`
+    const timeout = setTimeout(() => navigate(target), 2600)
+    return () => clearTimeout(timeout)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dominoMatch?.matchCode])
+
   useEffect(() => {
     if (!matchAccusationFailedMessage) return
     const timeout = setTimeout(clearMatchAccusationFailedMessage, 3500)
@@ -249,7 +261,13 @@ function TournamentSession() {
 
   return (
     <div className="page-fade fixed inset-0 z-50 overflow-y-auto bg-bg">
-      {showPairingOverlay && pairingAnnouncement && (
+      {dominoMatch && (
+        <PairingAnnouncementOverlay
+          announcement={{ round: dominoMatch.round, pairing: dominoMatch.players.map((p) => ({ userId: p.userId, displayName: p.displayName })) }}
+          selfUserId={user?.id ?? null}
+        />
+      )}
+      {!dominoMatch && showPairingOverlay && pairingAnnouncement && (
         <PairingAnnouncementOverlay announcement={pairingAnnouncement} selfUserId={user?.id ?? null} />
       )}
 
@@ -307,7 +325,7 @@ function TournamentSession() {
           </p>
         )}
 
-        {tournament.phase === 'RUNNING' && tournament.myMatch && self && (
+        {tournament.phase === 'RUNNING' && tournament.myMatch && tournament.myMatch.gameType !== 'DOMINO' && self && (
           <RunningMatch
             error={error}
             onSend={sendMatchMessage}
@@ -321,6 +339,20 @@ function TournamentSession() {
             passMatchTurn={passMatchTurn}
             selfUserId={user?.id ?? null}
           />
+        )}
+
+        {tournament.phase === 'RUNNING' && dominoMatch && (
+          <div className="stagger-in flex flex-col items-center gap-3 py-8 text-center">
+            <p className="text-[16px] font-semibold text-text-h">Tu partida de Dominó está lista.</p>
+            <button
+              type="button"
+              className="rounded-lg px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)] transition-all duration-200 hover:-translate-y-0.5"
+              style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
+              onClick={() => navigate(`/domino/sala/${encodeURIComponent(dominoMatch.dominoRoomCode ?? '')}?torneo=${encodeURIComponent(tournament.code)}`)}
+            >
+              Ir a la partida
+            </button>
+          </div>
         )}
 
         {tournament.phase === 'RUNNING' && !tournament.myMatch && (

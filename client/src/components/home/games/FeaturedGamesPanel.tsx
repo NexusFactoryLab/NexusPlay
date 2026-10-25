@@ -151,7 +151,7 @@ export function FeaturedGamesPanel() {
               <Star className="h-3.5 w-3.5" fill={game.featured ? 'currentColor' : 'none'} strokeWidth={2} />
               {game.featured ? 'Quitar' : 'Destacar'}
             </button>
-            {game.gameType === 'GUESS_WHO' && (
+            {(game.gameType === 'GUESS_WHO' || game.gameType === 'DOMINO') && (
               <button
                 type="button"
                 aria-pressed={game.tournamentEnabled}

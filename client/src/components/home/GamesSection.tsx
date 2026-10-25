@@ -181,13 +181,18 @@ export function GamesSection({
   const [joinByCodeOpen, setJoinByCodeOpen] = useState(false)
   // Acceso temporal al torneo (issue #102): solo existe mientras un ADMIN tenga algún torneo habilitado.
   const [tournamentOpen, setTournamentOpen] = useState(false)
+  // Un juego con torneo habilitado desde el cual el administrador arma el torneo (en el formulario elige todos los demás).
+  const [tournamentGameId, setTournamentGameId] = useState<string | null>(null)
   const [tournamentCodeOpen, setTournamentCodeOpen] = useState(false)
   useEffect(() => {
     if (!token) return
     let cancelled = false
     listGames(token, { tournamentEnabled: true, pageSize: 1 })
       .then((result) => {
-        if (!cancelled) setTournamentOpen(result.total > 0)
+        if (!cancelled) {
+          setTournamentOpen(result.total > 0)
+          setTournamentGameId(result.items[0]?.id ?? null)
+        }
       })
       .catch(() => {
         if (!cancelled) setTournamentOpen(false)
@@ -1076,6 +1081,16 @@ export function GamesSection({
                   >
                     <Swords className="h-[18px] w-[18px]" strokeWidth={2.5} />
                     Entrar al torneo
+                  </button>
+                )}
+                {tournamentGameId && user?.role?.toUpperCase() === 'ADMIN' && (
+                  <button
+                    type="button"
+                    className="flex items-center gap-2 rounded-xl border border-border bg-surface px-5 py-3 text-[14px] font-semibold text-text-h transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/50 hover:text-accent"
+                    onClick={() => navigate(`/quien-es/torneo?gameId=${encodeURIComponent(tournamentGameId)}`)}
+                  >
+                    <Trophy className="h-[18px] w-[18px]" strokeWidth={2} />
+                    Crear torneo
                   </button>
                 )}
               </div>

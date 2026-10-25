@@ -44,8 +44,8 @@ export class SetGameTournamentEnabledUseCase implements UseCase<SetGameTournamen
       if (game.status.getName() !== 'PUBLISHED') {
         throw new InvalidGameStateError('solo un juego publicado puede tener torneo.');
       }
-      if (game.gameType.getName() !== 'GUESS_WHO') {
-        throw new InvalidGameStateError('por ahora solo "¿Quién Es?" admite torneos.');
+      if (!['GUESS_WHO', 'DOMINO'].includes(game.gameType.getName())) {
+        throw new InvalidGameStateError('por ahora solo "¿Quién Es?" y Dominó admiten torneos.');
       }
     }
 

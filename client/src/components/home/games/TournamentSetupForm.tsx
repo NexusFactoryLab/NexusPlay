@@ -2,7 +2,14 @@ import { useState } from 'react'
 import { Check } from 'lucide-react'
 import { Modal } from './Modal'
 import type { GameSummary } from '../../../services/game.service'
-import { TOURNAMENT_LEVEL_INFO, TOURNAMENT_LEVEL_ORDER, type TournamentLevel } from './tournamentLevels'
+import {
+  TOURNAMENT_GAME_LABEL,
+  TOURNAMENT_LEVEL_DETAIL,
+  TOURNAMENT_LEVEL_INFO,
+  TOURNAMENT_LEVEL_ORDER,
+  type TournamentGameType,
+  type TournamentLevel,
+} from './tournamentLevels'
 
 /** Debe coincidir con los límites del gateway. */
 export const TOURNAMENT_MAX_PARTICIPANTS = 40
@@ -128,6 +135,9 @@ export function TournamentSetupForm({ games, loading, initialGameId, onSubmit, o
                       {level && <Check className="h-3 w-3" strokeWidth={3} />}
                     </span>
                     <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-text-h">{game.title}</span>
+                    <span className="shrink-0 rounded-full border border-border px-2 py-0.5 text-[10.5px] font-medium text-text">
+                      {TOURNAMENT_GAME_LABEL[game.gameType as TournamentGameType] ?? game.gameType}
+                    </span>
                     {level && <span className="shrink-0 rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-semibold text-accent">Ronda {order + 1}</span>}
                   </button>
 
@@ -154,7 +164,9 @@ export function TournamentSetupForm({ games, loading, initialGameId, onSubmit, o
                           )
                         })}
                       </div>
-                      <p className="mt-1.5 text-[11.5px] text-text">{TOURNAMENT_LEVEL_INFO[level].detail}</p>
+                      <p className="mt-1.5 text-[11.5px] text-text">
+                        {TOURNAMENT_LEVEL_DETAIL[(game.gameType as TournamentGameType) in TOURNAMENT_LEVEL_DETAIL ? (game.gameType as TournamentGameType) : 'GUESS_WHO'][level]}
+                      </p>
                     </div>
                   )}
                 </li>

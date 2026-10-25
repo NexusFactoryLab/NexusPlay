@@ -47,6 +47,9 @@ import { useTheme } from '../../../hooks/useTheme'
  * fue una página dedicada, así que sí es una <Route>.
  */
 export function DominoRoomPage() {
+  const [searchParams] = useSearchParams()
+  // Dentro de un torneo se entra directo a la partida: la guía ya se puede ver desde la sala de espera del torneo.
+  if (searchParams.get('torneo')) return <DominoRoomPageSession />
   return <GameInstructionsGate kind="DOMINO"><DominoRoomPageSession /></GameInstructionsGate>
 }
 
@@ -54,6 +57,8 @@ function DominoRoomPageSession() {
   const { code: codeFromUrl } = useParams<{ code?: string }>()
   const [searchParams] = useSearchParams()
   const gameIdToCreate = searchParams.get('gameId')
+  // Partida de un torneo (issue #102): sin revancha, y al terminar se vuelve al torneo.
+  const tournamentCode = searchParams.get('torneo')
   const navigate = useNavigate()
   const { token, user } = useAuth()
   const { theme } = useTheme()
@@ -150,8 +155,20 @@ function DominoRoomPageSession() {
 
   function handleExit() {
     leaveRoom()
-    navigate('/')
+    navigate(tournamentCode ? `/quien-es/torneo/${encodeURIComponent(tournamentCode)}` : '/')
   }
+
+  // Terminada la partida del torneo, se vuelve solo a la pantalla del torneo (hay botón para hacerlo antes).
+  const finishedInTournament = Boolean(tournamentCode) && room?.phase === 'FINISHED'
+  useEffect(() => {
+    if (!finishedInTournament || !tournamentCode) return
+    const timeout = setTimeout(() => {
+      leaveRoom()
+      navigate(`/quien-es/torneo/${encodeURIComponent(tournamentCode)}`)
+    }, 9000)
+    return () => clearTimeout(timeout)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [finishedInTournament, tournamentCode])
 
   function toggleDominoSound() {
     setIsDominoSoundMuted((muted) => {
@@ -466,6 +483,18 @@ function DominoRoomPageSession() {
           </button>
         </div>
       </Modal>
+    )
+  }
+
+  // Partida de torneo a punto de repartirse: nada que configurar ni confirmar.
+  if (tournamentCode && (!room || room.phase === 'WAITING')) {
+    return (
+      <div className="page-fade fixed inset-0 z-50 flex items-center justify-center bg-[#080F24] text-white">
+        <p className="flex items-center gap-3 text-[15px] font-medium">
+          <span className="live-dot" aria-hidden="true" />
+          Preparando tu partida de Dominó…
+        </p>
+      </div>
     )
   }
 
@@ -858,6 +887,19 @@ function DominoRoomPageSession() {
 
             <DominoLearningSummary room={room} level={level} />
 
+            {tournamentCode ? (
+              <div className="mt-2 flex flex-col items-center gap-2">
+                <p className="domino-premium-finish__rematch text-[12.5px]">Volviendo al torneo…</p>
+                <button
+                  type="button"
+                  className="rounded-lg px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)] transition-all duration-200 hover:-translate-y-0.5"
+                  style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
+                  onClick={handleExit}
+                >
+                  Volver al torneo
+                </button>
+              </div>
+            ) : (
             <div className="mt-2 flex flex-col items-center gap-2">
               <p className="domino-premium-finish__rematch text-[12.5px]">
                 {self.hasVotedRematch
@@ -885,6 +927,7 @@ function DominoRoomPageSession() {
                 </div>
               )}
             </div>
+            )}
           </div>
         )}
       </div>

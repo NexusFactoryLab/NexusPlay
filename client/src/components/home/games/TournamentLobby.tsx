@@ -4,7 +4,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { Modal } from './Modal'
 import type { TournamentStateView } from './guessWhoTypes'
 import { GameInstructionsGate } from './GameInstructionsGate'
-import { TOURNAMENT_LEVEL_INFO } from './tournamentLevels'
+import { TOURNAMENT_GAME_LABEL, TOURNAMENT_LEVEL_INFO } from './tournamentLevels'
 
 type Props = {
   tournament: TournamentStateView
@@ -115,7 +115,9 @@ export function TournamentLobby({ tournament, error, onStart, onClose, onExit }:
               return (
                 <li key={round} className="flex items-center gap-2 text-[12.5px] text-text-h">
                   <span className="w-14 shrink-0 text-text">Ronda {round + 1}</span>
-                  <span className="min-w-0 flex-1 truncate font-medium">{game.title}</span>
+                  <span className="min-w-0 flex-1 truncate font-medium">
+                    {game.title} <span className="font-normal text-text">· {TOURNAMENT_GAME_LABEL[game.gameType]}</span>
+                  </span>
                   <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${info.tone}`}>
                     {info.label} · {info.audience}
                   </span>
