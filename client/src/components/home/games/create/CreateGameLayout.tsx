@@ -1,3 +1,4 @@
+import { PageTransition } from '../../../PageTransition'
 import type { CSSProperties } from 'react'
 import { Gamepad2 } from 'lucide-react'
 import { Outlet, useLocation } from 'react-router-dom'
@@ -58,7 +59,9 @@ function CreateGameLayoutContent() {
       {/* `app-main`: mismas piezas de Fantasía que las secciones del inicio (ver index.css). */}
       <main className="app-main flex-1 overflow-y-auto">
         {/* Issue #69: "Continuar" otro borrador del mismo tipo cambia solo el query; la clave remonta el formulario. */}
-        <Outlet key={location.pathname + location.search} />
+        <PageTransition>
+          <Outlet key={location.pathname + location.search} />
+        </PageTransition>
         <ScrollMoreHint />
       </main>
     </div>

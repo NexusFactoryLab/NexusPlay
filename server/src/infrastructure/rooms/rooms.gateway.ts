@@ -1762,14 +1762,23 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
 
     for (const match of newMatches) {
       if (match.isBye) continue;
-      this.server.to(`tournament:${tournament.code}`).emit('tournament:pairing-announced', {
-        round: tournament.currentRound,
-        matchCode: match.matchCode,
-        pairing: match.playerUserIds.map((userId) => ({
-          userId,
-          displayName: tournament.participants.find((p) => p.userId === userId)?.displayName ?? '???',
-        })),
-      });
+      // Cada pareja solo recibe su propio anuncio (con 40 personas, el de toda la sala sería ruido).
+      const pairing = match.playerUserIds.map((userId) => ({
+        userId,
+        displayName:
+          tournament.participants.find((p) => p.userId === userId)?.displayName ??
+          match.players.find((p) => p.userId === userId)?.displayName ??
+          '???',
+      }));
+      for (const userId of match.playerUserIds) {
+        const participant = tournament.participants.find((p) => p.userId === userId);
+        if (!participant) continue;
+        this.server.to(participant.socketId).emit('tournament:pairing-announced', {
+          round: tournament.currentRound,
+          matchCode: match.matchCode,
+          pairing,
+        });
+      }
       this.startTournamentMatchTurn(tournament, match, match.players[Math.floor(Math.random() * match.players.length)].userId);
     }
 

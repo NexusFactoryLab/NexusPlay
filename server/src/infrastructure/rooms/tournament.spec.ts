@@ -82,6 +82,19 @@ describe('torneo grupal administrado', () => {
     expect(() => gateway.handleTournamentJoin(client('extra'), { code: tournament.code })).toThrow(/cupo/);
   });
 
+  it('cada pareja recibe solo su propio anuncio de emparejamiento', async () => {
+    const { gateway, admin, events, tournament } = await start(4);
+    events.length = 0;
+    gateway.handleTournamentStart(admin);
+    const announced = events.filter((e) => e.event === 'tournament:pairing-announced');
+    expect(announced).toHaveLength(4);
+    for (const e of announced) {
+      const pairing = (e.payload as { pairing: { userId: string }[] }).pairing;
+      expect(pairing.map((p) => p.userId)).toContain(e.target);
+    }
+    expect(tournament.matches).toHaveLength(2);
+  });
+
   it('con número impar, la persona que sobra juega contra el bot', async () => {
     const { gateway, admin, tournament } = await start(5);
     gateway.handleTournamentStart(admin);

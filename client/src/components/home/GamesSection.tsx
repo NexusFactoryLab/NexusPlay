@@ -1069,7 +1069,7 @@ export function GamesSection({
                 {tournamentOpen && (
                   <button
                     type="button"
-                    className="relative flex animate-pulse items-center gap-2 rounded-xl border-2 border-accent-2 bg-surface px-5 py-3 text-[14px] font-bold text-accent-2 transition-transform hover:-translate-y-0.5"
+                    className="tournament-cta relative flex items-center gap-2 rounded-xl border-2 border-accent-2 bg-surface px-5 py-3 text-[14px] font-bold text-accent-2"
                     onClick={() => navigate('/quien-es/torneo')}
                   >
                     <Swords className="h-[18px] w-[18px]" strokeWidth={2.5} />

@@ -49,7 +49,7 @@ export function TournamentLobby({ tournament, error, onUpdateTurnDuration, onSta
   return (
     <Modal onClose={tournament.isModerator ? onClose : onExit} maxWidthClassName="max-w-[760px]" ariaLabel="Sala de espera del torneo">
       <div className="flex flex-col gap-4">
-        <div className="flex items-start justify-between gap-3">
+        <div className="stagger-in flex items-start justify-between gap-3" style={{ '--stagger': 0 } as React.CSSProperties}>
           <div>
             <p className="text-[11px] font-semibold tracking-[0.18em] text-accent uppercase">
               {tournament.isModerator ? 'Torneo · Administrador' : 'Torneo'}
@@ -62,7 +62,7 @@ export function TournamentLobby({ tournament, error, onUpdateTurnDuration, onSta
           </div>
           <button
             type="button"
-            className="flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-[13px] font-medium text-text-h"
+            className="flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-[13px] font-medium text-text-h transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/50 hover:text-accent active:translate-y-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             onClick={onExit}
           >
             <LogOut className="h-4 w-4" strokeWidth={2} />
@@ -71,17 +71,17 @@ export function TournamentLobby({ tournament, error, onUpdateTurnDuration, onSta
         </div>
 
         {tournament.isModerator && (
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 rounded-2xl border border-border bg-surface p-4">
+          <div className="stagger-in grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 rounded-2xl border border-border bg-surface p-4 shadow-[var(--shadow)]" style={{ '--stagger': 1 } as React.CSSProperties}>
             <div className="flex min-w-0 flex-col gap-2.5">
               <div className="flex flex-wrap items-center gap-2 text-[13px] text-text">
                 <span className="font-medium text-text-h">Código:</span>
                 <code className="rounded-lg border border-accent/30 bg-accent/5 px-3 py-1 text-[24px] font-semibold tracking-widest text-accent">
                   {tournament.code}
                 </code>
-                <button type="button" aria-label="Copiar código" className="rounded-lg border border-border p-2" onClick={() => copy(tournament.code, 'Código copiado')}>
+                <button type="button" aria-label="Copiar código" className="rounded-lg border border-border p-2 transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/50 hover:text-accent active:translate-y-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" onClick={() => copy(tournament.code, 'Código copiado')}>
                   <Copy className="h-4 w-4" strokeWidth={2} />
                 </button>
-                <button type="button" aria-label="Copiar enlace" className="rounded-lg border border-border p-2" onClick={() => copy(invitationUrl, 'Enlace copiado')}>
+                <button type="button" aria-label="Copiar enlace" className="rounded-lg border border-border p-2 transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/50 hover:text-accent active:translate-y-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" onClick={() => copy(invitationUrl, 'Enlace copiado')}>
                   <Link className="h-4 w-4" strokeWidth={2} />
                 </button>
               </div>
@@ -96,26 +96,34 @@ export function TournamentLobby({ tournament, error, onUpdateTurnDuration, onSta
                   onChange={(event) => setTurnText(event.target.value)}
                   onBlur={commitTurn}
                   onKeyDown={(event) => event.key === 'Enter' && commitTurn()}
-                  className="w-20 rounded-lg border border-border bg-bg px-2 py-1 text-[14px] text-text-h"
+                  className="w-20 rounded-lg border border-border bg-bg px-2 py-1 text-[14px] text-text-h outline-none transition-colors duration-200 focus:border-accent"
                 />
               </label>
-              {copied && <p className="text-[12px] font-medium text-accent" role="status">{copied}</p>}
+              <p className={`h-4 text-[12px] font-medium text-accent transition-opacity duration-300 ${copied ? 'opacity-100' : 'opacity-0'}`} role="status">{copied ?? ''}</p>
             </div>
-            <QRCodeSVG value={invitationUrl} size={120} />
+            <div className="rounded-xl bg-white p-2 shadow-[0_8px_24px_-12px_var(--accent)] transition-transform duration-300 hover:scale-105">
+              <QRCodeSVG value={invitationUrl} size={112} />
+            </div>
           </div>
         )}
 
-        <div className="rounded-2xl border border-border p-4">
-          <p className="mb-3 flex items-center gap-1.5 text-[13px] font-semibold text-text-h">
+        <div className="stagger-in rounded-2xl border border-border p-4" style={{ '--stagger': 2 } as React.CSSProperties}>
+          <p className="mb-2 flex items-center gap-1.5 text-[13px] font-semibold text-text-h">
             <Users className="h-4 w-4 text-accent" strokeWidth={2} />
             {tournament.participants.length} / {tournament.maxParticipants} participantes
           </p>
+          <div className="progress-track mb-3" role="progressbar" aria-valuenow={tournament.participants.length} aria-valuemin={0} aria-valuemax={tournament.maxParticipants}>
+            <div className="progress-fill" style={{ width: `${Math.min(100, (tournament.participants.length / tournament.maxParticipants) * 100)}%` }} />
+          </div>
           {tournament.participants.length === 0 ? (
-            <p className="text-[13px] text-text">Aún no ha entrado nadie.</p>
+            <p className="flex items-center gap-2 text-[13px] text-text">
+              <span className="live-dot" aria-hidden="true" />
+              Esperando a que entre la primera persona…
+            </p>
           ) : (
             <div className="grid max-h-[260px] grid-cols-2 gap-1.5 overflow-y-auto sm:grid-cols-3">
               {tournament.participants.map((participant) => (
-                <span key={participant.userId} className="truncate rounded-lg bg-code-bg px-3 py-1.5 text-[12.5px] font-medium text-text-h">
+                <span key={participant.userId} className="chip-pop truncate rounded-lg bg-code-bg px-3 py-1.5 text-[12.5px] font-medium text-text-h">
                   {participant.displayName}
                   {participant.isSelf ? ' (tú)' : ''}
                 </span>
@@ -132,13 +140,13 @@ export function TournamentLobby({ tournament, error, onUpdateTurnDuration, onSta
 
         {tournament.isModerator ? (
           <div className="flex gap-2">
-            <button type="button" className="rounded-lg border border-border px-4 py-2.5 text-[14px] font-medium text-text-h" onClick={onClose}>
+            <button type="button" className="rounded-lg border border-border px-4 py-2.5 text-[14px] font-medium text-text-h transition-all duration-200 hover:-translate-y-0.5 hover:border-danger/50 hover:text-danger active:translate-y-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" onClick={onClose}>
               Cerrar torneo
             </button>
             <button
               type="button"
               disabled={!canStart}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)] disabled:opacity-50"
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)] transition-all duration-200 enabled:hover:-translate-y-0.5 enabled:hover:shadow-[0_14px_26px_-10px_var(--accent)] enabled:active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
               style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
               onClick={onStart}
             >
@@ -147,7 +155,10 @@ export function TournamentLobby({ tournament, error, onUpdateTurnDuration, onSta
             </button>
           </div>
         ) : (
-          <p className="text-center text-[14px] font-medium text-text-h">Esperando a que el administrador inicie el torneo…</p>
+          <p className="flex items-center justify-center gap-2.5 text-center text-[14px] font-medium text-text-h">
+            <span className="live-dot" aria-hidden="true" />
+            Esperando a que el administrador inicie el torneo…
+          </p>
         )}
       </div>
     </Modal>

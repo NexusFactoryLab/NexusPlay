@@ -4,7 +4,7 @@ import { TournamentLobby } from './TournamentLobby'
 import { TournamentModeratorPanel } from './TournamentModeratorPanel'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Crown, LogOut, Trophy, Users } from 'lucide-react'
+import { Bot, Crown, LogOut, Swords, Trophy } from 'lucide-react'
 import { useAuth } from '../../../hooks/useAuth'
 import { useGuessWhoTournament } from './useGuessWhoTournament'
 import { Modal } from './Modal'
@@ -318,7 +318,7 @@ function TournamentSession() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-bg">
+    <div className="page-fade fixed inset-0 z-50 overflow-y-auto bg-bg">
       {showPairingOverlay && pairingAnnouncement && (
         <PairingAnnouncementOverlay announcement={pairingAnnouncement} selfUserId={user?.id ?? null} />
       )}
@@ -328,15 +328,20 @@ function TournamentSession() {
           <div>
             <h2 className="text-[19px] tracking-tight text-text-h">{tournament.gameTitle} — Grupo</h2>
             {tournament.phase === 'RUNNING' && (
-              <p className="text-[12.5px] text-text">
-                Ronda {tournament.currentRound} de {tournament.totalRounds}
-                {self ? ` · ${self.points} pts` : ''}
-              </p>
+              <div className="mt-1.5 flex items-center gap-3">
+                <p className="text-[12.5px] text-text">
+                  Ronda {tournament.currentRound} de {tournament.totalRounds}
+                  {self ? ` · ${self.points} ${self.points === 1 ? 'punto' : 'puntos'}` : ''}
+                </p>
+                <div className="progress-track w-28" aria-hidden="true">
+                  <div className="progress-fill" style={{ width: `${(tournament.currentRound / tournament.totalRounds) * 100}%` }} />
+                </div>
+              </div>
             )}
           </div>
           <button
             type="button"
-            className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-[13px] font-medium text-text-h"
+            className="flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-2 text-[13px] font-medium text-text-h transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/50 hover:text-accent"
             onClick={handleExit}
           >
             <LogOut className="h-4 w-4" strokeWidth={2} />
@@ -382,17 +387,20 @@ function TournamentSession() {
         )}
 
         {tournament.phase === 'RUNNING' && !tournament.myMatch && (
-          <div className="flex flex-col items-center gap-3 py-8 text-center">
-            <p className="text-[14px] font-medium text-text-h">Terminaste tu partida de la ronda {tournament.currentRound}.</p>
-            <p className="text-[13px] text-text">Esperando a que terminen las demás para empezar la siguiente…</p>
+          <div className="stagger-in flex flex-col items-center gap-3 py-8 text-center">
+            <p className="text-[16px] font-semibold text-text-h">Terminaste tu partida de la ronda {tournament.currentRound}.</p>
+            <p className="flex items-center gap-2 text-[13px] text-text">
+              <span className="live-dot" aria-hidden="true" />
+              Esperando a que terminen las demás para empezar la siguiente…
+            </p>
             <RoundsRanking tournament={tournament} selfUserId={user?.id ?? null} />
           </div>
         )}
 
         {tournament.phase === 'FINISHED' && (
-          <div className="flex flex-col items-center gap-4 py-6 text-center">
+          <div className="stagger-in flex flex-col items-center gap-4 py-6 text-center">
             <span
-              className="flex h-14 w-14 items-center justify-center rounded-full text-white animate-[trophy-pop-in_0.5s_cubic-bezier(0.16,1,0.3,1)]"
+              className="flex h-14 w-14 items-center justify-center rounded-full text-white shadow-[0_14px_30px_-12px_var(--accent)] animate-[trophy-pop-in_0.6s_cubic-bezier(0.16,1,0.3,1)]"
               style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
             >
               <Trophy className="h-7 w-7" strokeWidth={1.75} />
@@ -403,7 +411,7 @@ function TournamentSession() {
             <RoundsRanking tournament={tournament} selfUserId={user?.id ?? null} />
             <button
               type="button"
-              className="mt-2 rounded-lg px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)] transition-transform hover:-translate-y-0.5"
+              className="mt-2 rounded-lg px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_26px_-10px_var(--accent)] active:translate-y-0"
               style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
               onClick={handleExit}
             >
@@ -502,10 +510,13 @@ function RoundsRanking({
           Clasificación
         </p>
         <div className="flex flex-col gap-1.5">
-          {ranked.map((participant) => (
+          {ranked.map((participant, index) => (
             <div
               key={participant.userId}
-              className="flex items-center justify-between rounded-lg bg-code-bg px-3 py-1.5 text-[12.5px]"
+              className={`stagger-in flex items-center justify-between rounded-lg px-3 py-1.5 text-[12.5px] transition-colors duration-300 ${
+                participant.userId === selfUserId ? 'bg-accent/10 ring-1 ring-accent/30' : 'bg-code-bg'
+              }`}
+              style={{ '--stagger': index } as React.CSSProperties}
             >
               <span className="font-medium text-text-h">
                 {participant.displayName}
@@ -544,18 +555,35 @@ function PairingAnnouncementOverlay({
   announcement,
   selfUserId,
 }: {
-  announcement: { pairing: { userId: string; displayName: string }[] }
+  announcement: { round: number; pairing: { userId: string; displayName: string }[] }
   selfUserId: string | null
 }) {
-  const teammate = announcement.pairing.find((p) => p.userId !== selfUserId)
+  const self = announcement.pairing.find((p) => p.userId === selfUserId)
+  const rival = announcement.pairing.find((p) => p.userId !== selfUserId)
+  const rivalIsBot = rival?.userId.startsWith('bot:') === true
 
   return (
-    <div className="fixed inset-0 z-[70] flex flex-col items-center justify-center gap-4 bg-black/70 backdrop-blur-sm animate-[modal-backdrop-in_0.2s_ease-out] text-center">
-      <Users className="h-10 w-10 text-white" strokeWidth={1.75} />
-      <p className="text-[14px] font-medium tracking-wide text-white/80 uppercase">Nueva ronda</p>
-      <p className="text-[24px] font-bold text-white animate-[fade-in-up_0.3s_ease-out]">
-        Tu rival es: {teammate?.displayName ?? '???'}
-      </p>
+    <div className="page-fade fixed inset-0 z-[70] flex flex-col items-center justify-center gap-6 bg-black/75 px-5 text-center backdrop-blur-md">
+      <p className="stagger-in text-[13px] font-semibold tracking-[0.22em] text-white/70 uppercase">Ronda {announcement.round}</p>
+      <div className="flex w-full max-w-[640px] items-center justify-center gap-4 sm:gap-8">
+        <div className="versus-left min-w-0 flex-1 rounded-2xl border border-white/15 bg-white/10 px-4 py-5 text-white">
+          <p className="truncate text-[18px] font-bold sm:text-[22px]">{self?.displayName ?? 'Tú'}</p>
+          <p className="text-[12px] text-white/60">Tú</p>
+        </div>
+        <span
+          className="versus-badge flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-white shadow-[0_10px_28px_-8px_var(--accent-2)]"
+          style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
+        >
+          <Swords className="h-6 w-6" strokeWidth={2} />
+        </span>
+        <div className="versus-right min-w-0 flex-1 rounded-2xl border border-white/15 bg-white/10 px-4 py-5 text-white">
+          <p className="flex items-center justify-center gap-1.5 truncate text-[18px] font-bold sm:text-[22px]">
+            {rivalIsBot && <Bot className="h-5 w-5 shrink-0" strokeWidth={2} />}
+            {rival?.displayName ?? '???'}
+          </p>
+          <p className="text-[12px] text-white/60">{rivalIsBot ? 'Rival automático' : 'Tu rival'}</p>
+        </div>
+      </div>
     </div>
   )
 }
