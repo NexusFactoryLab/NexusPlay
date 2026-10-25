@@ -32,14 +32,25 @@ import { SPACESHIP_MAP } from './spaceshipMap'
 import { INTRO_MS, type Direction, type TfAnswerRecord } from './trueFalseMazeEngine'
 import type { Insets } from './TrueFalseMazeRenderer'
 import { TrueFalseMazeGuide } from './TrueFalseMazeGuide'
+import { TrueFalseMazeTutorial } from '../tutorial/TrueFalseMazeTutorial'
 import { useTrueFalseMazeSession, type TrueFalseMazeHud } from './useTrueFalseMazeSession'
 import type { TrueFalseMazeConfig, TrueFalseMazeQuestion } from './trueFalseMazeTypes'
+
+/** Una parte del tutorial jugable (issue #93): la nave real con una pregunta de práctica. */
+export type TrueFalseMazeTutorialPart = {
+  /** Terminó la pregunta: `correct` dice si la respondió bien. */
+  onFinished: (correct: boolean) => void
+  /** Una medusa lo atrapó (en el juego costaría una batería). */
+  onCaught: () => void
+}
 
 export type TrueFalseMazeGameProps = {
   title: string
   questions: TrueFalseMazeQuestion[]
   config: TrueFalseMazeConfig
   onExit: () => void
+  /** Si viene, se juega una parte del tutorial: sin guía ni pantallas de inicio y de fin. */
+  tutorial?: TrueFalseMazeTutorialPart
 }
 
 /** Movimiento mínimo (px) para que un toque sobre el mapa cuente como deslizar. */
@@ -82,17 +93,36 @@ function saveFullscreenPreference(value: boolean) {
  * pasos; se puede volver a abrir desde el botón de ayuda.
  */
 export function TrueFalseMazeGame(props: TrueFalseMazeGameProps) {
-  const [guideOpen, setGuideOpen] = useState(true)
+  const [guideOpen, setGuideOpen] = useState(!props.tutorial)
+  // Al final de la guía se ofrece el tutorial jugable (issue #93); al terminarlo
+  // empieza una partida nueva (la sesión se vuelve a montar con otra clave).
+  const [inTutorial, setInTutorial] = useState(false)
+  const [round, setRound] = useState(0)
+  if (inTutorial) {
+    return (
+      <TrueFalseMazeTutorial
+        title={props.title}
+        onFinish={() => {
+          setInTutorial(false)
+          setGuideOpen(false)
+          setRound((value) => value + 1)
+        }}
+      />
+    )
+  }
   // La guía se dibuja DENTRO de la sesión (no al lado): en pantalla completa el
   // navegador solo muestra lo que está dentro del elemento que la pidió, y una
   // guía de afuera quedaba invisible pero capturando el teclado (el juego
   // parecía trabado hasta salir de pantalla completa).
   return (
     <TrueFalseMazeSession
+      key={round}
       {...props}
       guideOpen={guideOpen}
-      onOpenGuide={() => setGuideOpen(true)}
+      // En el tutorial la guía ya se vio: el botón de ayuda no la vuelve a abrir encima.
+      onOpenGuide={() => !props.tutorial && setGuideOpen(true)}
       onCloseGuide={() => setGuideOpen(false)}
+      onStartTutorial={props.tutorial ? undefined : () => setInTutorial(true)}
     />
   )
 }
@@ -128,10 +158,12 @@ function TrueFalseMazeSession({
   questions,
   config,
   onExit,
+  tutorial,
   guideOpen,
   onOpenGuide,
   onCloseGuide,
-}: TrueFalseMazeGameProps & { guideOpen: boolean; onOpenGuide: () => void; onCloseGuide: () => void }) {
+  onStartTutorial,
+}: TrueFalseMazeGameProps & { guideOpen: boolean; onOpenGuide: () => void; onCloseGuide: () => void; onStartTutorial?: () => void }) {
   const [assets, setAssets] = useState<SpaceshipAssets | null>(null)
   const [loadError, setLoadError] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -144,7 +176,8 @@ function TrueFalseMazeSession({
   const [fullscreen, setFullscreen] = useState(false)
   const [wantFullscreen, setWantFullscreen] = useState(readFullscreenPreference)
   const [fullscreenHintClosed, setFullscreenHintClosed] = useState(false)
-  const canFullscreen = typeof document !== 'undefined' && document.fullscreenEnabled
+  // En el tutorial la pantalla completa la maneja el tutorial (entra al jugar y sale para explicar).
+  const canFullscreen = !tutorial && typeof document !== 'undefined' && document.fullscreenEnabled
 
   function enterFullscreen() {
     const root = rootRef.current
@@ -202,6 +235,20 @@ function TrueFalseMazeSession({
     }
   }, [])
 
+  // Tutorial: la parte arranca sola en cuanto la nave cargó, y avisa cómo terminó.
+  const tutorialRef = useRef(tutorial)
+  useEffect(() => {
+    tutorialRef.current = tutorial
+  })
+  const { start } = actions
+  useEffect(() => {
+    if (tutorial && assets && hud.phase === 'ready') start()
+  }, [tutorial, assets, hud.phase, start])
+  useEffect(() => {
+    if (hud.phase === 'caught') tutorialRef.current?.onCaught()
+    if (hud.phase === 'finished') tutorialRef.current?.onFinished(hud.answers.length > 0 && hud.answers.every((answer) => answer.correct))
+  }, [hud.phase, hud.answers])
+
   // Abrir la guía a mitad de partida pausa el juego.
   const { pause } = actions
   useEffect(() => {
@@ -249,7 +296,8 @@ function TrueFalseMazeSession({
       const active = !!document.fullscreenElement
       setFullscreen(active)
       // Al salir (con Esc, por ejemplo) la pantalla cambia de tamaño de golpe: la partida se pausa para no perder el hilo.
-      if (!active) pause()
+      // En el tutorial salir de pantalla completa es parte del recorrido (para explicar), no una pausa.
+      if (!active && !tutorialRef.current) pause()
     }
     document.addEventListener('fullscreenchange', onChange)
     return () => document.removeEventListener('fullscreenchange', onChange)
@@ -302,7 +350,8 @@ function TrueFalseMazeSession({
   // segundos (se va antes si el jugador pausa o termina la ronda). Se ajusta
   // durante el render, al cambiar la fase, sin un efecto de por medio.
   const [pauseHint, setPauseHint] = useState<'pending' | 'showing' | 'done'>('pending')
-  if (pauseHint === 'pending' && hud.phase === 'playing' && !paused) setPauseHint('showing')
+  // En el tutorial la barra de la tarea ya guía: no se suma este aviso.
+  if (pauseHint === 'pending' && hud.phase === 'playing' && !paused && !tutorial) setPauseHint('showing')
   if (pauseHint === 'showing' && (paused || hud.phase !== 'playing')) setPauseHint('done')
   useEffect(() => {
     if (pauseHint !== 'showing') return
@@ -431,7 +480,7 @@ function TrueFalseMazeSession({
       {hudPanels}
 
       {!assets && <LoadingOverlay error={loadError} onExit={onExit} />}
-      {assets && hud.phase === 'ready' && (
+      {assets && hud.phase === 'ready' && !tutorial && (
         <ReadyOverlay
           total={hud.totalQuestions}
           lives={hud.maxLives}
@@ -463,8 +512,8 @@ function TrueFalseMazeSession({
           onExit={onExit}
         />
       )}
-      {hud.phase === 'finished' && <ResultsOverlay hud={hud} compact={compactLandscape} onRestart={actions.restart} onExit={onExit} />}
-      {guideOpen && <TrueFalseMazeGuide onClose={onCloseGuide} />}
+      {hud.phase === 'finished' && !tutorial && <ResultsOverlay hud={hud} compact={compactLandscape} onRestart={actions.restart} onExit={onExit} />}
+      {guideOpen && !tutorial && <TrueFalseMazeGuide onClose={onCloseGuide} onTutorial={onStartTutorial} />}
     </div>
   )
 }

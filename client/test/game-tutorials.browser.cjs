@@ -22,6 +22,12 @@ if ('${game}'==='MAZE') {
   const items=['Botella','Lata','Caja','Vidrio'].map((l,i)=>({itemId:'i'+i,label:l,icon:'target',color:'#2ecc71'}));
   el=React.createElement(MazeCollectorGame,{title:'Camión reciclador',primaryColor:'#2ecc71',layout:T.MAZE_LAYOUTS.CITY,items,config:{...T.DEFAULT_MAZE_CONFIG,layout:'CITY'},onExit:()=>{window.exited=1}});
 }
+if ('${game}'==='TF') {
+  const {TrueFalseMazeGame}=await import('/src/components/home/games/true-false-maze/TrueFalseMazeGame.tsx');
+  const {DEFAULT_TRUE_FALSE_MAZE_CONFIG}=await import('/src/components/home/games/true-false-maze/trueFalseMazeTypes.ts');
+  const qs=[1,2,3].map(i=>({questionId:'q'+i,statement:'Afirmación de prueba '+i+'.',answer:i%2==0,explanation:'Explicación.'}));
+  el=React.createElement(TrueFalseMazeGame,{title:'Misión Galáctica',questions:qs,config:DEFAULT_TRUE_FALSE_MAZE_CONFIG,onExit:()=>{window.exited=1}});
+}
 createRoot(document.getElementById('root')).render(React.createElement(AuthProvider,null,React.createElement(ThemeProvider,null,el)));
 </script></body></html>`
 
@@ -94,6 +100,29 @@ async function mazeTutorial(browser, viewport, touch) {
   await page.close()
 }
 
+async function tfTutorial(browser, viewport, touch) {
+  const tag = `${viewport.width}${touch ? '-touch' : ''}`
+  const { page, errors } = await openGame(browser, 'TF', viewport, touch)
+  const guide = page.locator('[data-game-guide]')
+  await guide.waitFor()
+  for (let i = 0; i < 4; i++) await guide.getByRole('button', { name: /Siguiente/ }).click()
+  await guide.getByRole('group', { name: '¿Deseas jugar un tutorial?' }).waitFor()
+  assert.equal(await guide.evaluate((el) => el.scrollHeight <= el.clientHeight + 1), true, 'La guía no tiene scroll')
+  await page.screenshot({ path: `.scratch/tutorial-tf-pregunta-${tag}.png` })
+  await guide.getByRole('button', { name: /Sí/ }).click()
+  await page.locator('[data-game-tutorial]').waitFor()
+  await page.getByText('Parte 1 de 3').waitFor()
+  await page.waitForTimeout(2500)
+  await page.screenshot({ path: `.scratch/tutorial-tf-parte1-${tag}.png` })
+  assert.equal(await page.getByRole('button', { name: 'Despegar' }).count(), 0, 'El tutorial arranca solo, sin la pantalla de inicio')
+  await page.getByRole('button', { name: 'Salir del tutorial' }).click()
+  await page.locator('[data-game-tutorial]').waitFor({ state: 'detached' })
+  await page.getByRole('button', { name: /Despegar/ }).waitFor()
+  assert.deepEqual(errors, [])
+  console.log(`PASS ${tag} Laberinto V/F: pregunta sin scroll, Sí → parte 1 en la nave real sin pantalla de inicio, salir → juego`)
+  await page.close()
+}
+
 async function main() {
   mkdirSync('.scratch', { recursive: true })
   const browser = await chromium.launch({ channel: 'chrome', headless: true })
@@ -101,6 +130,10 @@ async function main() {
     if (!only || only === 'MAZE') {
       await mazeTutorial(browser, { width: 1280, height: 800 }, false)
       await mazeTutorial(browser, { width: 390, height: 844 }, true)
+    }
+    if (!only || only === 'TF') {
+      await tfTutorial(browser, { width: 1280, height: 800 }, false)
+      await tfTutorial(browser, { width: 390, height: 844 }, true)
     }
   } finally {
     await browser.close()
