@@ -38,7 +38,7 @@ export interface DraftIdentity {
 export function identityPromptSection(categories: CategoryOption[]): string {
   const list = categories.slice(0, MAX_PROMPT_CATEGORIES);
   const areas = list.length
-    ? `"categoryId": el id (copiado EXACTO) del área de esta lista donde mejor encaja el juego, o null si ninguna encaja. NUNCA inventes un área ni un id.\nÁreas disponibles:\n${list.map((c) => `- ${c.id}: ${c.name}`).join('\n')}`
+    ? `"categoryId": el id (copiado EXACTO) del área de esta lista donde mejor encaja el juego, o null si ninguna encaja. NUNCA inventes un área ni un id. Elige la MÁS ESPECÍFICA de la lista que encaje con el tema (por ejemplo, una disciplina concreta antes que una categoría amplia o transversal); si ninguna encaja de verdad, usa null.\nÁreas disponibles:\n${list.map((c) => `- ${c.id}: ${c.name}`).join('\n')}`
     : '"categoryId": null (no hay áreas disponibles).';
   return `\n\nAdemás, en la RAÍZ del JSON (junto a "config" y "content") agrega la identidad del juego:
 - "title": nombre atractivo del juego (entre ${IDENTITY_TITLE_MIN} y ${IDENTITY_TITLE_MAX} caracteres), sin comillas ni emojis.
