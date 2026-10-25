@@ -3,6 +3,7 @@ import { ArrowLeft, Bot, FileClock, Ghost, Layers, Puzzle, UserRoundSearch, Dice
 import { LIVE_ROOM_GAME_TYPES } from './resolveRoomCode'
 import { modeColorForGameType } from './gameModeVisuals'
 import { resolveGameTypeDisplayName } from './gameTypePublicNames'
+import { GAME_TYPE_BY_CHOICE } from './archivedGameTypes'
 
 export type GameTypeChoice =
   | 'CARDS'
@@ -12,17 +13,6 @@ export type GameTypeChoice =
   | 'SNAKES_LADDERS'
   | 'DUAL_QUEST'
   | 'TRUE_FALSE_MAZE'
-
-/** Tipo de juego real (`GameType`) que corresponde a cada opción del picker. */
-export const GAME_TYPE_BY_CHOICE: Record<GameTypeChoice, string> = {
-  CARDS: 'MEMORY_MATCH',
-  GUESS_WHO: 'GUESS_WHO',
-  DOMINO: 'DOMINO',
-  MAZE_COLLECTOR: 'MAZE_COLLECTOR',
-  SNAKES_LADDERS: 'SNAKES_LADDERS',
-  DUAL_QUEST: 'DUAL_QUEST',
-  TRUE_FALSE_MAZE: 'TRUE_FALSE_MAZE',
-}
 
 type GameTypePickerProps = {
   onClose: () => void

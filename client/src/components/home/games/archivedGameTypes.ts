@@ -1,3 +1,16 @@
+import type { GameTypeChoice } from './GameTypePicker'
+
+/** Tipo de juego real (`GameType`) que corresponde a cada opción del picker. */
+export const GAME_TYPE_BY_CHOICE: Record<GameTypeChoice, string> = {
+  CARDS: 'MEMORY_MATCH',
+  GUESS_WHO: 'GUESS_WHO',
+  DOMINO: 'DOMINO',
+  MAZE_COLLECTOR: 'MAZE_COLLECTOR',
+  SNAKES_LADDERS: 'SNAKES_LADDERS',
+  DUAL_QUEST: 'DUAL_QUEST',
+  TRUE_FALSE_MAZE: 'TRUE_FALSE_MAZE',
+}
+
 /**
  * Qué tipos de juego están archivados, a partir de GET /game-types.
  *
