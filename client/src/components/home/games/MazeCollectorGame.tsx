@@ -5,14 +5,29 @@ import type { MazeCollectorConfig, MazeCollectorItem, MazeLayoutDef, CellPositio
 import { iconForConcept } from './mazeCollectorTypes'
 import { POWER_MODE_MS } from './mazeEngine'
 import { useMazeCollectorGame } from './useMazeCollectorGame'
-import type { Direction } from './useMazeCollectorGame'
+import type { Direction, MazeScenario } from './useMazeCollectorGame'
 import { EcoTruckSprite } from './EcoTruckSprite'
 import { PollutionGhostSprite } from './PollutionGhostSprite'
 import { BonusSprite, PetSprite, PowerPelletSprite, TrashBagSprite } from './mazeCollectibleSprites'
 import { SostenibleCityBackground } from './SostenibleCityBackground'
 import { SpriteStrip, mazeSpriteUrl } from './mazeSpriteStrip'
 import { MazeCollectorGuide } from './MazeCollectorGuide'
+import { MazeCollectorTutorial } from './tutorial/MazeCollectorTutorial'
 import { ConfettiBurst } from '../../kids/ConfettiBurst'
+
+/**
+ * Una parte del tutorial jugable (issue #93): la misma ciudad y el mismo
+ * motor, con un escenario que enseña una sola cosa y la cámara acercada a
+ * la zona donde ocurre (el resto del mapa se oscurece).
+ */
+export type MazeTutorialPart = {
+  scenario: MazeScenario
+  /** Zona del mapa que se enseña, en celdas. */
+  focus: { row: number; col: number; rows: number; cols: number }
+  onDone: () => void
+  /** Una nube alcanzó al camión: el escenario volvió a empezar. */
+  onCaught: () => void
+}
 
 type MazeCollectorGameProps = {
   title: string
@@ -21,6 +36,8 @@ type MazeCollectorGameProps = {
   items: MazeCollectorItem[]
   config: MazeCollectorConfig
   onExit: () => void
+  /** Si viene, se juega una parte del tutorial (sin guía, sin pantalla de inicio ni de fin). */
+  tutorial?: MazeTutorialPart
 }
 
 /** Celda mínima: por debajo de esto los sprites dejan de leerse (en ese caso el tablero se desplaza). */
@@ -34,6 +51,8 @@ const MAX_CELL_SIZE = 96
  */
 const CAMERA_FIT_THRESHOLD = 26
 const CAMERA_CELL_SIZE = 32
+/** Tutorial: tope de la celda al acercar la cámara a la zona que se enseña. */
+const FOCUS_MAX_CELL_SIZE = 64
 /** Cuánto hay que arrastrar el dedo sobre el mapa para que cuente como un giro. */
 const SWIPE_THRESHOLD = 22
 /** Alto de la zona de controles táctiles cuando el teléfono está en vertical. */
@@ -119,15 +138,37 @@ function hashCell(row: number, col: number): number {
  * desde el botón de ayuda.
  */
 export function MazeCollectorGame(props: MazeCollectorGameProps) {
-  const [guideOpen, setGuideOpen] = useState(true)
+  const [guideOpen, setGuideOpen] = useState(!props.tutorial)
+  // Al final de la guía se ofrece el tutorial jugable (issue #93); al terminarlo
+  // empieza una partida nueva (la sesión se vuelve a montar con otra clave).
+  const [inTutorial, setInTutorial] = useState(false)
+  const [round, setRound] = useState(0)
+  if (inTutorial) {
+    return (
+      <MazeCollectorTutorial
+        title={props.title}
+        primaryColor={props.primaryColor}
+        items={props.items}
+        config={props.config}
+        onFinish={() => {
+          setInTutorial(false)
+          setGuideOpen(false)
+          setRound((value) => value + 1)
+        }}
+      />
+    )
+  }
   // La guía se dibuja DENTRO de la sesión: en pantalla completa el navegador
   // solo muestra lo que está dentro del elemento que la pidió.
   return (
     <MazeCollectorSession
+      key={round}
       {...props}
       guideOpen={guideOpen}
-      onOpenGuide={() => setGuideOpen(true)}
+      // En el tutorial la guía ya se vio: el botón de ayuda no la vuelve a abrir encima.
+      onOpenGuide={() => !props.tutorial && setGuideOpen(true)}
       onCloseGuide={() => setGuideOpen(false)}
+      onStartTutorial={props.tutorial ? undefined : () => setInTutorial(true)}
     />
   )
 }
@@ -139,11 +180,14 @@ function MazeCollectorSession({
   items,
   config,
   onExit,
+  tutorial,
   guideOpen,
   onOpenGuide,
   onCloseGuide,
-}: MazeCollectorGameProps & { guideOpen: boolean; onOpenGuide: () => void; onCloseGuide: () => void }) {
-  const game = useMazeCollectorGame({ layout, items, config, inputEnabled: !guideOpen })
+  onStartTutorial,
+}: MazeCollectorGameProps & { guideOpen: boolean; onOpenGuide: () => void; onCloseGuide: () => void; onStartTutorial?: () => void }) {
+  const game = useMazeCollectorGame({ layout, items, config, inputEnabled: !guideOpen, scenario: tutorial?.scenario })
+  const focus = tutorial?.focus
   const isCity = config.layout === 'CITY'
   // En Ciudad, la primera y la última fila son franjas verdes decorativas: se
   // muestra solo media de cada una y ese alto se le da al resto del mapa.
@@ -157,7 +201,8 @@ function MazeCollectorSession({
   const [fullscreen, setFullscreen] = useState(false)
   const [wantFullscreen, setWantFullscreen] = useState(readFullscreenPreference)
   const [fullscreenHintClosed, setFullscreenHintClosed] = useState(false)
-  const canFullscreen = typeof document !== 'undefined' && document.fullscreenEnabled
+  // En el tutorial la pantalla completa la maneja el tutorial (entra al jugar y sale para explicar).
+  const canFullscreen = !tutorial && typeof document !== 'undefined' && document.fullscreenEnabled
   // La cruceta aparece en cualquier pantalla táctil, no según el ancho.
   const coarsePointer = useMediaQuery('(pointer: coarse)')
   // Pantalla chica: teléfono en vertical o en horizontal (poco alto). Ahí el encabezado se compacta.
@@ -204,18 +249,25 @@ function MazeCollectorSession({
       const style = window.getComputedStyle(stage)
       const innerWidth = stage.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
       const innerHeight = stage.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom)
+      setView({ width: innerWidth, height: innerHeight })
+      if (focus) {
+        // Tutorial: la zona que se enseña llena la pantalla (la cámara se acerca a ella).
+        const zoomed = Math.floor(Math.min(innerWidth / focus.cols, innerHeight / focus.rows))
+        setCameraMode(true)
+        setCellSize(Math.max(MIN_CELL_SIZE, Math.min(FOCUS_MAX_CELL_SIZE, zoomed)))
+        return
+      }
       const fit = Math.floor(Math.min(innerWidth / layout.cols, innerHeight / (layout.rows - trimmedRows)))
       // La cámara que sigue al camión es de celular/tablet; en computador se ve el mapa entero (con scroll si no cabe).
       const follow = fit < CAMERA_FIT_THRESHOLD && window.matchMedia('(pointer: coarse)').matches
       setCameraMode(follow)
-      setView({ width: innerWidth, height: innerHeight })
       setCellSize(follow ? CAMERA_CELL_SIZE : Math.max(MIN_CELL_SIZE, Math.min(MAX_CELL_SIZE, fit)))
     }
     measure()
     const observer = new ResizeObserver(measure)
     observer.observe(stage)
     return () => observer.disconnect()
-  }, [layout.cols, layout.rows, trimmedRows])
+  }, [layout.cols, layout.rows, trimmedRows, focus?.row, focus?.col, focus?.rows, focus?.cols])
 
   const { pause, resume } = game
   // Abrir la guía a mitad de partida pausa el juego.
@@ -228,7 +280,8 @@ function MazeCollectorSession({
       const active = !!document.fullscreenElement
       setFullscreen(active)
       // Al salir (con Esc, por ejemplo) la pantalla cambia de tamaño de golpe: la partida se pausa para no perder el hilo.
-      if (!active) pause()
+      // En el tutorial salir de pantalla completa es parte del recorrido (para explicar), no una pausa.
+      if (!active && !tutorialRef.current) pause()
     }
     document.addEventListener('fullscreenchange', onChange)
     return () => document.removeEventListener('fullscreenchange', onChange)
@@ -284,10 +337,23 @@ function MazeCollectorSession({
   const windowWidth = cameraMode ? Math.min(boardWidth, view.width) : boardWidth
   const windowHeight = cameraMode ? Math.min(boardHeight, view.height) : boardHeight
   const trimShift = (trimmedRows * cellSize) / 2
-  const cameraX = cameraMode ? clampCamera((game.player.col + 0.5) * cellSize - windowWidth / 2, boardWidth - windowWidth) : 0
-  const cameraY = cameraMode
-    ? clampCamera((game.player.row + 0.5) * cellSize - trimShift - windowHeight / 2, boardHeight - windowHeight)
-    : 0
+  // Con zona de tutorial la cámara queda fija en su centro; si no, sigue al camión.
+  const lookCol = focus ? focus.col + focus.cols / 2 : game.player.col + 0.5
+  const lookRow = focus ? focus.row + focus.rows / 2 : game.player.row + 0.5
+  const cameraX = cameraMode ? clampCamera(lookCol * cellSize - windowWidth / 2, boardWidth - windowWidth) : 0
+  const cameraY = cameraMode ? clampCamera(lookRow * cellSize - trimShift - windowHeight / 2, boardHeight - windowHeight) : 0
+
+  // Avisos al tutorial: objetivo cumplido o la nube alcanzó al camión.
+  const tutorialRef = useRef(tutorial)
+  useEffect(() => {
+    tutorialRef.current = tutorial
+  })
+  useEffect(() => {
+    if (game.scenarioDone) tutorialRef.current?.onDone()
+  }, [game.scenarioDone])
+  useEffect(() => {
+    if (game.caughtCount > 0) tutorialRef.current?.onCaught()
+  }, [game.caughtCount])
 
   /** Deslizar el dedo sobre el mapa gira el camión (sin soltar: el giro se aplica en cuanto pasa el umbral). */
   function handleSwipeDown(event: ReactPointerEvent<HTMLDivElement>) {
@@ -496,6 +562,20 @@ function MazeCollectorSession({
             )
           })}
           {game.bonus && <BonusMarker bonus={game.bonus} cellSize={cellSize} pixelPos={pixelPos} />}
+          {tutorial?.scenario.goal && (
+            <div
+              className="absolute flex items-center justify-center"
+              style={{ ...pixelPos(tutorial.scenario.goal), width: cellSize, height: cellSize }}
+              aria-label="Meta"
+            >
+              <span
+                className="flex animate-pulse items-center justify-center rounded-full bg-white/90 shadow-[0_0_18px_4px_rgba(52,211,153,0.8)]"
+                style={{ width: cellSize * 0.8, height: cellSize * 0.8, fontSize: cellSize * 0.5 }}
+              >
+                🏁
+              </span>
+            </div>
+          )}
 
           {/* Capa 3: entidades vivas — posición interpolada por el motor cada frame. */}
           {game.ghosts.map((ghost) => (
@@ -518,6 +598,21 @@ function MazeCollectorSession({
               slowed={game.player.slowed}
             />
           </CenteredSprite>
+
+          {/* Tutorial: la zona que se enseña queda iluminada y el resto del mapa, oscurecido. */}
+          {focus && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute z-30 rounded-xl ring-4 ring-emerald-300/80"
+              style={{
+                left: focus.col * cellSize,
+                top: focus.row * cellSize,
+                width: focus.cols * cellSize,
+                height: focus.rows * cellSize,
+                boxShadow: '0 0 0 9999px rgba(6, 11, 22, 0.74)',
+              }}
+            />
+          )}
         </div>
         </div>
       </div>
@@ -544,7 +639,7 @@ function MazeCollectorSession({
         </div>
       )}
 
-      {game.phase === 'ready' && (
+      {game.phase === 'ready' && !tutorial && (
         <Overlay>
           <div className="flex items-end justify-center gap-3 [@media(max-height:520px)]:hidden">
             <SpriteStrip name="truck-drive" frames={4} size={84} durationMs={640} />
@@ -639,7 +734,7 @@ function MazeCollectorSession({
           onExit={onExit}
         />
       )}
-      {guideOpen && <MazeCollectorGuide onClose={onCloseGuide} />}
+      {guideOpen && !tutorial && <MazeCollectorGuide onClose={onCloseGuide} onTutorial={onStartTutorial} />}
     </div>
   )
 }

@@ -97,7 +97,29 @@ type ActiveBonus = {
   expiresAt: number
 }
 
+/**
+ * Escenario de tutorial (issue #93): la misma ciudad y el mismo motor, pero
+ * con lo justo para enseñar una cosa — dónde empieza el camión, qué botellas
+ * o canecas hay, qué nubes salen y qué hay que lograr. Una nube que toca al
+ * camión no le quita vidas: el escenario vuelve a empezar.
+ */
+export type MazeScenario = {
+  playerStart: CellPosition
+  pickups: Array<{ pos: CellPosition; kind: 'PET' | 'POWER' }>
+  ghostSpawns: CellPosition[]
+  /** Comportamiento de las nubes del escenario (por defecto, el de cada esquina). */
+  ghostPersonality?: GhostPersonality
+  /** Celda a la que hay que llegar (objetivo `reach`). */
+  goal?: CellPosition
+  objective: 'reach' | 'collect' | 'catch'
+}
+
 type InternalState = {
+  scenario: MazeScenario | null
+  /** El objetivo del escenario ya se cumplió: el motor se detiene. */
+  scenarioDone: boolean
+  /** Veces que una nube alcanzó al camión en el escenario (para avisar al tutorial). */
+  caughtCount: number
   phase: MazePhase
   level: number
   score: number
@@ -126,9 +148,9 @@ function ghostSpeed(level: number, enemySpeedConfig: number): number {
   return base * Math.pow(GHOST_LEVEL_GROWTH, growthSteps)
 }
 
-function spawnGhosts(layout: MazeLayoutDef): InternalGhost[] {
-  return layout.enemySpawns.map((spawn, index) => {
-    const def = GHOST_PERSONALITIES[index % GHOST_PERSONALITIES.length]
+function spawnGhosts(layout: MazeLayoutDef, scenario: MazeScenario | null = null): InternalGhost[] {
+  return (scenario?.ghostSpawns ?? layout.enemySpawns).map((spawn, index) => {
+    const def = (scenario?.ghostPersonality && GHOST_PERSONALITIES.find((item) => item.personality === scenario.ghostPersonality)) || GHOST_PERSONALITIES[index % GHOST_PERSONALITIES.length]
     return {
       id: `ghost-${index}`,
       name: def.name,
@@ -144,10 +166,11 @@ function spawnGhosts(layout: MazeLayoutDef): InternalGhost[] {
   })
 }
 
-function resetPlayer(layout: MazeLayoutDef): InternalPlayer {
+function resetPlayer(layout: MazeLayoutDef, scenario: MazeScenario | null = null): InternalPlayer {
+  const start = scenario?.playerStart ?? layout.playerStart
   return {
-    pos: { ...layout.playerStart },
-    nextPos: { ...layout.playerStart },
+    pos: { ...start },
+    nextPos: { ...start },
     progress: 0,
     facing: 'RIGHT',
     desiredDirection: null,
@@ -176,19 +199,31 @@ function startLevel(layout: MazeLayoutDef, items: MazeCollectorItem[]): {
   }
 }
 
-function createInitialState(layout: MazeLayoutDef, items: MazeCollectorItem[], config: MazeCollectorConfig): InternalState {
-  const { pickups, bags, bonusQueue, bonusThresholdsRemaining, bonusSpawnPoint, petTotalThisLevel } = startLevel(
-    layout,
-    items,
-  )
+function createInitialState(
+  layout: MazeLayoutDef,
+  items: MazeCollectorItem[],
+  config: MazeCollectorConfig,
+  scenario: MazeScenario | null = null,
+): InternalState {
+  const level = startLevel(layout, scenario ? [] : items)
+  // En un escenario solo están las botellas y canecas que enseña; sin bolsas ni bonus.
+  const pickups: Collectible[] = scenario
+    ? scenario.pickups.map((pickup, index) => ({ id: `tutorial-${index}`, kind: pickup.kind, pos: pickup.pos }))
+    : level.pickups
+  const bags = scenario ? [] : level.bags
+  const { bonusQueue, bonusThresholdsRemaining, bonusSpawnPoint } = level
+  const petTotalThisLevel = scenario ? pickups.filter((pickup) => pickup.kind === 'PET').length : level.petTotalThisLevel
   return {
+    scenario,
+    scenarioDone: false,
+    caughtCount: 0,
     phase: 'ready',
     level: 1,
     score: 0,
     lives: config.lives,
     baseEnemySpeed: config.enemySpeed,
-    player: resetPlayer(layout),
-    ghosts: spawnGhosts(layout),
+    player: resetPlayer(layout, scenario),
+    ghosts: spawnGhosts(layout, scenario),
     pickups,
     bags,
     bonusQueue,
@@ -274,6 +309,13 @@ function resolvePlayerArrival(state: InternalState, now: number) {
     celebrateMatch()
   }
 
+  if (state.scenario) {
+    const { objective, goal } = state.scenario
+    if (objective === 'reach' && goal && samePos(goal, pos)) state.scenarioDone = true
+    if (objective === 'collect' && !state.pickups.some((pickup) => pickup.kind === 'PET')) state.scenarioDone = true
+    return
+  }
+
   maybeSpawnBonus(state, now)
 
   if (state.pickups.length === 0) {
@@ -355,10 +397,21 @@ function resolveGhostCollisions(state: InternalState, layout: MazeLayoutDef) {
       state.score += comboPointsFor(state.comboIndex)
       state.comboIndex += 1
       celebrateMatch()
+      if (state.scenario?.objective === 'catch' && state.ghosts.every((other) => other.mode === 'EATEN')) state.scenarioDone = true
       continue
     }
 
     signalMismatch()
+    if (state.scenario) {
+      // Tutorial: sin vidas que perder; todo vuelve al inicio del escenario.
+      state.caughtCount += 1
+      state.player = resetPlayer(layout, state.scenario)
+      state.ghosts = spawnGhosts(layout, state.scenario)
+      state.pickups = state.scenario.pickups.map((pickup, index) => ({ id: `tutorial-${index}`, kind: pickup.kind, pos: pickup.pos }))
+      state.energizedUntil = null
+      state.comboIndex = 0
+      return
+    }
     state.lives -= 1
     if (state.lives <= 0) {
       state.phase = 'lost'
@@ -374,6 +427,8 @@ function resolveGhostCollisions(state: InternalState, layout: MazeLayoutDef) {
 
 function tickEngine(state: InternalState, layout: MazeLayoutDef, items: MazeCollectorItem[], now: number, dtRaw: number) {
   const dt = Math.min(dtRaw, MAX_DELTA_SECONDS)
+
+  if (state.scenarioDone) return
 
   if (state.phase === 'levelup') {
     if (state.levelUpUntil !== null && now >= state.levelUpUntil) {
@@ -434,6 +489,8 @@ export type MazeGameSnapshot = {
   lastCollected: MazeCollectorItem | null
   totalPet: number
   collectedPet: number
+  scenarioDone: boolean
+  caughtCount: number
 }
 
 function toSnapshot(state: InternalState, now: number): MazeGameSnapshot {
@@ -464,6 +521,8 @@ function toSnapshot(state: InternalState, now: number): MazeGameSnapshot {
     lastCollected: state.lastCollected,
     totalPet: state.petTotalThisLevel,
     collectedPet: state.petCollectedThisLevel,
+    scenarioDone: state.scenarioDone,
+    caughtCount: state.caughtCount,
   }
 }
 
@@ -473,12 +532,14 @@ export type UseMazeCollectorGameOptions = {
   config: MazeCollectorConfig
   /** false mientras hay algo encima del juego (la guía): las flechas no mueven el camión. */
   inputEnabled?: boolean
+  /** Parte de un tutorial: se juega este escenario en vez de la partida completa. */
+  scenario?: MazeScenario
 }
 
-export function useMazeCollectorGame({ layout, items, config, inputEnabled = true }: UseMazeCollectorGameOptions) {
+export function useMazeCollectorGame({ layout, items, config, inputEnabled = true, scenario }: UseMazeCollectorGameOptions) {
   const stateRef = useRef<InternalState | undefined>(undefined)
   if (!stateRef.current) {
-    stateRef.current = createInitialState(layout, items, config)
+    stateRef.current = createInitialState(layout, items, config, scenario ?? null)
   }
 
   const [snapshot, setSnapshot] = useState<MazeGameSnapshot>(() => toSnapshot(stateRef.current!, 0))
