@@ -84,6 +84,18 @@ function mediumPlaying() {
   return h;
 }
 
+/** Deja los 3 conceptos con caso de aplicación y una pregunta para cada nivel. */
+function makeAllLevelsAvailable(room: DominoRoomState) {
+  room.concepts.forEach((concept, i) => {
+    concept.application = `Caso ${i}`;
+    concept.questions = [
+      { text: `M${i}`, options: ['A', 'B', 'C'], correctIndex: 1, explanation: 'e', levels: ['MEDIUM'] },
+      { text: `U${i}`, options: ['A', 'B', 'C'], correctIndex: 1, explanation: 'e', levels: ['ADVANCED'] },
+    ];
+    delete concept.question;
+  });
+}
+
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => {
   vi.clearAllTimers();
@@ -93,6 +105,7 @@ afterEach(() => {
 describe('nivel de la sala', () => {
   it('el anfitrión cambia el nivel en WAITING, reinicia los Listo y ajusta el tiempo sugerido', () => {
     const h = setup();
+    makeAllLevelsAvailable(h.room);
     h.room.players[1].ready = true;
     h.gateway.handleDominoUpdateLevel(h.p1, { level: 'ADVANCED' });
     expect(h.room.level).toBe('ADVANCED');
