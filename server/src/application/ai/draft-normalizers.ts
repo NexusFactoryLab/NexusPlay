@@ -1,6 +1,6 @@
 import type { GameTypeName } from '../../domain/value-objects/game-type.vo.js';
 import { DOMINO_ICON_CATALOG } from './domino-icon-catalog.js';
-import { assignDominoIcons, shuffleQuestionOptions, type Rng } from './domino-quality.js';
+import { assignDominoIcons, ensureLevelCoverage, sanitizeQuestionLevels, shuffleQuestionOptions, type Rng } from './domino-quality.js';
 
 /**
  * Ajustes de FORMA y TAMAÑO sobre lo que devuelve la IA, antes de pasarlo
@@ -273,8 +273,10 @@ function normalizeDomino(config: Record<string, unknown>, content: unknown, opti
     const icon = nonEmptyString(raw.icon);
     const { question: legacyQuestion, questions: rawQuestions, definition, example, application, ...rest } = raw;
     // Las opciones se barajan aquí (tras limpiar duplicados) para que la correcta no quede casi siempre en la misma posición.
-    const questions = normalizeDominoQuestions(rawQuestions, legacyQuestion).map((q) =>
-      shuffleQuestionOptions(q as { options: string[]; correctIndex: number }, rng),
+    const questions = ensureLevelCoverage(
+      normalizeDominoQuestions(rawQuestions, legacyQuestion).map((q) =>
+        shuffleQuestionOptions(q as { options: string[]; correctIndex: number; levels?: Array<'MEDIUM' | 'ADVANCED'> }, rng),
+      ),
     );
     const optionalTexts: Record<string, string> = {};
     for (const [key, value, max] of [
@@ -335,7 +337,14 @@ function normalizeDominoQuestions(rawQuestions: unknown, legacyQuestion: unknown
     const key = text.toLowerCase().replace(/\s+/g, ' ');
     if (seenTexts.has(key)) continue;
     seenTexts.add(key);
-    result.push({ text: truncate(text, 300), options: finalOptions, correctIndex: newCorrect, explanation: truncate(explanation, 400) });
+    const levels = sanitizeQuestionLevels(raw.levels);
+    result.push({
+      text: truncate(text, 300),
+      options: finalOptions,
+      correctIndex: newCorrect,
+      explanation: truncate(explanation, 400),
+      ...(levels ? { levels } : {}),
+    });
     if (result.length === 6) break;
   }
   return result;

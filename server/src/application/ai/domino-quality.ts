@@ -16,7 +16,9 @@ export type DominoWarningCode =
   | 'repeated_icon'
   | 'missing_definition'
   | 'missing_example'
-  | 'missing_application';
+  | 'missing_application'
+  | 'missing_level_medium'
+  | 'missing_level_advanced';
 
 /** Advertencia que acompaña al borrador; nunca bloquea la generación. */
 export interface DraftWarning {
@@ -142,6 +144,38 @@ export function assignDominoIcons(items: ReadonlyArray<{ label: string; icon: st
   });
 }
 
+type QuestionLevel = 'MEDIUM' | 'ADVANCED';
+const QUESTION_LEVELS: readonly QuestionLevel[] = ['MEDIUM', 'ADVANCED'];
+
+/**
+ * Saneamiento de `levels` de una pregunta de IA: descarta valores inválidos y duplicados. Si queda
+ * un solo nivel lo devuelve; si queda vacío, falta o están los dos, devuelve `undefined` (= sirve
+ * para ambos, que es el valor por defecto del contenido).
+ */
+export function sanitizeQuestionLevels(raw: unknown): QuestionLevel[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const valid = QUESTION_LEVELS.filter((level) => raw.some((value) => typeof value === 'string' && value.trim().toUpperCase() === level));
+  return valid.length === 1 ? [...valid] : undefined;
+}
+
+const servesLevel = (q: { levels?: QuestionLevel[] }, level: QuestionLevel): boolean => !q.levels || q.levels.includes(level);
+
+/**
+ * Garantiza que el banco de un concepto tenga al menos una pregunta usable por Intermedio y una por
+ * Universitario. Si el modelo las marcó todas para un solo nivel, la primera pregunta del otro lado
+ * pasa a servir para ambos (se quita su restricción). No inventa ni cambia contenido.
+ */
+export function ensureLevelCoverage<T extends { levels?: QuestionLevel[] }>(questions: T[]): T[] {
+  if (questions.length === 0) return questions;
+  const result = questions.map((q) => ({ ...q }));
+  for (const level of QUESTION_LEVELS) {
+    if (result.some((q) => servesLevel(q, level))) continue;
+    const reassign = result[0];
+    delete reassign.levels;
+  }
+  return result;
+}
+
 const UNBALANCED_RATIO = 2.5;
 const UNBALANCED_MIN_GAP = 25;
 
@@ -187,6 +221,10 @@ export function analyzeDominoQuality(content: unknown): DraftWarning[] {
       if (texts.length < 4) add('few_options', 'Pocas opciones', questionIndex);
       else if (isUnbalanced(texts)) add('unbalanced_options', 'Opciones desbalanceadas', questionIndex);
     });
+    // Niveles: cada concepto necesita una pregunta usable por Intermedio y otra por Universitario.
+    const typed = questions as Array<{ levels?: QuestionLevel[] }>;
+    if (!typed.some((q) => servesLevel(q ?? {}, 'MEDIUM'))) add('missing_level_medium', 'Sin pregunta para Intermedio');
+    if (!typed.some((q) => servesLevel(q ?? {}, 'ADVANCED'))) add('missing_level_advanced', 'Sin pregunta para Universitario');
   });
   return warnings;
 }

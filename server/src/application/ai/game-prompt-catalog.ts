@@ -84,12 +84,17 @@ y un color hexadecimal distinto y armonioso para cada uno. Para "icon" elige UNA
 lista, la que mejor represente el concepto (si ninguna encaja usa "star"; no inventes claves):
 ${DOMINO_ICON_CATALOG.join(', ')}.
 
-Además, cada concepto lleva material para los tres niveles del juego:
-- "definition": una frase clara que defina el concepto (máximo 300 caracteres).
-- "example": un ejemplo cotidiano y sencillo, pensado para niños (máximo 300 caracteres).
+Además, CADA concepto lleva material para los tres niveles del juego (todos son obligatorios):
+- "definition": una frase clara que defina el concepto (máximo 300 caracteres). Nivel Fácil.
+- "example": un ejemplo cotidiano y sencillo, pensado para niños (máximo 300 caracteres). Nivel Fácil.
 - "application": un caso o situación real donde se aplica, para nivel universitario (máximo 400 caracteres).
-- "questions": entre 1 y 3 preguntas distintas sobre ESE concepto (nunca más de 6; la primera es obligatoria).
-  Varía el tipo: una conceptual, una de identificación y una de aplicación simple. Cada pregunta tiene
+  Nivel Universitario: sin este caso el nivel no queda disponible, así que NUNCA lo omitas.
+- "questions": entre 2 y 3 preguntas distintas sobre ESE concepto (nunca más de 6; la primera es obligatoria).
+  Cada pregunta lleva "levels": lista con "MEDIUM" (Intermedio: comprensión directa del concepto),
+  "ADVANCED" (Universitario: aplicación o análisis del caso de "application") o ambos. Cada concepto debe
+  tener AL MENOS una pregunta que incluya "MEDIUM" y AL MENOS una que incluya "ADVANCED"; una misma pregunta
+  puede servir para ambos (["MEDIUM","ADVANCED"]). Las de "ADVANCED" deben apoyarse en el caso, sin inventar datos.
+  Varía el tipo: una conceptual (MEDIUM), una de identificación (ambos) y una de aplicación (ADVANCED). Cada pregunta tiene
   "text" (máximo 300 caracteres), "options" (SIEMPRE 4 opciones distintas, máximo 120 caracteres cada una),
   "correctIndex" (posición 0 a 3 de la opción correcta; el servidor mezcla las opciones después) y
   "explanation" (por qué es correcta, máximo 400 caracteres).
@@ -113,12 +118,17 @@ Elige un ícono DISTINTO para cada concepto; usa "star" solo si ningún otro enc
       "example": "Una planta en la ventana que crece gracias a la luz del sol.",
       "application": "Un invernadero ajusta la luz y el CO2 para aumentar la producción de lechuga.",
       "questions": [
-        { "text": "¿Qué gas liberan las plantas durante la fotosíntesis?", "options": ["Oxígeno", "Nitrógeno", "Metano", "Helio"], "correctIndex": 0, "explanation": "La fotosíntesis produce azúcar y libera oxígeno." },
-        { "text": "¿Cuál de estas es una condición necesaria para la fotosíntesis?", "options": ["Oscuridad total", "Luz", "Aceite", "Sal"], "correctIndex": 1, "explanation": "La luz aporta la energía que impulsa el proceso." }
+        { "text": "¿Qué gas liberan las plantas durante la fotosíntesis?", "options": ["Oxígeno", "Nitrógeno", "Metano", "Helio"], "correctIndex": 0, "levels": ["MEDIUM"], "explanation": "La fotosíntesis produce azúcar y libera oxígeno." },
+        { "text": "¿Cuál de estas es una condición necesaria para la fotosíntesis?", "options": ["Oscuridad total", "Luz", "Aceite", "Sal"], "correctIndex": 1, "levels": ["MEDIUM", "ADVANCED"], "explanation": "La luz aporta la energía que impulsa el proceso." },
+        { "text": "En el invernadero del caso, ¿qué ajuste aumenta la producción de lechuga?", "options": ["Más luz y CO2 controlados", "Quitar toda la luz", "Regar con aceite", "Bajar el CO2 a cero"], "correctIndex": 0, "levels": ["ADVANCED"], "explanation": "Más luz y CO2 elevan la fotosíntesis, como describe el caso." }
       ]
     },
-    { "label": "Clorofila", "icon": "leaf", "color": "#16a34a", "questions": [
-      { "text": "¿Qué pigmento da el color verde a las hojas?", "options": ["Clorofila", "Hemoglobina", "Melanina", "Queratina"], "correctIndex": 0, "explanation": "La clorofila absorbe la luz y refleja el verde." }
+    { "label": "Clorofila", "icon": "leaf", "color": "#16a34a",
+      "definition": "Pigmento verde de las plantas que absorbe la luz.",
+      "example": "Por la clorofila las hojas se ven verdes.",
+      "application": "Un agricultor revisa el color de las hojas para detectar falta de clorofila.",
+      "questions": [
+      { "text": "¿Qué pigmento da el color verde a las hojas?", "options": ["Clorofila", "Hemoglobina", "Melanina", "Queratina"], "correctIndex": 0, "levels": ["MEDIUM", "ADVANCED"], "explanation": "La clorofila absorbe la luz y refleja el verde." }
     ] }
   ]
 }`,
