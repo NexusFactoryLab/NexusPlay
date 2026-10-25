@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../../hooks/useAuth'
 import { listAllGameTypeSettings } from '../../../../services/game.service'
 import { GameTypePicker } from '../GameTypePicker'
+import { computeArchivedGameTypes, GAME_TYPE_BY_CHOICE } from '../archivedGameTypes'
 import { CreationDraftsModal } from '../CreationDraftsModal'
 import type { GameTypeChoice } from '../GameTypePicker'
 import { resolveGameTypeDisplayName } from '../gameTypePublicNames'
@@ -19,24 +20,33 @@ const ROUTE_BY_CHOICE: Record<GameTypeChoice, string> = {
 
 export function GameTypePickerPage() {
   const navigate = useNavigate()
-  const { token } = useAuth()
+  const { token, user } = useAuth()
+  const isAdmin = user?.role?.toUpperCase() === 'ADMIN'
   const [archivedGameTypes, setArchivedGameTypes] = useState<Set<string>>(new Set())
   const [displayNames, setDisplayNames] = useState<Map<string, string>>(new Map())
+  // Hasta saber qué tipos están archivados no se pinta el selector: si no, las
+  // opciones archivadas se verían un instante y luego desaparecerían.
+  const [settingsReady, setSettingsReady] = useState(false)
 
   useEffect(() => {
     if (!token) return
     listAllGameTypeSettings(token)
       .then((settings) => {
-        setArchivedGameTypes(new Set(settings.filter((s) => s.isArchived).map((s) => s.gameType)))
+        // Si esta consulta falla, el servidor igual rechaza la creación de un
+        // tipo archivado al guardar (ver computeArchivedGameTypes).
+        setArchivedGameTypes(computeArchivedGameTypes(Object.values(GAME_TYPE_BY_CHOICE), settings))
         setDisplayNames(new Map(settings.map((setting) => [
           setting.gameType,
           resolveGameTypeDisplayName(setting.gameType, setting.displayName),
         ])))
       })
       .catch(() => {})
+      .finally(() => setSettingsReady(true))
   }, [token])
 
   const [showDrafts, setShowDrafts] = useState(false)
+
+  if (!settingsReady) return <p className="p-8 text-[14px] text-text">Cargando…</p>
 
   return (
     <>
@@ -44,6 +54,7 @@ export function GameTypePickerPage() {
         onClose={() => navigate('/')}
         onSelect={(choice) => navigate(ROUTE_BY_CHOICE[choice])}
         archivedGameTypes={archivedGameTypes}
+        hideArchived={!isAdmin}
         displayNames={displayNames}
         onViewDrafts={() => setShowDrafts(true)}
       />

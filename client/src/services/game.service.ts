@@ -19,6 +19,8 @@ export type GameSummary = {
   organizationId: string | null
   /** Juego del que se adaptó este (issue #8); `null` si se creó desde cero. */
   sourceGameId: string | null
+  /** Destacado por un ADMIN: es lo que muestra el Inicio. */
+  featured: boolean
   /** Solo viene en el listado de "Comunidad". */
   creatorDisplayName?: string
   createdAt: string
@@ -43,10 +45,10 @@ export type ListGamesParams = {
   search?: string
   status?: GameSummary['status']
   onlyMine?: boolean
-  /** Sección "Comunidad": todos los juegos publicados salvo los demos del Inicio, con el nombre del creador. */
+  /** Sección "Comunidad": todos los juegos publicados, con el nombre del creador. */
   community?: boolean
-  /** Inicio: solo los juegos demo de prueba (primera versión de cada juego). */
-  demos?: boolean
+  /** Inicio: solo los juegos destacados por un ADMIN. */
+  featured?: boolean
   categoryId?: string
   /** Filtra por tipo de juego exacto (vista de catálogo de tipos, issue #156). */
   gameType?: string
@@ -63,7 +65,7 @@ export function listGames(token: string, params: ListGamesParams = {}): Promise<
   if (params.status) query.set('status', params.status)
   if (params.onlyMine) query.set('onlyMine', 'true')
   if (params.community) query.set('community', 'true')
-  if (params.demos) query.set('demos', 'true')
+  if (params.featured) query.set('featured', 'true')
   if (params.categoryId) query.set('categoryId', params.categoryId)
   if (params.gameType) query.set('gameType', params.gameType)
   if (params.organizationId) query.set('organizationId', params.organizationId)
@@ -312,6 +314,11 @@ export function updateGame(
 /** PATCH /games/:id/publish — solo el creador o un admin. */
 export function publishGame(token: string, gameId: string): Promise<GameDetail> {
   return request<GameDetail>(`/games/${gameId}/publish`, { method: 'PATCH', token })
+}
+
+/** PATCH /games/:id/featured — solo ADMIN: fija o quita el juego como destacado del Inicio. */
+export function setGameFeatured(token: string, gameId: string, featured: boolean): Promise<GameDetail> {
+  return request<GameDetail>(`/games/${gameId}/featured`, { method: 'PATCH', token, body: { featured } })
 }
 
 /** DELETE /games/:id — borrado lógico; solo el creador o un admin. */

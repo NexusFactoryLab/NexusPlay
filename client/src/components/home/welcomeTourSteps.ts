@@ -42,10 +42,10 @@ export function getWelcomeSteps(role: string, isKids: boolean, options: WelcomeO
   steps.push({
     title: 'Todo tiene su lugar',
     text: role === 'TEACHER'
-      ? 'Mis clases reúne tus grupos. Mis actividades guarda tus creaciones y Comunidad te permite descubrir juegos compartidos.'
+      ? 'El menú tiene tres partes: Explorar (Áreas y Comunidad), Mi espacio (Mis clases y Mis juegos) y, si tienes acceso, Administración.'
       : role === 'ADMIN'
-        ? 'Explora Áreas y Comunidad. En Usuarios y Organización administras la plataforma; Temas te permite probar su apariencia.'
-        : 'Explora Áreas y Comunidad para encontrar juegos. Tus juegos privados están en el menú.',
+        ? 'El menú tiene tres partes: Explorar (Áreas y Comunidad), Mi espacio (Mis juegos) y Administración (Usuarios, Edición, Proveedores de IA y Organización).'
+        : 'El menú tiene dos partes: Explorar (Áreas y Comunidad) para encontrar juegos y Mi espacio para lo tuyo, como Mis juegos.',
     target: 'navigation', icon: 'explore',
   })
   steps.push(
@@ -56,12 +56,13 @@ export function getWelcomeSteps(role: string, isKids: boolean, options: WelcomeO
     title: 'Tus grupos, en Mis clases', text: 'Organiza tus grupos y abre una clase para consultar o agregar sus actividades.', target: 'nav-classes', icon: 'explore', action: 'Ver mis clases',
   })
   steps.push(
-    { title: 'Descubre la Comunidad', text: 'Explora los juegos que otras personas comparten en Comunidad.', target: 'nav-community', icon: 'play', action: 'Explorar comunidad' },
-    { title: role === 'TEACHER' ? 'Encuentra tus actividades' : 'Tus juegos privados', text: role === 'TEACHER' ? 'En Mis actividades encuentras tus creaciones para consultarlas y seguir trabajando en ellas.' : 'En Mis juegos privados encuentras tus juegos que no están publicados para la comunidad.', target: 'nav-own-games', icon: 'create', action: role === 'TEACHER' ? 'Ver mis actividades' : 'Ver mis juegos privados' },
+    { title: 'Descubre la Comunidad', text: 'Explora los juegos que otras personas comparten en Comunidad y usa el filtro para ver solo un tipo de juego.', target: 'nav-community', icon: 'play', action: 'Explorar comunidad' },
+    { title: 'Encuentra tus juegos', text: role === 'TEACHER' ? 'En Mis juegos encuentras tus creaciones para consultarlas y seguir trabajando en ellas.' : 'En Mis juegos encuentras los juegos que creaste y que no están publicados para la comunidad.', target: 'nav-own-games', icon: 'create', action: 'Ver mis juegos' },
   )
   if (role === 'ADMIN') steps.push(
     { title: 'Gestiona los usuarios', text: 'En Usuarios puedes consultar y administrar las cuentas de NexusPlay.', target: 'nav-users', icon: 'profile', action: 'Ver usuarios' },
-    { title: 'La IA, bajo control', text: 'En IA revisas las peticiones de creación con IA y el estado de cada una.', target: 'nav-ai-providers', icon: 'create', action: 'Ver IA' },
+    { title: 'Edita lo que ven los demás', text: 'En Edición eliges los juegos destacados del Inicio y archivas o renombras los tipos de juego. Quien explora los ve en Comunidad, con el filtro por tipo.', target: 'nav-edition', icon: 'create', action: 'Ver edición' },
+    { title: 'La IA, bajo control', text: 'En Proveedores de IA revisas las peticiones de creación con IA y el estado de cada una.', target: 'nav-ai-providers', icon: 'create', action: 'Ver proveedores de IA' },
   )
   if (role === 'ADMIN' || options.canAccessOrganization) steps.push({
     title: 'Tu organización', text: 'Abre Organización para consultar y gestionar las organizaciones a las que tienes acceso.', target: 'nav-organization', icon: 'explore', action: 'Ver organización',

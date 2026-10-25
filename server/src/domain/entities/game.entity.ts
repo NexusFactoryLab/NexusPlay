@@ -48,6 +48,13 @@ export interface GameProps {
    * significa que alguien más ya guardó un cambio más nuevo mientras tanto.
    */
   version: number;
+  /**
+   * Juego destacado: el que el Inicio muestra. Lo fija un ADMIN (reemplaza a
+   * la antigua lista de slugs fija en el código). Solo se escribe por
+   * `GameRepository.setFeatured`, nunca por `save()`, para que una edición del
+   * dueño con una copia vieja del juego no pise lo que decidió el admin.
+   */
+  featured: boolean;
 }
 
 /**
@@ -106,11 +113,12 @@ export class Game {
       createdAt: now,
       updatedAt: now,
       version: 0,
+      featured: false,
     });
   }
 
-  static fromPersistence(props: GameProps): Game {
-    return new Game(props);
+  static fromPersistence(props: Omit<GameProps, 'featured'> & { featured?: boolean }): Game {
+    return new Game({ ...props, featured: props.featured ?? false });
   }
 
   get id(): string {
@@ -151,6 +159,10 @@ export class Game {
 
   get sourceGameId(): string | null {
     return this.props.sourceGameId;
+  }
+
+  get featured(): boolean {
+    return this.props.featured;
   }
 
   /** `true` si el juego pertenece a una organización (institucional). */

@@ -12,17 +12,17 @@ export class ListGamesQueryDto {
   @IsBoolean()
   onlyMine?: boolean;
 
-  /** Sección "Comunidad": todos los juegos publicados salvo los demos del Inicio, con el nombre del creador. */
+  /** Sección "Comunidad": todos los juegos publicados, con el nombre del creador. */
   @IsOptional()
   @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   community?: boolean;
 
-  /** Inicio: solo los juegos demo (primera versión de cada juego). */
+  /** Inicio: solo los juegos destacados por un ADMIN. */
   @IsOptional()
   @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
-  demos?: boolean;
+  featured?: boolean;
 
   @IsOptional()
   @IsString()
