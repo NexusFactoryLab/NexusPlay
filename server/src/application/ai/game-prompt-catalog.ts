@@ -109,6 +109,9 @@ Además, CADA concepto lleva material para los tres niveles del juego (todos son
   - Los distractores deben ser plausibles y de la MISMA categoría que la respuesta (si la correcta es una fecha,
     todas son fechas; si es un personaje, todos son personajes), con longitud parecida. Evita opciones absurdas
     como "Luna / Marte / Satélite" para "¿Cuál orbita alrededor del Sol?".
+  - Las 4 opciones tienen una longitud SIMILAR (la más larga no debe pasar del doble de la más corta) y la
+    respuesta correcta NO debe ser la más larga ni la más detallada: si necesita más palabras, agrégaselas también
+    a los distractores o acorta la correcta.
   - Las 4 opciones deben significar cosas DISTINTAS: ningún distractor es sinónimo o reformulación de la respuesta
     ni de otro distractor. Mal: "Se congela" y "Se vuelve hielo" en la misma pregunta (dicen lo mismo).
     Bien: "Se evapora", "Se congela", "Se condensa", "Se filtra" (cuatro procesos diferentes).

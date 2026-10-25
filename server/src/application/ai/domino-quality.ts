@@ -209,7 +209,8 @@ function dice(a: string, b: string): number {
   return (2 * shared) / (x.length + y.length);
 }
 
-const JACCARD_THRESHOLD = 0.67;
+/** Con 0.75 "Más de un libro" vs "Menos de un libro" (2/3) no se marca; solo cuando casi todo coincide. */
+const JACCARD_THRESHOLD = 0.75;
 const DICE_THRESHOLD = 0.82;
 const MIN_DICE_LENGTH = 8;
 
@@ -226,9 +227,10 @@ export function areOptionsSimilar(first: string, second: string): boolean {
   const stemsA = new Set(a.map(stemOf));
   const stemsB = new Set(b.map(stemOf));
   if (jaccard(stemsA, stemsB) >= JACCARD_THRESHOLD) return true;
-  const textA = a.join(' ');
-  const textB = b.join(' ');
-  return textA.length >= MIN_DICE_LENGTH && textB.length >= MIN_DICE_LENGTH && dice(textA, textB) >= DICE_THRESHOLD;
+  // Dice de caracteres solo entre opciones de UNA palabra (variantes como "evaporación"/"evaporarse"):
+  // en frases, las mismas palabras en otro orden o con un antónimo ("más"/"menos") darían falsos positivos.
+  if (a.length !== 1 || b.length !== 1) return false;
+  return a[0].length >= MIN_DICE_LENGTH && b[0].length >= MIN_DICE_LENGTH && dice(a[0], b[0]) >= DICE_THRESHOLD;
 }
 
 /** Primer par de opciones parecidas de una pregunta, o `null`. */

@@ -89,6 +89,8 @@ describe('areOptionsSimilar', () => {
     ['Revolución Francesa', 'Revolución Industrial'],
     ['La Bastilla', 'El Louvre'],
     ['3/4', '3/5'],
+    ['Más de un libro por estudiante', 'Menos de un libro por estudiante'],
+    ['Restar el denominador al numerador', 'Sumar numerador y denominador'],
   ])('"%s" y "%s" son distintas (sin falso positivo)', (a, b) => {
     expect(areOptionsSimilar(a, b)).toBe(false);
   });
