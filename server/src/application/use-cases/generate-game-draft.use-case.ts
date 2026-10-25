@@ -11,6 +11,13 @@ import { ContentValidatorRegistry } from '../content-validators/content-validato
 import { resolveGamePromptSpec, type GamePromptSpec } from '../ai/game-prompt-catalog.js';
 import { normalizeDraft } from '../ai/draft-normalizers.js';
 import { analyzeDominoQuality, type DraftWarning } from '../ai/domino-quality.js';
+import {
+  identityPromptSection,
+  normalizeIdentity,
+  type CategoryOption,
+  type DraftIdentity,
+} from '../ai/draft-identity.js';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { ContentImageResolver, describeImageResolution } from '../services/content-image-resolver.service.js';
 import { ContentImageFiller } from '../services/content-image-filler.service.js';
 import {
@@ -45,6 +52,8 @@ export interface GenerateGameDraftInput {
    * suficiente, igual que `files` o `message`.
    */
   sourceText?: string;
+  /** Áreas (categorías) existentes: la IA solo puede elegir una de esta lista para el juego. */
+  categories?: CategoryOption[];
 }
 
 export interface GenerateGameDraftOutput {
@@ -57,6 +66,12 @@ export interface GenerateGameDraftOutput {
   notice?: string;
   /** Advertencias de calidad por concepto (solo Dominó): se muestran en la revisión, no bloquean. */
   warnings?: DraftWarning[];
+  /** Título sugerido por la IA (>= 3 caracteres); ausente si no sirvió. */
+  title?: string;
+  /** Descripción sugerida por la IA (>= 10 caracteres); ausente si no sirvió. */
+  description?: string;
+  /** Id de un área existente donde encaja el juego, o `null` si ninguna encaja (nunca se crean áreas). */
+  categoryId?: string | null;
 }
 
 const MAX_FILES = 65;
@@ -196,9 +211,22 @@ export class GenerateGameDraftUseCase
       );
     }
 
-    return spec.imageRequirement
-      ? this.executeWithContentImages(gameType.getName(), input.mode, spec, input.files, message, extraSourceText)
-      : this.executeTextOnly(gameType.getName(), input.mode, spec, input.files, message, extraSourceText);
+    // Contexto de esta generación (áreas disponibles y la identidad que sugiera el modelo). Se
+    // comparte con `buildInstructions` y `generateValidatedDraft` sin pasarlo por cada camino.
+    const context: IdentityContext = { categories: input.categories ?? [] };
+    const output = await identityStore.run(context, () =>
+      spec.imageRequirement
+        ? this.executeWithContentImages(gameType.getName(), input.mode, spec, input.files, message, extraSourceText)
+        : this.executeTextOnly(gameType.getName(), input.mode, spec, input.files, message, extraSourceText),
+    );
+    const identity = context.identity;
+    if (!identity) return output;
+    return {
+      ...output,
+      ...(identity.title ? { title: identity.title } : {}),
+      ...(identity.description ? { description: identity.description } : {}),
+      categoryId: identity.categoryId,
+    };
   }
 
   /**
@@ -411,6 +439,8 @@ export class GenerateGameDraftUseCase
 
         const prepared = request.prepare({ config: raw.config, content: raw.content });
         const draft = this.validate(request.gameTypeName, prepared.config, prepared.content);
+        const context = identityStore.getStore();
+        if (context) context.identity = normalizeIdentity(raw.identity, context.categories);
         return { draft, prepared, sourceTruncated: raw.sourceTruncated === true };
       } catch (error) {
         if (!(error instanceof InvalidGameContentError)) throw error;
@@ -463,8 +493,17 @@ function buildInstructions(
   const userInstructions = message?.trim()
     ? `\n\nInstrucciones del usuario (aplícalas dentro de las reglas de arriba):\n${message.trim()}`
     : '';
-  return `${spec.instructions}${userInstructions}\n\nForma de JSON esperada:\n${spec.jsonShapeExample}`;
+  const identity = identityPromptSection(identityStore.getStore()?.categories ?? []);
+  return `${spec.instructions}${userInstructions}\n\nForma de JSON esperada:\n${spec.jsonShapeExample}${identity}`;
 }
+
+interface IdentityContext {
+  categories: CategoryOption[];
+  identity?: DraftIdentity;
+}
+
+/** Contexto por generación: evita pasar las áreas y la identidad por todos los caminos de `execute`. */
+const identityStore = new AsyncLocalStorage<IdentityContext>();
 
 /** Sección que se agrega a las instrucciones al reintentar: dice por qué se rechazó el borrador anterior. */
 function repairSection(reason: string): string {

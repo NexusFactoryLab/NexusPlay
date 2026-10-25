@@ -9,6 +9,11 @@ export type GameDraft = {
   notice?: string
   /** Advertencias automáticas de calidad por concepto (solo Dominexo); no bloquean nada. */
   warnings?: DraftWarning[]
+  /** Identidad sugerida por la IA (todos los tipos): se aplica solo a campos que el usuario no escribió. */
+  title?: string
+  description?: string
+  /** Id de un área existente, o `null` si ninguna encaja. */
+  categoryId?: string | null
 }
 
 export type DraftWarning = {
@@ -33,9 +38,12 @@ export async function generateGameDraft(
   message?: string,
   /** Permite cancelar la generación desde la interfaz (AbortController). */
   signal?: AbortSignal,
+  /** Áreas existentes: la IA solo puede sugerir una de esta lista para el juego. */
+  categories?: Array<{ id: string; name: string }>,
 ): Promise<GameDraft> {
   const formData = new FormData()
   formData.append('gameType', gameType)
+  if (categories && categories.length > 0) formData.append('categories', JSON.stringify(categories))
   if (mode) formData.append('mode', mode)
   if (message?.trim()) formData.append('message', message.trim())
   for (const file of files) formData.append('files', file)

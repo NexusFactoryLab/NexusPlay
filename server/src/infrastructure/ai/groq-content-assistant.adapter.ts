@@ -451,6 +451,7 @@ export class GroqContentAssistant implements AiContentAssistant {
 
 Responde ÚNICAMENTE con un objeto JSON con esta forma exacta (sin texto adicional, sin markdown):
 { "config": { ... }, "content": [ ... ] }
+(si las instrucciones piden "title", "description" y "categoryId", agrégalos en la raíz de ese mismo objeto)
 
 Texto fuente (extraído de los archivos que subió el usuario para el tema "${gameType}"${cut.truncated ? '; se recortó por ser muy largo' : ''}):
 """
@@ -499,8 +500,15 @@ ${cut.text}
       throw new InvalidGameContentError('la IA devolvió una respuesta con forma inesperada.');
     }
 
-    const { config, content } = parsed as { config?: unknown; content?: unknown };
-    return { config: config ?? {}, content, ...(truncated ? { sourceTruncated: true } : {}) };
+    const { config, content, title, description, categoryId, categoryName } = parsed as Record<string, unknown>;
+    return {
+      config: config ?? {},
+      content,
+      ...([title, description, categoryId, categoryName].some((v) => v !== undefined)
+        ? { identity: { title, description, categoryId, categoryName } }
+        : {}),
+      ...(truncated ? { sourceTruncated: true } : {}),
+    };
   }
 
   /**

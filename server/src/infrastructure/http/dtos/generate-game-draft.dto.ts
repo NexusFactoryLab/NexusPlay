@@ -23,4 +23,10 @@ export class GenerateGameDraftDto {
   @IsString()
   @MaxLength(2000)
   message?: string;
+
+  /** JSON `[{ id, name }]` con las áreas existentes; la IA solo puede elegir una de ellas. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(20000)
+  categories?: string;
 }

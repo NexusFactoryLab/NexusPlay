@@ -5,6 +5,7 @@ import { TextField } from '../../TextField'
 import { SaveVisibilityModal } from './SaveVisibilityModal'
 import { ImageUploadField } from './ImageUploadField'
 import { AiGameAssistantPanel } from './AiGameAssistantPanel'
+import { AiIdentityBadges, useAiIdentity } from './useAiIdentity'
 import { useReportCreateSummary } from './aiDraftContext'
 import { useCreationDraftId } from './useCreationDraftId'
 import {
@@ -147,6 +148,18 @@ export function OppositesGameForm({
     setCoverImageUrl(adapted.theme.coverImageUrl)
     setCategoryId(adapted.categoryId)
     applyAiDraft(adapted)
+  })
+
+  // La IA también sugiere título, descripción y área: se aplican sin pisar lo que escribió el usuario.
+  const aiIdentity = useAiIdentity({
+    title,
+    description,
+    categoryId,
+    categoryIds: categories.map((category) => category.id),
+    setTitle,
+    setDescription,
+    setCategoryId,
+    goToIdentity: () => setPhase(0),
   })
 
   function applyAiDraft(draft: GameDraft) {
@@ -309,7 +322,7 @@ export function OppositesGameForm({
        title="MatchMente: conceptos opuestos"
       description="Cada pareja tiene un aspecto positivo y su contraparte negativa."
       aiPanel={
-        <AiGameAssistantPanel gameType="MEMORY_MATCH" mode="OPPOSITES" disabled={submitting} onDraftReady={applyAiDraft} />
+        <AiGameAssistantPanel gameType="MEMORY_MATCH" mode="OPPOSITES" disabled={submitting} onDraftReady={(draft, meta) => { applyAiDraft(draft); aiIdentity.onDraft(draft, meta) }} />
       }
     >
       <form className="flex flex-col gap-[16px]" onSubmit={handleSubmit} noValidate>
@@ -317,6 +330,7 @@ export function OppositesGameForm({
 
         {phase === 0 && (
           <FormSection icon={Rocket} title="Cuéntanos de tu juego" subtitle="Nombre, portada y el lugar donde vivirá." tone={1}>
+            <AiIdentityBadges ai={aiIdentity} />
             <TextField
               label="Título del juego"
               type="text"
