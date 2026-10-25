@@ -424,7 +424,7 @@ export type MazeGameSnapshot = {
   level: number
   score: number
   lives: number
-  player: { row: number; col: number; facing: Direction }
+  player: { row: number; col: number; facing: Direction; slowed: boolean }
   ghosts: Array<{ id: string; name: string; personality: GhostPersonality; row: number; col: number; facing: Direction; mode: GhostMode }>
   pickups: Collectible[]
   bags: Collectible[]
@@ -443,7 +443,7 @@ function toSnapshot(state: InternalState, now: number): MazeGameSnapshot {
     level: state.level,
     score: state.score,
     lives: state.lives,
-    player: { row: playerPoint.row, col: playerPoint.col, facing: state.player.facing },
+    player: { row: playerPoint.row, col: playerPoint.col, facing: state.player.facing, slowed: now < state.player.slowUntil },
     ghosts: state.ghosts.map((ghost) => {
       const point = interpolated(ghost)
       return {
@@ -471,17 +471,25 @@ export type UseMazeCollectorGameOptions = {
   layout: MazeLayoutDef
   items: MazeCollectorItem[]
   config: MazeCollectorConfig
+  /** false mientras hay algo encima del juego (la guía): las flechas no mueven el camión. */
+  inputEnabled?: boolean
 }
 
-export function useMazeCollectorGame({ layout, items, config }: UseMazeCollectorGameOptions) {
+export function useMazeCollectorGame({ layout, items, config, inputEnabled = true }: UseMazeCollectorGameOptions) {
   const stateRef = useRef<InternalState | undefined>(undefined)
   if (!stateRef.current) {
     stateRef.current = createInitialState(layout, items, config)
   }
 
-  const [snapshot, setSnapshot] = useState<MazeGameSnapshot>(() => toSnapshot(stateRef.current!, performance.now()))
+  const [snapshot, setSnapshot] = useState<MazeGameSnapshot>(() => toSnapshot(stateRef.current!, 0))
   const frameRef = useRef<number>(0)
   const lastTimeRef = useRef<number | null>(null)
+  // Reloj de juego (issue #82): solo avanza fuera de la pausa. El motor guarda
+  // marcas de tiempo absolutas (fin del purificador, de la bolsa, del bonus),
+  // así que con el reloj real una pausa larga las dejaría vencidas al volver.
+  const clockRef = useRef(0)
+  const pausedRef = useRef(false)
+  const [paused, setPaused] = useState(false)
 
   useEffect(() => {
     function frame(time: number) {
@@ -490,10 +498,12 @@ export function useMazeCollectorGame({ layout, items, config }: UseMazeCollector
         lastTimeRef.current = time
         return
       }
-      const dt = (time - lastTimeRef.current) / 1000
+      const elapsedMs = time - lastTimeRef.current
       lastTimeRef.current = time
-      tickEngine(stateRef.current!, layout, items, time, dt)
-      setSnapshot(toSnapshot(stateRef.current!, time))
+      if (pausedRef.current) return
+      clockRef.current += elapsedMs
+      tickEngine(stateRef.current!, layout, items, clockRef.current, elapsedMs / 1000)
+      setSnapshot(toSnapshot(stateRef.current!, clockRef.current))
     }
     frameRef.current = requestAnimationFrame(frame)
     return () => {
@@ -503,7 +513,21 @@ export function useMazeCollectorGame({ layout, items, config }: UseMazeCollector
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layout, items])
 
+  // Solo se pausa una partida en curso: en "listo", al subir de nivel o al
+  // perder no hay nada que detener.
+  const pause = useCallback(() => {
+    if (stateRef.current!.phase !== 'playing' || pausedRef.current) return
+    pausedRef.current = true
+    setPaused(true)
+  }, [])
+
+  const resume = useCallback(() => {
+    pausedRef.current = false
+    setPaused(false)
+  }, [])
+
   const setDirection = useCallback((direction: Direction) => {
+    if (pausedRef.current) return
     primeGameFeedback()
     const state = stateRef.current!
     state.player.desiredDirection = direction
@@ -511,6 +535,7 @@ export function useMazeCollectorGame({ layout, items, config }: UseMazeCollector
   }, [])
 
   useEffect(() => {
+    if (!inputEnabled) return
     function handleKeyDown(event: KeyboardEvent) {
       const direction = KEY_TO_DIRECTION[event.key]
       if (!direction) return
@@ -519,7 +544,7 @@ export function useMazeCollectorGame({ layout, items, config }: UseMazeCollector
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [setDirection])
+  }, [setDirection, inputEnabled])
 
-  return { ...snapshot, setDirection }
+  return { ...snapshot, paused, pause, resume, setDirection }
 }
