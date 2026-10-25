@@ -37,14 +37,13 @@ import { GameFiltersPanel, type GameTypeFilterOption } from './games/GameFilters
 import { modeFilterForGameType, type GameModeFilter } from './games/gameModeVisuals'
 import { resolveGameTypeDisplayName } from './games/gameTypePublicNames'
 
-export type GamesSectionMode = 'all' | 'categories' | 'community' | 'my-games' | 'game-type'
+export type GamesSectionMode = 'all' | 'categories' | 'community' | 'my-games'
 
 const BASE_PATH_BY_MODE: Record<GamesSectionMode, string> = {
   all: '/',
   categories: '/areas',
   community: '/comunidad',
   'my-games': '/mis-juegos',
-  'game-type': '/tipos-de-juego',
 }
 
 type GamesSectionProps = {
@@ -60,10 +59,6 @@ type GamesSectionProps = {
    * adulto por debajo.
    */
   browsingHidden?: boolean
-  /** Solo aplica con mode='game-type': filtra el catálogo por ese GameType (issue #156). */
-  gameTypeFilter?: string
-  /** Solo aplica con mode='game-type': nombre visible del tipo para el encabezado (ej. "Fuego y Agua"). */
-  gameTypeDisplayName?: string
 }
 
 function gamesLabel(count: number): string {
@@ -90,8 +85,6 @@ export function GamesSection({
   searchQuery,
   searchNonce,
   browsingHidden = false,
-  gameTypeFilter,
-  gameTypeDisplayName,
 }: GamesSectionProps) {
   const navigate = useNavigate()
   const { slug: slugFromUrl } = useParams<{ slug?: string }>()
@@ -117,13 +110,8 @@ export function GamesSection({
     }
   }
 
-  // En modo 'game-type' la lista vive en /tipos-de-juego/:gameType, así que
-  // el detalle debe anidarse ahí (/tipos-de-juego/:gameType/:slug) para no
-  // perder el filtro de tipo al navegar de vuelta o al recargar (issue #156).
-  const basePath =
-    mode === 'game-type' && gameTypeFilter
-      ? `${BASE_PATH_BY_MODE[mode]}/${gameTypeFilter}`
-      : BASE_PATH_BY_MODE[mode]
+  const basePath = BASE_PATH_BY_MODE[mode]
+  const tipoParam = searchParams.get('tipo')
   const { token, user } = useAuth()
   const { showToast } = useToast()
   const isTeacher = user?.role?.toUpperCase() === 'TEACHER'
@@ -228,7 +216,6 @@ export function GamesSection({
       community: mode === 'community' || undefined,
       // El Inicio solo muestra los demos; lo creado por usuarios va a Comunidad.
       demos: mode === 'all' || undefined,
-      gameType: mode === 'game-type' ? gameTypeFilter ?? undefined : undefined,
       pageSize: 40,
     })
       .then((result) => setGames(result.items))
@@ -245,7 +232,6 @@ export function GamesSection({
     searchNonce,
     shouldLoadGames,
     browsingHidden,
-    gameTypeFilter,
   ])
 
   useEffect(() => {
@@ -309,10 +295,12 @@ export function GamesSection({
 
   // Se reinicia el filtro al cambiar de sección/modo, para no dejar
   // aplicado sin que se vea (el panel no se muestra en 'categories').
+  // En Comunidad, `?tipo=` deja el filtro por tipo ya aplicado (enlaces que
+  // venían de /tipos-de-juego/:gameType y el acceso desde la gestión de tipos).
   useEffect(() => {
     setActiveModes(new Set())
-    setActiveTypes(new Set())
-  }, [mode, gameTypeFilter])
+    setActiveTypes(new Set(mode === 'community' && tipoParam ? [tipoParam] : []))
+  }, [mode, tipoParam])
 
   function toggleModeFilter(value: GameModeFilter) {
     setActiveModes((prev) => {
@@ -1071,33 +1059,25 @@ export function GamesSection({
             <h2 className="mb-1 text-[22px] tracking-tight text-text-h">
               {mode === 'community'
                 ? 'Juegos de la comunidad'
-                : mode === 'game-type'
-                  ? (gameTypeDisplayName ?? 'Juegos de este tipo')
-                  : isTeacher
-                    ? 'Mis actividades'
-                    : 'Mis juegos privados'}
+                : 'Mis actividades'}
             </h2>
             <p className="text-[14px] text-text">
               {mode === 'community'
-                ? 'Juegos que otros usuarios crearon y decidieron publicar.'
-                : mode === 'game-type'
-                  ? 'Juegos publicados con esta mecánica.'
-                  : isTeacher
-                    ? 'Crea, organiza y administra tus actividades.'
-                    : 'Solo tú los ves. Comparte el código de la sala para que otros se unan.'}
+                ? 'Juegos que otros usuarios crearon y decidieron publicar. Filtra por tipo de juego con el panel de filtros.'
+                : isTeacher
+                  ? 'Crea, organiza y administra tus actividades.'
+                  : 'Solo tú los ves. Comparte el código de la sala para que otros se unan.'}
             </p>
           </div>
-          {mode !== 'game-type' && (
-            <button
-              type="button"
-              className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl px-6 py-3 text-[15px] font-bold text-white shadow-[0_12px_30px_-10px_var(--accent)] transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg sm:w-auto"
-              style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
-              onClick={() => navigate('/juegos/crear')}
-            >
-              <PlusCircle className="h-5 w-5" strokeWidth={2.25} />
-              {isTeacher ? 'Crear actividad' : 'Crear juego'}
-            </button>
-          )}
+          <button
+            type="button"
+            className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl px-6 py-3 text-[15px] font-bold text-white shadow-[0_12px_30px_-10px_var(--accent)] transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg sm:w-auto"
+            style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
+            onClick={() => navigate('/juegos/crear')}
+          >
+            <PlusCircle className="h-5 w-5" strokeWidth={2.25} />
+            {isTeacher ? 'Crear actividad' : 'Crear juego'}
+          </button>
         </div>
       )}
 
@@ -1157,22 +1137,18 @@ export function GamesSection({
                 ? `Sin resultados para "${searchQuery}".`
                 : mode === 'community'
                   ? 'Aún nadie ha publicado juegos en la comunidad.'
-                  : mode === 'game-type'
-                    ? 'Aún no hay juegos publicados con esta mecánica.'
-                    : mode === 'my-games' && isTeacher
-                        ? 'Aún no has creado actividades'
-                        : mode === 'my-games'
-                          ? 'Aún no tienes juegos privados.'
-                      : 'Aún no hay juegos disponibles.'}
+                  : mode === 'my-games' && isTeacher
+                      ? 'Aún no has creado actividades'
+                      : mode === 'my-games'
+                        ? 'Aún no tienes actividades.'
+                        : 'Aún no hay juegos disponibles.'}
             </p>
             <p className="mt-1 max-w-[320px] text-[13px] text-text">
               {searchQuery
                 ? 'Prueba con otro término de búsqueda.'
-                  : mode === 'game-type'
-                    ? 'Vuelve más adelante o elige otra mecánica.'
-                    : mode === 'my-games' && isTeacher
-                      ? 'Crea tu primera actividad para comenzar a jugar con tus estudiantes.'
-                : 'Sé la primera persona en crear uno.'}
+                  : mode === 'my-games' && isTeacher
+                    ? 'Crea tu primera actividad para comenzar a jugar con tus estudiantes.'
+                    : 'Sé la primera persona en crear uno.'}
             </p>
               {!searchQuery && mode === 'my-games' && isTeacher && (
                 <button

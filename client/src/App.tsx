@@ -6,7 +6,7 @@ import { HomeLayout } from './components/home/HomeLayout'
 import { HomePage } from './components/home/sections/HomePage'
 import { CategoriesPage } from './components/home/sections/CategoriesPage'
 import { GameTypesCatalogPage } from './components/home/games/GameTypesCatalogPage'
-import { GameTypeGamesPage } from './components/home/games/GameTypeGamesPage'
+import { LegacyGameTypeRedirect } from './components/home/games/LegacyGameTypeRedirect'
 import { CommunityPage } from './components/home/sections/CommunityPage'
 import { MyGamesPage } from './components/home/sections/MyGamesPage'
 import { AdminUsersPage } from './components/home/sections/AdminUsersPage'
@@ -174,8 +174,8 @@ function App() {
         <Route path="areas" element={<CategoriesPage />} />
         <Route path="areas/:slug" element={<CategoriesPage />} />
         <Route path="tipos-de-juego" element={<GameTypesCatalogPage />} />
-        <Route path="tipos-de-juego/:gameType" element={<GameTypeGamesPage />} />
-        <Route path="tipos-de-juego/:gameType/:slug" element={<GameTypeGamesPage />} />
+        <Route path="tipos-de-juego/:gameType" element={<LegacyGameTypeRedirect />} />
+        <Route path="tipos-de-juego/:gameType/:slug" element={<LegacyGameTypeRedirect />} />
         <Route path="mis-clases" element={<MyClassesPage />} />
         <Route path="mis-clases/:classId" element={<MyClassesPage />} />
         <Route path="comunidad" element={<CommunityPage />} />

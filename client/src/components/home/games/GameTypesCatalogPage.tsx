@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import {
   Bot,
   Ghost,
@@ -136,7 +136,7 @@ export function GameTypesCatalogPage() {
   }
 
   function handleCardClick(setting: GameTypeSetting) {
-    navigate(`/tipos-de-juego/${encodeURIComponent(setting.gameType)}`)
+    navigate(`/comunidad?tipo=${encodeURIComponent(setting.gameType)}`)
   }
 
   function handleSettingSaved(updated: GameTypeSetting) {
@@ -144,12 +144,16 @@ export function GameTypesCatalogPage() {
     setEditingSetting(null)
   }
 
+  // Issue #100: explorar por tipo ahora se hace con el filtro de Comunidad;
+  // esta página queda solo para administrar (archivar, renombrar) los tipos.
+  if (!isAdmin) return <Navigate to="/comunidad" replace />
+
   return (
     <div className="mx-auto -mt-6 max-w-[1100px] px-4 sm:-mt-8">
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="mb-1 text-[22px] tracking-tight text-text-h">Tipos de juego</h1>
-          <p className="text-[14px] text-text">Explora los juegos disponibles por mecánica.</p>
+          <p className="text-[14px] text-text">Archiva y renombra los tipos de juego. Toca uno para ver sus juegos en Comunidad.</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
