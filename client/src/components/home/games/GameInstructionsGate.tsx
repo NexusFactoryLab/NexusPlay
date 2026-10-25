@@ -8,6 +8,7 @@ import { GuessWhoVisualDemo } from './GuessWhoVisualDemo'
 import { flagsDemoExample, type GuessWhoDemoExample } from './guessWhoDemoExamples'
 import { DominoVisualDemo } from './DominoVisualDemo'
 import { MemoryMatchDemo } from './MemoryMatchFlash'
+import { TutorialQuestion } from './tutorial/TutorialQuestion'
 
 const SEEN_KEY_PREFIX = 'nexusplay:guia-vista:'
 
@@ -36,8 +37,24 @@ function markSeen(kind: InstructionKind): void {
  * nunca tiene scroll: si no cabe, se reduce para que se vea entera (ver
  * `fitContent` en Modal). El Laberinto V/F tiene su propia guía y no pasa por acá.
  */
-export function GameInstructionsGate({ kind, children, guessWhoExample = flagsDemoExample }: { kind: InstructionKind; children: ReactNode; guessWhoExample?: GuessWhoDemoExample }) {
+export function GameInstructionsGate({
+  kind,
+  children,
+  guessWhoExample = flagsDemoExample,
+  tutorial,
+}: {
+  kind: InstructionKind
+  children: ReactNode
+  guessWhoExample?: GuessWhoDemoExample
+  /**
+   * Tutorial jugable sobre el juego real (issue #93). Si viene, la guía
+   * termina preguntando «¿Deseas jugar un tutorial?»: Sí lo abre y, al
+   * terminarlo (o saltarlo), sigue el juego; No entra directo.
+   */
+  tutorial?: (onFinish: () => void) => ReactNode
+}) {
   const [accepted, setAccepted] = useState(false)
+  const [inTutorial, setInTutorial] = useState(false)
   const [seenBefore] = useState(() => wasSeen(kind))
   if (accepted) return children
   const content = gameInstructions[kind]
@@ -45,6 +62,8 @@ export function GameInstructionsGate({ kind, children, guessWhoExample = flagsDe
     markSeen(kind)
     setAccepted(true)
   }
+  if (inTutorial && tutorial) return tutorial(onContinue)
+  const onTutorial = tutorial ? () => setInTutorial(true) : undefined
   const isGuessWho = kind === 'GUESS_WHO' || kind === 'GUESS_WHO_GROUP'
   const isDomino = kind === 'DOMINO'
   const hasVisualDemo = isGuessWho || isDomino
@@ -68,7 +87,7 @@ export function GameInstructionsGate({ kind, children, guessWhoExample = flagsDe
             <X className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden="true" />
           </button>
         </div>
-        {isGuessWho ? <GuessWhoVisualDemo example={guessWhoExample} onContinue={onContinue} /> : isDomino ? <DominoVisualDemo onContinue={onContinue} /> : <>
+        {isGuessWho ? <GuessWhoVisualDemo example={guessWhoExample} onContinue={onContinue} onTutorial={onTutorial} /> : isDomino ? <DominoVisualDemo onContinue={onContinue} /> : <>
         {isMemory ? <MemoryMatchDemo opposites={kind === 'OPPOSITES'} /> : <>
         <p className="text-[13.5px] leading-relaxed text-text">{content.text}</p>
         <div className="rounded-2xl border border-border bg-code-bg p-4">
@@ -89,12 +108,12 @@ export function GameInstructionsGate({ kind, children, guessWhoExample = flagsDe
           <p className="mt-3 text-center text-[12px] text-text">{content.caption}</p>
         </div>
         </>}
-        <button type="button"
+        {onTutorial ? <TutorialQuestion onYes={onTutorial} onNo={onContinue} /> : <button type="button"
           className="flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-[14.5px] font-semibold text-white shadow-[0_12px_24px_-12px_var(--accent)] transition-all hover:-translate-y-0.5"
           style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }} onClick={onContinue}>
           <Check className="h-4 w-4" strokeWidth={2.25} />
           Entendido, continuar
-        </button>
+        </button>}
         </>}
       </div>
     </Modal>

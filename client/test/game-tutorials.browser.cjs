@@ -28,8 +28,81 @@ if ('${game}'==='TF') {
   const qs=[1,2,3].map(i=>({questionId:'q'+i,statement:'Afirmación de prueba '+i+'.',answer:i%2==0,explanation:'Explicación.'}));
   el=React.createElement(TrueFalseMazeGame,{title:'Misión Galáctica',questions:qs,config:DEFAULT_TRUE_FALSE_MAZE_CONFIG,onExit:()=>{window.exited=1}});
 }
+if ('${game}'==='MEMORY') {
+  const {MemoryMatchGame}=await import('/src/components/home/games/MemoryMatchGame.tsx');
+  // Cada imagen lleva su nombre dentro del SVG: así la prueba sabe qué cartas hacen pareja.
+  const image=(label)=>'data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><rect width="120" height="120" fill="#c7d2fe"/><text x="60" y="66" font-size="18" text-anchor="middle">'+label+'</text></svg>');
+  const pairs=['Perro','Gato','Pez','Loro'].map((label,i)=>({mode:'PAIRS',pairId:'p'+i,imageUrl:image(label),label}));
+  el=React.createElement(MemoryMatchGame,{title:'Animales',primaryColor:'#7c3aed',pairs,pairCount:4,difficulty:'normal',showPreview:true,perZone:4,timePerZoneSeconds:90,previewSeconds:5,onExit:()=>{window.exited=1}});
+}
 createRoot(document.getElementById('root')).render(React.createElement(AuthProvider,null,React.createElement(ThemeProvider,null,el)));
 </script></body></html>`
+
+/** Pares del tablero de MatchMente que siguen sin descubrir: [índice de la imagen, índice del nombre]. */
+async function memoryPairs(page) {
+  return page.evaluate(() => {
+    const cards = [...document.querySelectorAll('[data-game-tutorial] .grid > button')]
+    const keyOf = (card) => {
+      const img = card.querySelector('img')
+      if (img) return decodeURIComponent(img.getAttribute('src')).match(/>([^<]+)<\/text>/)?.[1] ?? '?'
+      // El reverso trae un ✦ y las cartas de palabra, la etiqueta «Aa»: solo cuenta el nombre.
+      return card.textContent.replace(/✦|Aa/g, '').trim()
+    }
+    const groups = {}
+    cards.forEach((card, index) => {
+      if (card.disabled) return
+      const key = keyOf(card)
+      ;(groups[key] ??= []).push(index)
+    })
+    return Object.values(groups).filter((group) => group.length === 2)
+  })
+}
+
+async function flipPair(page, [a, b]) {
+  const cards = page.locator('[data-game-tutorial] .grid > button')
+  await cards.nth(a).click()
+  await cards.nth(b).click()
+  await page.waitForTimeout(900)
+}
+
+async function memoryTutorial(browser, viewport, touch) {
+  const tag = `${viewport.width}${touch ? '-touch' : ''}`
+  const { page, errors } = await openGame(browser, 'MEMORY', viewport, touch)
+  const intro = page.locator('[data-game-instructions]')
+  await intro.waitFor()
+  const question = intro.getByRole('group', { name: '¿Deseas jugar un tutorial?' })
+  await question.waitFor()
+  const dialog = page.getByRole('dialog').last()
+  assert.equal(await dialog.evaluate((el) => el.scrollHeight <= el.clientHeight + 1), true, 'La guía no tiene scroll')
+  await page.screenshot({ path: `.scratch/tutorial-memoria-pregunta-${tag}.png` })
+  await question.getByRole('button', { name: 'Sí' }).click()
+
+  await page.locator('[data-game-tutorial]').waitFor()
+  await page.getByText('Parte 1 de 3').waitFor()
+  await page.waitForTimeout(600)
+  await page.screenshot({ path: `.scratch/tutorial-memoria-parte1-${tag}.png` })
+  const card = page.getByRole('dialog', { name: /Tutorial de/ })
+  await card.getByText('Parte 2 de 3').waitFor({ timeout: 12000 })
+  await card.getByRole('button', { name: /Siguiente/ }).click()
+
+  await page.getByText('Parte 2 de 3').waitFor()
+  await page.waitForTimeout(500)
+  await flipPair(page, (await memoryPairs(page))[0])
+  await card.getByText('Parte 3 de 3').waitFor({ timeout: 6000 })
+  await card.getByRole('button', { name: /Siguiente/ }).click()
+
+  await page.getByRole('button', { name: /¡Ya, a jugar!/ }).click()
+  await page.waitForTimeout(400)
+  for (const pair of await memoryPairs(page)) await flipPair(page, pair)
+  await card.getByRole('heading', { name: '¡Tutorial completado!' }).waitFor({ timeout: 8000 })
+  await page.screenshot({ path: `.scratch/tutorial-memoria-fin-${tag}.png` })
+  await card.getByRole('button', { name: /¡A jugar!/ }).click()
+  await page.locator('[data-game-tutorial]').waitFor({ state: 'detached' })
+  await page.getByText(/Zona 1 de/).waitFor()
+  assert.deepEqual(errors, [])
+  console.log(`PASS ${tag} MatchMente: pregunta sin scroll, Sí → memorizar, pareja y zona en el tablero real, ¡A jugar! → juego`)
+  await page.close()
+}
 
 async function openGame(browser, game, viewport, touch) {
   const page = await browser.newPage({ viewport, hasTouch: touch, isMobile: touch })
@@ -134,6 +207,10 @@ async function main() {
     if (!only || only === 'TF') {
       await tfTutorial(browser, { width: 1280, height: 800 }, false)
       await tfTutorial(browser, { width: 390, height: 844 }, true)
+    }
+    if (!only || only === 'MEMORY') {
+      await memoryTutorial(browser, { width: 1280, height: 800 }, false)
+      await memoryTutorial(browser, { width: 390, height: 844 }, true)
     }
   } finally {
     await browser.close()
