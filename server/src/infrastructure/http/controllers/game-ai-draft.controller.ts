@@ -13,6 +13,7 @@ import type { Express } from 'express';
 import { AiUsagePolicy } from '../../../application/services/ai-usage-policy.service.js';
 import { AiNotConfiguredError } from '../../../application/errors/application.errors.js';
 import { GenerateGameDraftUseCase } from '../../../application/use-cases/generate-game-draft.use-case.js';
+import { parseCategoryOptions } from '../../../application/ai/draft-identity.js';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard.js';
 import { GenerateGameDraftDto } from '../dtos/generate-game-draft.dto.js';
 
@@ -84,6 +85,7 @@ export class GameAiDraftController {
       gameType: dto.gameType,
       mode: dto.mode,
       message: dto.message,
+      categories: parseCategoryOptions(dto.categories),
       files: (files ?? []).map((file) => ({
         buffer: file.buffer,
         mimeType: file.mimetype,

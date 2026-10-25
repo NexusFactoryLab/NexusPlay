@@ -84,6 +84,18 @@ function mediumPlaying() {
   return h;
 }
 
+/** Deja los 3 conceptos con caso de aplicación y una pregunta para cada nivel. */
+function makeAllLevelsAvailable(room: DominoRoomState) {
+  room.concepts.forEach((concept, i) => {
+    concept.application = `Caso ${i}`;
+    concept.questions = [
+      { text: `M${i}`, options: ['A', 'B', 'C'], correctIndex: 1, explanation: 'e', levels: ['MEDIUM'] },
+      { text: `U${i}`, options: ['A', 'B', 'C'], correctIndex: 1, explanation: 'e', levels: ['ADVANCED'] },
+    ];
+    delete concept.question;
+  });
+}
+
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => {
   vi.clearAllTimers();
@@ -93,6 +105,7 @@ afterEach(() => {
 describe('nivel de la sala', () => {
   it('el anfitrión cambia el nivel en WAITING, reinicia los Listo y ajusta el tiempo sugerido', () => {
     const h = setup();
+    makeAllLevelsAvailable(h.room);
     h.room.players[1].ready = true;
     h.gateway.handleDominoUpdateLevel(h.p1, { level: 'ADVANCED' });
     expect(h.room.level).toBe('ADVANCED');
@@ -303,16 +316,24 @@ describe('compatibilidad', () => {
     expect(h.room.board.map((t) => t.id)).toEqual(['open', 'to2', 'x']);
   });
 
-  it('en Fácil y Universitario nunca se pregunta, aunque el concepto tenga question', () => {
-    for (const level of ['EASY', 'ADVANCED'] as const) {
-      const h = setup('PLAYING');
-      h.room.level = level;
-      h.gateway.handleDominoPlay(h.p1, { tileId: 'open', side: 'right' });
-      h.room.activePlayerUserId = 'p1';
-      h.gateway.handleDominoPlay(h.p1, { tileId: 'to1', side: 'right' });
-      expect(h.room.pendingQuestion ?? null).toBeNull();
-      expect(h.room.board).toHaveLength(2);
-    }
+  it('en Fácil nunca se pregunta, aunque el concepto tenga question', () => {
+    const h = setup('PLAYING');
+    h.room.level = 'EASY';
+    h.gateway.handleDominoPlay(h.p1, { tileId: 'open', side: 'right' });
+    h.room.activePlayerUserId = 'p1';
+    h.gateway.handleDominoPlay(h.p1, { tileId: 'to1', side: 'right' });
+    expect(h.room.pendingQuestion ?? null).toBeNull();
+    expect(h.room.board).toHaveLength(2);
+  });
+
+  it('en Universitario también se pregunta antes de colocar, igual que en Intermedio', () => {
+    const h = setup('PLAYING');
+    h.room.level = 'ADVANCED';
+    h.gateway.handleDominoPlay(h.p1, { tileId: 'open', side: 'right' });
+    h.room.activePlayerUserId = 'p1';
+    h.gateway.handleDominoPlay(h.p1, { tileId: 'to1', side: 'right' });
+    expect(h.room.pendingQuestion).toBeTruthy();
+    expect(h.room.board).toHaveLength(1);
   });
 
   it('una sala sin level (anterior a este cambio) se juega como Fácil', () => {

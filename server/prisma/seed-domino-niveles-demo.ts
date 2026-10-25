@@ -16,7 +16,22 @@ import { MongoClient } from 'mongodb';
 const SLUG = 'dominexo-niveles-demo';
 const GAME_ID = 'seed-dominexo-niveles-demo';
 
-type Question = { text: string; options: string[]; correctIndex: number; explanation: string };
+type QuestionLevel = 'MEDIUM' | 'ADVANCED';
+type Question = { text: string; options: string[]; correctIndex: number; explanation: string; levels?: QuestionLevel[] };
+
+/**
+ * Niveles por posición en el banco de cada concepto: la conceptual solo en Intermedio, la de
+ * identificación en ambos y la de aplicación solo en Universitario. Así cada concepto cumple
+ * los requisitos de los tres niveles (pregunta para Intermedio, caso y pregunta para Universitario).
+ */
+const LEVELS_BY_POSITION: QuestionLevel[][] = [['MEDIUM'], ['MEDIUM', 'ADVANCED'], ['ADVANCED']];
+
+function withLevels(concepts: Concept[]): Concept[] {
+  return concepts.map((concept) => ({
+    ...concept,
+    questions: concept.questions.map((question, position) => ({ ...question, levels: LEVELS_BY_POSITION[position] ?? ['MEDIUM', 'ADVANCED'] })),
+  }));
+}
 type Concept = {
   conceptId: string;
   label: string;
@@ -235,6 +250,12 @@ function assertWithinLimits(concepts: Concept[]): void {
       if (value.length > max) throw new Error(`${c.label}: ${field} excede ${max} caracteres (${value.length}).`);
     }
     if (c.questions.length < 1 || c.questions.length > 6) throw new Error(`${c.label}: el banco necesita de 1 a 6 preguntas.`);
+    // Requisitos de los niveles: caso de aplicación y una pregunta para cada nivel.
+    if (!c.application.trim()) throw new Error(`${c.label}: falta el caso de aplicación (Universitario).`);
+    const leveled = withLevels([c])[0].questions;
+    for (const level of ['MEDIUM', 'ADVANCED'] as const) {
+      if (!leveled.some((q) => q.levels?.includes(level))) throw new Error(`${c.label}: ninguna pregunta sirve para ${level}.`);
+    }
     const texts = new Set(c.questions.map((q) => q.text.toLowerCase().replace(/\s+/g, ' ')));
     if (texts.size !== c.questions.length) throw new Error(`${c.label}: preguntas repetidas.`);
     for (const [n, q] of c.questions.entries()) {
@@ -305,7 +326,7 @@ async function main(): Promise<void> {
       creatorUserId: 'system',
       status: 'PUBLISHED',
       config: { handSize: 7 },
-      content: CONCEPTS,
+      content: withLevels(CONCEPTS),
       updatedAt: now,
     };
 

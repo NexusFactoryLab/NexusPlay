@@ -4,6 +4,7 @@ import { FileText, Loader2, Paperclip, RotateCcw, Send, Sparkles, Upload, X } fr
 import { useAuth } from '../../../hooks/useAuth'
 import { useToast } from '../../../hooks/useToast'
 import { generateGameDraft, type GameDraft } from '../../../services/ai-game-assistant.service'
+import { listSubjects } from '../../../services/subject.service'
 import { ApiError } from '../../../utils/http'
 import { AiNotConfiguredNotice } from '../ai/AiNotConfiguredNotice'
 import { useAiConfigured } from '../ai/useAiConfigured'
@@ -98,7 +99,12 @@ type AiGameAssistantPanelProps = {
    * después. Por defecto (`undefined`) sí bloquea, como antes.
    */
   imagesRequired?: { min: number; max: number; enforceMinimum?: boolean }
-  onDraftReady: (draft: GameDraft) => void
+  /**
+   * Se llama varias veces mientras la IA "llena" el formulario con animación (borradores
+   * parciales) y una última con `final: true` con el borrador completo; los formularios
+   * que no lo necesitan ignoran el segundo parámetro.
+   */
+  onDraftReady: (draft: GameDraft, meta?: { final: boolean }) => void
 }
 
 /**
@@ -250,7 +256,11 @@ export function AiGameAssistantPanel({
       } else {
         // Los archivos recuperados del borrador se descargan de Cloudinary solo si hay que reenviarlos.
         const realFiles = await materializeFiles(files)
-        draft = await generateGameDraft(token, gameType, realFiles, mode, message, controller.signal)
+        // Las áreas existentes viajan con la solicitud para que la IA elija solo entre ellas.
+        const areas = await listSubjects(token)
+          .then((items) => items.map((item) => ({ id: item.id, name: item.name })))
+          .catch(() => [])
+        draft = await generateGameDraft(token, gameType, realFiles, mode, message, controller.signal, areas)
         persist?.save(draft, message, realFiles)
       }
       // El servidor manda el borrador completo de una vez: se aplica por pasos
@@ -273,11 +283,11 @@ export function AiGameAssistantPanel({
           await wait(stepDelay)
         }
       }
-      onDraftReady(draft)
+      onDraftReady(draft, { final: true })
       await wait(40)
       fillStep?.(items.length)
       showToast(
-        draft.notice ? `¡Listo! ${draft.notice}` : '¡Listo! Revisa el juego y completa nombre, descripción y área.',
+        draft.notice ? `¡Listo! ${draft.notice}` : '¡Listo! Revisa el nombre, la descripción y el área que sugirió la IA, y luego el contenido.',
         'success',
         6000,
       )

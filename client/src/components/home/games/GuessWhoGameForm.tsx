@@ -6,6 +6,7 @@ import { SaveVisibilityModal } from './SaveVisibilityModal'
 import { ImageUploadField } from './ImageUploadField'
 import { AudioUploadField } from './AudioUploadField'
 import { AiGameAssistantPanel } from './AiGameAssistantPanel'
+import { AiIdentityBadges, useAiIdentity } from './useAiIdentity'
 import { useReportCreateSummary } from './aiDraftContext'
 import { useCreationDraftId } from './useCreationDraftId'
 import {
@@ -175,6 +176,18 @@ export function GuessWhoGameForm({
     setCoverImageUrl(adapted.theme.coverImageUrl)
     setCategoryId(adapted.categoryId)
     applyAiDraft(adapted)
+  })
+
+  // La IA también sugiere título, descripción y área: se aplican sin pisar lo que escribió el usuario.
+  const aiIdentity = useAiIdentity({
+    title,
+    description,
+    categoryId,
+    categoryIds: categories.map((category) => category.id),
+    setTitle,
+    setDescription,
+    setCategoryId,
+    goToIdentity: () => setPhase(0),
   })
 
   function applyAiDraft(draft: GameDraft) {
@@ -386,7 +399,10 @@ export function GuessWhoGameForm({
           gameType="GUESS_WHO"
           disabled={submitting}
           imagesRequired={{ min: MIN_CARDS, max: 60, enforceMinimum: false }}
-          onDraftReady={applyAiDraft}
+          onDraftReady={(draft, meta) => {
+            applyAiDraft(draft)
+            aiIdentity.onDraft(draft, meta)
+          }}
         />
       }
     >
@@ -395,6 +411,7 @@ export function GuessWhoGameForm({
 
         {phase === 0 && (
           <FormSection icon={Rocket} title="Cuéntanos de tu juego" subtitle="Nombre, portada y el lugar donde vivirá." tone={1}>
+            <AiIdentityBadges ai={aiIdentity} />
             <TextField
               label="Título del juego"
               type="text"

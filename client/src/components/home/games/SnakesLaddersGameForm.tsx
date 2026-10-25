@@ -5,6 +5,7 @@ import { TextField } from '../../TextField'
 import { SaveVisibilityModal } from './SaveVisibilityModal'
 import { ImageUploadField } from './ImageUploadField'
 import { AiGameAssistantPanel } from './AiGameAssistantPanel'
+import { AiIdentityBadges, useAiIdentity } from './useAiIdentity'
 import { useReportCreateSummary } from './aiDraftContext'
 import { useCreationDraftId } from './useCreationDraftId'
 import {
@@ -183,6 +184,18 @@ export function SnakesLaddersGameForm({ onClose, onCreated, onBack, onCategoryCr
     setCoverImageUrl(adapted.theme.coverImageUrl)
     setCategoryId(adapted.categoryId)
     applyAiDraft(adapted)
+  })
+
+  // La IA también sugiere título, descripción y área: se aplican sin pisar lo que escribió el usuario.
+  const aiIdentity = useAiIdentity({
+    title,
+    description,
+    categoryId,
+    categoryIds: categories.map((category) => category.id),
+    setTitle,
+    setDescription,
+    setCategoryId,
+    goToIdentity: () => setPhase(0),
   })
 
   function applyAiDraft(draft: GameDraft) {
@@ -416,13 +429,14 @@ export function SnakesLaddersGameForm({ onClose, onCreated, onBack, onCategoryCr
        title="Escaleras y serpientes"
       description="Escaleras y serpientes con retos: avanzar depende de responder."
       descriptionDetail="Cada escalera exige un reto de alta complejidad para subir y cada serpiente da una oportunidad de recuperación. Ciudad Sostenible es el tema por defecto, pero puedes cambiar la narrativa con tus propias preguntas."
-      aiPanel={<AiGameAssistantPanel gameType="SNAKES_LADDERS" disabled={submitting} onDraftReady={applyAiDraft} />}
+      aiPanel={<AiGameAssistantPanel gameType="SNAKES_LADDERS" disabled={submitting} onDraftReady={(draft, meta) => { applyAiDraft(draft); aiIdentity.onDraft(draft, meta) }} />}
     >
       <form className="flex flex-col gap-[16px]" onSubmit={handleSubmit} noValidate>
         <PhaseLabel phase={phase + 1} total={TOTAL_PHASES} label={PHASES[phase].label} />
 
         {phase === 0 && (
         <FormSection icon={Rocket} title="Cuéntanos de tu juego" subtitle="Nombre, portada y el lugar donde vivirá." tone={1}>
+<AiIdentityBadges ai={aiIdentity} />
 <TextField label="Título del juego" type="text" value={title} disabled={submitting} onChange={setTitle} onBlur={() => {}} />
         <TextField
           label="Descripción"

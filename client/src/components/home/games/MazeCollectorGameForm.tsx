@@ -6,6 +6,7 @@ import { SaveVisibilityModal } from './SaveVisibilityModal'
 import { ImageUploadField } from './ImageUploadField'
 import { IconPickerField } from './IconPickerField'
 import { AiGameAssistantPanel } from './AiGameAssistantPanel'
+import { AiIdentityBadges, useAiIdentity } from './useAiIdentity'
 import { useReportCreateSummary } from './aiDraftContext'
 import { useCreationDraftId } from './useCreationDraftId'
 import {
@@ -204,6 +205,18 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
     applyAiDraft(adapted)
   })
 
+  // La IA también sugiere título, descripción y área: se aplican sin pisar lo que escribió el usuario.
+  const aiIdentity = useAiIdentity({
+    title,
+    description,
+    categoryId,
+    categoryIds: categories.map((category) => category.id),
+    setTitle,
+    setDescription,
+    setCategoryId,
+    goToIdentity: () => setPhase(0),
+  })
+
   function applyAiDraft(draft: GameDraft) {
     const items = Array.isArray(draft.content) ? draft.content : []
     // El panel sigue al objeto más reciente mientras la IA llena la lista.
@@ -377,7 +390,7 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
        title="Laberinto recolector"
       description="Recolecta objetos temáticos en un laberinto y esquiva enemigos."
       descriptionDetail="Puedes cambiar la narrativa: por ejemplo, un camión de reciclaje esquivando nubes de contaminación, o cualquier otra idea."
-      aiPanel={<AiGameAssistantPanel gameType="MAZE_COLLECTOR" disabled={submitting} onDraftReady={applyAiDraft} />}
+      aiPanel={<AiGameAssistantPanel gameType="MAZE_COLLECTOR" disabled={submitting} onDraftReady={(draft, meta) => { applyAiDraft(draft); aiIdentity.onDraft(draft, meta) }} />}
     >
       <form className="flex flex-col gap-[16px]" onSubmit={handleSubmit} noValidate>
         <PhaseLabel phase={phase + 1} total={TOTAL_PHASES} label={PHASES[phase].label} />
@@ -385,6 +398,7 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
         {phase === 0 && (
         <>
         <FormSection icon={Rocket} title="Cuéntanos de tu juego" subtitle="Nombre, portada y el lugar donde vivirá." tone={1}>
+<AiIdentityBadges ai={aiIdentity} />
 <TextField label="Título del juego" type="text" value={title} disabled={submitting} onChange={setTitle} onBlur={() => {}} />
         <TextField
           label="Descripción"

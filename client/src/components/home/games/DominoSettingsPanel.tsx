@@ -1,6 +1,6 @@
 import { useId, useState, type KeyboardEvent } from 'react'
-import { Timer } from 'lucide-react'
-import { DOMINO_LEVEL_INFO, DOMINO_LEVEL_ORDER, DOMINO_TURN_PRESETS } from './dominoLevels'
+import { Lock, Timer } from 'lucide-react'
+import { DOMINO_LEVEL_INFO, DOMINO_LEVEL_ORDER, DOMINO_TURN_PRESETS, levelAvailability, type DominoLevelAvailabilityView } from './dominoLevels'
 import type { DominoLevel } from './dominoTypes'
 
 const MIN_TURN = 5
@@ -13,6 +13,30 @@ type Props = {
   disabled: boolean
   onChangeLevel: (level: DominoLevel) => void
   onUpdateTurnDuration: (seconds: number) => void
+  /** Niveles que el contenido puede ofrecer; los no disponibles se ven bloqueados con su motivo. */
+  availableLevels?: DominoLevelAvailabilityView
+}
+
+/** Niveles bloqueados con su motivo (lo ven anfitrión e invitado). */
+function UnavailableLevelNotes({ availableLevels }: { availableLevels: DominoLevelAvailabilityView }) {
+  const blocked = DOMINO_LEVEL_ORDER.map((level) => ({ level, ...levelAvailability(availableLevels, level) })).filter((entry) => !entry.available)
+  if (blocked.length === 0) return null
+  return (
+    <ul className="mt-3 flex flex-col gap-2" aria-label="Niveles no disponibles">
+      {blocked.map(({ level, reason }) => (
+        <li
+          key={level}
+          className="flex min-h-[44px] animate-[fade-in-up_0.25s_ease-out] items-center gap-2 rounded-xl border border-border px-3 py-2 text-[1rem] leading-snug text-text-h motion-reduce:animate-none"
+          style={{ background: `color-mix(in srgb, ${DOMINO_LEVEL_INFO[level].color} 10%, transparent)` }}
+        >
+          <Lock className="h-5 w-5 shrink-0" style={{ color: DOMINO_LEVEL_INFO[level].color }} aria-hidden="true" />
+          <span>
+            <strong>{DOMINO_LEVEL_INFO[level].label}:</strong> {reason ?? 'no disponible'}
+          </span>
+        </li>
+      ))}
+    </ul>
+  )
 }
 
 /**
@@ -21,7 +45,7 @@ type Props = {
  * para leerse sin acercarse: texto ≥ 16 px, controles ≥ 48 px. Las animaciones
  * son transiciones CSS y se anulan con prefers-reduced-motion.
  */
-export function DominoSettingsPanel({ level, turnDurationSeconds, isHost, disabled, onChangeLevel, onUpdateTurnDuration }: Props) {
+export function DominoSettingsPanel({ level, turnDurationSeconds, isHost, disabled, onChangeLevel, onUpdateTurnDuration, availableLevels }: Props) {
   const info = DOMINO_LEVEL_INFO[level]
   const durationId = useId()
   const [durationText, setDurationText] = useState(String(turnDurationSeconds))
@@ -36,7 +60,16 @@ export function DominoSettingsPanel({ level, turnDurationSeconds, isHost, disabl
     const step = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 0
     if (step === 0) return
     event.preventDefault()
-    const next = DOMINO_LEVEL_ORDER[(index + step + DOMINO_LEVEL_ORDER.length) % DOMINO_LEVEL_ORDER.length]
+    // Las flechas saltan los niveles bloqueados.
+    let next = level
+    for (let hop = 1; hop <= DOMINO_LEVEL_ORDER.length; hop += 1) {
+      const candidate = DOMINO_LEVEL_ORDER[(index + step * hop + DOMINO_LEVEL_ORDER.length * hop) % DOMINO_LEVEL_ORDER.length]
+      if (levelAvailability(availableLevels, candidate).available) {
+        next = candidate
+        break
+      }
+    }
+    if (next === level) return
     onChangeLevel(next)
     // El foco sigue a la selección (patrón radiogroup).
     event.currentTarget.parentElement?.querySelector<HTMLButtonElement>(`[data-level="${next}"]`)?.focus()
@@ -69,6 +102,7 @@ export function DominoSettingsPanel({ level, turnDurationSeconds, isHost, disabl
           <Timer className="h-6 w-6 text-accent" aria-hidden="true" />
           <strong className="text-text-h tabular-nums">{turnDurationSeconds} s</strong> por turno
         </p>
+        <UnavailableLevelNotes availableLevels={availableLevels} />
       </section>
     )
   }
@@ -80,6 +114,7 @@ export function DominoSettingsPanel({ level, turnDurationSeconds, isHost, disabl
         {DOMINO_LEVEL_ORDER.map((option, index) => {
           const { label, icon: Icon, color } = DOMINO_LEVEL_INFO[option]
           const selected = option === level
+          const { available, reason } = levelAvailability(availableLevels, option)
           return (
             <button
               key={option}
@@ -87,8 +122,10 @@ export function DominoSettingsPanel({ level, turnDurationSeconds, isHost, disabl
               role="radio"
               data-level={option}
               aria-checked={selected}
+              aria-disabled={!available}
+              title={available ? undefined : (reason ?? undefined)}
               tabIndex={selected ? 0 : -1}
-              disabled={disabled}
+              disabled={disabled || !available}
               onClick={() => !selected && onChangeLevel(option)}
               onKeyDown={(event) => handleLevelKey(event, index)}
               className="flex min-h-[96px] flex-col items-center justify-center gap-2 rounded-2xl border-2 px-2 py-3 text-[1.125rem] font-bold text-text-h transition-all duration-200 hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-accent active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100"
@@ -99,10 +136,12 @@ export function DominoSettingsPanel({ level, turnDurationSeconds, isHost, disabl
             >
               <Icon className={`h-8 w-8 transition-transform duration-200 motion-reduce:transition-none ${selected ? 'scale-110' : ''}`} style={{ color }} strokeWidth={2.2} aria-hidden="true" />
               {label}
+              {!available && <Lock className="h-4 w-4 text-text" aria-label="No disponible" />}
             </button>
           )
         })}
       </div>
+      <UnavailableLevelNotes availableLevels={availableLevels} />
       <div className="mt-3 min-h-[3.5rem]">{description}</div>
 
       <div className="mt-4 border-t border-border pt-4">

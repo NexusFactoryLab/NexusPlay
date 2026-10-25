@@ -35,7 +35,15 @@ export interface DominoConceptQuestion {
   options: string[];
   correctIndex: number;
   explanation: string;
+  /**
+   * Niveles en los que puede salir la pregunta (Fácil no pregunta). Subconjunto no vacío y sin
+   * duplicados. Ausente = sirve para ambos (juegos y borradores anteriores a esta marca).
+   */
+  levels?: DominoQuestionLevel[];
 }
+
+export const DOMINO_QUESTION_LEVELS = ['MEDIUM', 'ADVANCED'] as const;
+export type DominoQuestionLevel = (typeof DOMINO_QUESTION_LEVELS)[number];
 
 /**
  * Nivel de dificultad de una partida. Es ajuste de la sala, no del contenido:
@@ -217,11 +225,22 @@ export class DominoContentValidator implements ContentValidator {
       throw new InvalidGameContentError(`${where} tiene un correctIndex fuera de rango.`);
     }
 
-    return {
+    const result: DominoConceptQuestion = {
       text: q.text.trim(),
       options,
       correctIndex: q.correctIndex as number,
       explanation: q.explanation.trim(),
     };
+    if (q.levels !== undefined && q.levels !== null) {
+      if (
+        !Array.isArray(q.levels) ||
+        q.levels.length === 0 ||
+        !q.levels.every((l) => (DOMINO_QUESTION_LEVELS as readonly unknown[]).includes(l))
+      ) {
+        throw new InvalidGameContentError(`${where} tiene levels inválido (usa MEDIUM y/o ADVANCED, al menos uno).`);
+      }
+      result.levels = DOMINO_QUESTION_LEVELS.filter((l) => (q.levels as unknown[]).includes(l));
+    }
+    return result;
   }
 }

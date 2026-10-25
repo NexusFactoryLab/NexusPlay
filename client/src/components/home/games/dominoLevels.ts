@@ -31,13 +31,24 @@ export const DOMINO_LEVEL_INFO: Record<DominoLevel, LevelInfo> = {
   ADVANCED: {
     label: 'Universitario',
     short: 'Casos y aplicaciones',
-    description: 'Razonamiento con casos y aplicaciones de cada concepto.',
+    description: 'Razonamiento con casos reales: se responde una pregunta con su caso antes de colocar cada ficha.',
     icon: GraduationCap,
     color: '#7c3aed',
   },
 }
 
 export const DOMINO_LEVEL_ORDER: DominoLevel[] = ['EASY', 'MEDIUM', 'ADVANCED']
+
+export type DominoLevelAvailabilityView = Partial<Record<DominoLevel, { available: boolean; reason: string | null }>> | undefined
+
+/** Disponibilidad de un nivel en la sala; sin dato (sala anterior) se considera disponible. */
+export function levelAvailability(
+  availableLevels: DominoLevelAvailabilityView,
+  level: DominoLevel,
+): { available: boolean; reason: string | null } {
+  const entry = availableLevels?.[level]
+  return entry ? { available: entry.available, reason: entry.available ? null : entry.reason } : { available: true, reason: null }
+}
 
 /** Duraciones de turno sugeridas como chips en el lobby. */
 export const DOMINO_TURN_PRESETS = [15, 25, 30, 60] as const

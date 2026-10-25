@@ -295,17 +295,22 @@ describe('normalizeDraft — Dominó y Laberinto recolector', () => {
     ]);
     const concepts = content as Array<{ label: string; icon: string; color: string }>;
     expect(concepts[0].label.length).toBeLessThanOrEqual(60);
-    expect(concepts[0].icon).toBe('star');
+    // Sin ícono válido ni palabra clave: ícono neutro de la reserva (nunca star ni heart).
+    expect(['star', 'heart']).not.toContain(concepts[0].icon);
     expect(concepts[0].color).toMatch(/^#[0-9a-f]{6}$/i);
-    expect(concepts[1]).toMatchObject({ icon: 'star', color: '#16a34a' });
+    // "Solar" no trae ícono válido: se infiere por el nombre en vez de repetir "star".
+    expect(concepts[1]).toMatchObject({ icon: 'sun', color: '#16a34a' });
   });
 
-  it('DOMINO: conserva íconos del catálogo y reemplaza los desconocidos por "star"', () => {
+  it('DOMINO: conserva íconos del catálogo y reemplaza los desconocidos por uno neutro distinto', () => {
     const { content } = normalizeDraft({ gameType: 'DOMINO' }, {}, [
       { label: 'Sol', icon: 'sun', color: '#f59e0b' },
       { label: 'Raro', icon: 'inventadoXYZ', color: '#16a34a' },
     ]);
-    expect((content as Array<{ icon: string }>).map((c) => c.icon)).toEqual(['sun', 'star']);
+    const icons = (content as Array<{ icon: string }>).map((c) => c.icon);
+    expect(icons[0]).toBe('sun');
+    expect(icons[1]).not.toBe('sun');
+    expect(['star', 'heart']).not.toContain(icons[1]);
   });
 
   describe('DOMINO: material de niveles y banco de preguntas', () => {
@@ -338,8 +343,9 @@ describe('normalizeDraft — Dominó y Laberinto recolector', () => {
         ],
       });
       expect(c.questions.map((x: { text: string }) => x.text)).toEqual(['¿Uno?', '¿Dos?']);
-      // Al quitar la opción repetida, la correcta sigue apuntando a "C".
-      expect(c.questions[1]).toMatchObject({ options: ['A', 'B', 'C'], correctIndex: 2 });
+      // Al quitar la opción repetida (y barajar), la correcta sigue siendo "C".
+      expect([...c.questions[1].options].sort()).toEqual(['A', 'B', 'C']);
+      expect(c.questions[1].options[c.questions[1].correctIndex]).toBe('C');
     });
 
     it('convierte una question suelta en un banco de 1 y acota el banco a 6', () => {

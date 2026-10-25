@@ -21,6 +21,8 @@ export type QuestionDraft = {
   options: string[]
   correctIndex: number | null
   explanation: string
+  /** Niveles en los que sale la pregunta; ausente = Intermedio y Universitario (borradores y juegos anteriores). */
+  levels?: Array<'MEDIUM' | 'ADVANCED'>
 }
 
 export type ConceptDraft = {
@@ -33,6 +35,13 @@ export type ConceptDraft = {
   application: string
   /** La primera pregunta es obligatoria; hasta 6 en total. */
   questions: QuestionDraft[]
+  /**
+   * Revisión del contenido generado por IA (ver dominoReview.ts). Ausente = el concepto
+   * no pasa por revisión (escrito a mano, adaptado o de un borrador anterior a la revisión).
+   */
+  review?: 'pending' | 'approved'
+  /** Advertencias automáticas del servidor para mostrar en la tarjeta de revisión. */
+  aiWarnings?: string[]
 }
 
 export function emptyQuestion(): QuestionDraft {
@@ -63,7 +72,15 @@ function toQuestionDraft(raw: unknown): QuestionDraft | null {
     typeof q.correctIndex === 'number' && Number.isInteger(q.correctIndex) && q.correctIndex >= 0 && q.correctIndex < options.length
       ? q.correctIndex
       : null
-  return { text: asText(q.text), options, correctIndex: correct, explanation: asText(q.explanation) }
+  // Solo valores válidos; vacío o los dos niveles equivale a "ausente" (sirve para ambos).
+  const levels = (['MEDIUM', 'ADVANCED'] as const).filter((l) => Array.isArray(q.levels) && q.levels.includes(l))
+  return {
+    text: asText(q.text),
+    options,
+    correctIndex: correct,
+    explanation: asText(q.explanation),
+    ...(levels.length === 1 ? { levels: [...levels] } : {}),
+  }
 }
 
 /**
@@ -88,6 +105,11 @@ export function toConceptDraft(raw: unknown, index: number): ConceptDraft {
     example: asText(r.example),
     application: asText(r.application),
     questions: questions.length > 0 ? questions : [emptyQuestion()],
+    // Un borrador viejo no trae estas claves: queda sin revisión pendiente (no se bloquea).
+    ...(r.review === 'pending' || r.review === 'approved' ? { review: r.review } : {}),
+    ...(Array.isArray(r.aiWarnings) && r.aiWarnings.some((w) => typeof w === 'string')
+      ? { aiWarnings: r.aiWarnings.filter((w): w is string => typeof w === 'string') }
+      : {}),
   }
 }
 
@@ -170,6 +192,8 @@ export function toConceptInputs(concepts: ConceptDraft[]): DominoConceptInput[] 
       options: q.options.map((o) => o.trim()),
       correctIndex: q.correctIndex as number,
       explanation: q.explanation.trim(),
+      // Solo se manda cuando la pregunta se limita a un nivel; ausente = ambos.
+      ...(q.levels && q.levels.length === 1 ? { levels: q.levels } : {}),
     })),
   }))
 }

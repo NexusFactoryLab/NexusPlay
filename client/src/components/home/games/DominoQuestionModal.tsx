@@ -8,6 +8,8 @@ type Props = {
   concept: DominoConcept
   /** Pregunta elegida por el servidor (del banco del concepto); sin respuesta correcta ni explicación. */
   question: { text: string; options: string[] }
+  /** Universitario: caso o situación del concepto, mostrado como contexto sobre la pregunta. */
+  scenario?: string
   /** true si la pregunta la responde quien mira esta pantalla; false = modo espectador. */
   isSelf: boolean
   answeringDisplayName: string
@@ -23,7 +25,7 @@ type Props = {
  * feedback (acierto/error + explicación) llega solo después de que el
  * servidor corrige — nunca se conoce la respuesta correcta antes.
  */
-export function DominoQuestionModal({ concept, question, isSelf, answeringDisplayName, result, onAnswer, onClose }: Props) {
+export function DominoQuestionModal({ concept, question, scenario, isSelf, answeringDisplayName, result, onAnswer, onClose }: Props) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
 
   // Una pregunta nueva (aunque sea del mismo concepto) reinicia la selección.
@@ -44,11 +46,18 @@ export function DominoQuestionModal({ concept, question, isSelf, answeringDispla
       aria-modal="true"
       aria-label="Pregunta del concepto"
     >
-      <div className="w-full max-w-[560px] rounded-3xl border border-border bg-surface p-7 shadow-[var(--shadow)] animate-[domino-q-panel-in_0.45s_cubic-bezier(0.16,1,0.3,1)] motion-reduce:animate-none">
-        <p className="mb-2 text-[0.9375rem] font-semibold text-accent">Concepto: {concept.label}</p>
-        <h2 className="mb-5 text-[1.375rem] font-bold leading-snug text-text-h">{question.text}</h2>
+      <div className="max-h-[calc(100dvh-24px)] w-full max-w-[540px] overflow-y-auto rounded-3xl border border-border bg-surface p-5 shadow-[var(--shadow)] animate-[domino-q-panel-in_0.45s_cubic-bezier(0.16,1,0.3,1)] motion-reduce:animate-none">
+        <p className="mb-1.5 text-[0.9375rem] font-semibold text-accent">Concepto: {concept.label}</p>
+        {/* El caso solo hace falta para contestar: al mostrar el resultado se oculta para que el panel no crezca. */}
+        {scenario && !result && (
+          <div className="mb-3 rounded-2xl border border-accent/30 bg-accent/10 px-3.5 py-2.5 text-[0.9375rem] leading-snug text-text">
+            <strong className="text-accent">Caso: </strong>
+            {scenario}
+          </div>
+        )}
+        <h2 className="mb-4 text-[1.25rem] font-bold leading-snug text-text-h">{question.text}</h2>
 
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2">
           {question.options.map((option, index) => {
             const isChosen = selectedIndex === index
             const isWrongChosen = result !== null && isChosen && !result.correct
@@ -61,7 +70,7 @@ export function DominoQuestionModal({ concept, question, isSelf, answeringDispla
                 disabled={!isSelf || selectedIndex !== null || result !== null}
                 onClick={() => handleSelect(index)}
                 style={{ animationDelay: `${120 + index * 70}ms` }}
-                className={`flex min-h-[56px] items-center justify-between gap-3 rounded-2xl border-2 px-5 py-3 text-left text-[1.0625rem] font-medium transition-all duration-300 ease-out disabled:cursor-default motion-reduce:animate-none motion-reduce:transition-none ${
+                className={`flex min-h-[48px] items-center justify-between gap-3 rounded-2xl border-2 px-4 py-2 text-left text-[1rem] font-medium transition-all duration-300 ease-out disabled:cursor-default motion-reduce:animate-none motion-reduce:transition-none ${
                   isRightChosen || isWrongChosen || isChosen ? '' : 'animate-[domino-q-option-in_0.4s_cubic-bezier(0.16,1,0.3,1)_backwards]'
                 } ${
                   isRightChosen
@@ -82,7 +91,7 @@ export function DominoQuestionModal({ concept, question, isSelf, answeringDispla
         </div>
 
         {result ? (
-          <div key="result" className="mt-5 space-y-3 text-center animate-[domino-q-result-in_0.45s_cubic-bezier(0.16,1,0.3,1)_0.15s_backwards] motion-reduce:animate-none" role="status">
+          <div key="result" className="mt-4 space-y-2 text-center animate-[domino-q-result-in_0.45s_cubic-bezier(0.16,1,0.3,1)_0.15s_backwards] motion-reduce:animate-none" role="status">
             <p className={`text-[1.125rem] font-bold ${result.correct ? 'text-emerald-600' : 'text-rose-600'}`}>
               {result.correct
                 ? '¡Correcto! La ficha se colocó.'
@@ -90,10 +99,10 @@ export function DominoQuestionModal({ concept, question, isSelf, answeringDispla
                   ? 'Se acabó el tiempo: pierdes el turno.'
                   : 'Incorrecto: pierdes el turno.'}
             </p>
-            {result.explanation && <p className="text-[1rem] leading-relaxed text-text">{result.explanation}</p>}
+            {result.explanation && <p className="text-[0.9375rem] leading-snug text-text">{result.explanation}</p>}
             <button
               type="button"
-              className="mt-1 min-h-[52px] w-full rounded-2xl px-5 py-2.5 text-[1.0625rem] font-semibold text-white shadow-[0_12px_24px_-12px_var(--accent)] transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.99] motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+              className="mt-1 min-h-[48px] w-full rounded-2xl px-5 py-2 text-[1rem] font-semibold text-white shadow-[0_12px_24px_-12px_var(--accent)] transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.99] motion-reduce:transition-none motion-reduce:hover:translate-y-0"
               style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
               onClick={onClose}
             >
@@ -102,7 +111,7 @@ export function DominoQuestionModal({ concept, question, isSelf, answeringDispla
           </div>
         ) : (
           <p
-            className={`mt-5 text-center text-[1rem] text-text ${isSelf && selectedIndex !== null ? 'animate-pulse motion-reduce:animate-none' : ''}`}
+            className={`mt-4 text-center text-[0.9375rem] text-text ${isSelf && selectedIndex !== null ? 'animate-pulse motion-reduce:animate-none' : ''}`}
             role="status"
           >
             {!isSelf

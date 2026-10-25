@@ -21,7 +21,8 @@ import {
   type TournamentMatch,
 } from '../../domain/ports/tournament-store.port.js';
 import type { GuessWhoCard } from '../../application/content-validators/guess-who.content-validator.js';
-import { dominoQuestionBank, pickDominoQuestion } from '../../application/content-validators/domino-question-bank.js';
+import { dominoQuestionBank } from '../../application/content-validators/domino-question-bank.js';
+import { dominoAvailableLevels, pickDominoQuestionForLevel } from '../../application/content-validators/domino-levels.js';
 import { DOMINO_LEVELS, type DominoConcept, type DominoLevel } from '../../application/content-validators/domino.content-validator.js';
 import {
   DOMINO_ROOM_STORE,
@@ -269,7 +270,7 @@ function dominoHasValidMove(hand: DominoTile[], board: DominoPlacedTile[]): bool
 }
 
 /** Segundos por turno que se sugieren al elegir cada nivel (el anfitrión puede ajustarlos después). */
-export const DOMINO_LEVEL_TURN_SECONDS: Record<DominoLevel, number> = { EASY: 30, MEDIUM: 25, ADVANCED: 15 };
+export const DOMINO_LEVEL_TURN_SECONDS: Record<DominoLevel, number> = { EASY: 30, MEDIUM: 25, ADVANCED: 30 };
 
 /**
  * Concepto tal como viaja al cliente: la pregunta se envía sin `correctIndex`
@@ -315,6 +316,16 @@ function buildDominoPlacement(room: DominoRoomState, tile: DominoTile, side: 'le
     : { id: tile.id, left: tile.a, right: tile.b, isDouble, placedByUserId: userId };
 }
 
+/** Disponibilidad de niveles para el cliente: solo banderas y la frase corta del motivo. */
+function dominoLevelsView(room: DominoRoomState) {
+  const levels = dominoAvailableLevels(room.concepts);
+  return {
+    EASY: { available: true, reason: null as string | null },
+    MEDIUM: { available: levels.MEDIUM.available, reason: levels.MEDIUM.reason },
+    ADVANCED: { available: levels.ADVANCED.available, reason: levels.ADVANCED.reason },
+  };
+}
+
 /** Pregunta pendiente tal como la ve el cliente: quién responde y la pregunta elegida, sin correctIndex ni explanation. */
 function dominoPendingQuestionView(room: DominoRoomState, pending: DominoPendingQuestion) {
   const question = dominoQuestionBank(room.concepts[pending.conceptIndex])[pending.questionIndex];
@@ -334,6 +345,8 @@ export function toDominoClientView(room: DominoRoomState, forSocketId: string) {
     handSize: room.handSize,
     turnDurationSeconds: room.turnDurationSeconds,
     level: room.level ?? 'EASY',
+    // Qué niveles puede ofrecer el contenido y, si no, el motivo corto (sin conceptos ni banco).
+    availableLevels: dominoLevelsView(room),
     // Solo quién responde y de qué concepto: ficha, lado y respuesta correcta se quedan en el servidor.
     pendingQuestion: room.pendingQuestion ? dominoPendingQuestionView(room, room.pendingQuestion) : null,
     seenConceptIndexes: room.seenConceptIndexes ?? [],
@@ -1975,6 +1988,11 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
 
     const level = body?.level;
     if (!DOMINO_LEVELS.includes(level)) throw new Error('Nivel no válido.');
+    // Un nivel que el contenido no puede ofrecer (sin casos de aplicación o sin preguntas) no se puede elegir.
+    const availability = dominoAvailableLevels(room.concepts)[level];
+    if (!availability.available) {
+      throw new Error(`Ese nivel no está disponible: ${(availability.reason ?? 'falta contenido').toLowerCase()}.`);
+    }
 
     if ((room.level ?? 'EASY') === level) return;
     this.cancelDealCountdown('domino:' + room.code);
@@ -2057,13 +2075,16 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
 
     const placed = buildDominoPlacement(room, tile, side, player.userId);
 
-    // Intermedio: antes de colocar, se responde la pregunta del concepto del extremo que empata.
-    // Un concepto sin preguntas (juegos viejos) se coloca directo.
+    // Intermedio y Universitario: antes de colocar, se responde la pregunta del concepto del extremo que empata
+    // (en Universitario el cliente la acompaña con el caso de aplicación del concepto).
+    // Fácil, y un concepto sin preguntas (juegos viejos), se coloca directo.
     const conceptIndex = dominoMatchedConceptIndex(room, side);
-    const bankSize = conceptIndex === null ? 0 : dominoQuestionBank(room.concepts[conceptIndex]).length;
-    if ((room.level ?? 'EASY') === 'MEDIUM' && conceptIndex !== null && bankSize > 0) {
-      // Rotación: una pregunta del banco que aún no se hizo en la sala (robar y volver a jugar el mismo concepto no la repite).
-      const pick = pickDominoQuestion(bankSize, room.askedQuestions?.[conceptIndex] ?? [], room.lastQuestion?.[conceptIndex], this.dominoQuestionRng)!;
+    const bank = conceptIndex === null ? [] : dominoQuestionBank(room.concepts[conceptIndex]);
+    const level = room.level ?? 'EASY';
+    if ((level === 'MEDIUM' || level === 'ADVANCED') && conceptIndex !== null && bank.length > 0) {
+      // Rotación: una pregunta del banco que sirva para el nivel y aún no se haya hecho en la sala
+      // (robar y volver a jugar el mismo concepto no la repite). Sin ninguna marcada para el nivel, usa todo el banco.
+      const pick = pickDominoQuestionForLevel(bank, level, room.askedQuestions?.[conceptIndex] ?? [], room.lastQuestion?.[conceptIndex], this.dominoQuestionRng)!;
       room.askedQuestions = { ...room.askedQuestions, [conceptIndex]: pick.asked };
       room.lastQuestion = { ...room.lastQuestion, [conceptIndex]: pick.index };
       room.pendingQuestion = { userId: player.userId, tileId: tile.id, side, conceptIndex, questionIndex: pick.index };

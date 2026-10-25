@@ -1,5 +1,6 @@
 import type { GameTypeName } from '../../domain/value-objects/game-type.vo.js';
 import { DOMINO_ICON_CATALOG } from './domino-icon-catalog.js';
+import { assignDominoIcons, ensureLevelCoverage, sanitizeQuestionLevels, shuffleQuestionOptions, type Rng } from './domino-quality.js';
 
 /**
  * Ajustes de FORMA y TAMAÑO sobre lo que devuelve la IA, antes de pasarlo
@@ -25,6 +26,8 @@ export interface NormalizeDraftOptions {
    * tarjeta corresponde a una imagen y no se puede descartar ninguna).
    */
   dedupe?: boolean;
+  /** Azar para barajar opciones (Dominó). Por defecto `Math.random`; las pruebas inyectan uno determinista. */
+  rng?: Rng;
 }
 
 export interface NormalizedDraft {
@@ -261,6 +264,7 @@ function keepUsefulTraits(cards: unknown, catalog: Map<string, Omit<GuessWhoTrai
 function normalizeDomino(config: Record<string, unknown>, content: unknown, options: NormalizeDraftOptions): NormalizedDraft {
   const next: Record<string, unknown> = { ...config };
   setClampedInt(next, 'handSize', 3, 12);
+  const rng = options.rng ?? Math.random;
 
   const items = mapObjects(content, (raw, index) => {
     const label = trimmedLabel(raw.label, 60);
@@ -268,7 +272,12 @@ function normalizeDomino(config: Record<string, unknown>, content: unknown, opti
     // Ícono: solo claves que el cliente sabe pintar; cualquier otra cosa vuelve a "star".
     const icon = nonEmptyString(raw.icon);
     const { question: legacyQuestion, questions: rawQuestions, definition, example, application, ...rest } = raw;
-    const questions = normalizeDominoQuestions(rawQuestions, legacyQuestion);
+    // Las opciones se barajan aquí (tras limpiar duplicados) para que la correcta no quede casi siempre en la misma posición.
+    const questions = ensureLevelCoverage(
+      normalizeDominoQuestions(rawQuestions, legacyQuestion).map((q) =>
+        shuffleQuestionOptions(q as { options: string[]; correctIndex: number; levels?: Array<'MEDIUM' | 'ADVANCED'> }, rng),
+      ),
+    );
     const optionalTexts: Record<string, string> = {};
     for (const [key, value, max] of [
       ['definition', definition, 300],
@@ -287,7 +296,12 @@ function normalizeDomino(config: Record<string, unknown>, content: unknown, opti
       ...(questions.length > 0 ? { questions } : {}),
     };
   });
-  return { config: next, content: limit(options.dedupe === false ? items : dedupeBy(items, (item) => item.label), 10) };
+  const kept = limit(options.dedupe === false ? items : dedupeBy(items, (item) => item.label), 10);
+  if (!Array.isArray(kept)) return { config: next, content: kept };
+  // Íconos distintos por concepto: se evita el "star" de respaldo repetido y se infiere por el nombre.
+  const concepts = kept as Array<Record<string, unknown>>;
+  const icons = assignDominoIcons(concepts.map((item) => ({ label: String(item.label), icon: String(item.icon) })));
+  return { config: next, content: concepts.map((item, index) => ({ ...item, icon: icons[index] })) };
 }
 
 /**
@@ -323,7 +337,14 @@ function normalizeDominoQuestions(rawQuestions: unknown, legacyQuestion: unknown
     const key = text.toLowerCase().replace(/\s+/g, ' ');
     if (seenTexts.has(key)) continue;
     seenTexts.add(key);
-    result.push({ text: truncate(text, 300), options: finalOptions, correctIndex: newCorrect, explanation: truncate(explanation, 400) });
+    const levels = sanitizeQuestionLevels(raw.levels);
+    result.push({
+      text: truncate(text, 300),
+      options: finalOptions,
+      correctIndex: newCorrect,
+      explanation: truncate(explanation, 400),
+      ...(levels ? { levels } : {}),
+    });
     if (result.length === 6) break;
   }
   return result;

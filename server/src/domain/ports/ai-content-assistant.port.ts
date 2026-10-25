@@ -52,6 +52,11 @@ export interface GenerateGameDraftOutput {
    * un proveedor sin ese límite nunca lo manda.
    */
   sourceTruncated?: boolean;
+  /**
+   * Título, descripción y área que el modelo sugirió en la raíz del JSON (sin validar; el caso de
+   * uso los valida). Opcional: solo viene si las instrucciones lo pidieron.
+   */
+  identity?: { title?: unknown; description?: unknown; categoryId?: unknown; categoryName?: unknown };
 }
 
 /**
