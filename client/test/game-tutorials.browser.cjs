@@ -83,18 +83,16 @@ async function memoryTutorial(browser, viewport, touch) {
   await question.getByRole('button', { name: 'Sí' }).click()
 
   await page.locator('[data-game-tutorial]').waitFor()
-  await page.getByText('Parte 1 de 3').waitFor()
+  await page.screenshot({ path: `.scratch/tutorial-memoria-instruccion-${tag}.png` })
+  await understood(page, 'Parte 1 de 3')
   await page.waitForTimeout(600)
   await page.screenshot({ path: `.scratch/tutorial-memoria-parte1-${tag}.png` })
   const card = page.getByRole('dialog', { name: /Tutorial de/ })
-  await card.getByText('Parte 2 de 3').waitFor({ timeout: 12000 })
-  await card.getByRole('button', { name: /Siguiente/ }).click()
+  await understood(page, 'Parte 2 de 3')
 
-  await page.getByText('Parte 2 de 3').waitFor()
   await page.waitForTimeout(500)
   await flipPair(page, (await memoryPairs(page))[0])
-  await card.getByText('Parte 3 de 3').waitFor({ timeout: 6000 })
-  await card.getByRole('button', { name: /Siguiente/ }).click()
+  await understood(page, 'Parte 3 de 3')
 
   await page.getByRole('button', { name: /¡Ya, a jugar!/ }).click()
   await page.waitForTimeout(400)
@@ -119,6 +117,14 @@ async function openGame(browser, game, viewport, touch) {
   return { page, errors }
 }
 
+/** Cada parte empieza con su instrucción en el centro: «Entendido» la cierra y arranca el juego. */
+async function understood(page, part) {
+  const card = page.getByRole('dialog', { name: /Tutorial de/ })
+  if (part) await card.getByText(part).waitFor({ timeout: 12000 })
+  await card.getByRole('button', { name: /Entendido/ }).click()
+  await card.waitFor({ state: 'hidden' })
+}
+
 const press = async (page, key, wait = 0) => {
   await page.keyboard.press(key)
   if (wait) await page.waitForTimeout(wait)
@@ -137,7 +143,7 @@ async function mazeTutorial(browser, viewport, touch) {
 
   const runner = page.locator('[data-game-tutorial]')
   await runner.waitFor()
-  await page.getByText('Parte 1 de 4').waitFor()
+  await understood(page, 'Parte 1 de 4')
   await page.waitForTimeout(800)
   await page.screenshot({ path: `.scratch/tutorial-maze-parte1-${tag}.png` })
   if (touch) {
@@ -150,13 +156,11 @@ async function mazeTutorial(browser, viewport, touch) {
     await press(page, 'ArrowDown')
   }
   const card = page.getByRole('dialog', { name: /Tutorial de/ })
-  await card.waitFor({ timeout: 8000 })
-  await card.getByText('Parte 2 de 4').waitFor()
+  await card.getByText('Parte 2 de 4').waitFor({ timeout: 8000 })
   await page.screenshot({ path: `.scratch/tutorial-maze-entre-partes-${tag}.png` })
-  await card.getByRole('button', { name: /Siguiente/ }).click()
+  await understood(page)
 
   // Parte 2: recoger 4 botellas (derecha, abajo por la columna 5, izquierda y de vuelta a la derecha).
-  await page.getByText('Recoge las 4 botellas PET de esta zona.').waitFor()
   if (!touch) {
     await press(page, 'ArrowRight', 60)
     await press(page, 'ArrowDown', 1550)
@@ -164,8 +168,7 @@ async function mazeTutorial(browser, viewport, touch) {
     await press(page, 'ArrowRight')
     await card.getByText('Parte 3 de 4').waitFor({ timeout: 8000 })
     await page.screenshot({ path: `.scratch/tutorial-maze-parte3-${tag}.png` })
-    await card.getByRole('button', { name: /Siguiente/ }).click()
-    await page.getByText('Parte 3 de 4').waitFor()
+    await understood(page)
     await page.waitForTimeout(700)
     await page.screenshot({ path: `.scratch/tutorial-maze-parte3-juego-${tag}.png` })
   }
@@ -189,15 +192,72 @@ async function tfTutorial(browser, viewport, touch) {
   await page.screenshot({ path: `.scratch/tutorial-tf-pregunta-${tag}.png` })
   await guide.getByRole('button', { name: /Sí/ }).click()
   await page.locator('[data-game-tutorial]').waitFor()
-  await page.getByText('Parte 1 de 3').waitFor()
-  await page.waitForTimeout(2500)
-  await page.screenshot({ path: `.scratch/tutorial-tf-parte1-${tag}.png` })
+  await page.waitForTimeout(1500)
+  await page.screenshot({ path: `.scratch/tutorial-tf-instruccion-${tag}.png` })
+  await understood(page, 'Parte 1 de 6')
+  await page.waitForTimeout(800)
   assert.equal(await page.getByRole('button', { name: 'Despegar' }).count(), 0, 'El tutorial arranca solo, sin la pantalla de inicio')
+  // Parte 1: apenas se mueve el robot, pasa a la siguiente.
+  if (touch) await page.getByRole('button', { name: 'Derecha' }).tap()
+  else await press(page, 'ArrowRight')
+  await understood(page, 'Parte 2 de 6')
+  await page.waitForTimeout(1500)
+  await page.screenshot({ path: `.scratch/tutorial-tf-parte2-${tag}.png` })
+  if (!touch) {
+    // El juego deja su estado en window.__tfMaze (solo en desarrollo): así la prueba sabe dónde está el robot.
+    const robotAt = (row, col) => page.waitForFunction(([r, c]) => {
+      const pos = window.__tfMaze?.state.player.pos
+      return pos && pos.row === r && pos.col === c
+    }, [row, col], { timeout: 8000 })
+    const card = page.getByRole('dialog', { name: /Tutorial de/ })
+    // 2. Cruzar: derecha hasta la puerta (si la medusa lo atrapa, vuelve a intentar).
+    for (let i = 0; i < 6 && !(await card.isVisible()); i++) {
+      await press(page, 'ArrowRight', 2500)
+    }
+    await understood(page, 'Parte 3 de 6')
+    // 3. Núcleo arriba a la izquierda y después hacia la medusa, a la derecha.
+    await page.waitForTimeout(400)
+    await press(page, 'ArrowUp', 350)
+    await press(page, 'ArrowLeft')
+    await robotAt(1, 1)
+    for (let i = 0; i < 8 && !(await card.isVisible()); i++) await press(page, i % 2 ? 'ArrowLeft' : 'ArrowRight', 1200)
+    await understood(page, 'Parte 4 de 6')
+    // 4. Rejilla: abajo hasta la rejilla de la izquierda.
+    await page.waitForTimeout(400)
+    await press(page, 'ArrowDown')
+    await understood(page, 'Parte 5 de 6')
+    // 5. Apagón: zigzag por los pasillos hasta la puerta.
+    await page.waitForTimeout(400)
+    await press(page, 'ArrowRight', 60)
+    await press(page, 'ArrowDown')
+    await robotAt(3, 6)
+    await page.screenshot({ path: `.scratch/tutorial-tf-apagon-${tag}.png` })
+    await press(page, 'ArrowLeft')
+    await robotAt(3, 1)
+    await press(page, 'ArrowDown')
+    await robotAt(5, 1)
+    await press(page, 'ArrowRight')
+    await understood(page, 'Parte 6 de 6')
+    // 6. Responder: la afirmación es verdadera; se va a la sala VERDADERO.
+    await page.waitForFunction(() => window.__tfMaze?.state.phase === 'playing' && window.__tfMaze.state.zones.TRUE.pos, null, { timeout: 8000 })
+    const zone = await page.evaluate(() => window.__tfMaze.state.zones.TRUE.pos)
+    await press(page, 'ArrowUp', 350)
+    await press(page, zone.col < 4 ? 'ArrowLeft' : 'ArrowRight')
+    await card.getByRole('heading', { name: '¡Tutorial completado!' }).waitFor({ timeout: 10000 })
+    await page.screenshot({ path: `.scratch/tutorial-tf-fin-${tag}.png` })
+    await card.getByRole('button', { name: /¡A jugar!/ }).click()
+    await page.locator('[data-game-tutorial]').waitFor({ state: 'detached' })
+    await page.getByRole('button', { name: /Despegar/ }).waitFor()
+    assert.deepEqual(errors, [])
+    console.log(`PASS ${tag} Laberinto V/F: las 6 partes jugadas (mover, cruzar, aturdir, rejilla, apagón y responder), ¡A jugar! → juego`)
+    await page.close()
+    return
+  }
   await page.getByRole('button', { name: 'Salir del tutorial' }).click()
   await page.locator('[data-game-tutorial]').waitFor({ state: 'detached' })
   await page.getByRole('button', { name: /Despegar/ }).waitFor()
   assert.deepEqual(errors, [])
-  console.log(`PASS ${tag} Laberinto V/F: pregunta sin scroll, Sí → parte 1 en la nave real sin pantalla de inicio, salir → juego`)
+  console.log(`PASS ${tag} Laberinto V/F: pregunta sin scroll, Sí → instrucción y Entendido, mover el robot pasa a la parte 2 (nave de tutorial), salir → juego`)
   await page.close()
 }
 
@@ -216,10 +276,8 @@ async function guessWhoTutorial(browser, viewport, touch) {
   await question.getByRole('button', { name: 'Sí' }).click()
 
   const card = page.getByRole('dialog', { name: /Tutorial de/ })
-  const next = async (n) => {
-    await card.getByText(`Parte ${n} de 4`).waitFor({ timeout: 6000 })
-    await card.getByRole('button', { name: /Siguiente/ }).click()
-  }
+  const next = (n) => understood(page, `Parte ${n} de 4`)
+  await next(1)
   // 1. Preguntar desde el chat guiado.
   await page.getByRole('listitem', { name: 'Preguntar: ¿Tu tarjeta vuela?' }).waitFor()
   await page.waitForTimeout(500)

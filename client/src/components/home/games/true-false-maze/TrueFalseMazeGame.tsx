@@ -29,6 +29,8 @@ import {
 import { FitScale } from './FitScale'
 import { loadSpaceshipAssets, spaceshipSpriteUrl, type SpaceshipAssets } from './spaceshipAssets'
 import { SPACESHIP_MAP } from './spaceshipMap'
+import type { ShipMap } from './spaceshipMap'
+import type { TfEvent, TfState } from './trueFalseMazeEngine'
 import { INTRO_MS, type Direction, type TfAnswerRecord } from './trueFalseMazeEngine'
 import type { Insets } from './TrueFalseMazeRenderer'
 import { TrueFalseMazeGuide } from './TrueFalseMazeGuide'
@@ -38,6 +40,15 @@ import type { TrueFalseMazeConfig, TrueFalseMazeQuestion } from './trueFalseMaze
 
 /** Una parte del tutorial jugable (issue #93): la nave real con una pregunta de práctica. */
 export type TrueFalseMazeTutorialPart = {
+  /** false mientras se lee la instrucción de la parte: la nave está quieta. */
+  active: boolean
+  /** Nave chica armada para la tarea (por defecto, la nave completa). */
+  map?: ShipMap
+  /**
+   * Tarea sin afirmación (mover, esquivar, rejilla, apagón…): sin salas ni
+   * pregunta; el tutorial mira cada cuadro y decide cuándo se logró.
+   */
+  onFrame?: (state: TfState, events: TfEvent[]) => void
   /** Terminó la pregunta: `correct` dice si la respondió bien. */
   onFinished: (correct: boolean) => void
   /** Una medusa lo atrapó (en el juego costaría una batería). */
@@ -173,7 +184,8 @@ function TrueFalseMazeSession({
   const bottomPadRef = useRef<HTMLDivElement>(null)
   const pointerStart = useRef<{ x: number; y: number } | null>(null)
   const [layout, setLayout] = useState<Layout>({ width: 0, height: 0, insets: { top: 0, right: 0, bottom: 0, left: 0 } })
-  const [fullscreen, setFullscreen] = useState(false)
+  // Puede llegar ya en pantalla completa (la que dejó puesta el tutorial).
+  const [fullscreen, setFullscreen] = useState(() => typeof document !== 'undefined' && Boolean(document.fullscreenElement))
   const [wantFullscreen, setWantFullscreen] = useState(readFullscreenPreference)
   const [fullscreenHintClosed, setFullscreenHintClosed] = useState(false)
   // En el tutorial la pantalla completa la maneja el tutorial (entra al jugar y sale para explicar).
@@ -206,7 +218,11 @@ function TrueFalseMazeSession({
     config,
     assets,
     canvasRef,
-    inputEnabled: !guideOpen,
+    // En el tutorial, mientras se lee la instrucción el robot no responde.
+    inputEnabled: !guideOpen && (tutorial?.active ?? true),
+    map: tutorial?.map,
+    taskMode: Boolean(tutorial?.onFrame),
+    onFrame: tutorial?.onFrame,
     // Despegar es un gesto del jugador: ahí se puede pasar a pantalla completa sin que tenga que buscar el botón.
     onBeforeStart: () => {
       if (wantFullscreen) enterFullscreen()
@@ -240,10 +256,12 @@ function TrueFalseMazeSession({
   useEffect(() => {
     tutorialRef.current = tutorial
   })
+  // Tarea de tutorial sin afirmación: no hay panel de pregunta ni presentación.
+  const taskOnly = Boolean(tutorial?.onFrame)
   const { start } = actions
   useEffect(() => {
-    if (tutorial && assets && hud.phase === 'ready') start()
-  }, [tutorial, assets, hud.phase, start])
+    if (tutorial?.active && assets && hud.phase === 'ready') start()
+  }, [tutorial?.active, assets, hud.phase, start])
   useEffect(() => {
     if (hud.phase === 'caught') tutorialRef.current?.onCaught()
     if (hud.phase === 'finished') tutorialRef.current?.onFinished(hud.answers.length > 0 && hud.answers.every((answer) => answer.correct))
@@ -303,12 +321,13 @@ function TrueFalseMazeSession({
     return () => document.removeEventListener('fullscreenchange', onChange)
   }, [pause])
 
-  // Al salir del juego no se deja la pantalla completa puesta.
+  // Al salir del juego no se deja la pantalla completa puesta (en el tutorial sigue: la maneja el tutorial).
+  const partOfTutorial = Boolean(tutorial)
   useEffect(
     () => () => {
-      if (document.fullscreenElement) void document.exitFullscreen().catch(() => {})
+      if (!partOfTutorial && document.fullscreenElement) void document.exitFullscreen().catch(() => {})
     },
-    [],
+    [partOfTutorial],
   )
 
   // El manejador de teclas vive entre renders: lee siempre la versión más reciente de la función.
@@ -418,7 +437,7 @@ function TrueFalseMazeSession({
           <div className="ml-auto">{controls}</div>
         </div>
         <HudBar hud={hud} compact className="pointer-events-auto w-full" />
-        <QuestionPanel hud={hud} title={title} relocateTotal={relocateEnabled ? config.relocateSeconds : 0} compact className="pointer-events-auto" />
+        {!taskOnly && <QuestionPanel hud={hud} title={title} relocateTotal={relocateEnabled ? config.relocateSeconds : 0} compact className="pointer-events-auto" />}
         <div className="pointer-events-none relative">{statusStack}</div>
         {coarsePointer && (
           <div className="pointer-events-auto flex justify-center pt-1">
@@ -434,15 +453,17 @@ function TrueFalseMazeSession({
           <div className="order-1 flex">{pauseButton}</div>
           <div className="order-2 ml-auto flex sm:order-3 sm:ml-0 xl:order-4">{controls}</div>
           <HudBar hud={hud} className="order-3 basis-full sm:order-2 sm:basis-0 sm:flex-1 xl:flex-none xl:basis-auto" />
-          <QuestionPanel
-            hud={hud}
-            title={title}
-            relocateTotal={relocateEnabled ? config.relocateSeconds : 0}
-            className="order-4 basis-full xl:order-3 xl:basis-0"
-          />
+          {!taskOnly && (
+            <QuestionPanel
+              hud={hud}
+              title={title}
+              relocateTotal={relocateEnabled ? config.relocateSeconds : 0}
+              className="order-4 basis-full xl:order-3 xl:basis-0"
+            />
+          )}
         </div>
         <div className="pointer-events-none relative">{statusStack}</div>
-        {portraitPhone && playing && (
+        {portraitPhone && playing && !tutorial && (
           <p className="pointer-events-none mx-auto mt-2 w-fit max-w-full rounded-full border border-white/10 bg-slate-950/70 px-3 py-1 text-center text-[11.5px] text-slate-300 backdrop-blur">
             Gira el teléfono para ver la nave más grande
           </p>
@@ -492,7 +513,7 @@ function TrueFalseMazeSession({
           onExit={onExit}
         />
       )}
-      {hud.phase === 'intro' && hud.statement && (
+      {hud.phase === 'intro' && hud.statement && !taskOnly && (
         <IntroCard key={hud.questionIndex} index={hud.questionIndex} total={hud.totalQuestions} statement={hud.statement} />
       )}
       {hud.phase === 'feedback' && hud.result && (

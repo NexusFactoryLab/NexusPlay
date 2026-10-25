@@ -24,6 +24,8 @@ export type MazeTutorialPart = {
   scenario: MazeScenario
   /** Zona del mapa que se enseña, en celdas. */
   focus: { row: number; col: number; rows: number; cols: number }
+  /** false mientras se lee la instrucción de la parte: el camión todavía no responde. */
+  active: boolean
   onDone: () => void
   /** Una nube alcanzó al camión: el escenario volvió a empezar. */
   onCaught: () => void
@@ -186,7 +188,8 @@ function MazeCollectorSession({
   onCloseGuide,
   onStartTutorial,
 }: MazeCollectorGameProps & { guideOpen: boolean; onOpenGuide: () => void; onCloseGuide: () => void; onStartTutorial?: () => void }) {
-  const game = useMazeCollectorGame({ layout, items, config, inputEnabled: !guideOpen, scenario: tutorial?.scenario })
+  // En el tutorial, mientras se lee la instrucción el camión no responde.
+  const game = useMazeCollectorGame({ layout, items, config, inputEnabled: !guideOpen && (tutorial?.active ?? true), scenario: tutorial?.scenario })
   const focus = tutorial?.focus
   const isCity = config.layout === 'CITY'
   // En Ciudad, la primera y la última fila son franjas verdes decorativas: se
@@ -198,7 +201,8 @@ function MazeCollectorSession({
   const [cameraMode, setCameraMode] = useState(false)
   const [view, setView] = useState({ width: 0, height: 0 })
   const swipeStart = useRef<{ x: number; y: number } | null>(null)
-  const [fullscreen, setFullscreen] = useState(false)
+  // Puede llegar ya en pantalla completa (la que dejó puesta el tutorial).
+  const [fullscreen, setFullscreen] = useState(() => typeof document !== 'undefined' && Boolean(document.fullscreenElement))
   const [wantFullscreen, setWantFullscreen] = useState(readFullscreenPreference)
   const [fullscreenHintClosed, setFullscreenHintClosed] = useState(false)
   // En el tutorial la pantalla completa la maneja el tutorial (entra al jugar y sale para explicar).
@@ -287,12 +291,13 @@ function MazeCollectorSession({
     return () => document.removeEventListener('fullscreenchange', onChange)
   }, [pause])
 
-  // Al salir del juego no se deja la pantalla completa puesta.
+  // Al salir del juego no se deja la pantalla completa puesta (en el tutorial sigue: la maneja el tutorial).
+  const partOfTutorial = Boolean(tutorial)
   useEffect(
     () => () => {
-      if (document.fullscreenElement) void document.exitFullscreen().catch(() => {})
+      if (!partOfTutorial && document.fullscreenElement) void document.exitFullscreen().catch(() => {})
     },
-    [],
+    [partOfTutorial],
   )
 
   // El manejador de teclas vive entre renders: lee siempre la versión más reciente.

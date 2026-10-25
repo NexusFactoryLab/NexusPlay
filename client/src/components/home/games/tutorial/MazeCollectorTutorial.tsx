@@ -43,6 +43,7 @@ export function MazeCollectorTutorial({
           tutorial={{
             scenario,
             focus,
+            active: context.active,
             onDone: context.onDone,
             onCaught: () => context.onMistake('¡La nube te alcanzó! En el juego perderías una vida. Vuelves a empezar esta parte.'),
           }}
@@ -88,6 +89,5 @@ export function MazeCollectorTutorial({
     },
   ]
 
-  // En celular vertical la cruceta del juego ocupa la franja de abajo: la tarea va encima.
-  return <TutorialRunner name="el Camión Reciclador" parts={parts} onFinish={onFinish} touchBannerBottom={184} />
+  return <TutorialRunner name="el Camión Reciclador" parts={parts} onFinish={onFinish} />
 }

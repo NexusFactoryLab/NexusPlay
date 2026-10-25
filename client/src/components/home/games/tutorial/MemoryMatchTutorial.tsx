@@ -17,6 +17,8 @@ export function MemoryMatchTutorial({ onFinish, ...game }: GameProps & { onFinis
   const small = Math.min(3, game.pairs.length)
   const board = (goal: MemoryMatchTutorialPart['goal'], overrides: Partial<GameProps>): TutorialPart['render'] =>
     function MemoryPart(context) {
+      // Mientras se lee la instrucción no se monta el tablero: así la vista previa y el reloj no corren.
+      if (!context.active) return <div className="fixed inset-0 z-50 bg-bg" />
       return (
         <MemoryMatchGame
           {...game}

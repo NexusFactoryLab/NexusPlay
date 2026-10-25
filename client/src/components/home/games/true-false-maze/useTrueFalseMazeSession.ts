@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 import type { SpaceshipAssets } from './spaceshipAssets'
 import { SPACESHIP_MAP } from './spaceshipMap'
+import type { ShipMap } from './spaceshipMap'
 import {
   createTfState,
   currentQuestion,
@@ -14,6 +15,7 @@ import {
   ZONE_WARNING_MS,
   type Direction,
   type TfAnswerRecord,
+  type TfEvent,
   type TfPhase,
   type TfResult,
   type TfState,
@@ -120,6 +122,15 @@ type Options = {
    * pedir la pantalla completa sin que el jugador lo haga a mano.
    */
   onBeforeStart?: () => void
+  /** Mapa de la nave: por defecto la nave completa; el tutorial usa naves chicas, una por tarea. */
+  map?: ShipMap
+  /**
+   * Tutorial (issue #93): una tarea sin afirmaciones (mover, esquivar, usar la
+   * rejilla…). Se salta la presentación de la pregunta y no aparecen salas.
+   */
+  taskMode?: boolean
+  /** Se llama en cada cuadro con el estado y lo que pasó (el tutorial mira ahí si se logró la tarea). */
+  onFrame?: (state: TfState, events: TfEvent[]) => void
 }
 
 /**
@@ -127,8 +138,22 @@ type Options = {
  * mueve el loop con requestAnimationFrame. El HUD de React solo se
  * actualiza cuando cambia algo visible (puntos, vidas, fase...).
  */
-export function useTrueFalseMazeSession({ questions, config, assets, canvasRef, inputEnabled = true, onBeforeStart }: Options) {
-  const [initialState] = useState(() => createTfState({ map: SPACESHIP_MAP, questions, config }))
+export function useTrueFalseMazeSession({
+  questions,
+  config,
+  assets,
+  canvasRef,
+  inputEnabled = true,
+  onBeforeStart,
+  map = SPACESHIP_MAP,
+  taskMode = false,
+  onFrame,
+}: Options) {
+  const [initialState] = useState(() => createTfState({ map, questions, config }))
+  const onFrameRef = useRef(onFrame)
+  useEffect(() => {
+    onFrameRef.current = onFrame
+  })
   const [sfx] = useState(() => new TrueFalseMazeSfx(readMutedPreference()))
   const stateRef = useRef<TfState>(initialState)
   const rendererRef = useRef<TrueFalseMazeRenderer | null>(null)
@@ -159,14 +184,14 @@ export function useTrueFalseMazeSession({ questions, config, assets, canvasRef, 
   useEffect(() => {
     const canvas = canvasRef.current
     if (!assets || !canvas) return
-    const created = new TrueFalseMazeRenderer(canvas, assets, SPACESHIP_MAP)
+    const created = new TrueFalseMazeRenderer(canvas, assets, map, { fitWhole: map !== SPACESHIP_MAP })
     rendererRef.current = created
     setRenderer(created)
     return () => {
       rendererRef.current = null
       setRenderer(null)
     }
-  }, [assets, canvasRef])
+  }, [assets, canvasRef, map])
 
   useEffect(() => () => sfx.dispose(), [sfx])
 
@@ -180,6 +205,8 @@ export function useTrueFalseMazeSession({ questions, config, assets, canvasRef, 
       last = time
       if (pausedRef.current) return
       const state = stateRef.current
+      // Tarea de tutorial: sin la presentación de la afirmación (se juega en cuanto arranca).
+      if (taskMode && state.phase === 'intro') state.phaseUntil = state.now
       // Sub-pasos de 25 ms: aunque el navegador dibuje lento (equipos sin
       // aceleración gráfica), el juego avanza a velocidad real y nadie
       // "atraviesa" a una medusa entre un frame y otro. Más de 150 ms es un
@@ -190,7 +217,15 @@ export function useTrueFalseMazeSession({ questions, config, assets, canvasRef, 
         tickTf(state, step)
         remaining -= step
       }
-      const events = drainTfEvents(state)
+      if (taskMode) {
+        // Tarea de tutorial: sin salas VERDADERO/FALSO ni cuenta regresiva para moverlas.
+        state.zones.TRUE.pos = null
+        state.zones.FALSE.pos = null
+        state.relocateAt = null
+      }
+      // En una tarea no hay salas: sus movimientos (hacia ningún lado) no se anuncian ni se dibujan.
+      const events = drainTfEvents(state).filter((event) => !taskMode || (event.type !== 'zones-move' && event.type !== 'zones-warning'))
+      onFrameRef.current?.(state, events)
       const current = rendererRef.current
       // Solo en desarrollo (se elimina del build): deja el estado a mano para las pruebas en navegador.
       if (import.meta.env.DEV) (window as unknown as { __tfMaze?: unknown }).__tfMaze = { state, renderer: current }
@@ -203,7 +238,7 @@ export function useTrueFalseMazeSession({ questions, config, assets, canvasRef, 
     }
     frame = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(frame)
-  }, [assets, publish, sfx])
+  }, [assets, publish, sfx, taskMode])
 
   const setPausedBoth = useCallback(
     (value: boolean) => {
@@ -258,13 +293,13 @@ export function useTrueFalseMazeSession({ questions, config, assets, canvasRef, 
   }, [sfx])
 
   const restart = useCallback(() => {
-    stateRef.current = createTfState({ map: SPACESHIP_MAP, questions, config })
+    stateRef.current = createTfState({ map, questions, config })
     rendererRef.current?.reset()
     pausedRef.current = false
     setPaused(false)
     hudKeyRef.current = ''
     publish()
-  }, [questions, config, publish])
+  }, [map, questions, config, publish])
 
   // Teclado: flechas/WASD mueven; Espacio/Enter empieza, salta el resultado o reanuda; P/Esc pausa; M silencia.
   useEffect(() => {

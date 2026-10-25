@@ -257,7 +257,11 @@ export class TrueFalseMazeRenderer {
   private nextShootingStarAt = 4000
   private readonly emitters = new Map<string, number>()
 
-  constructor(canvas: HTMLCanvasElement, assets: SpaceshipAssets, map: ShipMap) {
+  /** Naves chicas del tutorial: se ven enteras (sin el zoom que cubre la pantalla con la nave completa). */
+  private readonly fitWhole: boolean
+
+  constructor(canvas: HTMLCanvasElement, assets: SpaceshipAssets, map: ShipMap, options: { fitWhole?: boolean } = {}) {
+    this.fitWhole = options.fitWhole ?? false
     const ctx = canvas.getContext('2d')
     if (!ctx) throw new Error('El navegador no permite dibujar en canvas.')
     this.canvas = canvas
@@ -280,7 +284,9 @@ export class TrueFalseMazeRenderer {
   resize(cssWidth: number, cssHeight: number, devicePixelRatio: number, insets: Insets = NO_INSETS) {
     const availWidth = Math.max(120, cssWidth - insets.left - insets.right)
     const availHeight = Math.max(120, cssHeight - insets.top - insets.bottom)
-    const scale = fitShipScale(availWidth, availHeight, this.shipWidth, this.shipHeight)
+    const scale = this.fitWhole
+      ? Math.min(availWidth / this.shipWidth, availHeight / this.shipHeight)
+      : fitShipScale(availWidth, availHeight, this.shipWidth, this.shipHeight)
     // La capa de la nave puede ser más grande que la pantalla: el tope de píxeles cuenta las dos.
     const largest = Math.max(1, cssWidth * cssHeight, this.shipWidth * this.shipHeight * scale * scale)
     const dpr = Math.max(1, Math.min(devicePixelRatio, 2, Math.sqrt(MAX_LAYER_PIXELS / largest)))

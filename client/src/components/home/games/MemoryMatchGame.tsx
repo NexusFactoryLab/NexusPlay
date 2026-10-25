@@ -8,6 +8,27 @@ import { MemoryMatchFlash } from './MemoryMatchFlash'
 import { MemoryCityBackdrop } from './MemoryCityBackdrop'
 import { bestBoardGrid } from './memoryMatchLayout'
 import { MemoryMatchTutorial } from './tutorial/MemoryMatchTutorial'
+import { enterPageFullscreen } from './tutorial/TutorialRunner'
+import { Maximize, Minimize } from 'lucide-react'
+
+const FULLSCREEN_PREF_KEY = 'nexusplay-memory-fullscreen'
+
+/** "Jugar en pantalla completa" viene activado y se recuerda lo último que eligió el jugador. */
+function readFullscreenPreference(): boolean {
+  try {
+    return window.localStorage.getItem(FULLSCREEN_PREF_KEY) !== 'off'
+  } catch {
+    return true
+  }
+}
+
+function saveFullscreenPreference(value: boolean) {
+  try {
+    window.localStorage.setItem(FULLSCREEN_PREF_KEY, value ? 'on' : 'off')
+  } catch {
+    // Sin almacenamiento (modo privado): la elección vale solo para esta partida.
+  }
+}
 
 const BOARD_GAP = 8
 import { useAuth } from '../../../hooks/useAuth'
@@ -104,6 +125,33 @@ function MemoryMatchSession({
     if (goal === 'zone' && game.phase === 'time-up') part.onFailed('Se acabó el tiempo antes de completar la zona. ¡Inténtalo otra vez!')
   }, [goal, game.phase, game.matchedPairIds.length])
 
+  // Pantalla completa (como en el Camión y el Laberinto V/F): el navegador solo
+  // la deja pedir dentro de un gesto, así que se aplica con el primer toque al
+  // tablero; el botón de arriba la quita o la vuelve a poner (y se recuerda).
+  const canFullscreen = !tutorial && typeof document !== 'undefined' && document.fullscreenEnabled
+  const [fullscreen, setFullscreen] = useState(() => typeof document !== 'undefined' && Boolean(document.fullscreenElement))
+  const [wantFullscreen, setWantFullscreen] = useState(readFullscreenPreference)
+  useEffect(() => {
+    const onChange = () => setFullscreen(Boolean(document.fullscreenElement))
+    document.addEventListener('fullscreenchange', onChange)
+    return () => document.removeEventListener('fullscreenchange', onChange)
+  }, [])
+  const partOfTutorial = Boolean(tutorial)
+  useEffect(
+    () => () => {
+      // Al salir del juego no se deja la pantalla completa puesta (en el tutorial sigue).
+      if (!partOfTutorial && document.fullscreenElement) void document.exitFullscreen().catch(() => {})
+    },
+    [partOfTutorial],
+  )
+  function toggleFullscreen() {
+    const next = !document.fullscreenElement
+    setWantFullscreen(next)
+    saveFullscreenPreference(next)
+    if (next) enterPageFullscreen()
+    else void document.exitFullscreen().catch(() => {})
+  }
+
   const reportedRef = useRef(false)
   useEffect(() => {
     if (tutorial || game.phase !== 'finished' || reportedRef.current || !token || !gameId) return
@@ -151,7 +199,12 @@ function MemoryMatchSession({
   return (
     // Pantalla completa sin scroll: barra superior compacta y el tablero ocupa
     // el resto; las cartas se dimensionan para caber (ver memoryMatchLayout).
-    <div className="fixed inset-0 z-50 flex h-dvh flex-col overflow-hidden bg-bg">
+    <div
+      className="fixed inset-0 z-50 flex h-dvh flex-col overflow-hidden bg-bg"
+      onPointerDown={() => {
+        if (canFullscreen && wantFullscreen) enterPageFullscreen()
+      }}
+    >
       <MemoryCityBackdrop />
       <div className="relative mx-auto flex h-full w-full max-w-[1600px] flex-col gap-2 p-2 sm:p-3">
         {/* Encabezado y contadores en una sola placa: se lee bien encima del cielo. */}
@@ -164,6 +217,25 @@ function MemoryMatchSession({
             >
               ← Salir
             </button>
+            {canFullscreen && (
+              <button
+                type="button"
+                aria-label={fullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+                title={fullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+                className={`flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[12px] font-semibold ${
+                  fullscreen ? 'border-border bg-bg text-text-h' : 'border-accent bg-accent/10 text-accent'
+                }`}
+                onClick={(event) => {
+                  // El toque del tablero ya la pediría: este botón decide por sí solo.
+                  event.stopPropagation()
+                  toggleFullscreen()
+                }}
+                onPointerDown={(event) => event.stopPropagation()}
+              >
+                {fullscreen ? <Minimize className="h-3.5 w-3.5" /> : <Maximize className="h-3.5 w-3.5" />}
+                <span className="max-sm:hidden">{fullscreen ? 'Salir' : 'Pantalla completa'}</span>
+              </button>
+            )}
             <div className="min-w-0">
               <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-accent">{title}</p>
               <p className="text-[15px] font-semibold leading-tight text-text-h">
