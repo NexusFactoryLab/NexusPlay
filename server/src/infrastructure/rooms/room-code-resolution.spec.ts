@@ -100,7 +100,7 @@ describe('RoomsGateway room code registry', () => {
     const gateway = new RoomsGateway(
       new JwtService(),
       gameRepository,
-      {} as UserRepository,
+      { findById: async () => ({ isAdmin: () => true }) } as unknown as UserRepository,
       stores.room,
       stores.tournament,
       stores.domino,

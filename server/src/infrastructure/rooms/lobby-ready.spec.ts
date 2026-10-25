@@ -65,16 +65,6 @@ const modes = [
     store: 'dual',
     delay: false,
   },
-  {
-    name: 'tournament',
-    type: 'GUESS_WHO',
-    create: 'handleTournamentCreate',
-    join: 'handleTournamentJoin',
-    ready: 'handleTournamentReady',
-    start: 'handleTournamentStart',
-    store: 'tournament',
-    delay: false,
-  },
 ] as const;
 type Mode = (typeof modes)[number];
 
@@ -138,15 +128,12 @@ async function setup(mode: Mode, count = 2) {
     }),
   } as unknown as Server;
   const sockets = Array.from({ length: count }, (_, i) => client(`p${i}`));
-  await gateway[mode.create](sockets[0], {
-    gameId: 'game',
-    maxParticipants: 10,
-  });
+  const createBody = { gameId: 'game', maxParticipants: 10 };
+  await gateway[mode.create](sockets[0], createBody);
   const room = stores[mode.store].findBySocketId('p0')!;
   for (const socket of sockets.slice(1))
     gateway[mode.join](socket, { code: room.code });
-  const players = () =>
-    'participants' in room ? room.participants : room.players;
+  const players = () => room.players;
   const ready = (index: number, value = true) =>
     gateway[mode.ready](sockets[index], { ready: value });
   return { gateway, room, sockets, stores, players, ready, events };
@@ -185,9 +172,7 @@ describe.each(modes)('$name: consenso en el servidor', (mode) => {
       ).toHaveLength(1);
       vi.advanceTimersByTime(3000);
     }
-    expect(h.room.phase).toBe(
-      mode.name === 'tournament' ? 'RUNNING' : 'PLAYING',
-    );
+    expect(h.room.phase).toBe('PLAYING');
     expect(() => h.ready(1)).not.toThrow();
     expect(() => h.ready(0, false)).toThrow();
   });
@@ -289,27 +274,9 @@ describe('salas de varios participantes', () => {
     h.gateway.handleDisconnect(h.sockets[3]);
     expect(h.room.phase).toBe('PLAYING');
   });
-  it('el torneo exige cantidad par además de unanimidad y reevalúa al salir', async () => {
-    const h = await setup(modes[4], 3);
-    h.ready(0);
-    h.ready(1);
-    h.ready(2);
-    expect(h.room.phase).toBe('WAITING');
-    h.gateway.handleTournamentLeave(h.sockets[2]);
-    expect(h.room.phase).toBe('RUNNING');
-  });
-  it('el torneo de 4 no inicia hasta la cuarta confirmación', async () => {
-    const h = await setup(modes[4], 4);
-    h.ready(1);
-    h.ready(2);
-    h.ready(3);
-    expect(h.room.phase).toBe('WAITING');
-    h.ready(0);
-    expect(h.room.phase).toBe('RUNNING');
-  });
 });
 
-describe.each([modes[0], modes[1], modes[2], modes[4]])(
+describe.each([modes[0], modes[1], modes[2]])(
   '$name: configuración',
   (mode) => {
     it('cambiar el turno exige que todos vuelvan a confirmar', async () => {
@@ -368,7 +335,6 @@ describe.each(modes.slice(0, 3))(
 const chatHandlers = {
   room: 'handleChat',
   domino: 'handleDominoChat',
-  tournament: 'handleTournamentChat',
   'snakes-ladders': 'handleSnakesLaddersChat',
   'dual-quest': 'handleDualQuestChat',
 } as const;

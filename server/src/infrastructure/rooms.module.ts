@@ -10,7 +10,8 @@ import { DUAL_QUEST_ROOM_STORE } from '../domain/ports/dual-quest-room-store.por
 import { MongoService } from './persistence/mongo/mongo.service.js';
 import { MongoGameRepository } from './persistence/mongo/mongo-game.repository.js';
 import { InMemoryRoomStore } from './rooms/in-memory-room.store.js';
-import { InMemoryTournamentStore } from './rooms/in-memory-tournament.store.js';
+import { PrismaTournamentStore } from './rooms/prisma-tournament.store.js';
+import { PrismaService } from './persistence/prisma/prisma.service.js';
 import { InMemoryDominoRoomStore } from './rooms/in-memory-domino-room.store.js';
 import { InMemorySnakesLaddersRoomStore } from './rooms/in-memory-snakes-ladders-room.store.js';
 import { InMemoryDualQuestRoomStore } from './rooms/in-memory-dual-quest-room.store.js';
@@ -27,7 +28,9 @@ import { AiCoreModule } from './ai-core.module.js';
     MongoService,
     { provide: GAME_REPOSITORY, useClass: MongoGameRepository },
     { provide: ROOM_STORE, useClass: InMemoryRoomStore },
-    { provide: TOURNAMENT_STORE, useClass: InMemoryTournamentStore },
+    // Memoria como fuente viva + volcado a Postgres con soft delete (issue #102).
+    PrismaService,
+    { provide: TOURNAMENT_STORE, useClass: PrismaTournamentStore },
     { provide: DOMINO_ROOM_STORE, useClass: InMemoryDominoRoomStore },
     { provide: SNAKES_LADDERS_ROOM_STORE, useClass: InMemorySnakesLaddersRoomStore },
     { provide: DUAL_QUEST_ROOM_STORE, useClass: InMemoryDualQuestRoomStore },

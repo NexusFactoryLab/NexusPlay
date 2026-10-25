@@ -96,6 +96,21 @@ export type TournamentParticipantView = {
   eliminatedAtRound: number | null
   ready?: boolean
   isSelf: boolean
+  wins: number
+  losses: number
+  botMatches: number
+  questionsAsked: number
+  wrongAccusations: number
+}
+
+export type TournamentLiveMatch = {
+  matchCode: string
+  phase: RoomPhase
+  vsBot: boolean
+  activePlayerUserId: string | null
+  winnerUserId: string | null
+  players: { userId: string; displayName: string; discardedCount: number }[]
+  totalCards: number
 }
 
 export type TournamentRoundMatchSummary = {
@@ -104,6 +119,7 @@ export type TournamentRoundMatchSummary = {
   phase: RoomPhase
   playerUserIds: string[]
   winnerUserId: string | null
+  vsBot: boolean
 }
 
 export type TournamentRoundSummary = {
@@ -134,9 +150,14 @@ export type TournamentStateView = {
   turnDurationSeconds: number
   phase: TournamentPhase
   currentRound: number
+  totalRounds: number
   creatorUserId: string
+  /** true para el administrador que modera: ve el panel y no juega. */
+  isModerator: boolean
   winnerUserId: string | null
   participants: TournamentParticipantView[]
+  /** Partidas de la ronda actual; solo llega al moderador. */
+  liveMatches: TournamentLiveMatch[]
   rounds: TournamentRoundSummary[]
   myMatch: TournamentMatchStateView | null
 }

@@ -1,9 +1,10 @@
 import { GameInstructionsGate } from './GameInstructionsGate'
 import { ChatPanel } from './ChatPanel'
-import { MultiplayerLobby } from './MultiplayerLobby'
+import { TournamentLobby } from './TournamentLobby'
+import { TournamentModeratorPanel } from './TournamentModeratorPanel'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Crown, LogOut, Skull, Trophy, Users } from 'lucide-react'
+import { Crown, LogOut, Trophy, Users } from 'lucide-react'
 import { useAuth } from '../../../hooks/useAuth'
 import { useGuessWhoTournament } from './useGuessWhoTournament'
 import { Modal } from './Modal'
@@ -11,11 +12,13 @@ import { MatchBoard } from './MatchBoard'
 import { MIN_DISCARDS_TO_ACCUSE } from './guessWhoTypes'
 
 /** Debe coincidir con TOURNAMENT_MAX_PARTICIPANTS del gateway. */
-const MAX_PARTICIPANTS_LIMIT = 10
+const MAX_PARTICIPANTS_LIMIT = 40
 const MIN_PARTICIPANTS_LIMIT = 2
+const DEFAULT_ROUNDS = 3
+const MAX_ROUNDS = 10
 
 /**
- * Sala de torneo eliminatorio ("¿Quién Es?" grupal) en página propia (ruta
+ * Sala de torneo por puntos, moderado por un administrador ("¿Quién Es?" grupal) en página propia (ruta
  * `/quien-es/torneo/:code?`, ver App.tsx), mismo criterio que
  * GuessWhoRoomPage/DominoRoomPage: reconecta al torneo en curso vía el
  * código en la URL, y no deja el Sidebar/header de HomeLayout montado detrás.
@@ -40,9 +43,9 @@ function TournamentSession() {
     clearMatchAccusationFailedMessage,
     createTournament,
     joinTournament,
-    setReady,
-    messages,
-    sendChatMessage,
+    startTournament,
+    closeTournament,
+    closed,
     sendMatchMessage,
     askQuestion,
     answerQuestion,
@@ -55,7 +58,8 @@ function TournamentSession() {
 
   const startedRef = useRef(false)
   const [joinCodeInput, setJoinCodeInput] = useState('')
-  const [maxParticipantsText, setMaxParticipantsText] = useState('4')
+  const [maxParticipantsText, setMaxParticipantsText] = useState('40')
+  const [roundsText, setRoundsText] = useState(String(DEFAULT_ROUNDS))
   const [maxParticipantsWarning, setMaxParticipantsWarning] = useState<string | null>(null)
   const [showPairingOverlay, setShowPairingOverlay] = useState(false)
 
@@ -110,8 +114,24 @@ function TournamentSession() {
     const safeValue = Number.isInteger(parsed)
       ? Math.min(MAX_PARTICIPANTS_LIMIT, Math.max(MIN_PARTICIPANTS_LIMIT, parsed))
       : MIN_PARTICIPANTS_LIMIT
+    const parsedRounds = Number(roundsText)
+    const safeRounds = Number.isInteger(parsedRounds) ? Math.min(MAX_ROUNDS, Math.max(1, parsedRounds)) : DEFAULT_ROUNDS
     startedRef.current = true
-    createTournament(gameIdToCreate ?? '', safeValue)
+    createTournament(gameIdToCreate ?? '', safeValue, safeRounds)
+  }
+
+  // El administrador cerró el torneo.
+  if (closed) {
+    return (
+      <Modal onClose={() => navigate('/')}>
+        <div className="flex flex-col items-center gap-3 py-4 text-center">
+          <p className="text-[15px] font-semibold text-text-h">El administrador cerró el torneo.</p>
+          <button type="button" className="rounded-lg border border-border px-4 py-2 text-[14px] font-medium text-text-h" onClick={() => navigate('/')}>
+            Volver al inicio
+          </button>
+        </div>
+      </Modal>
+    )
   }
 
   // Sin código ni gameId en la URL: solo cabe unirse con un código (crear
@@ -162,7 +182,7 @@ function TournamentSession() {
           <h2 className="mb-1 text-[19px] tracking-tight text-text-h">Modo grupo</h2>
           <div className="rounded-xl border border-border p-4">
             <label className="mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="max-participants-input-2">
-              Cupo máximo (hasta 10)
+              Cupo máximo (hasta 40)
             </label>
             <input
               id="max-participants-input-2"
@@ -188,6 +208,23 @@ function TournamentSession() {
                 {maxParticipantsWarning}
               </p>
             )}
+          </div>
+          <div className="rounded-xl border border-border p-4">
+            <label className="mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="rounds-input">
+              Rondas (1 a {MAX_ROUNDS})
+            </label>
+            <input
+              id="rounds-input"
+              type="number"
+              min={1}
+              max={MAX_ROUNDS}
+              className="w-full rounded-lg border border-border bg-bg px-[13px] py-2 text-[14px] text-text-h outline-none focus:border-accent"
+              value={roundsText}
+              onChange={(event) => setRoundsText(event.target.value)}
+            />
+            <p className="mt-1.5 text-[12px] text-text">
+              Todos juegan todas las rondas; cada ronda se empareja al azar y quien quede impar juega contra el bot.
+            </p>
           </div>
           <div className="flex gap-2">
             <button
@@ -225,16 +262,25 @@ function TournamentSession() {
   }
 
   const self = tournament.participants.find((p) => p.isSelf)
-  const isCreator = tournament.creatorUserId === user?.id
-  const iAmEliminated = self?.eliminated ?? false
   const tournamentWinnerName = tournament.participants.find((p) => p.userId === tournament.winnerUserId)?.displayName
 
-  if (tournament.phase === 'WAITING') return <MultiplayerLobby
-    room={{ ...tournament, players: tournament.participants }} roomPath={`/quien-es/torneo/${encodeURIComponent(tournament.code)}`}
-    maxPlayers={tournament.maxParticipants} isHost={isCreator} connecting={connecting} error={error} requireEven
-    turnDurationSeconds={tournament.turnDurationSeconds} onUpdateTurnDuration={updateTurnDuration}
-    onReady={setReady} onExit={handleExit} messages={messages} onSend={sendChatMessage}
-  />
+  if (tournament.phase === 'WAITING') {
+    return (
+      <TournamentLobby
+        tournament={tournament}
+        error={error}
+        onUpdateTurnDuration={updateTurnDuration}
+        onStart={startTournament}
+        onClose={closeTournament}
+        onExit={handleExit}
+      />
+    )
+  }
+
+  // El administrador no juega: ve el panel con la clasificación y las partidas en vivo.
+  if (tournament.isModerator) {
+    return <TournamentModeratorPanel tournament={tournament} error={error} onClose={closeTournament} onExit={handleExit} />
+  }
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-bg">
@@ -247,7 +293,10 @@ function TournamentSession() {
           <div>
             <h2 className="text-[19px] tracking-tight text-text-h">{tournament.gameTitle} — Grupo</h2>
             {tournament.phase === 'RUNNING' && (
-              <p className="text-[12.5px] text-text">Ronda {tournament.currentRound}</p>
+              <p className="text-[12.5px] text-text">
+                Ronda {tournament.currentRound} de {tournament.totalRounds}
+                {self ? ` · ${self.points} pts` : ''}
+              </p>
             )}
           </div>
           <button
@@ -281,11 +330,7 @@ function TournamentSession() {
           </p>
         )}
 
-        {tournament.phase === 'RUNNING' && iAmEliminated && (
-          <EliminatedSummary tournament={tournament} selfUserId={user?.id ?? null} />
-        )}
-
-        {tournament.phase === 'RUNNING' && !iAmEliminated && tournament.myMatch && self && (
+        {tournament.phase === 'RUNNING' && tournament.myMatch && self && (
           <RunningMatch
             error={error}
             onSend={sendMatchMessage}
@@ -301,10 +346,11 @@ function TournamentSession() {
           />
         )}
 
-        {tournament.phase === 'RUNNING' && !iAmEliminated && !tournament.myMatch && (
+        {tournament.phase === 'RUNNING' && !tournament.myMatch && (
           <div className="flex flex-col items-center gap-3 py-8 text-center">
-            <p className="text-[14px] font-medium text-text-h">Avanzaste esta ronda sin jugar (bye).</p>
-            <p className="text-[13px] text-text">Esperando a que termine la ronda…</p>
+            <p className="text-[14px] font-medium text-text-h">Terminaste tu partida de la ronda {tournament.currentRound}.</p>
+            <p className="text-[13px] text-text">Esperando a que terminen las demás para empezar la siguiente…</p>
+            <RoundsRanking tournament={tournament} selfUserId={user?.id ?? null} />
           </div>
         )}
 
@@ -404,25 +450,6 @@ function RunningMatch({
   )
 }
 
-function EliminatedSummary({
-  tournament,
-  selfUserId,
-}: {
-  tournament: NonNullable<ReturnType<typeof useGuessWhoTournament>['tournament']>
-  selfUserId: string | null
-}) {
-  return (
-    <div className="flex flex-col items-center gap-4 py-6 text-center">
-      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-danger/15 text-danger">
-        <Skull className="h-7 w-7" strokeWidth={1.75} />
-      </span>
-      <p className="text-[18px] font-semibold text-text-h">Fuiste eliminado</p>
-      <p className="text-[13px] text-text">El torneo sigue sin ti. Aquí puedes ver el progreso general.</p>
-      <RoundsRanking tournament={tournament} selfUserId={selfUserId} />
-    </div>
-  )
-}
-
 function RoundsRanking({
   tournament,
   selfUserId,
@@ -437,7 +464,7 @@ function RoundsRanking({
       <div className="rounded-xl border border-border p-4">
         <p className="mb-3 flex items-center gap-1.5 text-[13px] font-semibold text-text-h">
           <Crown className="h-4 w-4 text-accent" strokeWidth={2} />
-          Sigue vivos / puntos
+          Clasificación
         </p>
         <div className="flex flex-col gap-1.5">
           {ranked.map((participant) => (
@@ -445,12 +472,12 @@ function RoundsRanking({
               key={participant.userId}
               className="flex items-center justify-between rounded-lg bg-code-bg px-3 py-1.5 text-[12.5px]"
             >
-              <span className={`font-medium ${participant.eliminated ? 'text-text line-through' : 'text-text-h'}`}>
+              <span className="font-medium text-text-h">
                 {participant.displayName}
                 {participant.userId === selfUserId ? ' (tú)' : ''}
               </span>
               <span className="text-text">
-                {participant.points} pts{participant.eliminated ? ` · eliminado ronda ${participant.eliminatedAtRound}` : ''}
+                {participant.points} pts · {participant.wins}G {participant.losses}P
               </span>
             </div>
           ))}
@@ -465,11 +492,9 @@ function RoundsRanking({
               <p className="mb-1 font-semibold text-text-h">Ronda {round.round}</p>
               {round.matches.map((match) => (
                 <p key={match.matchCode}>
-                  {match.isBye
-                    ? `Bye para ${tournament.participants.find((p) => p.userId === match.playerUserIds[0])?.displayName ?? '???'}`
-                    : match.winnerUserId
-                      ? `Ganó ${tournament.participants.find((p) => p.userId === match.winnerUserId)?.displayName ?? '???'}`
-                      : 'En curso'}
+                  {match.winnerUserId
+                    ? `Ganó ${tournament.participants.find((p) => p.userId === match.winnerUserId)?.displayName ?? 'el bot'}${match.vsBot ? ' (vs bot)' : ''}`
+                    : 'En curso'}
                 </p>
               ))}
             </div>

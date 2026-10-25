@@ -137,8 +137,23 @@ const DUAL_QUEST_DIRECTION_DELTAS: Record<DualQuestDirection, DualQuestCellPosit
 /** Largo máximo de un mensaje de chat de sala; se recorta, no se rechaza. */
 const MAX_CHAT_MESSAGE_LENGTH = 500;
 
-/** Cupo máximo absoluto de una sala de torneo (modo grupo de "¿Quién Es?"). */
-const TOURNAMENT_MAX_PARTICIPANTS = 10;
+/** Cupo máximo absoluto de una sala de torneo (modo grupo de "¿Quién Es?"): la prueba con un curso completo (issue #102). */
+const TOURNAMENT_MAX_PARTICIPANTS = 40;
+/** Rondas por defecto y tope de un torneo por puntos. */
+const TOURNAMENT_DEFAULT_ROUNDS = 3;
+const TOURNAMENT_MAX_ROUNDS = 10;
+const TOURNAMENT_BOT_DIFFICULTY: BotDifficulty = 'MEDIUM';
+
+/** Vista del match como si fuera una sala 1v1, para que el bot existente lo juegue sin duplicar su lógica. */
+function asBotRoom(match: TournamentMatch): RoomState {
+  return new Proxy(match, {
+    get(target, key, receiver) {
+      if (key === 'code') return target.matchCode;
+      if (key === 'rematchVotes') return {};
+      return Reflect.get(target, key, receiver);
+    },
+  }) as unknown as RoomState;
+}
 
 /** Nombre con el que el bot aparece en la sala y en el chat de una partida en solitario. */
 const BOT_DISPLAY_NAMES: Record<BotDifficulty, string> = {
@@ -161,7 +176,10 @@ function toTournamentClientView(tournament: TournamentState, forUserId: string) 
     turnDurationSeconds: tournament.turnDurationSeconds,
     phase: tournament.phase,
     currentRound: tournament.currentRound,
+    totalRounds: tournament.totalRounds,
     creatorUserId: tournament.creatorUserId,
+    /** El administrador modera: ve el panel completo y no juega. */
+    isModerator: tournament.creatorUserId === forUserId,
     winnerUserId: tournament.winnerUserId,
     participants: tournament.participants.map((participant) => ({
       userId: participant.userId,
@@ -171,7 +189,13 @@ function toTournamentClientView(tournament: TournamentState, forUserId: string) 
       eliminated: participant.eliminated,
       eliminatedAtRound: participant.eliminatedAtRound,
       isSelf: participant.userId === forUserId,
+      wins: participant.wins ?? 0,
+      losses: participant.losses ?? 0,
+      botMatches: participant.botMatches ?? 0,
+      questionsAsked: participant.questionsAsked ?? 0,
+      wrongAccusations: participant.wrongAccusations ?? 0,
     })),
+    liveMatches: tournament.creatorUserId === forUserId ? buildLiveMatches(tournament) : [],
     // Rondas ya jugadas o en curso, para armar el ranking/progreso del
     // torneo en el cliente (pantalla de eliminado y pantalla de fin).
     rounds: buildRoundsSummary(tournament),
@@ -200,7 +224,31 @@ function buildRoundsSummary(tournament: TournamentState) {
         phase: match.phase,
         playerUserIds: match.playerUserIds,
         winnerUserId: match.winnerUserId,
+        vsBot: match.vsBot === true,
       })),
+    }));
+}
+
+/** Partidas de la ronda actual para el panel del moderador: quién juega, de quién es el turno y cómo va. */
+function buildLiveMatches(tournament: TournamentState) {
+  const nameOf = (userId: string) =>
+    tournament.participants.find((p) => p.userId === userId)?.displayName ??
+    tournament.matches.flatMap((m) => m.players).find((p) => p.userId === userId)?.displayName ??
+    '???';
+  return tournament.matches
+    .filter((match) => match.round === tournament.currentRound && !match.isBye)
+    .map((match) => ({
+      matchCode: match.matchCode,
+      phase: match.phase,
+      vsBot: match.vsBot === true,
+      activePlayerUserId: match.activePlayerUserId,
+      winnerUserId: match.winnerUserId,
+      players: match.players.map((player) => ({
+        userId: player.userId,
+        displayName: nameOf(player.userId),
+        discardedCount: player.discardedCardIds.length,
+      })),
+      totalCards: match.cards.length,
     }));
 }
 
@@ -232,7 +280,7 @@ function toMatchClientView(match: TournamentMatch, tournament: TournamentState, 
       const participant = tournament.participants.find((p) => p.userId === player.userId);
       return {
         userId: player.userId,
-        displayName: participant?.displayName ?? '???',
+        displayName: participant?.displayName ?? player.displayName ?? '???',
         discardedCardIds: player.discardedCardIds,
         // Al terminar el partido se revelan ambas (pantalla "Tarjeta de …"); antes, solo la propia.
         secretCardId: player.userId === forUserId || match.phase === 'FINISHED' ? player.secretCardId : null,
@@ -596,6 +644,10 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   /** Hace jugar al bot de las salas en solitario (issue #60) con las mismas acciones que un jugador. */
   private readonly botRunner: GuessWhoBotRunner;
 
+  /** Mismo bot, jugando el match de la persona que quedó impar en una ronda de torneo (issue #102). */
+  private readonly tournamentBotRunner: GuessWhoBotRunner;
+  private readonly tournamentBotRooms = new Map<string, RoomState>();
+
   private cancelDealCountdown(key: string) {
     clearTimeout(this.dealTimers.get(key));
     this.dealTimers.delete(key);
@@ -628,6 +680,53 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
         accuse: (room, userId, cardId) => this.accuseInRoom(room, userId, cardId),
         passTurn: (room, userId) => this.passTurnInRoom(room, userId),
         voteRematch: (room, userId) => this.voteRematchInRoom(room, userId, true),
+      },
+      botPolicy,
+      Math.random,
+      freeAnswerer,
+    );
+    const matchOf = (room: RoomState) => {
+      const match = room as unknown as TournamentMatch;
+      const tournament = this.tournamentStore.get(match.matchCode.split('-')[0]);
+      if (!tournament) throw new Error('El torneo ya no existe.');
+      return { tournament, match };
+    };
+    this.tournamentBotRunner = new GuessWhoBotRunner(
+      {
+        getRoom: (code) => this.tournamentBotRooms.get(code),
+        ask: (room, userId, name, questionId) => {
+          const { tournament, match } = matchOf(room);
+          askGuidedQuestion(match, userId, name, questionId);
+          this.tournamentStore.set(tournament);
+          this.broadcastMatchState(tournament, match);
+        },
+        answer: (room, userId, name, requestId, answer, note) => {
+          const { tournament, match } = matchOf(room);
+          answerGuidedQuestion(match, userId, name, requestId, answer, note);
+          this.advanceTournamentMatchTurn(tournament, match);
+        },
+        declineFree: (room, userId, name, reason) => {
+          const { tournament, match } = matchOf(room);
+          declineFreeQuestion(match, userId, name, reason);
+          this.tournamentStore.set(tournament);
+          this.broadcastMatchState(tournament, match);
+        },
+        discard: (room, userId, cardId) => {
+          const { tournament, match } = matchOf(room);
+          toggleDiscard(match, userId, cardId);
+          this.tournamentStore.set(tournament);
+          this.broadcastMatchState(tournament, match);
+        },
+        accuse: (room, userId, cardId) => {
+          const { tournament, match } = matchOf(room);
+          this.accuseInTournamentMatch(tournament, match, userId, cardId);
+        },
+        passTurn: (room, userId) => {
+          const { tournament, match } = matchOf(room);
+          assertCanPassTurn(match, userId);
+          this.advanceTournamentMatchTurn(tournament, match);
+        },
+        voteRematch: () => {},
       },
       botPolicy,
       Math.random,
@@ -1105,6 +1204,8 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   handleMatchQuestion(@ConnectedSocket() socket: AuthenticatedSocket, @MessageBody() body: { questionId: string }) {
     const { tournament, match } = this.requireActiveTournamentMatch(socket);
     askGuidedQuestion(match, socket.data.userId, socket.data.displayName, body?.questionId);
+    const asker = tournament.participants.find((p) => p.userId === socket.data.userId);
+    if (asker) asker.questionsAsked = (asker.questionsAsked ?? 0) + 1;
     this.tournamentStore.set(tournament);
     this.broadcastMatchState(tournament, match);
   }
@@ -1402,8 +1503,12 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   @SubscribeMessage('tournament:create')
   async handleTournamentCreate(
     @ConnectedSocket() socket: AuthenticatedSocket,
-    @MessageBody() body: { gameId: string; maxParticipants: number },
+    @MessageBody() body: { gameId: string; maxParticipants: number; totalRounds?: number },
   ) {
+    // Solo el administrador de la plataforma crea y modera torneos (issue #102).
+    const requester = await this.userRepository.findById(socket.data.userId);
+    if (!requester?.isAdmin()) throw new Error('Solo un administrador puede crear torneos.');
+
     const game = await this.gameRepository.findById(body.gameId);
     if (!game || game.gameType.getName() !== 'GUESS_WHO') {
       throw new Error('Juego no encontrado o no es de tipo "¿Quién Es?".');
@@ -1413,6 +1518,10 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     if (!Number.isInteger(maxParticipants) || maxParticipants < 2 || maxParticipants > TOURNAMENT_MAX_PARTICIPANTS) {
       throw new Error(`El cupo debe ser un entero entre 2 y ${TOURNAMENT_MAX_PARTICIPANTS}.`);
     }
+    const totalRounds = body.totalRounds ?? TOURNAMENT_DEFAULT_ROUNDS;
+    if (!Number.isInteger(totalRounds) || totalRounds < 1 || totalRounds > TOURNAMENT_MAX_ROUNDS) {
+      throw new Error(`Las rondas deben ser un entero entre 1 y ${TOURNAMENT_MAX_ROUNDS}.`);
+    }
 
     const code = this.generateUniqueRoomCode();
 
@@ -1421,25 +1530,18 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       gameId: game.id,
       gameTitle: game.title,
       maxParticipants,
+      totalRounds,
       maxAccusationCount: (game.config.maxAccusationCount as number | undefined) ?? 6,
       turnDurationSeconds: GUESS_WHO_DEFAULT_TURN_SECONDS,
       phase: 'WAITING',
       creatorUserId: socket.data.userId,
+      moderatorSocketId: socket.id,
       currentRound: 0,
       matches: [],
       winnerUserId: null,
       createdAt: Date.now(),
-      participants: [
-        {
-          socketId: socket.id,
-          userId: socket.data.userId,
-          displayName: socket.data.displayName,
-          ready: false,
-          points: 0,
-          eliminated: false,
-          eliminatedAtRound: null,
-        },
-      ],
+      // El administrador modera: no es participante.
+      participants: [],
     };
 
     this.lastCreatedGameCards.set(game.id, game.content as GuessWhoCard[]);
@@ -1451,7 +1553,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       type: 'room_created',
       userId: socket.data.userId,
       gameId: game.id,
-      metadata: { mode: 'group', maxParticipants, turnDurationSeconds: tournament.turnDurationSeconds },
+      metadata: { mode: 'group', maxParticipants, totalRounds, turnDurationSeconds: tournament.turnDurationSeconds },
     });
   }
 
@@ -1463,11 +1565,21 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     const code = body.code?.trim().toUpperCase();
     const tournament = this.tournamentStore.get(code);
     if (!tournament) throw new Error('No existe una sala grupal con ese código.');
-    if (tournament.phase !== 'WAITING') throw new Error('El torneo ya inició.');
+
+    // El moderador que se reconecta recupera su panel, en cualquier fase.
+    if (tournament.creatorUserId === socket.data.userId) {
+      tournament.moderatorSocketId = socket.id;
+      this.tournamentStore.set(tournament);
+      socket.join(`tournament:${code}`);
+      this.broadcastTournamentState(tournament);
+      return;
+    }
 
     const existing = tournament.participants.find((p) => p.userId === socket.data.userId);
+    // Quien ya estaba en el torneo puede reconectarse aunque ya haya iniciado.
+    if (tournament.phase !== 'WAITING' && !existing) throw new Error('El torneo ya inició.');
+
     if (existing) {
-      if (existing.socketId !== socket.id) existing.ready = false;
       existing.socketId = socket.id;
     } else {
       if (tournament.participants.length >= tournament.maxParticipants) {
@@ -1481,6 +1593,11 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
         points: 0,
         eliminated: false,
         eliminatedAtRound: null,
+        wins: 0,
+        losses: 0,
+        botMatches: 0,
+        questionsAsked: 0,
+        wrongAccusations: 0,
       });
     }
 
@@ -1490,21 +1607,16 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   }
 
   /**
-   * El creador ajusta los segundos por turno mientras espera participantes
-   * en la sala grupal (antes de tournament:start); se difunde en vivo para
-   * que el resto vea el valor actualizado, igual que en el modo individual.
+   * El administrador ajusta los segundos por turno mientras espera
+   * participantes (antes de tournament:start); se difunde en vivo.
    */
   @SubscribeMessage('tournament:update-turn-duration')
   handleTournamentUpdateTurnDuration(
     @ConnectedSocket() socket: AuthenticatedSocket,
     @MessageBody() body: { turnDurationSeconds: number },
   ) {
-    const tournament = this.tournamentStore.findBySocketId(socket.id);
-    if (!tournament) throw new Error('No estás en ninguna sala grupal.');
+    const tournament = this.requireModeratedTournament(socket);
     if (tournament.phase !== 'WAITING') throw new Error('El torneo ya inició.');
-    if (tournament.creatorUserId !== socket.data.userId) {
-      throw new Error('Solo quien creó la sala puede cambiar los segundos por turno.');
-    }
 
     const { turnDurationSeconds } = body ?? {};
     if (!Number.isInteger(turnDurationSeconds) || turnDurationSeconds < 5 || turnDurationSeconds > 120) {
@@ -1512,41 +1624,43 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     }
 
     if (tournament.turnDurationSeconds === turnDurationSeconds) return;
-    resetLobbyReady(tournament.participants);
     tournament.turnDurationSeconds = turnDurationSeconds;
-    this.broadcastTournamentState(tournament);
-  }
-
-  /**
-   * Confirma al emisor. La primera ronda requiere unanimidad y un número PAR de
-   * participantes (2, 4, 6, 8 o 10) — no hace falta llegar al cupo
-   * configurado, solo que el número actual sea par para poder emparejar a
-   * todos sin dejar a nadie afuera desde el arranque.
-   */
-  @SubscribeMessage('tournament:start')
-  handleTournamentStart(@ConnectedSocket() socket: AuthenticatedSocket) {
-    this.handleTournamentReady(socket, { ready: true });
-  }
-
-  @SubscribeMessage('tournament:ready')
-  handleTournamentReady(@ConnectedSocket() socket: AuthenticatedSocket, @MessageBody() body: { ready: boolean }) {
-    const tournament = this.tournamentStore.findBySocketId(socket.id);
-    if (!tournament) throw new Error('No estás en ninguna sala grupal.');
-    // Una retransmisión del último Listo no inicia otra partida ni produce un error tardío.
-    if (tournament.phase !== 'WAITING' && body?.ready === true && tournament.participants.some(
-      (p) => p.socketId === socket.id && p.userId === socket.data.userId && p.ready === true,
-    )) return;
-    if (tournament.phase !== 'WAITING') throw new Error('El torneo ya inició.');
-    if (!recordLobbyReady(tournament.participants, socket, body?.ready)) return;
     this.tournamentStore.set(tournament);
     this.broadcastTournamentState(tournament);
-    this.tryStartTournament(tournament);
   }
 
-  private tryStartTournament(tournament: TournamentState) {
-    if (tournament.phase !== 'WAITING' || !allLobbyReady(tournament.participants, 2, TOURNAMENT_MAX_PARTICIPANTS, true)) return;
+  /** El torneo del que `socket` es el moderador (el administrador que lo creó); si no, error. */
+  private requireModeratedTournament(socket: AuthenticatedSocket): TournamentState {
+    const tournament = this.tournamentStore.findBySocketId(socket.id);
+    if (!tournament) throw new Error('No estás en ninguna sala grupal.');
+    if (tournament.creatorUserId !== socket.data.userId) {
+      throw new Error('Solo el administrador que creó el torneo puede hacer esto.');
+    }
+    return tournament;
+  }
+
+  /** Arranca el torneo: lo decide el administrador, sin esperar confirmación de cada participante. */
+  @SubscribeMessage('tournament:start')
+  handleTournamentStart(@ConnectedSocket() socket: AuthenticatedSocket) {
+    const tournament = this.requireModeratedTournament(socket);
+    if (tournament.phase !== 'WAITING') throw new Error('El torneo ya inició.');
+    if (tournament.participants.length < 2) throw new Error('Se necesitan al menos 2 participantes para iniciar.');
     tournament.phase = 'RUNNING';
     this.startTournamentRound(tournament, tournament.participants.map((p) => p.userId));
+  }
+
+  /** Cierra el torneo para todos: el registro se conserva en la BD con soft delete. */
+  @SubscribeMessage('tournament:close')
+  handleTournamentClose(@ConnectedSocket() socket: AuthenticatedSocket) {
+    const tournament = this.requireModeratedTournament(socket);
+    for (const match of tournament.matches) {
+      this.clearTournamentTurnTimer(match.matchCode);
+      this.tournamentBotRunner.forget(match.matchCode);
+      this.tournamentBotRooms.delete(match.matchCode);
+    }
+    this.server.to(`tournament:${tournament.code}`).emit('tournament:closed', { code: tournament.code });
+    this.server.in(`tournament:${tournament.code}`).socketsLeave(`tournament:${tournament.code}`);
+    this.tournamentStore.delete(tournament.code);
   }
 
   @SubscribeMessage('tournament:leave')
@@ -1555,18 +1669,17 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     socket.leave(`tournament:${tournament?.code}`);
     if (!tournament) return;
 
+    if (tournament.moderatorSocketId === socket.id) {
+      // El moderador solo se desconecta: el torneo sigue y puede volver con el código.
+      tournament.moderatorSocketId = null;
+      this.tournamentStore.set(tournament);
+      return;
+    }
+
     if (tournament.phase === 'WAITING') {
       tournament.participants = tournament.participants.filter((p) => p.socketId !== socket.id);
-      if (tournament.participants.length === 0) {
-        this.tournamentStore.delete(tournament.code);
-        return;
-      }
-      if (!tournament.participants.some((p) => p.userId === tournament.creatorUserId)) {
-        tournament.creatorUserId = tournament.participants[0].userId;
-      }
       this.tournamentStore.set(tournament);
       this.broadcastTournamentState(tournament);
-      this.tryStartTournament(tournament);
     }
     // Si el torneo ya está RUNNING o FINISHED, no se elimina al participante
     // del estado (para no romper el ranking histórico); simplemente deja de
@@ -1583,9 +1696,10 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     tournament.currentRound += 1;
     const shuffledIds = shuffle(userIds);
 
-    let byeUserId: string | null = null;
+    // Con número impar, quien sobra juega contra el bot en vez de esperar (issue #102).
+    let botUserId: string | null = null;
     if (shuffledIds.length % 2 !== 0) {
-      byeUserId = shuffledIds.pop() ?? null;
+      botUserId = shuffledIds.pop() ?? null;
     }
 
     const newMatches: TournamentMatch[] = [];
@@ -1596,21 +1710,11 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       newMatches.push(match);
     }
 
-    if (byeUserId) {
-      const participant = tournament.participants.find((p) => p.userId === byeUserId);
-      if (participant) participant.points += 1;
-      newMatches.push({
-        matchCode: `${tournament.code}-R${tournament.currentRound}-BYE`,
-        round: tournament.currentRound,
-        playerUserIds: [byeUserId],
-        isBye: true,
-        phase: 'FINISHED',
-        cards: [],
-        players: [],
-        winnerUserId: byeUserId,
-        activePlayerUserId: null,
-        turnDeadline: null,
-      });
+    if (botUserId) {
+      const matchCode = `${tournament.code}-R${tournament.currentRound}-BOT`;
+      newMatches.push(this.buildBotMatch(tournament, matchCode, tournament.currentRound, botUserId));
+      const participant = tournament.participants.find((p) => p.userId === botUserId);
+      if (participant) participant.botMatches = (participant.botMatches ?? 0) + 1;
     }
 
     tournament.matches.push(...newMatches);
@@ -1630,6 +1734,18 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     }
 
     this.broadcastTournamentState(tournament);
+  }
+
+  /** Match de la persona impar de la ronda contra el bot: el bot es un jugador más del match, sin socket. */
+  private buildBotMatch(tournament: TournamentState, matchCode: string, round: number, humanUserId: string): TournamentMatch {
+    const botUserId = `bot:${matchCode}`;
+    const match = this.buildDealtMatch(tournament, matchCode, round, [humanUserId, botUserId]);
+    match.vsBot = true;
+    match.players[1].displayName = BOT_DISPLAY_NAMES[TOURNAMENT_BOT_DIFFICULTY];
+    match.players[1].socketId = `bot:${matchCode}`;
+    match.players[1].bot = { difficulty: TOURNAMENT_BOT_DIFFICULTY };
+    this.tournamentBotRooms.set(matchCode, asBotRoom(match));
+    return match;
   }
 
   /** Baraja cartas y reparte un secreto a cada jugador de un match nuevo de torneo. */
@@ -1738,7 +1854,12 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     @MessageBody() body: { cardId: string },
   ) {
     const { tournament, match } = this.requireActiveTournamentMatch(socket);
-    const { accuser, opponent, correct } = judgeAccusation(match, socket.data.userId, body?.cardId);
+    this.accuseInTournamentMatch(tournament, match, socket.data.userId, body?.cardId);
+  }
+
+  /** Acusación por userId (persona o bot): suma puntos al ganador y, sin eliminar a nadie, cierra el match. */
+  private accuseInTournamentMatch(tournament: TournamentState, match: TournamentMatch, userId: string, cardId: unknown) {
+    const { accuser, opponent, correct } = judgeAccusation(match, userId, cardId);
 
     this.server.to(`tournament:${tournament.code}`).emit('tournament:match-accusation-result', {
       matchCode: match.matchCode,
@@ -1747,24 +1868,28 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     });
 
     if (!correct) {
+      const wrong = tournament.participants.find((p) => p.userId === accuser.userId);
+      if (wrong) wrong.wrongAccusations = (wrong.wrongAccusations ?? 0) + 1;
       // Acusación fallida: igual que en 1v1, el match continúa y solo pasa el turno.
       this.advanceTournamentMatchTurn(tournament, match);
       return;
     }
 
     this.clearTournamentTurnTimer(match.matchCode);
+    this.tournamentBotRunner.forget(match.matchCode);
     match.phase = 'FINISHED';
     match.winnerUserId = accuser.userId;
     match.activePlayerUserId = null;
     match.turnDeadline = null;
 
+    // Torneo por puntos: ganar suma, perder no elimina. Contra el bot también cuenta.
     const winner = tournament.participants.find((p) => p.userId === accuser.userId);
     const loser = tournament.participants.find((p) => p.userId === opponent.userId);
-    if (winner) winner.points += 1;
-    if (loser) {
-      loser.eliminated = true;
-      loser.eliminatedAtRound = tournament.currentRound;
+    if (winner) {
+      winner.points += 1;
+      winner.wins = (winner.wins ?? 0) + 1;
     }
+    if (loser) loser.losses = (loser.losses ?? 0) + 1;
 
     this.tournamentStore.set(tournament);
     this.broadcastMatchState(tournament, match);
@@ -1784,17 +1909,20 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     const allFinished = currentRoundMatches.every((m) => m.phase === 'FINISHED');
     if (!allFinished) return;
 
-    const advancing = tournament.participants.filter((p) => !p.eliminated).map((p) => p.userId);
-
-    if (advancing.length <= 1) {
+    if (tournament.currentRound >= tournament.totalRounds) {
+      // Gana quien más puntos acumuló; ante empate, quien tuvo menos acusaciones fallidas.
+      const ranking = [...tournament.participants].sort(
+        (a, b) => b.points - a.points || (a.wrongAccusations ?? 0) - (b.wrongAccusations ?? 0),
+      );
       tournament.phase = 'FINISHED';
-      tournament.winnerUserId = advancing[0] ?? null;
+      tournament.winnerUserId = ranking[0]?.userId ?? null;
       this.tournamentStore.set(tournament);
       this.broadcastTournamentState(tournament);
       return;
     }
 
-    this.startTournamentRound(tournament, advancing);
+    // Nadie queda eliminado: todos vuelven a emparejarse al azar para la siguiente ronda.
+    this.startTournamentRound(tournament, tournament.participants.map((p) => p.userId));
   }
 
   private requireActiveTournamentMatch(socket: AuthenticatedSocket): {
@@ -1816,6 +1944,11 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       if (!participant) continue;
       this.server.to(participant.socketId).emit('tournament:match-state', toMatchClientView(match, tournament, userId));
     }
+    // El bot reacciona a cada cambio de su match (le toca preguntar, responder, descartar...).
+    if (match.vsBot && match.phase === 'PLAYING') {
+      const room = this.tournamentBotRooms.get(match.matchCode);
+      if (room) this.tournamentBotRunner.onRoomChanged(room);
+    }
   }
 
   private broadcastTournamentState(tournament: TournamentState) {
@@ -1823,6 +1956,11 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       this.server
         .to(participant.socketId)
         .emit('tournament:state', toTournamentClientView(tournament, participant.userId));
+    }
+    if (tournament.moderatorSocketId) {
+      this.server
+        .to(tournament.moderatorSocketId)
+        .emit('tournament:state', toTournamentClientView(tournament, tournament.creatorUserId));
     }
   }
 

@@ -19,6 +19,7 @@ export function useGuessWhoTournament(token: string | null) {
   const [error, setError] = useState<string | null>(null)
   const [connecting, setConnecting] = useState(true)
   const [pairingAnnouncement, setPairingAnnouncement] = useState<TournamentPairingAnnouncement | null>(null)
+  const [closed, setClosed] = useState(false)
   const [matchAccusationFailedMessage, setMatchAccusationFailedMessage] = useState<string | null>(null)
 
   useEffect(() => {
@@ -41,6 +42,12 @@ export function useGuessWhoTournament(token: string | null) {
       waitingCodeRef.current = state.phase === 'WAITING' ? state.code : null
       setTournament(state)
       setError(null)
+    })
+    // El administrador cerró el torneo: todos salen de la sala.
+    socket.on('tournament:closed', () => {
+      waitingCodeRef.current = null
+      setTournament(null)
+      setClosed(true)
     })
     socket.on('room:error', (payload: { message: string }) => setError(payload.message))
     // Anuncio de emparejamiento al arrancar una ronda: se muestra brevemente
@@ -70,8 +77,16 @@ export function useGuessWhoTournament(token: string | null) {
     }
   }, [token])
 
-  const createTournament = useCallback((gameId: string, maxParticipants: number) => {
-    socketRef.current?.emit('tournament:create', { gameId, maxParticipants })
+  const createTournament = useCallback((gameId: string, maxParticipants: number, totalRounds: number) => {
+    socketRef.current?.emit('tournament:create', { gameId, maxParticipants, totalRounds })
+  }, [])
+
+  const startTournament = useCallback(() => {
+    socketRef.current?.emit('tournament:start')
+  }, [])
+
+  const closeTournament = useCallback(() => {
+    socketRef.current?.emit('tournament:close')
   }, [])
 
   const joinTournament = useCallback((code: string) => {
@@ -91,10 +106,6 @@ export function useGuessWhoTournament(token: string | null) {
   }, [])
   const answerQuestion = useCallback((requestId: string, answer: boolean) => {
     if (socketRef.current?.connected) socketRef.current.emit('tournament:match-answer', { requestId, answer })
-  }, [])
-
-  const setReady = useCallback((ready: boolean) => {
-    if (socketRef.current?.connected) socketRef.current.emit('tournament:ready', { ready })
   }, [])
 
   const updateTurnDuration = useCallback((turnDurationSeconds: number) => {
@@ -135,7 +146,9 @@ export function useGuessWhoTournament(token: string | null) {
     clearMatchAccusationFailedMessage: () => setMatchAccusationFailedMessage(null),
     createTournament,
     joinTournament,
-    setReady,
+    startTournament,
+    closeTournament,
+    closed,
     updateTurnDuration,
     leaveTournament,
     discardMatchCard,
