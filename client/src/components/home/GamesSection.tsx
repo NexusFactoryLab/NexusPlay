@@ -34,6 +34,7 @@ import { JoinByCodeModal } from './games/JoinByCodeModal'
 import { resolveRoomCode, LIVE_ROOM_ROUTES, type ResolvedRoom } from './games/resolveRoomCode'
 import { GuessWhoRoom } from './games/GuessWhoRoom'
 import { GameFiltersPanel, type GameTypeFilterOption } from './games/GameFiltersPanel'
+import { GameFilterBar, type GameAreaFilterOption } from './games/GameFilterBar'
 import { modeFilterForGameType, type GameModeFilter } from './games/gameModeVisuals'
 import { resolveGameTypeDisplayName } from './games/gameTypePublicNames'
 
@@ -133,6 +134,8 @@ export function GamesSection({
   // en cliente sobre `games` ya cargados, sin disparar peticiones nuevas.
   const [activeModes, setActiveModes] = useState<Set<GameModeFilter>>(new Set())
   const [activeTypes, setActiveTypes] = useState<Set<string>>(new Set())
+  // Filtro por área (issue #100): solo lo usa la barra de filtros visible.
+  const [activeAreaId, setActiveAreaId] = useState<string | null>(null)
 
   const [categories, setCategories] = useState<CategoryWithGameCount[]>([])
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null)
@@ -299,8 +302,15 @@ export function GamesSection({
   // venían de /tipos-de-juego/:gameType y el acceso desde la gestión de tipos).
   useEffect(() => {
     setActiveModes(new Set())
+    setActiveAreaId(null)
     setActiveTypes(new Set(mode === 'community' && tipoParam ? [tipoParam] : []))
   }, [mode, tipoParam])
+
+  function clearFilters() {
+    setActiveModes(new Set())
+    setActiveTypes(new Set())
+    setActiveAreaId(null)
+  }
 
   function toggleModeFilter(value: GameModeFilter) {
     setActiveModes((prev) => {
@@ -329,6 +339,7 @@ export function GamesSection({
   const filteredGames = games.filter((game) => {
     if (activeModes.size > 0 && !activeModes.has(modeFilterForGameType(game.gameType))) return false
     if (activeTypes.size > 0 && !activeTypes.has(game.gameType)) return false
+    if (activeAreaId && game.categoryId !== activeAreaId) return false
     return true
   })
 
@@ -341,6 +352,7 @@ export function GamesSection({
     if (justCreatedFiltered) {
       setActiveModes(new Set())
       setActiveTypes(new Set())
+      setActiveAreaId(null)
     }
   }, [justCreatedFiltered])
   useEffect(() => {
@@ -357,6 +369,15 @@ export function GamesSection({
       label: resolveGameTypeDisplayName(gameType, gameTypeDisplayNames.get(gameType)),
     }))
     .sort((a, b) => a.label.localeCompare(b.label))
+
+  const areaFilterOptions: GameAreaFilterOption[] = Array.from(
+    games.reduce((acc, game) => acc.set(game.categoryId, (acc.get(game.categoryId) ?? 0) + 1), new Map<string, number>()),
+  )
+    .flatMap(([id, count]) => {
+      const name = categories.find((c) => c.id === id)?.name
+      return name ? [{ id, name, count }] : []
+    })
+    .sort((a, b) => a.name.localeCompare(b.name))
 
   const soloFilterCount = games.filter((game) => modeFilterForGameType(game.gameType) === 'SOLO').length
   const multiFilterCount = games.length - soloFilterCount
@@ -940,10 +961,7 @@ export function GamesSection({
       typeOptions={typeFilterOptions}
       activeTypes={activeTypes}
       onToggleType={toggleTypeFilter}
-      onClear={() => {
-        setActiveModes(new Set())
-        setActiveTypes(new Set())
-      }}
+      onClear={clearFilters}
     />
   )
   const gamesCount = (
@@ -1174,10 +1192,22 @@ export function GamesSection({
                 sin empujarlo (ver GameFiltersPanel). En el inicio va en la
                 fila del título "Juegos", que también queda justo encima. */}
             {mode !== 'all' && (
-              <div className="flex items-center justify-between gap-4">
-                {filtersPanel}
-                {gamesCount}
-              </div>
+              <GameFilterBar
+                total={games.length}
+                shown={filteredGames.length}
+                typeOptions={typeFilterOptions}
+                activeTypes={activeTypes}
+                onToggleType={toggleTypeFilter}
+                onClearTypes={() => setActiveTypes(new Set())}
+                soloCount={soloFilterCount}
+                multiCount={multiFilterCount}
+                activeMode={activeModes.size === 1 ? [...activeModes][0] : null}
+                onModeChange={(next) => setActiveModes(new Set(next ? [next] : []))}
+                areaOptions={areaFilterOptions}
+                activeAreaId={activeAreaId}
+                onAreaChange={setActiveAreaId}
+                onClearAll={clearFilters}
+              />
             )}
 
             {filteredGames.length === 0 ? (
@@ -1186,10 +1216,7 @@ export function GamesSection({
                 <button
                   type="button"
                   className="mt-3 text-[13px] font-medium text-accent hover:underline"
-                  onClick={() => {
-                    setActiveModes(new Set())
-                    setActiveTypes(new Set())
-                  }}
+                  onClick={clearFilters}
                 >
                   Limpiar filtros
                 </button>
