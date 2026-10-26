@@ -4,7 +4,7 @@ import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, BookOpen, CircleHelp, LogOut
 import type { MazeCollectorConfig, MazeCollectorItem, MazeLayoutDef, CellPosition } from './mazeCollectorTypes'
 import { iconForConcept } from './mazeCollectorTypes'
 import { POWER_MODE_MS } from './mazeEngine'
-import { QUESTION_TIME_MS, useMazeCollectorGame } from './useMazeCollectorGame'
+import { ANSWER_FEEDBACK_MS, QUESTION_TIME_MS, useMazeCollectorGame } from './useMazeCollectorGame'
 import type { ActiveQuestion, AnswerFeedback, Direction, MazeAnswer, MazeScenario } from './useMazeCollectorGame'
 import type { MazeQuestion } from './mazeCollectorQuestions'
 import { EcoTruckSprite } from './EcoTruckSprite'
@@ -299,7 +299,9 @@ function MazeCollectorSession({
   // Cada pregunta nueva sale primero en grande con el juego en pausa (como en el
   // Laberinto V/F): se lee tranquilo y recién después se sale a buscar la respuesta.
   const [seenQuestionId, setSeenQuestionId] = useState<number | null>(null)
-  const questionIntro = game.question && game.phase === 'playing' && game.question.id !== seenQuestionId ? game.question : null
+  // Tras acertar, primero se ve el «¡Correcto!» y después la pregunta nueva.
+  const questionIntro =
+    game.question && game.phase === 'playing' && !game.feedbackActive && game.question.id !== seenQuestionId ? game.question : null
   const introId = questionIntro?.id
   useEffect(() => {
     if (introId !== undefined) pause()
@@ -635,7 +637,7 @@ function MazeCollectorSession({
 
           <CenteredSprite row={game.player.row} col={game.player.col} cellSize={cellSize} scale={TRUCK_SCALE} zIndex={20}>
             {/* Halo claro detrás del camión: sobre el mapa oscuro se encuentra de un vistazo. */}
-            <div className="h-full w-full [filter:drop-shadow(0_0_6px_rgba(255,255,255,0.85))_drop-shadow(0_0_14px_rgba(52,211,153,0.6))]">
+            <div className="h-full w-full [filter:drop-shadow(0_0_7px_rgba(255,255,255,0.95))_drop-shadow(0_0_16px_rgba(52,211,153,0.75))]">
               <EcoTruckSprite
                 facing={game.player.facing}
                 size={cellSize * TRUCK_SCALE}
@@ -1016,7 +1018,7 @@ function QuestionClock({ remainingMs, compact }: { remainingMs: number; compact?
 function AnswerToast({ feedback }: { feedback: AnswerFeedback }) {
   const [visible, setVisible] = useState(true)
   useEffect(() => {
-    const timer = window.setTimeout(() => setVisible(false), 1600)
+    const timer = window.setTimeout(() => setVisible(false), ANSWER_FEEDBACK_MS)
     return () => window.clearTimeout(timer)
   }, [])
   if (!visible) return null

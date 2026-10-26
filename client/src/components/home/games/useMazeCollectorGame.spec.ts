@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { QUESTION_TIME_MS, __engineForTests as engine } from './useMazeCollectorGame'
+import { ANSWER_FEEDBACK_MS, QUESTION_TIME_MS, __engineForTests as engine } from './useMazeCollectorGame'
 import type { MazeScenario } from './useMazeCollectorGame'
 import { DEFAULT_MAZE_CONFIG, MAZE_LAYOUTS } from './mazeCollectorTypes'
 import type { CellPosition } from './mazeCollectorTypes'
@@ -148,6 +148,25 @@ describe('Camión Reciclador: preguntas de opción múltiple', () => {
     expect(state.lives).toBe(config.lives - 1)
     expect(state.answerFeedback?.kind).toBe('timeout')
     expect(state.question!.id).toBe(firstId + 1)
+  })
+
+  it('mientras sale el aviso de la respuesta, el juego y el reloj de la pregunta se detienen', () => {
+    const state = engine.createInitialState(city, [], config, null, SUSTAINABLE_CITY_QUESTIONS)
+    state.ghosts = []
+    const wrong = state.question!.answers.find((answer) => !answer.correct)!
+    state.question!.answers.forEach((answer) => (answer.wrong = answer !== wrong))
+    const end = drive(state, () => wrong.pos, (s) => s.lives < config.lives)
+    const deadline = state.questionDeadline!
+    const left = deadline - end
+    const position = { ...state.player.pos }
+    for (let now = end + 16; now < end + ANSWER_FEEDBACK_MS - 16; now += 16) {
+      state.player.desiredDirection = 'UP'
+      engine.tickEngine(state, city, [], now, FRAME)
+    }
+    const after = end + ANSWER_FEEDBACK_MS - 16
+    expect(state.questionDeadline! - after).toBeGreaterThanOrEqual(left - 32)
+    expect(state.player.pos).toEqual(position)
+    expect(state.feedbackUntil).not.toBeNull()
   })
 
   it('en el tutorial la respuesta incorrecta no quita vidas: la parte vuelve a empezar', () => {

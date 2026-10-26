@@ -68,6 +68,8 @@ export type ActiveQuestion = { id: number; question: string; answers: MazeAnswer
 export type AnswerFeedback = { id: number; kind: 'correct' | 'wrong' | 'timeout'; letter: string }
 /** Tiempo para llegar a la respuesta correcta; solo corre mientras se juega (no en pausa ni con la pregunta en pantalla). */
 export const QUESTION_TIME_MS = 30000
+/** Lo que dura el aviso de correcto / incorrecto / tiempo agotado: mientras tanto el juego (y su reloj) se congela. */
+export const ANSWER_FEEDBACK_MS = 1600
 
 /**
  * Las 4 nubes son fijas: mismo orden que `layout.enemySpawns` (que ya viene
@@ -170,6 +172,8 @@ type InternalState = {
   answerFeedback: AnswerFeedback | null
   /** Momento (reloj del juego) en que se acaba el tiempo de la pregunta; null = todavía no empezó a correr. */
   questionDeadline: number | null
+  /** Hasta cuándo dura el aviso de la última respuesta; mientras tanto nada se mueve. */
+  feedbackUntil: number | null
 }
 
 function ghostSpeed(level: number, enemySpeedConfig: number): number {
@@ -335,9 +339,10 @@ function scenarioQuestion(scenario: MazeScenario | null): ActiveQuestion | null 
 }
 
 /** El camión llegó a la celda de una respuesta. */
-function resolveAnswer(state: InternalState, layout: MazeLayoutDef, answer: MazeAnswer) {
+function resolveAnswer(state: InternalState, layout: MazeLayoutDef, answer: MazeAnswer, now: number) {
   const feedbackId = (state.answerFeedback?.id ?? 0) + 1
   state.answerFeedback = { id: feedbackId, kind: answer.correct ? 'correct' : 'wrong', letter: answer.letter }
+  if (!state.scenario) state.feedbackUntil = now + ANSWER_FEEDBACK_MS
   if (answer.correct) {
     celebrateMatch()
     state.score += POINTS_ANSWER
@@ -370,9 +375,10 @@ function resolveAnswer(state: InternalState, layout: MazeLayoutDef, answer: Maze
 }
 
 /** Se acabó el tiempo: cuesta una vida y sale otra pregunta. */
-function questionTimedOut(state: InternalState, layout: MazeLayoutDef) {
+function questionTimedOut(state: InternalState, layout: MazeLayoutDef, now: number) {
   signalMismatch()
   state.answerFeedback = { id: (state.answerFeedback?.id ?? 0) + 1, kind: 'timeout', letter: '' }
+  state.feedbackUntil = now + ANSWER_FEEDBACK_MS
   state.lives -= 1
   if (state.lives <= 0) {
     state.phase = 'lost'
@@ -429,6 +435,7 @@ function createInitialState(
     answeredCorrect: 0,
     answerFeedback: null,
     questionDeadline: null,
+    feedbackUntil: null,
   }
   if (!scenario) nextQuestion(state, layout)
   return state
@@ -473,7 +480,7 @@ function resolvePlayerArrival(state: InternalState, layout: MazeLayoutDef, now: 
 
   const answer = state.question?.answers.find((candidate) => !candidate.wrong && samePos(candidate.pos, pos))
   if (answer) {
-    resolveAnswer(state, layout, answer)
+    resolveAnswer(state, layout, answer, now)
     if (state.phase === 'lost' || state.scenarioDone || answer.wrong || state.scenario) return
   }
 
@@ -676,6 +683,20 @@ function tickEngine(state: InternalState, layout: MazeLayoutDef, items: MazeColl
 
   if (state.phase !== 'playing') return
 
+  // Aviso de la respuesta en pantalla: todo queda quieto y los plazos (reloj de la
+  // pregunta, purificador, bonus) se corren lo mismo que dura, para no perder tiempo.
+  if (state.feedbackUntil !== null) {
+    if (now < state.feedbackUntil) {
+      const frozenMs = dtRaw * 1000
+      if (state.questionDeadline !== null) state.questionDeadline += frozenMs
+      if (state.energizedUntil !== null) state.energizedUntil += frozenMs
+      if (state.activeBonus) state.activeBonus.expiresAt += frozenMs
+      state.player.slowUntil += frozenMs
+      return
+    }
+    state.feedbackUntil = null
+  }
+
   if (state.energizedUntil !== null && now >= state.energizedUntil) {
     state.energizedUntil = null
     state.comboIndex = 0
@@ -688,7 +709,7 @@ function tickEngine(state: InternalState, layout: MazeLayoutDef, items: MazeColl
   if (state.question && !state.scenario) {
     if (state.questionDeadline === null) state.questionDeadline = now + QUESTION_TIME_MS
     else if (now >= state.questionDeadline) {
-      questionTimedOut(state, layout)
+      questionTimedOut(state, layout, now)
       return
     }
   }
@@ -724,6 +745,8 @@ export type MazeGameSnapshot = {
   answerFeedback: AnswerFeedback | null
   /** Lo que queda para responder (0 si la pregunta no tiene reloj). */
   questionRemainingMs: number
+  /** El aviso de la última respuesta sigue en pantalla (el juego está congelado). */
+  feedbackActive: boolean
 }
 
 function toSnapshot(state: InternalState, now: number): MazeGameSnapshot {
@@ -760,6 +783,7 @@ function toSnapshot(state: InternalState, now: number): MazeGameSnapshot {
     question: state.question,
     answeredCorrect: state.answeredCorrect,
     answerFeedback: state.answerFeedback,
+    feedbackActive: state.feedbackUntil !== null,
     questionRemainingMs:
       state.question && !state.scenario ? (state.questionDeadline === null ? QUESTION_TIME_MS : Math.max(0, state.questionDeadline - now)) : 0,
   }
