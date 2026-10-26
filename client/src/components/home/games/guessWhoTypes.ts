@@ -84,7 +84,7 @@ export type GuessWhoChatMessage = {
   sentAt: number
 }
 
-// --- Modo grupo (torneo eliminatorio) ---
+// --- Modo grupo (torneo por puntos) ---
 
 import type { TournamentGameType, TournamentLevel } from './tournamentLevels'
 

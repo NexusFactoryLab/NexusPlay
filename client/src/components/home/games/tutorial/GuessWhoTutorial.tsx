@@ -296,19 +296,19 @@ export function GuessWhoTutorial({ tournament, onFinish }: { tournament: boolean
       render: play('open-guess', near),
     },
     {
-      title: tournament ? 'Elige y avanza en el torneo' : 'Elige la tarjeta y confirma',
+      title: tournament ? 'Elige y suma un punto en el torneo' : 'Elige la tarjeta y confirma',
       task: 'Vuela, sale de noche y tiene plumas: elige la tarjeta de tu rival y confirma con «Sí, confirmar».',
       explain: tournament
-        ? 'Elige la tarjeta que crees que tiene tu rival y confirma. Si aciertas, ganas el duelo y pasas a la siguiente ronda.'
+        ? 'Elige la tarjeta que crees que tiene tu rival y confirma. Si aciertas, ganas el duelo y sumas 1 punto en el torneo.'
         : 'Elige la tarjeta que crees que tiene tu rival y confirma. Si aciertas, ganas la partida; si fallas, pierdes el turno.',
-      success: tournament ? '¡Acertaste! En el torneo pasarías a la siguiente ronda.' : '¡Acertaste! Gana quien adivina primero.',
+      success: tournament ? '¡Acertaste! En el torneo sumarías 1 punto.' : '¡Acertaste! Gana quien adivina primero.',
       art: <ArtGwGuess />,
       points: [
         { icon: <Target className="h-4 w-4" />, tone: 'rose', text: <>Elige <b className="text-white">una sola tarjeta</b> y confirma.</> },
-        { icon: <Trophy className="h-4 w-4" />, tone: 'emerald', text: tournament ? <>Ganar el duelo te lleva a <b className="text-white">la siguiente ronda</b>.</> : <>Si aciertas, <b className="text-white">ganas</b>.</> },
+        { icon: <Trophy className="h-4 w-4" />, tone: 'emerald', text: tournament ? <>Ganar el duelo te da <b className="text-white">1 punto</b>.</> : <>Si aciertas, <b className="text-white">ganas</b>.</> },
       ],
       render: play('guess', near),
     },
   ]
-  return <TutorialRunner name={tournament ? 'el torneo de Identidad Oculta' : 'Identidad Oculta'} parts={parts} accent={tournament ? 'amber' : 'violet'} onFinish={onFinish} />
+  return <TutorialRunner name={tournament ? 'un duelo del torneo' : 'Identidad Oculta'} parts={parts} accent={tournament ? 'amber' : 'violet'} onFinish={onFinish} />
 }

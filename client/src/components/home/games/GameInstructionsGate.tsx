@@ -70,7 +70,7 @@ export function GameInstructionsGate({
       <GameGuide
         steps={steps}
         label={kind === 'GUESS_WHO_GROUP' ? 'Guía del torneo' : 'Guía rápida'}
-        ariaLabel={kind === 'GUESS_WHO_GROUP' ? 'Guía del torneo de Identidad Oculta' : kind === 'GUESS_WHO' ? 'Guía de Identidad Oculta' : 'Guía de MatchMente'}
+        ariaLabel={kind === 'GUESS_WHO_GROUP' ? 'Guía del torneo' : kind === 'GUESS_WHO' ? 'Guía de Identidad Oculta' : 'Guía de MatchMente'}
         dataAttr={kind}
         accent={kind === 'GUESS_WHO_GROUP' ? 'amber' : 'violet'}
         onClose={onContinue}

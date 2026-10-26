@@ -6,7 +6,7 @@ import type { TournamentMatchStateView, TournamentPairingAnnouncement, Tournamen
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:3000'
 
 /**
- * Conexión de socket para el modo grupo (torneo eliminatorio) de "¿Quién
+ * Conexión de socket para el torneo por puntos (modo grupo) de "¿Quién
  * Es?". Espeja el patrón de useGuessWhoRoom (un socket por montaje), pero
  * habla los eventos `tournament:*` en vez de `room:*` — el servidor los
  * mantiene separados para no chocar con las salas 1v1 sueltas.

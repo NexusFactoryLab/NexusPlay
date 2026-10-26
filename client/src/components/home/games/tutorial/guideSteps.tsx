@@ -1,7 +1,9 @@
 import type { CSSProperties, ReactNode } from 'react'
-import { Brain, Check, CircleHelp, Clock, Eye, Layers, MessageCircleQuestion, Sparkles, Target, Timer, Trophy, Users, X } from 'lucide-react'
-import { At, Floor, Item, Scene, Tag, strong } from '../true-false-maze/TrueFalseMazeGuide'
+import { Bot, Brain, Check, CircleHelp, Clock, Crown, Eye, Gauge, Layers, MessageCircleQuestion, Shuffle, Sparkles, Swords, Target, Timer, Trophy, Users, X } from 'lucide-react'
+import { At, Floor, Item, Scene, Sprite, Tag, strong } from '../true-false-maze/TrueFalseMazeGuide'
+import { spaceshipSpriteUrl } from '../true-false-maze/spaceshipAssets'
 import type { GuideStep } from './GameGuide'
+import { AvatarBuddy, GuideAvatarCircle } from './guideAvatars'
 import './gameGuides.css'
 
 /*
@@ -103,8 +105,8 @@ function SceneAsk() {
   return (
     <Scene>
       <Floor />
-      <Big style={{ left: '8%', top: '8%' }}>🧑</Big>
-      <Big style={{ left: '82%', top: '40%' }}>🤖</Big>
+      <AvatarBuddy who="self" left="3%" top="4%" size={17} style={loop('gg-bob', 3)} />
+      <AvatarBuddy who={1} left="80%" top="36%" size={17} style={loop('gg-bob', 3, 0.5)} />
       <Bubble mine style={{ left: '22%', top: '10%', ...loop('gg-slide-in', 6) }}>
         ¿Tu tarjeta vuela?
       </Bubble>
@@ -155,7 +157,7 @@ function SceneAnswer() {
   return (
     <Scene>
       <Floor />
-      <Big style={{ left: '8%', top: '6%' }}>🤖</Big>
+      <AvatarBuddy who={1} left="3%" top="2%" size={17} style={loop('gg-bob', 3)} />
       <Bubble style={{ left: '24%', top: '9%', ...loop('gg-slide-in-right', 6) }}>¿Tu tarjeta vive en el agua?</Bubble>
       <AnimalCard animal={FISH} left="8%" top="42%" width={17} />
       <Tag tone="info" style={{ left: '4%', top: '88%' }}>
@@ -302,41 +304,163 @@ export function guessWhoGuideSteps(): GuideStep[] {
   ]
 }
 
-// ==================== torneo de Identidad Oculta ====================
+// ==================== torneo ====================
+//
+// El torneo es por puntos: todos juegan todas las rondas (nadie queda fuera),
+// cada ronda se sortea uno de los juegos que eligió el administrador y gana
+// quien más puntos junte. La guía lo cuenta así; ver `handleTournament*` en
+// rooms.gateway.ts para las reglas reales.
 
-function SceneBracket() {
-  const player = (emoji: string, left: string, top: string, delay: number) => (
-    <Big key={left + top} style={{ left, top, ...loop('gg-pop', 6, delay) }}>
-      {emoji}
-    </Big>
-  )
+/** Clasificación de muestra: avatares + puntos que suben cada tanto. */
+const SCOREBOARD: Array<{ who: 'self' | number; name: string; points: number }> = [
+  { who: 'self', name: 'Tú', points: 3 },
+  { who: 2, name: 'Camila', points: 2 },
+  { who: 3, name: 'Andrés', points: 2 },
+  { who: 4, name: 'Valeria', points: 1 },
+]
+
+function SceneScoreboard() {
   return (
     <Scene>
       <Floor />
-      {player('🧑', '6%', '8%', 0)}
-      {player('👧', '6%', '30%', 0.15)}
-      {player('👦', '6%', '56%', 0.3)}
-      {player('🧒', '6%', '78%', 0.45)}
-      {player('🧑', '38%', '18%', 1.2)}
-      {player('👦', '38%', '66%', 1.4)}
-      <At style={{ left: '66%', top: '30%', fontSize: '18cqw', lineHeight: 1, ...loop('gg-pulse', 2) }}>🏆</At>
-      <Tag tone="info" style={{ left: '22%', top: '90%' }}>
-        Cuartos → semifinal → final
+      {SCOREBOARD.map((row, i) => (
+        <At key={row.name} style={{ left: '9%', top: `${7 + i * 19}%`, width: '82%', ...loop('gg-slide-in', 6, i * 0.18) }}>
+          <div
+            className={`flex items-center border font-bold text-white shadow-lg ${i === 0 ? 'border-amber-300/70 bg-amber-500/25' : 'border-white/20 bg-slate-900/80'}`}
+            style={{ borderRadius: '2.4cqw', gap: '2.4cqw', padding: '1cqw 2.6cqw 1cqw 1.2cqw' }}
+          >
+            <GuideAvatarCircle who={row.who} size={9} />
+            <span className="min-w-0 flex-1 truncate" style={{ fontSize: '3.6cqw' }}>
+              {row.name}
+            </span>
+            <span className="inline-flex items-center" style={{ gap: '1cqw', fontSize: '3.6cqw', ...loop('gg-pop', 6, 1 + i * 0.2) }}>
+              {i === 0 && <Crown style={{ width: '4cqw', height: '4cqw' }} className="text-amber-300" />}
+              {row.points} pts
+            </span>
+          </div>
+        </At>
+      ))}
+      <Tag tone="info" style={{ left: '17%', top: '88%' }}>
+        Todos juegan todas las rondas
       </Tag>
     </Scene>
   )
 }
 
-function SceneChampion() {
+const ROUND_GAMES: Array<{ name: string; icon: ReactNode }> = [
+  { name: 'Identidad Oculta', icon: <CircleHelp style={{ width: '9cqw', height: '9cqw' }} /> },
+  { name: 'Dominexo', icon: <Layers style={{ width: '9cqw', height: '9cqw' }} /> },
+  { name: 'Laberinto V/F', icon: <Sprite src={spaceshipSpriteUrl('robot/robot-down-0')} style={{ width: '9cqw', height: '9cqw', objectFit: 'contain' }} /> },
+]
+
+function SceneRandomGame() {
   return (
     <Scene>
       <Floor />
-      <At style={{ left: '38%', top: '16%', fontSize: '22cqw', lineHeight: 1, ...loop('gg-bob', 2.4) }}>🏆</At>
-      <Big style={{ left: '14%', top: '44%', ...loop('gg-pop', 5) }}>🎉</Big>
-      <Big style={{ left: '72%', top: '44%', ...loop('gg-pop', 5, 0.3) }}>🎉</Big>
-      <Big style={{ left: '44%', top: '66%' }}>🧑</Big>
-      <Tag tone="true" style={{ left: '34%', top: '88%' }}>
-        ¡Campeón del torneo!
+      {ROUND_GAMES.map((game, i) => (
+        <At key={game.name} style={{ left: `${6 + i * 31}%`, top: '14%', width: '27%' }}>
+          <div
+            className="flex flex-col items-center border-2 border-violet-300/60 bg-slate-900/85 text-violet-100 shadow-lg"
+            style={{ borderRadius: '2cqw', padding: '3cqw 1cqw 2.4cqw', gap: '1.6cqw', ...loop('gg-glow', 6, i * 2) }}
+          >
+            {game.icon}
+            <span className="text-center font-extrabold leading-tight" style={{ fontSize: '2.9cqw' }}>
+              {game.name}
+            </span>
+          </div>
+        </At>
+      ))}
+      <At style={{ left: '40%', top: '60%', fontSize: '11cqw', lineHeight: 1, ...loop('gg-pulse', 1.8) }}>
+        <Shuffle style={{ width: '14cqw', height: '14cqw' }} className="text-amber-300" />
+      </At>
+      <Tag tone="info" style={{ left: '14%', top: '88%' }}>
+        Cada ronda, un juego al azar
+      </Tag>
+    </Scene>
+  )
+}
+
+function SceneDuelRound() {
+  return (
+    <Scene>
+      <Floor />
+      <AvatarBuddy who="self" left="6%" top="14%" size={28} style={loop('gg-bob', 3)} />
+      <AvatarBuddy who={3} left="66%" top="14%" size={28} style={loop('gg-bob', 3, 0.5)} />
+      <At style={{ left: '43%', top: '30%', fontSize: '12cqw', lineHeight: 1, ...loop('gg-pulse', 1.6) }}>
+        <Swords style={{ width: '14cqw', height: '14cqw' }} className="text-amber-300" />
+      </At>
+      <At style={{ left: '14%', top: '64%' }}>
+        <span className="inline-flex items-center rounded-full border border-white/20 bg-slate-900/85 font-bold text-white" style={{ fontSize: '3cqw', padding: '0.6cqw 2.2cqw', gap: '1.2cqw' }}>
+          Tú
+        </span>
+      </At>
+      <At style={{ left: '71%', top: '64%' }}>
+        <span className="inline-flex items-center rounded-full border border-white/20 bg-slate-900/85 font-bold text-white" style={{ fontSize: '3cqw', padding: '0.6cqw 2.2cqw', gap: '1.2cqw' }}>
+          Tu rival
+        </span>
+      </At>
+      <Tag tone="true" style={{ left: '31%', top: '86%' }}>
+        Ganas el duelo: +1 punto
+      </Tag>
+    </Scene>
+  )
+}
+
+function SceneSoloMaze() {
+  return (
+    <Scene>
+      <Floor />
+      <At style={{ left: '38%', top: '30%', width: '22%', ...loop('gg-bob', 2.4) }}>
+        <Sprite src={spaceshipSpriteUrl('robot/robot-down-0')} style={{ width: '100%' }} />
+      </At>
+      <At style={{ left: '8%', top: '8%', width: '26%' }}>
+        <Sprite src={spaceshipSpriteUrl('decor/zone-true')} style={{ width: '100%' }} />
+      </At>
+      <At style={{ left: '66%', top: '8%', width: '26%' }}>
+        <Sprite src={spaceshipSpriteUrl('decor/zone-false')} style={{ width: '100%' }} />
+      </At>
+      <At style={{ left: '70%', top: '52%', width: '14%', ...loop('gg-patrol', 5) }}>
+        <Sprite src={spaceshipSpriteUrl('jellyfish/jelly-down-0')} style={{ width: '100%' }} />
+      </At>
+      <At style={{ left: '8%', top: '56%' }}>
+        <GuideAvatarCircle who="self" size={10} />
+      </At>
+      <Tag tone="true" style={{ left: '8%', top: '78%' }}>
+        Todas bien: +1 punto
+      </Tag>
+      <Tag tone="info" style={{ left: '8%', top: '90%' }}>
+        Juegas solo, en tu pantalla
+      </Tag>
+    </Scene>
+  )
+}
+
+function ScenePodium() {
+  return (
+    <Scene>
+      <Floor />
+      {/* Podio: 2.º, 1.º y 3.º. */}
+      <At style={{ left: '14%', top: '58%', width: '22%', height: '26%' }}>
+        <div className="flex h-full w-full items-start justify-center rounded-t-lg border border-white/25 bg-slate-600/80 font-black text-white" style={{ fontSize: '5cqw', paddingTop: '1cqw' }}>
+          2
+        </div>
+      </At>
+      <At style={{ left: '39%', top: '46%', width: '22%', height: '38%' }}>
+        <div className="flex h-full w-full items-start justify-center rounded-t-lg border border-amber-200/60 bg-amber-500/80 font-black text-white" style={{ fontSize: '5.6cqw', paddingTop: '1cqw' }}>
+          1
+        </div>
+      </At>
+      <At style={{ left: '64%', top: '66%', width: '22%', height: '18%' }}>
+        <div className="flex h-full w-full items-start justify-center rounded-t-lg border border-white/25 bg-orange-800/80 font-black text-white" style={{ fontSize: '4.4cqw', paddingTop: '0.6cqw' }}>
+          3
+        </div>
+      </At>
+      <AvatarBuddy who={2} left="14%" top="30%" size={22} />
+      <AvatarBuddy who="self" left="39%" top="15%" size={22} style={loop('gg-bob', 2.4)} />
+      <AvatarBuddy who={4} left="64%" top="38%" size={22} />
+      <At style={{ left: '44%', top: '2%', fontSize: '8cqw', lineHeight: 1, ...loop('gg-pulse', 2) }}>🏆</At>
+      <Tag tone="true" style={{ left: '22%', top: '90%' }}>
+        ¡Gana quien más puntos tenga!
       </Tag>
     </Scene>
   )
@@ -347,39 +471,110 @@ export function tournamentGuideSteps(): GuideStep[] {
   return [
     {
       id: 'torneo',
-      title: 'Torneo: ¡avanza ronda a ronda!',
-      art: <SceneBracket />,
+      title: 'Torneo: ¡suma puntos ronda a ronda!',
+      art: <SceneScoreboard />,
       body: (
         <>
           <p>
-            Varias personas compiten en <b className={strong('text-amber-300')}>rondas eliminatorias</b>. En cada ronda juegas un duelo de Identidad Oculta contra una persona del grupo.
+            Varias personas compiten en <b className={strong('text-amber-300')}>rondas</b> y cada ronda ganada suma <b className="text-white">puntos</b>. Nadie queda fuera: ¡todos juegan todas las rondas!
           </p>
           <ul className="flex flex-col gap-2.5">
             <Item icon={<Users className="h-4 w-4" />} tone="violet">
-              Quien <b className="text-white">gana el duelo</b> pasa a la siguiente ronda.
+              Ganar una ronda te da <b className="text-white">1 punto</b>.
             </Item>
             <Item icon={<Trophy className="h-4 w-4" />} tone="amber">
-              Quien pierde se queda mirando el resto del torneo.
+              Al terminar las rondas, gana quien tenga <b className="text-white">más puntos</b>.
+            </Item>
+            <Item icon={<Timer className="h-4 w-4" />} tone="cyan">
+              El administrador modera: no juega y puede cerrar una ronda si alguien se queda inactivo.
             </Item>
           </ul>
         </>
       ),
     },
-    { ...duel[1], id: 'duelo-preguntar', title: 'En cada duelo, pregunta' },
-    duel[2],
-    { ...duel[4], id: 'duelo-adivinar', title: 'Adivina para avanzar' },
     {
-      id: 'campeon',
-      title: 'La final decide al campeón',
-      art: <SceneChampion />,
+      id: 'juego-al-azar',
+      title: 'Cada ronda, un juego sorpresa',
+      art: <SceneRandomGame />,
       body: (
         <>
           <p>
-            Los últimos dos jugadores se enfrentan en la <b className={strong('text-amber-300')}>final</b>. Quien adivine primero la tarjeta de su rival se lleva el torneo.
+            El administrador elige los juegos del torneo y, <b className={strong('text-violet-300')}>en cada ronda, se sortea uno al azar</b>. Un mismo juego puede repetirse.
+          </p>
+          <ul className="flex flex-col gap-2.5">
+            <Item icon={<Shuffle className="h-4 w-4" />} tone="violet">
+              Pueden salir <b className="text-white">Identidad Oculta, Dominexo o el Laberinto V/F</b>, según lo que haya elegido.
+            </Item>
+            <Item icon={<Gauge className="h-4 w-4" />} tone="amber">
+              Cada juego tiene su <b className="text-white">nivel</b> (niños, adolescentes o universitarios).
+            </Item>
+          </ul>
+        </>
+      ),
+    },
+    {
+      id: 'duelo',
+      title: 'Identidad Oculta y Dominexo: duelo 1 contra 1',
+      art: <SceneDuelRound />,
+      body: (
+        <>
+          <p>
+            Te toca <b className={strong('text-amber-300')}>una persona del grupo al azar</b>. Quien gana el duelo suma <b className="text-white">1 punto</b>.
+          </p>
+          <ul className="flex flex-col gap-2.5">
+            <Item icon={<Swords className="h-4 w-4" />} tone="violet">
+              <b className="text-white">Identidad Oculta:</b> pregunta, descarta tarjetas y adivina la de tu rival.
+            </Item>
+            <Item icon={<Layers className="h-4 w-4" />} tone="cyan">
+              <b className="text-white">Dominexo:</b> conecta fichas y responde las preguntas.
+            </Item>
+            <Item icon={<Bot className="h-4 w-4" />} tone="amber">
+              Si el grupo es impar, a alguien le toca jugar contra el <b className="text-white">bot</b>. Se reparte parejo.
+            </Item>
+          </ul>
+        </>
+      ),
+    },
+    { ...duel[1], id: 'duelo-preguntar', title: 'En Identidad Oculta, pregunta' },
+    { ...duel[4], id: 'duelo-adivinar', title: 'Adivina para ganar el duelo' },
+    {
+      id: 'laberinto',
+      title: 'Laberinto V/F: juegas solo',
+      art: <SceneSoloMaze />,
+      body: (
+        <>
+          <p>
+            En esta ronda <b className={strong('text-cyan-300')}>no hay rival</b>: todos juegan a la vez, cada uno en su pantalla. Lleva al robot a la sala <b className="text-emerald-300">VERDADERO</b> o <b className="text-rose-300">FALSO</b>.
+          </p>
+          <ul className="flex flex-col gap-2.5">
+            <Item icon={<Check className="h-4 w-4" />} tone="emerald">
+              Si respondes <b className="text-white">todas bien</b>, sumas <b className="text-white">1 punto</b>.
+            </Item>
+            <Item icon={<X className="h-4 w-4" />} tone="rose">
+              Si fallas alguna sigues en el torneo, solo que sin punto esa ronda.
+            </Item>
+            <Item icon={<Clock className="h-4 w-4" />} tone="amber">
+              La ronda termina cuando todos acaban o la cierra el administrador.
+            </Item>
+          </ul>
+        </>
+      ),
+    },
+    {
+      id: 'campeon',
+      title: 'Gana quien más puntos tenga',
+      art: <ScenePodium />,
+      body: (
+        <>
+          <p>
+            Al terminar la última ronda se muestra el <b className={strong('text-amber-300')}>podio</b>. Entre rondas puedes ver la clasificación y cuántos puntos llevas.
           </p>
           <ul className="flex flex-col gap-2.5">
             <Item icon={<Trophy className="h-4 w-4" />} tone="amber">
               ¡Cada ronda cuenta: <b className="text-white">no te confíes</b>!
+            </Item>
+            <Item icon={<Crown className="h-4 w-4" />} tone="violet">
+              Si hay empate, gana quien tuvo <b className="text-white">menos acusaciones fallidas</b>.
             </Item>
           </ul>
         </>
