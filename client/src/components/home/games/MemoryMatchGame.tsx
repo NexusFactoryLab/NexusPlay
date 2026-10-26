@@ -43,6 +43,8 @@ import { recordGamePlayResult } from '../../../services/metrics.service'
  */
 export type MemoryMatchTutorialPart = {
   goal: 'preview' | 'pair' | 'zone'
+  /** La pareja que se resalta (late) para que se vea cuáles cartas tocar. */
+  focusPairId?: string
   onDone: () => void
   onFailed: (message: string) => void
 }
@@ -105,6 +107,7 @@ function MemoryMatchSession({
     perZone,
     baseTimePerZoneSeconds: timePerZoneSeconds,
     previewSeconds,
+    fixedOrder: Boolean(tutorial),
   })
 
   // Reporta el resultado una sola vez al llegar a "finished" (issue #226,
@@ -201,6 +204,7 @@ function MemoryMatchSession({
     // el resto; las cartas se dimensionan para caber (ver memoryMatchLayout).
     <div
       className="fixed inset-0 z-50 flex h-dvh flex-col overflow-hidden bg-bg"
+      data-tut-goal={tutorial?.goal}
       onPointerDown={() => {
         if (canFullscreen && wantFullscreen) enterPageFullscreen()
       }}
@@ -244,9 +248,10 @@ function MemoryMatchSession({
             </div>
           </div>
           <div className="flex items-center gap-4 sm:gap-6">
-            <Stat label="Parejas" value={`${game.matchedInZone} / ${game.totalPairsInZone}`} />
+            <Stat label="Parejas" focus="pairs" value={`${game.matchedInZone} / ${game.totalPairsInZone}`} />
             <Stat
               label="Tiempo"
+              focus="time"
               value={
                 game.phase === 'preview'
                   ? `👁️ ${game.previewSecondsLeft}s`
@@ -285,6 +290,7 @@ function MemoryMatchSession({
             </span>
             <button
               type="button"
+              data-tut-focus="skip"
               className="rounded-full px-4 py-1 text-[13px] font-bold text-white shadow-[var(--shadow)]"
               style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
               onClick={game.skipPreview}
@@ -318,6 +324,7 @@ function MemoryMatchSession({
               <button
                 key={card.cardId}
                 type="button"
+                data-tut-focus={tutorial?.focusPairId && card.pairId === tutorial.focusPairId && !isMatched ? 'pair' : undefined}
                 disabled={isMatched}
                 onClick={() => game.flipCard(card.cardId)}
                 className={`group h-full w-full [perspective:1000px] ${isShaking ? 'animate-[shake_0.4s]' : ''}`}
@@ -447,9 +454,9 @@ function MemoryMatchSession({
   )
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, focus }: { label: string; value: string; focus?: string }) {
   return (
-    <div className="flex flex-col items-center px-1">
+    <div data-tut-focus={focus} className="flex flex-col items-center rounded-lg px-1">
       <span className="text-[10px] uppercase tracking-wide text-text/70">{label}</span>
       <span className="mt-0.5 text-[16px] font-semibold text-text-h">{value}</span>
     </div>

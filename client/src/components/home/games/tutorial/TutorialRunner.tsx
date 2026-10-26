@@ -187,6 +187,7 @@ export function TutorialRunner({
       {stage.kind !== 'play' && (
         <div
           className="fixed inset-0 z-[70] flex items-center justify-center bg-[#03040c]/80 p-2 text-slate-100 backdrop-blur-sm sm:p-5"
+          style={{ animation: 'gg-fade-in 0.45s ease-out' }}
           role="dialog"
           aria-modal="true"
           aria-label={`Tutorial de ${name}`}

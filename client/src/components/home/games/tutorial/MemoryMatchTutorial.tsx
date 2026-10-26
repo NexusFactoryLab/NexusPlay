@@ -64,7 +64,8 @@ const FUN_OPPOSITES: MemoryMatchPair[] = [
  */
 export function MemoryMatchTutorial({ onFinish, ...game }: GameProps & { onFinish: () => void }) {
   const opposites = game.pairs[0]?.mode === 'OPPOSITES'
-  const pairs = opposites ? FUN_OPPOSITES : FUN_PAIRS
+  // Tres parejas por tablero: pocas para no abrumar, y siempre las mismas (el orden también es fijo).
+  const pairs = (opposites ? FUN_OPPOSITES : FUN_PAIRS).slice(0, 3)
   const small = Math.min(3, pairs.length)
   const board = (goal: MemoryMatchTutorialPart['goal'], overrides: Partial<GameProps>): TutorialPart['render'] =>
     function MemoryPart(context) {
@@ -79,7 +80,7 @@ export function MemoryMatchTutorial({ onFinish, ...game }: GameProps & { onFinis
           {...overrides}
           gameId={undefined}
           onExit={context.onExit}
-          tutorial={{ goal, onDone: context.onDone, onFailed: context.onFailed }}
+          tutorial={{ goal, focusPairId: pairs[0].pairId, onDone: context.onDone, onFailed: context.onFailed }}
         />
       )
     }

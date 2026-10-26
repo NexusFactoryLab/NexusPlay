@@ -132,8 +132,12 @@ function TutorialMatch({ setup, goal, context }: { setup: Setup; goal: Goal; con
   }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-bg">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-bg" data-tut-goal={goal}>
       <GameThemeBackdrop />
+      {/* Las tarjetas que faltan por descartar laten para que se vea cuáles tocar. */}
+      {(goal === 'discard' || goal === 'discard-one') && (
+        <style>{NOT_FLYING.filter((id) => !discarded.includes(id)).map((id) => `[data-card-id="${id}"]`).join(',') + ' { border-radius: 10px; z-index: 3; } @media (prefers-reduced-motion: no-preference) { ' + NOT_FLYING.filter((id) => !discarded.includes(id)).map((id) => `[data-card-id="${id}"]`).join(',') + ' { animation: gg-focus 1.3s ease-in-out infinite; } }'}</style>
+      )}
       <div className="guess-who-play-shell">
         <div className="mb-3 flex items-center justify-end gap-2">
           <div className="mr-auto min-w-0 flex-1 sm:max-w-[460px]">

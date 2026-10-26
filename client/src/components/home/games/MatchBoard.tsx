@@ -261,7 +261,7 @@ export function AccusationOverlay({
         {/* Solo las tarjetas hacen scroll (con el aviso "Desliza para ver más");
             el título y los botones de confirmar quedan siempre a la vista. */}
         <div className="relative -mx-1 min-h-0 flex-1 overflow-y-auto px-1 pt-1 pb-1">
-        <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4 md:grid-cols-5">
+        <div data-tut-focus="pick" className="grid grid-cols-3 gap-2.5 sm:grid-cols-4 md:grid-cols-5">
           {remaining.map((card, index) => (
             <div key={card.cardId} className="relative">
               <button
@@ -287,7 +287,7 @@ export function AccusationOverlay({
         </div>
         {/* Botones en una fila: dejan más alto para las imágenes. */}
         <div className="mt-3 flex shrink-0 gap-2">
-        <button type="button" disabled={!selected} className="flex-1 rounded-xl bg-accent px-4 py-3 text-[14px] font-bold text-white disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-accent" onClick={() => {
+        <button type="button" data-tut-focus="confirm" disabled={!selected} className="flex-1 rounded-xl bg-accent px-4 py-3 text-[14px] font-bold text-white disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-accent" onClick={() => {
           if (!selected || submitted.current) return
           submitted.current = true
           onAccuse(selected.cardId)
@@ -469,6 +469,7 @@ export function MatchBoard({
             role={onSecretCardClick ? 'button' : undefined}
             tabIndex={onSecretCardClick ? 0 : undefined}
             aria-label={onSecretCardClick ? 'Tu tarjeta secreta' : undefined}
+            data-tut-focus="secret"
             onClick={onSecretCardClick}
             onKeyDown={onSecretCardClick ? (event) => (event.key === 'Enter' || event.key === ' ') && onSecretCardClick() : undefined}
             className={`rounded-xl border border-accent/60 bg-gradient-to-br from-accent/20 via-surface to-accent-2/10 p-3.5 shadow-[0_10px_28px_-18px_var(--accent)] animate-[secret-card-reveal_0.72s_cubic-bezier(0.16,1,0.3,1)_both] motion-reduce:animate-none ${onSecretCardClick ? 'cursor-pointer ring-2 ring-amber-300 ring-offset-2 ring-offset-transparent' : ''}`}
@@ -498,6 +499,7 @@ export function MatchBoard({
             <div className="relative flex items-center gap-2">
             <button
               type="button"
+              data-tut-focus="guess-btn"
               disabled={!guessAvailable}
               className={`flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl border border-accent bg-accent px-3 py-3 text-[13px] font-bold text-white transition-transform hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 ${
                 guessAvailable && !accusing ? 'animate-[result-glow-pulse_1s_ease-in-out_2] motion-reduce:animate-none' : ''
@@ -546,7 +548,7 @@ export function MatchBoard({
             // Tu tablero se puede ordenar en cualquier momento, también en el turno del rival (issue #64).
             const locked = false
             return (
-              <div key={card.cardId} className="relative">
+              <div key={card.cardId} className="relative" data-card-id={card.cardId}>
                 <button
                   type="button"
                   disabled={locked}

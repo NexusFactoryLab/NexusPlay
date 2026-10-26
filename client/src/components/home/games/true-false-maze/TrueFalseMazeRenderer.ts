@@ -488,16 +488,50 @@ export class TrueFalseMazeRenderer {
     const here = state.player.pos.row === cell.row && state.player.pos.col === cell.col
     this.doorOpen += ((here ? 1 : 0) - this.doorOpen) * Math.min(1, dt / 110)
     const open = this.doorOpen
-    const cx = (cell.col + 0.5) * CELL
-    const bottom = (cell.row + 1) * CELL - 2
-    const pulse = 0.55 + 0.45 * Math.sin(state.now / 260)
+    const pulse = 0.5 + 0.5 * Math.sin(state.now / 260)
+    // Una compuerta con marco, centrada en SU casilla: se levanta sobre el piso
+    // (como un muro) y sus dos hojas se separan hacia los lados al llegar.
+    // Las celdas se miden desde el margen del tablero (PAD), igual que todo lo demás.
+    const left = PAD.left + cell.col * CELL + 5
+    const width = CELL - 10
+    const floor = PAD.top + (cell.row + 1) * CELL - 4
+    const top = floor - CELL * 1.18
+    const half = width / 2
+    const gap = half * open
     ctx.save()
-    // Luz detrás de la puerta (se ve cuando se abre) y aro que invita a llegar.
-    this.drawGlow(ctx, cx, bottom - CELL * 0.45, CELL * (0.7 + open * 0.5), open > 0.3 ? '#67e8f9' : '#38bdf8', 0.35 + open * 0.55 + (here ? 0 : pulse * 0.2))
-    ctx.translate(cx, 0)
-    ctx.scale(Math.max(0.12, 1 - open * 0.88), 1)
-    ctx.translate(-cx, 0)
-    this.drawSpriteFit(ctx, this.assets.decor.door, cx, bottom, CELL * 0.9)
+    // Placa luminosa en el piso: invita a llegar y se enciende al abrir.
+    this.drawGlow(ctx, left + half, floor - CELL * 0.18, CELL * (0.75 + open * 0.35), open > 0.4 ? '#67e8f9' : '#38bdf8', 0.3 + open * 0.5 + (here ? 0 : pulse * 0.22))
+    // Hueco: lo que se ve entre las hojas (luz del otro lado).
+    const light = ctx.createLinearGradient(0, top, 0, floor)
+    light.addColorStop(0, '#0e7490')
+    light.addColorStop(1, '#67e8f9')
+    ctx.fillStyle = light
+    ctx.fillRect(left, top, width, floor - top)
+    // Hojas.
+    const panel = ctx.createLinearGradient(0, top, 0, floor)
+    panel.addColorStop(0, '#94a3b8')
+    panel.addColorStop(1, '#475569')
+    const leaf = (x: number, w: number) => {
+      if (w < 1) return
+      ctx.fillStyle = panel
+      ctx.fillRect(x, top, w, floor - top)
+      ctx.strokeStyle = 'rgba(15,23,42,0.55)'
+      ctx.lineWidth = 2
+      ctx.strokeRect(x + 1, top + 1, w - 2, floor - top - 2)
+      // Franjas de precaución.
+      ctx.fillStyle = '#facc15'
+      for (let y = top + 8; y < floor - 6; y += 14) ctx.fillRect(x + 3, y, Math.max(0, w - 6), 4)
+    }
+    leaf(left, half - gap)
+    leaf(left + half + gap, half - gap)
+    // Marco y luz de estado (roja cerrada, verde abierta).
+    ctx.strokeStyle = '#1e293b'
+    ctx.lineWidth = 5
+    ctx.strokeRect(left - 1, top - 1, width + 2, floor - top + 2)
+    ctx.fillStyle = open > 0.5 ? '#4ade80' : pulse > 0.5 ? '#f87171' : '#7f1d1d'
+    ctx.beginPath()
+    ctx.arc(left + half, top - 7, 5, 0, Math.PI * 2)
+    ctx.fill()
     ctx.restore()
   }
 

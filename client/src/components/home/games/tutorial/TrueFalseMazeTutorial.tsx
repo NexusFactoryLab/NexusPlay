@@ -164,7 +164,10 @@ function TaskPart({
           }
           if (!done.current && state.phase === 'playing' && check(state, events, memo.current, context)) {
             done.current = true
-            context.onDone()
+            // El logro se disfruta un momento antes de cambiar de parte (si no, el corte es brusco):
+            // la medusa aturdida alcanza a volver a su nido y la puerta termina de abrirse.
+            const enjoy = events.some((event) => event.type === 'zap') ? 1500 : 450
+            window.setTimeout(context.onDone, enjoy)
           }
         },
         onFinished: () => context.onFailed('Te quedaste sin baterías. ¡Inténtalo otra vez!'),

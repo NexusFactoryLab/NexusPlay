@@ -115,7 +115,8 @@ async function memoryTutorial(browser, viewport, touch) {
 }
 
 async function openGame(browser, game, viewport, touch) {
-  const page = await browser.newPage({ viewport, hasTouch: touch, isMobile: touch })
+  // Sin animaciones continuas: Playwright espera a que un elemento deje de moverse antes de tocarlo.
+  const page = await browser.newPage({ viewport, hasTouch: touch, isMobile: touch, reducedMotion: process.env.TUT_MOTION ? 'no-preference' : 'reduce' })
   const errors = []
   page.on('pageerror', (error) => errors.push(error.message))
   await page.route('**/__tutorial-fixture', (route) => route.fulfill({ contentType: 'text/html', body: fixture(game) }))
@@ -244,6 +245,8 @@ async function tfTutorial(browser, viewport, touch) {
         await page.waitForTimeout(2300)
         if (!(await card.isVisible())) await press(page, 'ArrowLeft', 900)
       }
+      // El logro se disfruta un momento antes de mostrar la tarjeta: se espera a que salga.
+      await card.waitFor({ state: 'visible', timeout: 6000 }).catch(() => {})
       if (await card.getByText('Parte 3 de 6').isVisible()) break
       await understood(page)
     }
@@ -256,6 +259,8 @@ async function tfTutorial(browser, viewport, touch) {
       await press(page, 'ArrowLeft')
       await robotAt(1, 1)
       for (let i = 0; i < 6 && !(await card.isVisible()); i++) await press(page, i % 2 ? 'ArrowLeft' : 'ArrowRight', 1200)
+      // El logro se disfruta un momento antes de mostrar la tarjeta: se espera a que salga.
+      await card.waitFor({ state: 'visible', timeout: 6000 }).catch(() => {})
       if (await card.getByText('Parte 4 de 6').isVisible()) break
       await understood(page)
     }

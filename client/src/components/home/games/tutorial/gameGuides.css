@@ -103,3 +103,86 @@
   0%, 100% { transform: translateX(10cqw); }
   50% { transform: translateX(-12cqw); }
 }
+
+/* Entrada suave del telón de la tarjeta de instrucciones (la parte anterior se apaga, no se corta). */
+@keyframes gg-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Foco: el elemento que hay que usar «late» con un aro y un destello, para que el ojo vaya directo a él. */
+@keyframes gg-focus {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.95), 0 0 0 0 rgba(251, 191, 36, 0.5); transform: scale(1); }
+  50% { box-shadow: 0 0 0 5px rgba(251, 191, 36, 0.95), 0 0 26px 8px rgba(251, 191, 36, 0.55); transform: scale(1.035); }
+}
+
+@keyframes gg-hand {
+  0%, 100% { transform: translate(0, 0) rotate(-8deg); }
+  50% { transform: translate(-3px, -9px) rotate(-8deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-tut-focus] {
+    animation: none !important;
+  }
+}
+
+/* Solo el aro (sin crecer), para contenedores grandes como la lista de preguntas. */
+@keyframes gg-ring {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.9), 0 0 0 0 rgba(251, 191, 36, 0.4); }
+  50% { box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.95), 0 0 22px 6px rgba(251, 191, 36, 0.45); }
+}
+
+/*
+ * Tutorial de Identidad Oculta: lo que la parte pide usar se ilumina.
+ * `data-tut-goal` lo pone el tutorial en su pantalla; `data-tut-focus` lo
+ * traen los elementos reales del juego (tarjeta secreta, preguntas, Sí/No,
+ * «¡Creo que es esta!», selección y confirmar).
+ */
+[data-tut-goal='secret'] [data-tut-focus='secret'],
+[data-tut-goal='ask'] [data-tut-focus='questions'],
+[data-tut-goal='answer'] [data-tut-focus='answer'],
+[data-tut-goal='guess'] [data-tut-focus='pick'] {
+  animation: gg-ring 1.4s ease-in-out infinite;
+}
+
+[data-tut-goal='open-guess'] [data-tut-focus='guess-btn']:not(:disabled),
+[data-tut-goal='guess'] [data-tut-focus='confirm']:not(:disabled) {
+  animation: gg-focus 1.2s ease-in-out infinite;
+  position: relative;
+  z-index: 3;
+}
+
+/* Una manito que señala el botón. */
+[data-tut-goal='open-guess'] [data-tut-focus='guess-btn']:not(:disabled)::after,
+[data-tut-goal='guess'] [data-tut-focus='confirm']:not(:disabled)::after,
+[data-tut-goal='secret'] [data-tut-focus='secret']::after {
+  content: '👆';
+  position: absolute;
+  right: 4px;
+  bottom: -26px;
+  font-size: 26px;
+  line-height: 1;
+  pointer-events: none;
+  animation: gg-hand 1s ease-in-out infinite;
+}
+
+/* Tarjetas que hay que descartar (las pone el tutorial según lo que falta). */
+
+/* MatchMente: lo que la parte pide mirar o tocar late con el mismo aro. */
+[data-tut-goal='preview'] [data-tut-focus='skip'],
+[data-tut-goal='pair'] [data-tut-focus='pair'] {
+  animation: gg-focus 1.2s ease-in-out infinite;
+  position: relative;
+  z-index: 3;
+}
+
+[data-tut-goal='pair'] [data-tut-focus='pair'] {
+  border-radius: 14px;
+}
+
+[data-tut-goal='zone'] [data-tut-focus='time'],
+[data-tut-goal='zone'] [data-tut-focus='pairs'] {
+  animation: gg-ring 1.4s ease-in-out infinite;
+  padding-inline: 8px;
+}
