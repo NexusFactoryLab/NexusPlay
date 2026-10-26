@@ -114,6 +114,8 @@ export type TournamentLiveMatch = {
   players: { userId: string; displayName: string; discardedCount: number; handCount: number | null }[]
   gameType: TournamentGameType
   totalCards: number
+  /** Misión Galáctica: avance de la persona que juega (el match es de una sola). */
+  maze: { answered: number; total: number; wrong: number } | null
 }
 
 export type TournamentRoundMatchSummary = {
@@ -123,6 +125,7 @@ export type TournamentRoundMatchSummary = {
   playerUserIds: string[]
   winnerUserId: string | null
   vsBot: boolean
+  gameType: TournamentGameType
 }
 
 export type TournamentRoundSummary = {
@@ -139,7 +142,11 @@ export type TournamentMatchStateView = GuidedChatState & {
   level: TournamentLevel
   /** En Dominó el match se juega en una sala de dominó (`dominoRoomCode`), no en el tablero de este torneo. */
   gameType: TournamentGameType
+  /** Juego de la ronda (para cargarlo cuando se juega fuera de este tablero, como Misión Galáctica). */
+  gameId: string
   dominoRoomCode: string | null
+  /** Misión Galáctica: su avance; el servidor califica y nunca envía las respuestas correctas. */
+  maze: { total: number; answered: number; wrong: number } | null
   cards: GuessWhoCard[]
   maxAccusationCount: number
   turnDurationSeconds: number
@@ -153,7 +160,7 @@ export type TournamentMatchStateView = GuidedChatState & {
 export type TournamentStateView = {
   code: string
   gameTitle: string
-  /** Juegos del torneo con su complejidad; la ronda N usa el juego N, rotando. */
+  /** Juegos del torneo con su complejidad; cada ronda sortea uno al azar. */
   games: { title: string; level: TournamentLevel; gameType: TournamentGameType }[]
   maxParticipants: number
   turnDurationSeconds: number

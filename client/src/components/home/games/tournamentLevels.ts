@@ -1,12 +1,19 @@
 /** Complejidad de un juego dentro del torneo (issue #102). Debe coincidir con TOURNAMENT_LEVELS del servidor. */
 export type TournamentLevel = 'EASY' | 'MEDIUM' | 'HARD'
 
-/** Juegos que tienen torneo. */
-export type TournamentGameType = 'GUESS_WHO' | 'DOMINO'
+/**
+ * Juegos que tienen torneo. `TRUE_FALSE_MAZE` (Misión Galáctica) no es un duelo:
+ * en su ronda cada persona juega sola y suma un punto si responde todo bien.
+ */
+export type TournamentGameType = 'GUESS_WHO' | 'DOMINO' | 'TRUE_FALSE_MAZE'
+
+/** Tipos de juego que admiten torneo (debe coincidir con TOURNAMENT_GAME_TYPES del servidor). */
+export const TOURNAMENT_GAME_TYPES: readonly TournamentGameType[] = ['GUESS_WHO', 'DOMINO', 'TRUE_FALSE_MAZE']
 
 export const TOURNAMENT_GAME_LABEL: Record<TournamentGameType, string> = {
   GUESS_WHO: '¿Quién Es?',
   DOMINO: 'Dominó',
+  TRUE_FALSE_MAZE: 'Laberinto V/F',
 }
 
 /** Qué cambia cada nivel en cada juego (el texto corto que ve el administrador al elegirlo). */
@@ -20,6 +27,11 @@ export const TOURNAMENT_LEVEL_DETAIL: Record<TournamentGameType, Record<Tourname
     EASY: 'Sin preguntas · fichas sueltas · bot al azar',
     MEDIUM: 'Pregunta antes de cada jugada · bot intermedio',
     HARD: 'Pregunta con caso de aplicación · bot experto',
+  },
+  TRUE_FALSE_MAZE: {
+    EASY: 'Pocas medusas y lentas · las salas se mueven cada 30 s',
+    MEDIUM: 'Tal como lo configuró su autor',
+    HARD: 'Más medusas y rápidas · las salas se mueven cada 12 s',
   },
 }
 

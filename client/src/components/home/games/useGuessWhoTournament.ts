@@ -85,6 +85,16 @@ export function useGuessWhoTournament(token: string | null) {
     [],
   )
 
+  /** Misión Galáctica: una respuesta de la persona; el servidor la califica. */
+  const sendMazeAnswer = useCallback((questionId: string, chosen: boolean) => {
+    socketRef.current?.emit('tournament:maze-answer', { questionId, chosen })
+  }, [])
+
+  /** Misión Galáctica: terminó su partida (o la abandonó). */
+  const sendMazeFinish = useCallback(() => {
+    socketRef.current?.emit('tournament:maze-finish')
+  }, [])
+
   const clearError = useCallback(() => setError(null), [])
 
   const startTournament = useCallback(() => {
@@ -155,6 +165,8 @@ export function useGuessWhoTournament(token: string | null) {
     matchAccusationFailedMessage,
     clearMatchAccusationFailedMessage: () => setMatchAccusationFailedMessage(null),
     createTournament,
+    sendMazeAnswer,
+    sendMazeFinish,
     clearError,
     joinTournament,
     startTournament,

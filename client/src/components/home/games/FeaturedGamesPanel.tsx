@@ -13,9 +13,7 @@ import {
 import { ApiError } from '../../../utils/http'
 import { resolveGameTypeDisplayName } from './gameTypePublicNames'
 import { TournamentSettingsModal } from './TournamentSettingsModal'
-
-/** Tipos de juego que tienen motor de torneo. */
-const TOURNAMENT_GAME_TYPES = ['GUESS_WHO', 'DOMINO']
+import { TOURNAMENT_GAME_TYPES } from './tournamentLevels'
 
 /**
  * Destacados del Inicio (issue #100): el ADMIN decide qué juegos publicados se
@@ -61,7 +59,7 @@ export function FeaturedGamesPanel() {
   }, [token])
 
   const tournamentGames = useMemo(
-    () => games.filter((game) => game.status === 'PUBLISHED' && TOURNAMENT_GAME_TYPES.includes(game.gameType)),
+    () => games.filter((game) => game.status === 'PUBLISHED' && (TOURNAMENT_GAME_TYPES as readonly string[]).includes(game.gameType)),
     [games],
   )
 

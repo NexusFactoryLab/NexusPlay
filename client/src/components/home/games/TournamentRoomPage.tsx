@@ -107,6 +107,17 @@ function TournamentSession() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dominoMatch?.matchCode])
 
+  // Misión Galáctica: cada persona juega sola, en su propia pantalla. Se avisa y se entra a ella.
+  const mazeMatch =
+    tournament?.myMatch?.gameType === 'TRUE_FALSE_MAZE' && tournament.myMatch.phase === 'PLAYING' ? tournament.myMatch : null
+  useEffect(() => {
+    if (!mazeMatch || !tournament) return
+    const target = `/laberinto-vf/torneo/${encodeURIComponent(tournament.code)}`
+    const timeout = setTimeout(() => navigate(target), 2600)
+    return () => clearTimeout(timeout)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mazeMatch?.matchCode])
+
   useEffect(() => {
     if (!matchAccusationFailedMessage) return
     const timeout = setTimeout(clearMatchAccusationFailedMessage, 3500)
@@ -256,6 +267,7 @@ function TournamentSession() {
           selfUserId={user?.id ?? null}
         />
       )}
+      {mazeMatch && <MazeRoundAnnouncement round={mazeMatch.round} title={mazeMatch.gameTitle} />}
       {!dominoMatch && showPairingOverlay && pairingAnnouncement && (
         <PairingAnnouncementOverlay announcement={pairingAnnouncement} selfUserId={user?.id ?? null} />
       )}
@@ -314,7 +326,7 @@ function TournamentSession() {
           </p>
         )}
 
-        {tournament.phase === 'RUNNING' && tournament.myMatch && tournament.myMatch.gameType !== 'DOMINO' && self && (
+        {tournament.phase === 'RUNNING' && tournament.myMatch && tournament.myMatch.gameType === 'GUESS_WHO' && self && (
           <RunningMatch
             error={error}
             onSend={sendMatchMessage}
@@ -340,6 +352,20 @@ function TournamentSession() {
               onClick={() => navigate(`/domino/sala/${encodeURIComponent(dominoMatch.dominoRoomCode ?? '')}?torneo=${encodeURIComponent(tournament.code)}`)}
             >
               Ir a la partida
+            </button>
+          </div>
+        )}
+
+        {tournament.phase === 'RUNNING' && mazeMatch && (
+          <div className="stagger-in flex flex-col items-center gap-3 py-8 text-center">
+            <p className="text-[16px] font-semibold text-text-h">Tu misión está lista.</p>
+            <button
+              type="button"
+              className="rounded-lg px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)] transition-all duration-200 hover:-translate-y-0.5"
+              style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
+              onClick={() => navigate(`/laberinto-vf/torneo/${encodeURIComponent(tournament.code)}`)}
+            >
+              Ir a la misión
             </button>
           </div>
         )}
@@ -494,17 +520,40 @@ function RoundsRanking({
           {tournament.rounds.map((round) => (
             <div key={round.round} className="rounded-lg bg-code-bg px-3 py-2 text-[12px] text-text">
               <p className="mb-1 font-semibold text-text-h">Ronda {round.round}</p>
-              {round.matches.map((match) => (
-                <p key={match.matchCode}>
-                  {match.winnerUserId
-                    ? `Ganó ${tournament.participants.find((p) => p.userId === match.winnerUserId)?.displayName ?? 'el bot'}${match.vsBot ? ' (vs bot)' : ''}`
-                    : 'En curso'}
+              {round.matches[0]?.gameType === 'TRUE_FALSE_MAZE' ? (
+                <p>
+                  Misión Galáctica: {round.matches.filter((match) => match.winnerUserId).length} de {round.matches.length}{' '}
+                  respondieron todo bien
+                  {round.matches.some((match) => match.phase !== 'FINISHED') ? ' (en curso)' : ''}
                 </p>
-              ))}
+              ) : (
+                round.matches.map((match) => (
+                  <p key={match.matchCode}>
+                    {match.winnerUserId
+                      ? `Ganó ${tournament.participants.find((p) => p.userId === match.winnerUserId)?.displayName ?? 'el bot'}${match.vsBot ? ' (vs bot)' : ''}`
+                      : 'En curso'}
+                  </p>
+                ))
+              )}
             </div>
           ))}
         </div>
       </div>
+    </div>
+  )
+}
+
+/** Aviso de una ronda de Misión Galáctica: no hay pareja, cada persona juega sola. */
+function MazeRoundAnnouncement({ round, title }: { round: number; title: string }) {
+  return (
+    <div className="page-fade fixed inset-0 z-[70] flex flex-col items-center justify-center gap-4 bg-black/75 px-5 text-center text-white backdrop-blur-md">
+      <p className="stagger-in text-[13px] font-semibold tracking-[0.22em] text-white/70 uppercase">Ronda {round}</p>
+      <p className="stagger-in text-[26px] font-bold sm:text-[32px]" style={{ '--stagger': 1 } as React.CSSProperties}>
+        {title}
+      </p>
+      <p className="stagger-in max-w-[420px] text-[14px] text-white/80" style={{ '--stagger': 2 } as React.CSSProperties}>
+        Juegas solo. Respondiendo <b>todas</b> bien sumas un punto.
+      </p>
     </div>
   )
 }

@@ -136,6 +136,11 @@ type Options = {
    * llegar a la puerta, para que una medusa no alcance al robot mientras se abre.
    */
   onFrame?: (state: TfState, events: TfEvent[]) => 'freeze' | void
+  /**
+   * Se llama solo en los cuadros donde pasó algo (una respuesta, el final…), sin
+   * tocar el modo del juego. El torneo reporta ahí cada respuesta al servidor.
+   */
+  onRunEvents?: (state: TfState, events: TfEvent[]) => void
 }
 
 /**
@@ -153,12 +158,15 @@ export function useTrueFalseMazeSession({
   map = SPACESHIP_MAP,
   taskMode = false,
   onFrame,
+  onRunEvents,
 }: Options) {
   const [initialState] = useState(() => createTfState({ map, questions, config }))
   const frozenRef = useRef(false)
   const onFrameRef = useRef(onFrame)
+  const onRunEventsRef = useRef(onRunEvents)
   useEffect(() => {
     onFrameRef.current = onFrame
+    onRunEventsRef.current = onRunEvents
   })
   const [sfx] = useState(() => new TrueFalseMazeSfx(readMutedPreference()))
   const stateRef = useRef<TfState>(initialState)
@@ -236,6 +244,7 @@ export function useTrueFalseMazeSession({
       // En una tarea no hay salas: sus movimientos (hacia ningún lado) no se anuncian ni se dibujan.
       const events = drainTfEvents(state).filter((event) => !taskMode || (event.type !== 'zones-move' && event.type !== 'zones-warning'))
       if (onFrameRef.current?.(state, events) === 'freeze') frozenRef.current = true
+      if (events.length > 0) onRunEventsRef.current?.(state, events)
       const current = rendererRef.current
       // Solo en desarrollo (se elimina del build): deja el estado a mano para las pruebas en navegador.
       if (import.meta.env.DEV) (window as unknown as { __tfMaze?: unknown }).__tfMaze = { state, renderer: current }

@@ -213,9 +213,23 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
                     {match.phase === 'FINISHED' ? (
                       <p className="mt-0.5 flex items-center gap-1.5 text-[11.5px] text-text">
                         <Trophy className="h-3 w-3 text-accent" strokeWidth={2} />
-                        {match.players.find((p) => p.userId === match.winnerUserId)?.displayName
-                          ? `Ganó ${match.players.find((p) => p.userId === match.winnerUserId)?.displayName}`
-                          : 'Cerrada sin ganador'}
+                        {match.gameType === 'TRUE_FALSE_MAZE'
+                          ? match.winnerUserId
+                            ? 'Respondió todo bien: +1 punto'
+                            : match.maze && match.maze.wrong > 0
+                              ? `Sin punto: ${match.maze.wrong} ${match.maze.wrong === 1 ? 'error' : 'errores'}`
+                              : 'Sin punto: no terminó'
+                          : match.players.find((p) => p.userId === match.winnerUserId)?.displayName
+                            ? `Ganó ${match.players.find((p) => p.userId === match.winnerUserId)?.displayName}`
+                            : 'Cerrada sin ganador'}
+                      </p>
+                    ) : match.gameType === 'TRUE_FALSE_MAZE' && match.maze ? (
+                      <p className="mt-0.5 flex items-center gap-1.5 text-[11.5px] text-text">
+                        <Radio className="h-3 w-3 text-accent" strokeWidth={2} />
+                        <span className="truncate">
+                          Respondió {match.maze.answered}/{match.maze.total}
+                          {match.maze.wrong > 0 ? ` · ${match.maze.wrong} ${match.maze.wrong === 1 ? 'error' : 'errores'}` : ''}
+                        </span>
                       </p>
                     ) : (
                       <p className="mt-0.5 flex items-center gap-1.5 text-[11.5px] text-text">

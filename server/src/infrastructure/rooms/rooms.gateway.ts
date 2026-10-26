@@ -25,6 +25,7 @@ import {
   type TournamentState,
   type TournamentMatch,
   type TournamentLevel,
+  TOURNAMENT_GAME_TYPES,
   type TournamentGameType,
   TOURNAMENT_LEVELS,
   isTournamentLevel,
@@ -180,6 +181,23 @@ function keepBotsReady(players: { ready?: boolean; bot?: unknown }[]) {
   for (const player of players) if (player.bot) player.ready = true;
 }
 
+/**
+ * Clave de respuestas de un Laberinto Verdadero o Falso: `questionId` → si la
+ * afirmación es verdadera. Los ids que faltan se asignan igual que en el
+ * cliente (`q-<posición>`), para que ambos hablen de la misma afirmación.
+ */
+function mazeAnswerKey(content: unknown): Map<string, boolean> {
+  const answers = new Map<string, boolean>();
+  if (!Array.isArray(content)) return answers;
+  content.forEach((item, index) => {
+    const value = (item ?? {}) as Record<string, unknown>;
+    if (typeof value.statement !== 'string' || typeof value.answer !== 'boolean') return;
+    const id = typeof value.questionId === 'string' && value.questionId ? value.questionId : `q-${index + 1}`;
+    answers.set(id, value.answer);
+  });
+  return answers;
+}
+
 /** Vista pública del torneo que se envía a un participante dado. */
 function toTournamentClientView(
   tournament: TournamentState,
@@ -247,6 +265,7 @@ function buildRoundsSummary(tournament: TournamentState) {
         playerUserIds: match.playerUserIds,
         winnerUserId: match.winnerUserId,
         vsBot: match.vsBot === true,
+        gameType: match.gameType ?? 'GUESS_WHO',
       })),
     }));
 }
@@ -268,14 +287,16 @@ function buildLiveMatches(tournament: TournamentState, dominoLookup?: (code: str
       players: match.players.map((player) => ({
         userId: player.userId,
         displayName: nameOf(player.userId),
-        discardedCount: player.discardedCardIds.length,
+        // Misión Galáctica: cuántas afirmaciones lleva respondidas.
+        discardedCount: match.maze ? match.maze.answeredIds.length : player.discardedCardIds.length,
         // Dominó: fichas que le quedan en la mano (se ve cómo va la partida).
         handCount: match.dominoRoomCode
           ? dominoLookup?.(match.dominoRoomCode)?.players.find((p) => p.userId === player.userId)?.hand.length ?? null
           : null,
       })),
       gameType: match.gameType ?? 'GUESS_WHO',
-      totalCards: match.cards.length,
+      totalCards: match.maze?.total ?? match.cards.length,
+      maze: match.maze ? { answered: match.maze.answeredIds.length, total: match.maze.total, wrong: match.maze.wrong } : null,
     }));
 }
 
@@ -298,7 +319,10 @@ function toMatchClientView(match: TournamentMatch, tournament: TournamentState, 
     gameTitle: match.gameTitle ?? tournament.gameTitle,
     level: match.level ?? 'MEDIUM',
     gameType: match.gameType ?? 'GUESS_WHO',
+    gameId: match.gameId ?? tournament.gameId,
     dominoRoomCode: match.dominoRoomCode ?? null,
+    // Misión Galáctica: su avance (nunca las respuestas correctas).
+    maze: match.maze ? { total: match.maze.total, answered: match.maze.answeredIds.length, wrong: match.maze.wrong } : null,
     cards: match.cards,
     maxAccusationCount: tournament.maxAccusationCount,
     turnDurationSeconds: match.turnDurationSeconds ?? tournament.turnDurationSeconds,
@@ -1554,7 +1578,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     const available = settings.games.flatMap((pick, index) => {
       const candidate = loaded[index];
       const type = candidate?.gameType.getName();
-      return candidate && candidate.status.getName() === 'PUBLISHED' && (type === 'GUESS_WHO' || type === 'DOMINO')
+      return candidate && candidate.status.getName() === 'PUBLISHED' && (TOURNAMENT_GAME_TYPES as readonly string[]).includes(type ?? '')
         ? [{ game: candidate, level: pick.level }]
         : [];
     });
@@ -1593,11 +1617,14 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     };
 
     for (const g of games) {
-      if (g.gameType.getName() === 'DOMINO') {
+      const type = g.gameType.getName();
+      if (type === 'DOMINO') {
         this.tournamentDominoGames.set(g.id, {
           concepts: g.content as DominoConcept[],
           handSize: (g.config.handSize as number | undefined) ?? 7,
         });
+      } else if (type === 'TRUE_FALSE_MAZE') {
+        this.tournamentMazeGames.set(g.id, mazeAnswerKey(g.content));
       } else {
         this.lastCreatedGameCards.set(g.id, g.content as GuessWhoCard[]);
       }
@@ -1784,7 +1811,22 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     // Las salas de dominó de la ronda anterior ya cumplieron: se liberan.
     this.disposeTournamentDominoRooms(tournament, tournament.currentRound - 1);
     const shuffledIds = shuffle(userIds);
-    const isDominoRound = this.gameForRound(tournament, tournament.currentRound).gameType === 'DOMINO';
+    const roundGame = this.gameForRound(tournament, tournament.currentRound);
+
+    // Misión Galáctica no es un duelo: cada persona juega sola, sin pareja ni bot,
+    // y suma un punto si responde todo bien. Nadie queda fuera por fallar.
+    if (roundGame.gameType === 'TRUE_FALSE_MAZE') {
+      tournament.matches.push(
+        ...shuffledIds.map((userId, index) =>
+          this.buildMazeMatch(tournament, `${tournament.code}-R${tournament.currentRound}-S${index + 1}`, tournament.currentRound, userId, roundGame),
+        ),
+      );
+      this.tournamentStore.set(tournament);
+      this.broadcastTournamentState(tournament);
+      return;
+    }
+
+    const isDominoRound = roundGame.gameType === 'DOMINO';
 
     // Con número impar, quien sobra juega contra el bot en vez de esperar (issue #102).
     // Se reparte parejo: entre los candidatos, el que menos veces ha jugado contra el bot (desempata el azar).
@@ -1938,6 +1980,106 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       activePlayerUserId: null,
       turnDeadline: null,
     };
+  }
+
+  /** Match de una sola persona para una ronda de Misión Galáctica. */
+  private buildMazeMatch(
+    tournament: TournamentState,
+    matchCode: string,
+    round: number,
+    userId: string,
+    roundGame: { gameId: string; title: string; level: TournamentLevel },
+  ): TournamentMatch {
+    return {
+      matchCode,
+      round,
+      playerUserIds: [userId],
+      isBye: false,
+      gameId: roundGame.gameId,
+      gameTitle: roundGame.title,
+      level: roundGame.level,
+      gameType: 'TRUE_FALSE_MAZE',
+      // Si el servidor se reinició, el total se completa con la primera respuesta (ver `mazeAnswers`).
+      maze: { total: this.tournamentMazeGames.get(roundGame.gameId)?.size ?? 0, answeredIds: [], correct: 0, wrong: 0 },
+      phase: 'PLAYING',
+      cards: [],
+      players: [{ userId, secretCardId: null, discardedCardIds: [] }],
+      winnerUserId: null,
+      activePlayerUserId: null,
+      turnDeadline: null,
+    };
+  }
+
+  private requireActiveMazeMatch(socket: AuthenticatedSocket): { tournament: TournamentState; match: TournamentMatch } {
+    const tournament = this.tournamentStore.findBySocketId(socket.id);
+    if (!tournament) throw new Error('No estás en ninguna sala grupal.');
+    const match = tournament.matches.find(
+      (m) =>
+        m.round === tournament.currentRound &&
+        m.gameType === 'TRUE_FALSE_MAZE' &&
+        m.playerUserIds.includes(socket.data.userId) &&
+        m.phase === 'PLAYING',
+    );
+    if (tournament.phase !== 'RUNNING' || !match?.maze) {
+      throw new Error('No tienes una partida de Misión Galáctica activa en esta ronda.');
+    }
+    return { tournament, match };
+  }
+
+  /**
+   * Una respuesta de Misión Galáctica: el servidor la califica con su propia
+   * copia de las respuestas. Solo cuenta la primera de cada afirmación, así
+   * recargar la página no deja corregir un error.
+   */
+  @SubscribeMessage('tournament:maze-answer')
+  async handleTournamentMazeAnswer(
+    @ConnectedSocket() socket: AuthenticatedSocket,
+    @MessageBody() body: { questionId?: unknown; chosen?: unknown },
+  ) {
+    const { tournament, match } = this.requireActiveMazeMatch(socket);
+    const questionId = body?.questionId;
+    if (typeof questionId !== 'string' || typeof body?.chosen !== 'boolean') throw new Error('Respuesta no válida.');
+
+    const answers = await this.mazeAnswers(match.gameId ?? tournament.gameId);
+    const correctAnswer = answers.get(questionId);
+    if (correctAnswer === undefined) throw new Error('Esa afirmación no es de este juego.');
+    const maze = match.maze!;
+    // El administrador pudo cerrar la ronda mientras se leía el juego.
+    if (match.phase !== 'PLAYING' || maze.answeredIds.includes(questionId)) return;
+
+    if (maze.total === 0) maze.total = answers.size;
+    maze.answeredIds.push(questionId);
+    if (body.chosen === correctAnswer) maze.correct += 1;
+    else maze.wrong += 1;
+    this.tournamentStore.set(tournament);
+    this.sendTournamentStateToModerator(tournament);
+  }
+
+  /**
+   * La persona terminó su partida (respondió todo o se quedó sin baterías).
+   * Suma un punto solo si respondió todas las afirmaciones y ninguna mal.
+   */
+  @SubscribeMessage('tournament:maze-finish')
+  handleTournamentMazeFinish(@ConnectedSocket() socket: AuthenticatedSocket) {
+    const { tournament, match } = this.requireActiveMazeMatch(socket);
+    const maze = match.maze!;
+    const userId = match.playerUserIds[0];
+    const passed = maze.total > 0 && maze.answeredIds.length >= maze.total && maze.wrong === 0;
+
+    match.phase = 'FINISHED';
+    match.winnerUserId = passed ? userId : null;
+    const participant = tournament.participants.find((p) => p.userId === userId);
+    if (participant) {
+      if (passed) {
+        participant.points += 1;
+        participant.wins = (participant.wins ?? 0) + 1;
+      } else {
+        participant.losses = (participant.losses ?? 0) + 1;
+      }
+    }
+    this.tournamentStore.set(tournament);
+    this.broadcastTournamentState(tournament);
+    this.maybeAdvanceTournamentRound(tournament);
   }
 
   /** Libera las salas de dominó de un torneo (de una ronda, o de todas si no se indica). */
@@ -2146,6 +2288,22 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   /** Contenido de los juegos de Dominó del torneo, por gameId (se arma al crear). */
   private readonly tournamentDominoGames = new Map<string, { concepts: DominoConcept[]; handSize: number }>();
 
+  /**
+   * Respuesta correcta de cada afirmación de los Misión Galáctica del torneo,
+   * por `questionId`. El servidor es quien califica: el navegador solo dice qué eligió.
+   */
+  private readonly tournamentMazeGames = new Map<string, Map<string, boolean>>();
+
+  /** La clave de respuestas de un juego; si el servidor se reinició y la perdió, se vuelve a leer del juego. */
+  private async mazeAnswers(gameId: string): Promise<Map<string, boolean>> {
+    const cached = this.tournamentMazeGames.get(gameId);
+    if (cached) return cached;
+    const game = await this.gameRepository.findById(gameId);
+    const answers = mazeAnswerKey(game?.content);
+    this.tournamentMazeGames.set(gameId, answers);
+    return answers;
+  }
+
   private startTournamentMatchTurn(tournament: TournamentState, match: TournamentMatch, userId: string) {
     match.pendingQuestion = null;
     match.activePlayerUserId = userId;
@@ -2286,6 +2444,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       (m) =>
         m.round === tournament.currentRound &&
         m.gameType !== 'DOMINO' &&
+        m.gameType !== 'TRUE_FALSE_MAZE' &&
         m.playerUserIds.includes(socket.data.userId) &&
         m.phase === 'PLAYING',
     );
@@ -2304,6 +2463,14 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       const room = this.tournamentBotRooms.get(match.matchCode);
       if (room) this.tournamentBotRunner.onRoomChanged(room);
     }
+  }
+
+  /** Solo el panel del moderador: con 40 personas respondiendo, avisar a todas en cada respuesta sería ruido. */
+  private sendTournamentStateToModerator(tournament: TournamentState) {
+    if (!tournament.moderatorSocketId) return;
+    this.server
+      .to(tournament.moderatorSocketId)
+      .emit('tournament:state', toTournamentClientView(tournament, tournament.creatorUserId, (c) => this.dominoRoomStore.get(c)));
   }
 
   private broadcastTournamentState(tournament: TournamentState) {

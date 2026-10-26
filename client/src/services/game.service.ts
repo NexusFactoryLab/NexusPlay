@@ -74,6 +74,11 @@ export function listGames(token: string, params: ListGamesParams = {}): Promise<
   return request<PaginatedGames>(`/games${queryString ? `?${queryString}` : ''}`, { token })
 }
 
+/** GET /games/:id — detalle por id (el torneo lo usa para cargar el juego de la ronda). */
+export function getGameById(token: string, gameId: string): Promise<GameDetail> {
+  return request<GameDetail>(`/games/${encodeURIComponent(gameId)}`, { token })
+}
+
 /** GET /games/slug/:slug — detalle por URL amigable, para la pantalla de descripción. */
 export function getGameBySlug(token: string, slug: string): Promise<GameDetail> {
   return request<GameDetail>(`/games/slug/${encodeURIComponent(slug)}`, { token })

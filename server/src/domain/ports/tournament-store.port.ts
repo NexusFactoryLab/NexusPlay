@@ -7,8 +7,24 @@ export type TournamentPhase = 'WAITING' | 'RUNNING' | 'FINISHED';
 /** Complejidad de un juego dentro del torneo (issue #102): cambia el tablero, el tiempo por turno y el bot. */
 export type TournamentLevel = 'EASY' | 'MEDIUM' | 'HARD';
 
-/** Juegos con motor de torneo. */
-export type TournamentGameType = 'GUESS_WHO' | 'DOMINO';
+/**
+ * Juegos con motor de torneo. `TRUE_FALSE_MAZE` (Misión Galáctica) no es un
+ * duelo: en su ronda cada persona juega sola y suma un punto si responde todo bien.
+ */
+export type TournamentGameType = 'GUESS_WHO' | 'DOMINO' | 'TRUE_FALSE_MAZE';
+
+/** Tipos de juego que admiten torneo (el servidor y el cliente deben coincidir). */
+export const TOURNAMENT_GAME_TYPES: readonly TournamentGameType[] = ['GUESS_WHO', 'DOMINO', 'TRUE_FALSE_MAZE'];
+
+/** Avance de una persona en una ronda de Misión Galáctica; el servidor lleva la cuenta de sus respuestas. */
+export interface TournamentMazeProgress {
+  /** Afirmaciones del juego. */
+  total: number;
+  /** `questionId` ya respondidas (una respuesta por afirmación: la primera vale). */
+  answeredIds: string[];
+  correct: number;
+  wrong: number;
+}
 
 export const TOURNAMENT_LEVELS: Record<
   TournamentLevel,
@@ -72,6 +88,8 @@ export interface TournamentMatch {
   /** Tipo de juego del match; ausente = ¿Quién Es?. En Dominó el match vive en una sala de dominó real (`dominoRoomCode`). */
   gameType?: TournamentGameType;
   dominoRoomCode?: string;
+  /** Solo en Misión Galáctica: el match es de una sola persona y esto es su avance. */
+  maze?: TournamentMazeProgress;
   /** Segundos por turno de este match (los fija la complejidad del juego de la ronda). */
   turnDurationSeconds?: number;
   phase: 'WAITING' | 'PLAYING' | 'FINISHED';

@@ -11,7 +11,7 @@ import {
   TOURNAMENT_SETTINGS_REPOSITORY,
   type TournamentSettingsRepository,
 } from '../../domain/ports/tournament-settings.repository.port.js';
-import type { TournamentLevel } from '../../domain/ports/tournament-store.port.js';
+import { TOURNAMENT_GAME_TYPES, type TournamentLevel } from '../../domain/ports/tournament-store.port.js';
 import { ForbiddenActionError } from '../../domain/errors/authorization.errors.js';
 import { InvalidGameStateError } from '../../domain/errors/game.errors.js';
 import { GameNotFoundError } from '../errors/application.errors.js';
@@ -67,8 +67,8 @@ export class SaveTournamentSettingsUseCase implements UseCase<SaveTournamentSett
       if (game.status.getName() !== 'PUBLISHED') {
         throw new InvalidGameStateError(`"${game.title}" no está publicado, no puede entrar al torneo.`);
       }
-      if (!['GUESS_WHO', 'DOMINO'].includes(game.gameType.getName())) {
-        throw new InvalidGameStateError('por ahora solo "¿Quién Es?" y Dominó admiten torneos.');
+      if (!(TOURNAMENT_GAME_TYPES as readonly string[]).includes(game.gameType.getName())) {
+        throw new InvalidGameStateError('por ahora solo "¿Quién Es?", Dominó y el Laberinto Verdadero o Falso admiten torneos.');
       }
     }
 
