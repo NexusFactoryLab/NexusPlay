@@ -23,7 +23,10 @@ import { ANSWER_LETTERS } from './mazeCollectorQuestions'
 import type { MazeQuestion } from './mazeCollectorQuestions'
 
 export type { Direction }
-export type MazePhase = 'ready' | 'playing' | 'levelup' | 'lost'
+export type MazePhase = 'ready' | 'playing' | 'levelup' | 'lost' | 'won'
+/** Rondas que se pueden elegir antes de jugar (cada ronda = limpiar toda la ciudad). */
+export const ROUND_OPTIONS = [1, 2, 3, 5] as const
+export const DEFAULT_ROUNDS = 2
 export type GhostMode = 'NORMAL' | 'FRIGHTENED' | 'EATEN'
 
 const REVERSE_DIRECTION: Record<Direction, Direction> = {
@@ -146,6 +149,8 @@ type InternalState = {
   caughtCount: number
   phase: MazePhase
   level: number
+  /** Rondas para salvar la ciudad: al limpiar la ciudad en la última, se gana. */
+  targetRounds: number
   score: number
   lives: number
   /** Config.enemySpeed no cambia durante la partida — se guarda acá una sola vez. */
@@ -412,6 +417,7 @@ function createInitialState(
     caughtCount: 0,
     phase: 'ready',
     level: 1,
+    targetRounds: DEFAULT_ROUNDS,
     score: 0,
     lives: config.lives,
     baseEnemySpeed: config.enemySpeed,
@@ -527,6 +533,11 @@ function resolvePlayerArrival(state: InternalState, layout: MazeLayoutDef, now: 
   maybeSpawnBonus(state, now)
 
   if (state.pickups.length === 0) {
+    // Ciudad limpia: si era la última ronda, ¡la ciudad está salvada!
+    if (state.level >= state.targetRounds) {
+      state.phase = 'won'
+      return
+    }
     state.phase = 'levelup'
     state.levelUpUntil = now + LEVELUP_PAUSE_MS
   }
@@ -726,6 +737,7 @@ function tickEngine(state: InternalState, layout: MazeLayoutDef, items: MazeColl
 export type MazeGameSnapshot = {
   phase: MazePhase
   level: number
+  targetRounds: number
   score: number
   lives: number
   player: { row: number; col: number; facing: Direction; slowed: boolean }
@@ -754,6 +766,7 @@ function toSnapshot(state: InternalState, now: number): MazeGameSnapshot {
   return {
     phase: state.phase,
     level: state.level,
+    targetRounds: state.targetRounds,
     score: state.score,
     lives: state.lives,
     player: { row: playerPoint.row, col: playerPoint.col, facing: state.player.facing, slowed: now < state.player.slowUntil },
@@ -852,6 +865,14 @@ export function useMazeCollectorGame({ layout, items, config, inputEnabled = tru
     setPaused(false)
   }, [])
 
+  /** Se elige en la pantalla de inicio, antes de empezar a jugar. */
+  const setRounds = useCallback((rounds: number) => {
+    const state = stateRef.current!
+    if (state.phase !== 'ready') return
+    state.targetRounds = rounds
+    setSnapshot((current) => ({ ...current, targetRounds: rounds }))
+  }, [])
+
   const setDirection = useCallback((direction: Direction) => {
     if (pausedRef.current) return
     primeGameFeedback()
@@ -872,7 +893,7 @@ export function useMazeCollectorGame({ layout, items, config, inputEnabled = tru
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [setDirection, inputEnabled])
 
-  return { ...snapshot, paused, pause, resume, setDirection }
+  return { ...snapshot, paused, pause, resume, setDirection, setRounds }
 }
 
 /** Solo para pruebas del motor. */

@@ -4,7 +4,7 @@ import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, BookOpen, CircleHelp, LogOut
 import type { MazeCollectorConfig, MazeCollectorItem, MazeLayoutDef, CellPosition } from './mazeCollectorTypes'
 import { iconForConcept } from './mazeCollectorTypes'
 import { POWER_MODE_MS } from './mazeEngine'
-import { ANSWER_FEEDBACK_MS, QUESTION_TIME_MS, useMazeCollectorGame } from './useMazeCollectorGame'
+import { ANSWER_FEEDBACK_MS, DEFAULT_ROUNDS, QUESTION_TIME_MS, ROUND_OPTIONS, useMazeCollectorGame } from './useMazeCollectorGame'
 import type { ActiveQuestion, AnswerFeedback, Direction, MazeAnswer, MazeScenario } from './useMazeCollectorGame'
 import type { MazeQuestion } from './mazeCollectorQuestions'
 import { EcoTruckSprite } from './EcoTruckSprite'
@@ -151,6 +151,8 @@ export function MazeCollectorGame(props: MazeCollectorGameProps) {
   // empieza una partida nueva (la sesión se vuelve a montar con otra clave).
   const [inTutorial, setInTutorial] = useState(false)
   const [round, setRound] = useState(0)
+  // Rondas elegidas en la pantalla de inicio: se recuerdan al jugar otra vez.
+  const [rounds, setRounds] = useState<number>(DEFAULT_ROUNDS)
   if (inTutorial) {
     return (
       <MazeCollectorTutorial
@@ -177,6 +179,9 @@ export function MazeCollectorGame(props: MazeCollectorGameProps) {
       onOpenGuide={() => !props.tutorial && setGuideOpen(true)}
       onCloseGuide={() => setGuideOpen(false)}
       onStartTutorial={props.tutorial ? undefined : () => setInTutorial(true)}
+      rounds={rounds}
+      onRoundsChange={setRounds}
+      onPlayAgain={() => setRound((value) => value + 1)}
     />
   )
 }
@@ -194,7 +199,18 @@ function MazeCollectorSession({
   onOpenGuide,
   onCloseGuide,
   onStartTutorial,
-}: MazeCollectorGameProps & { guideOpen: boolean; onOpenGuide: () => void; onCloseGuide: () => void; onStartTutorial?: () => void }) {
+  rounds,
+  onRoundsChange,
+  onPlayAgain,
+}: MazeCollectorGameProps & {
+  guideOpen: boolean
+  onOpenGuide: () => void
+  onCloseGuide: () => void
+  onStartTutorial?: () => void
+  rounds: number
+  onRoundsChange: (rounds: number) => void
+  onPlayAgain: () => void
+}) {
   // En el tutorial, mientras se lee la instrucción el camión no responde.
   const game = useMazeCollectorGame({
     layout,
@@ -290,7 +306,11 @@ function MazeCollectorSession({
     return () => observer.disconnect()
   }, [layout.cols, layout.rows, trimmedRows, focus?.row, focus?.col, focus?.rows, focus?.cols])
 
-  const { pause, resume } = game
+  const { pause, resume, setRounds } = game
+  // Las rondas se fijan antes de empezar (en el tutorial no aplican: no se pasa de ronda).
+  useEffect(() => {
+    if (!tutorial) setRounds(rounds)
+  }, [rounds, setRounds, tutorial])
   // Abrir la guía a mitad de partida pausa el juego.
   useEffect(() => {
     if (guideOpen) pause()
@@ -453,7 +473,7 @@ function MazeCollectorSession({
             ))}
           </div>
           <span className="max-[400px]:hidden">
-            <Stat label="Nivel" value={String(game.level)} />
+            <Stat label="Ronda" value={tutorial ? String(game.level) : `${game.level}/${game.targetRounds}`} />
           </span>
           <span className="flex items-center gap-1.5">
             <span className="max-[420px]:hidden">
@@ -738,6 +758,7 @@ function MazeCollectorSession({
               </>
             )}
           </p>
+          <RoundPicker value={rounds} onChange={onRoundsChange} />
           {canFullscreen && !compact && (
             <FullscreenChoice wanted={wantFullscreen} active={fullscreen} onChange={chooseFullscreen} />
           )}
@@ -780,8 +801,11 @@ function MazeCollectorSession({
       {game.phase === 'levelup' && (
         <Overlay celebrate>
           <img src={mazeSpriteUrl('ui-trophy')} alt="" className="mx-auto h-20 w-20 animate-[maze-levelup-pop_0.4s_cubic-bezier(0.16,1,0.3,1)]" />
-          <h2 className="mt-1 text-[22px] font-bold text-white">¡Ciudad limpia!</h2>
-          <p className="text-[14px] text-slate-300">Nivel {game.level + 1} — las nubes vienen más rápido…</p>
+          <h2 className="mt-1 text-[22px] font-bold text-white">¡Ronda {game.level} superada!</h2>
+          <p className="text-[14px] text-slate-300">
+            {game.targetRounds - game.level === 1 ? 'Falta 1 ronda' : `Faltan ${game.targetRounds - game.level} rondas`} para salvar la ciudad — las nubes vienen más
+            rápido…
+          </p>
         </Overlay>
       )}
 
@@ -798,13 +822,27 @@ function MazeCollectorSession({
               Preguntas acertadas: <b className="text-white">{game.answeredCorrect}</b>
             </p>
           )}
-          <button
-            type="button"
-            className="rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2.5 text-[14px] font-bold text-white"
-            onClick={onExit}
-          >
-            Salir
-          </button>
+          <EndButtons onPlayAgain={onPlayAgain} onExit={onExit} />
+        </Overlay>
+      )}
+
+      {game.phase === 'won' && (
+        <Overlay celebrate>
+          <img src={mazeSpriteUrl('ui-trophy')} alt="" className="mx-auto h-20 w-20 animate-[maze-levelup-pop_0.4s_cubic-bezier(0.16,1,0.3,1)]" />
+          <h2 className="mt-1 text-[24px] font-bold text-white">¡Salvaste la ciudad!</h2>
+          <p className="mt-1 text-[14px] text-slate-300">
+            Limpiaste la ciudad {game.targetRounds === 1 ? 'en 1 ronda' : `en las ${game.targetRounds} rondas`}. ¡Gracias, reciclador!
+          </p>
+          <p className="mt-3 mb-1 flex items-center justify-center gap-1.5 text-[14px] text-slate-300">
+            <img src={mazeSpriteUrl('ui-star')} alt="" className="h-5 w-5" />
+            Puntaje final: <b className="text-white">{game.score.toLocaleString('es')}</b>
+          </p>
+          {game.question && (
+            <p className="mb-4 text-[13.5px] text-slate-300">
+              Preguntas acertadas: <b className="text-white">{game.answeredCorrect}</b>
+            </p>
+          )}
+          <EndButtons onPlayAgain={onPlayAgain} onExit={onExit} />
         </Overlay>
       )}
 
@@ -908,6 +946,53 @@ function QuestionPanel({
       </ul>
       {aside && <p className="mt-auto text-[12px] leading-snug text-slate-400">Maneja hasta la letra de la respuesta correcta. Si te equivocas o se acaba el tiempo, pierdes una vida.</p>}
     </section>
+  )
+}
+
+/** Cuántas rondas hay que limpiar la ciudad para salvarla (se elige antes de empezar). */
+function RoundPicker({ value, onChange }: { value: number; onChange: (rounds: number) => void }) {
+  return (
+    <div role="radiogroup" aria-label="Rondas para salvar la ciudad" className="mx-auto mt-3 max-w-[400px] rounded-2xl border border-emerald-300/30 bg-emerald-400/[0.07] p-2.5">
+      <p className="text-[13px] font-bold text-white">¿Cuántas rondas para salvar la ciudad?</p>
+      <div className="mt-2 flex justify-center gap-2">
+        {ROUND_OPTIONS.map((option) => {
+          const selected = option === value
+          return (
+            <button
+              key={option}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              className={`h-10 min-w-12 rounded-xl border px-3 text-[16px] font-black transition-colors ${
+                selected ? 'border-emerald-300 bg-emerald-500 text-white shadow-[0_0_16px_-4px_rgba(52,211,153,0.9)]' : 'border-white/15 bg-white/5 text-slate-200 hover:bg-white/10'
+              }`}
+              onClick={() => onChange(option)}
+            >
+              {option}
+            </button>
+          )
+        })}
+      </div>
+      <p className="mt-1.5 text-[11.5px] leading-snug text-slate-400">Cada ronda es limpiar toda la ciudad: recoger todas las botellas.</p>
+    </div>
+  )
+}
+
+function EndButtons({ onPlayAgain, onExit }: { onPlayAgain: () => void; onExit: () => void }) {
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-2">
+      <button
+        type="button"
+        autoFocus
+        className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2.5 text-[14px] font-bold text-white"
+        onClick={onPlayAgain}
+      >
+        <Play className="h-4 w-4" fill="currentColor" /> Jugar otra vez
+      </button>
+      <button type="button" className="rounded-2xl border border-white/15 px-5 py-2.5 text-[14px] font-medium text-slate-200 hover:bg-white/5" onClick={onExit}>
+        Salir
+      </button>
+    </div>
   )
 }
 

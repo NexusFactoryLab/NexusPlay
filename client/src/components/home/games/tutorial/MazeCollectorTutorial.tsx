@@ -78,12 +78,13 @@ export function MazeCollectorTutorial({
       title: 'Recoge las botellas',
       task: 'Recoge las 4 botellas PET de esta zona.',
       explain:
-        'Tu misión es salvar la ciudad: para eso hay que recoger TODAS las botellas PET (basta con pasar por encima). En el juego, el contador PET te dice cuántas faltan y, cuando no queda ninguna, la ciudad se salva y pasas de nivel.',
-      success: '¡Calles limpias! Así se salva la ciudad: sin dejar ni una botella.',
+        'Tu misión es salvar la ciudad: hay que recoger TODAS las botellas PET (basta con pasar por encima). En el juego, antes de empezar eliges cuántas rondas jugar (1, 2, 3 o 5). Cada ronda es limpiar toda la ciudad; el contador PET te dice cuántas botellas faltan. Al superar todas las rondas, ¡salvaste la ciudad!',
+      success: '¡Calles limpias! Así se supera cada ronda: sin dejar ni una botella.',
       art: <ArtTruckBottles />,
       points: [
         { icon: <Target className="h-4 w-4" />, tone: 'emerald', text: <>Recoge <b className="text-white">todas las botellas PET</b> para salvar la ciudad.</> },
         { icon: <MousePointerClick className="h-4 w-4" />, tone: 'cyan', text: <>Basta con <b className="text-white">pasar por encima</b>: no hay que frenar.</> },
+        { icon: <Flag className="h-4 w-4" />, tone: 'amber', text: <>Ciudad limpia = <b className="text-white">ronda superada</b>. Supera las rondas que elegiste y ¡salvas la ciudad!</> },
       ],
       render: scene({ playerStart: { row: 1, col: 1 }, pickups: [pet(1, 5), pet(4, 5), pet(6, 2), pet(6, 8)], ghostSpawns: [], objective: 'collect' }, NORTH),
     },

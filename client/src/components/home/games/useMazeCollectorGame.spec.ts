@@ -89,6 +89,30 @@ describe('Camión Reciclador: purificador del tutorial', () => {
   })
 })
 
+describe('Camión Reciclador: rondas para salvar la ciudad', () => {
+  /** Deja una sola botella en el mapa y maneja hasta ella. */
+  function cleanCity(state: State) {
+    state.ghosts = []
+    state.bags = []
+    state.pickups = [{ id: 'ultima', kind: 'PET', pos: { row: 6, col: 11 } }]
+    drive(state, () => ({ row: 6, col: 11 }), (s) => s.pickups.length === 0)
+  }
+
+  it('al limpiar la ciudad en la última ronda elegida, la ciudad se salva', () => {
+    const state = engine.createInitialState(city, [], config)
+    state.targetRounds = 1
+    cleanCity(state)
+    expect(state.phase).toBe('won')
+  })
+
+  it('si quedan rondas, pasa a la siguiente', () => {
+    const state = engine.createInitialState(city, [], config)
+    state.targetRounds = 2
+    cleanCity(state)
+    expect(state.phase).toBe('levelup')
+  })
+})
+
 describe('Camión Reciclador: preguntas de opción múltiple', () => {
   it('reparte una respuesta por cuadrante, lejos del camión y con una sola correcta', () => {
     for (let round = 0; round < 20; round++) {
