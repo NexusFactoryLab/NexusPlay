@@ -41,17 +41,19 @@ import './trueFalseMazeGuide.css'
 type TrueFalseMazeGuideProps = {
   /** Se llama al terminar (último paso) o al saltar la guía. */
   onClose: () => void
+  /** Si viene, el último paso pregunta «¿Deseas jugar un tutorial?» (Sí: tutorial jugable; No: al juego). */
+  onTutorial?: () => void
 }
 
 type Step = { id: string; title: string; art: ReactNode; body: ReactNode }
 
 /** Variables CSS personalizadas (`--tfg-key`...) que React no tipa en `CSSProperties`. */
-type VarStyle = CSSProperties & Record<`--${string}`, string>
+export type VarStyle = CSSProperties & Record<`--${string}`, string>
 
 // ==================== piezas de las escenas ====================
 
 /** Recuadro de escena: se ajusta al espacio disponible conservando su proporción. */
-function Scene({ aspect = 1.6, children }: { aspect?: number; children: ReactNode }) {
+export function Scene({ aspect = 1.6, children }: { aspect?: number; children: ReactNode }) {
   return (
     <div className="flex h-full w-full items-center justify-center" style={{ containerType: 'size' }}>
       <div className="tfg-scene" style={{ width: `min(100cqw, ${aspect * 100}cqh)`, aspectRatio: String(aspect) }}>
@@ -61,12 +63,12 @@ function Scene({ aspect = 1.6, children }: { aspect?: number; children: ReactNod
   )
 }
 
-function Floor() {
+export function Floor() {
   return <div className="tfg-floor" style={{ backgroundImage: `url(${floorTile})` }} />
 }
 
 /** Elemento posicionado dentro de la escena (en %, para que la escena escale entera). */
-function At({ children, style, className = '' }: { children?: ReactNode; style: CSSProperties; className?: string }) {
+export function At({ children, style, className = '' }: { children?: ReactNode; style: CSSProperties; className?: string }) {
   return (
     <div className={`tfg-abs ${className}`} style={style}>
       {children}
@@ -74,11 +76,11 @@ function At({ children, style, className = '' }: { children?: ReactNode; style: 
   )
 }
 
-function Sprite({ src, alt = '', style, className = '' }: { src: string; alt?: string; style?: CSSProperties; className?: string }) {
+export function Sprite({ src, alt = '', style, className = '' }: { src: string; alt?: string; style?: CSSProperties; className?: string }) {
   return <img src={src} alt={alt} draggable={false} className={`tfg-sprite ${className}`} style={style} />
 }
 
-function Tag({ tone, children, style }: { tone: 'true' | 'false' | 'info'; children: ReactNode; style?: CSSProperties }) {
+export function Tag({ tone, children, style }: { tone: 'true' | 'false' | 'info'; children: ReactNode; style?: CSSProperties }) {
   const colors = {
     true: 'border-emerald-400/60 bg-emerald-950/85 text-emerald-200',
     false: 'border-rose-400/60 bg-rose-950/85 text-rose-200',
@@ -94,7 +96,7 @@ function Tag({ tone, children, style }: { tone: 'true' | 'false' | 'info'; child
   )
 }
 
-function KeyCap({ children, className = '', label }: { children: ReactNode; className?: string; label?: string }) {
+export function KeyCap({ children, className = '', label }: { children: ReactNode; className?: string; label?: string }) {
   return (
     <span className={`tfg-key ${className}`} aria-label={label}>
       {children}
@@ -103,7 +105,7 @@ function KeyCap({ children, className = '', label }: { children: ReactNode; clas
 }
 
 /** Las cuatro flechas del teclado en "T" invertida. `animated` enciende ← y → siguiendo la escena de movimiento. */
-function ArrowKeys({ size, animated = false }: { size: string; animated?: boolean }) {
+export function ArrowKeys({ size, animated = false }: { size: string; animated?: boolean }) {
   const style: VarStyle = { '--tfg-key': size }
   return (
     <div className="tfg-key-cluster" style={style} role="img" aria-label="Flechas del teclado: arriba, izquierda, abajo y derecha">
@@ -417,7 +419,7 @@ function SceneExtras() {
 
 // ==================== texto de cada paso ====================
 
-function Item({ icon, children, tone = 'cyan' }: { icon: ReactNode; children: ReactNode; tone?: 'cyan' | 'violet' | 'amber' | 'emerald' | 'rose' }) {
+export function Item({ icon, children, tone = 'cyan' }: { icon: ReactNode; children: ReactNode; tone?: 'cyan' | 'violet' | 'amber' | 'emerald' | 'rose' }) {
   const colors = {
     cyan: 'bg-cyan-400/15 text-cyan-300',
     violet: 'bg-violet-400/15 text-violet-300',
@@ -433,7 +435,7 @@ function Item({ icon, children, tone = 'cyan' }: { icon: ReactNode; children: Re
   )
 }
 
-const strong = (color: string) => `font-bold ${color}`
+export const strong = (color: string) => `font-bold ${color}`
 
 const STEPS: Step[] = [
   {
@@ -565,15 +567,17 @@ const STEPS: Step[] = [
 
 // ==================== guía ====================
 
-export function TrueFalseMazeGuide({ onClose }: TrueFalseMazeGuideProps) {
+export function TrueFalseMazeGuide({ onClose, onTutorial }: TrueFalseMazeGuideProps) {
   const [index, setIndex] = useState(0)
   const last = index === STEPS.length - 1
   const step = STEPS[index]
 
   const next = useCallback(() => {
-    if (last) onClose()
-    else setIndex((current) => current + 1)
-  }, [last, onClose])
+    // Con la pregunta del tutorial, el último paso se responde con Sí o No (no con Enter).
+    if (last) {
+      if (!onTutorial) onClose()
+    } else setIndex((current) => current + 1)
+  }, [last, onClose, onTutorial])
   const back = useCallback(() => setIndex((current) => Math.max(0, current - 1)), [])
 
   useEffect(() => {
@@ -660,14 +664,36 @@ export function TrueFalseMazeGuide({ onClose }: TrueFalseMazeGuideProps) {
               />
             ))}
           </div>
-          <button
-            type="button"
-            autoFocus
-            className="flex shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-500 to-cyan-500 px-4 py-2 text-[13.5px] font-bold text-white shadow-[0_10px_26px_-10px_rgba(34,211,238,0.8)] transition-transform hover:-translate-y-0.5 sm:px-5"
-            onClick={next}
-          >
-            {last ? '¡A jugar!' : 'Siguiente'} {!last && <ChevronRight className="h-4 w-4" />}
-          </button>
+          {last && onTutorial ? (
+            // Al final de la guía: ¿practicar en la nave de verdad antes de la partida?
+            <div className="flex shrink-0 items-center gap-2" role="group" aria-label="¿Deseas jugar un tutorial?">
+              <span className="text-[13px] font-semibold text-white max-sm:hidden">¿Deseas jugar un tutorial?</span>
+              <button
+                type="button"
+                autoFocus
+                className="flex shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-500 to-cyan-500 px-4 py-2 text-[13.5px] font-bold text-white shadow-[0_10px_26px_-10px_rgba(34,211,238,0.8)] transition-transform hover:-translate-y-0.5"
+                onClick={onTutorial}
+              >
+                <span className="sm:hidden">Tutorial:</span> Sí
+              </button>
+              <button
+                type="button"
+                className="rounded-xl border border-white/15 px-4 py-2 text-[13.5px] font-semibold text-slate-100 transition-colors hover:bg-white/10"
+                onClick={onClose}
+              >
+                No, jugar
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              autoFocus
+              className="flex shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-500 to-cyan-500 px-4 py-2 text-[13.5px] font-bold text-white shadow-[0_10px_26px_-10px_rgba(34,211,238,0.8)] transition-transform hover:-translate-y-0.5 sm:px-5"
+              onClick={next}
+            >
+              {last ? '¡A jugar!' : 'Siguiente'} {!last && <ChevronRight className="h-4 w-4" />}
+            </button>
+          )}
         </footer>
       </div>
     </div>

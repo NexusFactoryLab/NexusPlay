@@ -1,9 +1,32 @@
+/**
+ * Un paso del recorrido interactivo. La persona no mira una animación: HACE
+ * lo que el paso enseña.
+ * - `tap`: tocar el elemento señalado (o algo dentro de él, como un mundo).
+ * - `type`: escribir en el buscador y pulsar Enter o la lupa.
+ * - `look`: solo mirar (no hay nada que tocar); avanza con "Siguiente".
+ * Si tocar lleva a otra página, `away` explica esa página en la barra de
+ * "Volver a la guía" (ver tourProgress.ts y TourReturnBar).
+ */
 export type WelcomeStep = {
   title: string
   text: string
   target: string
   icon: 'play' | 'create' | 'explore' | 'profile'
-  action?: string
+  kind: 'tap' | 'type' | 'look'
+  /** Lo que tiene que hacer, en una frase corta ("Toca «Crear juego»"). */
+  task?: string
+  /** Qué está viendo si el paso lo llevó a otra página. */
+  away?: string
+  /** Lo que se le dice al lograrlo sin salir del inicio (abrió un menú, una ventana…). */
+  done?: string
+  /**
+   * Cómo dejar la pantalla como estaba al pasar a otro paso, si este la cambió:
+   * `toggle` vuelve a tocar el elemento (el menú contraído), `clear-search`
+   * borra la búsqueda. Las ventanas y menús abiertos se cierran siempre.
+   */
+  undo?: 'toggle' | 'clear-search'
+  /** Dónde tiene que estar la pantalla para este paso (Kids: la lista de mundos o dentro de uno). */
+  place?: 'world-list' | 'inside-world'
 }
 
 export type WelcomeOptions = {
@@ -21,23 +44,48 @@ export type WelcomeOptions = {
 export function getWelcomeSteps(role: string, isKids: boolean, options: WelcomeOptions = {}): WelcomeStep[] {
   const profile: WelcomeStep = {
     title: 'Tu espacio, a un toque',
-    text: 'Toca tu avatar para ver tu cuenta o cerrar sesión. Usa Guía cuando quieras repetir este recorrido.',
-    target: 'profile', icon: 'profile', action: 'Abrir mi perfil',
+    text: 'Desde tu avatar ves tu cuenta, cambias tu avatar o cierras sesión. Usa Guía cuando quieras repetir este recorrido.',
+    target: 'profile', icon: 'profile', kind: 'tap',
+    task: 'Toca tu avatar para abrir tu menú.',
+    done: '¡Ese es tu menú!',
   }
   if (isKids) return [
-    { title: 'Elige tu mundo', text: 'Toca un área y descubre sus juegos. Si aún no hay mundos, pídele a tu profe que publique un juego.', target: 'worlds', icon: 'explore' },
-    { title: '¡A jugar con tu equipo!', text: 'Elige la portada de un juego. Si tu profe te dio un código de sala, escríbelo en ese juego y toca Unirme. Para jugar por tu cuenta, toca Jugar.', target: 'worlds', icon: 'play', action: 'Explorar juegos' },
-    ...(options.canGoBackToWorlds ? [{
-      title: 'Descubre otro mundo', text: 'Toca Volver para regresar a las áreas y elegir otra aventura.',
-      target: 'worlds-back', icon: 'explore' as const, action: 'Volver a los mundos',
-    }] : []),
+    {
+      title: 'Elige tu mundo', text: 'Cada mundo es un área con sus juegos. Si aún no hay mundos, pídele a tu profe que publique un juego.',
+      target: 'worlds', icon: 'explore', kind: 'tap', place: 'world-list',
+      task: 'Toca un mundo para entrar.',
+      done: '¡Entraste a un mundo! Aquí están sus juegos.',
+    },
+    {
+      title: '¡A jugar con tu equipo!', text: 'Si tu profe te dio un código de sala, escríbelo en el juego y toca Unirme. Para jugar por tu cuenta, toca Jugar.',
+      target: 'worlds', icon: 'play', kind: 'tap', place: 'inside-world',
+      task: 'Toca la portada de un juego.',
+      away: 'Así se ve un juego por dentro. Aquí lees cómo se juega y empiezas la partida.',
+      done: '¡Muy bien! Así se abre un juego.',
+    },
+    // Siempre está: el primer paso hace entrar a un mundo, así que aquí ya
+    // hay botón Volver (si no lo hubiera, el recorrido deja pasar el paso).
+    {
+      title: 'Descubre otro mundo', text: 'Con Volver regresas a los mundos para elegir otra aventura.',
+      target: 'worlds-back', icon: 'explore', kind: 'tap',
+      task: 'Toca Volver.',
+      done: '¡Listo! Ya puedes elegir otro mundo.',
+    },
     profile,
   ]
   const steps: WelcomeStep[] = [
-    { title: 'Entra con un código', text: '¿Te invitaron a una partida? Toca Unirme con código y escribe el código de sala que te compartieron.', target: 'join', icon: 'play', action: 'Probar con un código' },
+    {
+      title: 'Entra con un código', text: '¿Te invitaron a una partida? Con el código de sala que te compartieron entras directo.',
+      target: 'join', icon: 'play', kind: 'tap',
+      task: 'Toca «Unirme con código».',
+      done: 'Aquí escribes el código que te compartan. Al tocar «Siguiente», la guía cierra esta ventana.',
+    },
   ]
   if (role === 'TEACHER' || role === 'ADMIN') steps.push({
-    title: 'Crea tu primera actividad', text: 'Elige un tipo de juego, prepara el contenido y guarda tu actividad. Desde su sala podrás invitar a jugar.', target: 'create', icon: 'create', action: 'Crear una actividad',
+    title: 'Crea tu primera actividad', text: 'Eliges un tipo de juego, preparas el contenido y lo guardas. Desde su sala podrás invitar a jugar.',
+    target: 'create', icon: 'create', kind: 'tap',
+    task: 'Toca el botón de crear juego.',
+    away: 'Aquí eliges el tipo de juego que quieres crear. Nada se guarda hasta que tú lo decidas.',
   })
   steps.push({
     title: 'Todo tiene su lugar',
@@ -46,31 +94,77 @@ export function getWelcomeSteps(role: string, isKids: boolean, options: WelcomeO
       : role === 'ADMIN'
         ? 'El menú tiene tres partes: Explorar (Áreas y Comunidad), Mi espacio (Mis juegos) y Administración (Usuarios, Edición, Proveedores de IA y Organización).'
         : 'El menú tiene dos partes: Explorar (Áreas y Comunidad) para encontrar juegos y Mi espacio para lo tuyo, como Mis juegos.',
-    target: 'navigation', icon: 'explore',
+    target: 'navigation', icon: 'explore', kind: 'look',
   })
   steps.push(
-    { title: 'Vuelve al inicio', text: 'Inicio te lleva al panel principal para volver a explorar los juegos.', target: 'nav-home', icon: 'explore', action: 'Ir al inicio' },
-    { title: 'Explora por área', text: 'En Áreas encuentras los juegos organizados por lo que quieres aprender o enseñar.', target: 'nav-subjects', icon: 'explore', action: 'Ver áreas' },
+    {
+      title: 'Vuelve al inicio', text: 'Inicio te trae a este panel desde cualquier sección.',
+      target: 'nav-home', icon: 'explore', kind: 'tap', task: 'Toca «Inicio».', done: '¡Ya estás en el inicio!',
+    },
+    {
+      title: 'Explora por área', text: 'En Áreas están los juegos organizados por lo que quieres aprender o enseñar.',
+      target: 'nav-subjects', icon: 'explore', kind: 'tap', task: 'Toca «Áreas».',
+      away: 'Estas son las áreas. Toca una para ver solo sus juegos.',
+    },
   )
   if (role === 'TEACHER') steps.push({
-    title: 'Tus grupos, en Mis clases', text: 'Organiza tus grupos y abre una clase para consultar o agregar sus actividades.', target: 'nav-classes', icon: 'explore', action: 'Ver mis clases',
+    title: 'Tus grupos, en Mis clases', text: 'Organiza tus grupos y abre una clase para consultar o agregar sus actividades.',
+    target: 'nav-classes', icon: 'explore', kind: 'tap', task: 'Toca «Mis clases».',
+    away: 'Aquí están tus clases. Abre una para ver sus actividades o crea una nueva.',
   })
   steps.push(
-    { title: 'Descubre la Comunidad', text: 'Explora los juegos que otras personas comparten en Comunidad y usa el filtro para ver solo un tipo de juego.', target: 'nav-community', icon: 'play', action: 'Explorar comunidad' },
-    { title: 'Encuentra tus juegos', text: role === 'TEACHER' ? 'En Mis juegos encuentras tus creaciones para consultarlas y seguir trabajando en ellas.' : 'En Mis juegos encuentras los juegos que creaste y que no están publicados para la comunidad.', target: 'nav-own-games', icon: 'create', action: 'Ver mis juegos' },
+    {
+      title: 'Descubre la Comunidad', text: 'Explora los juegos que otras personas comparten en Comunidad y usa el filtro para ver solo un tipo de juego.',
+      target: 'nav-community', icon: 'play', kind: 'tap', task: 'Toca «Comunidad».',
+      away: 'Estos son los juegos de la comunidad. Toca uno para jugarlo o ver de qué trata, o filtra por tipo de juego.',
+    },
+    {
+      title: 'Encuentra tus juegos',
+      text: role === 'TEACHER' ? 'En Mis juegos encuentras tus creaciones para consultarlas y seguir trabajando en ellas.' : 'En Mis juegos encuentras los juegos que creaste y que no están publicados para la comunidad.',
+      target: 'nav-own-games', icon: 'create', kind: 'tap',
+      task: 'Toca «Mis juegos».',
+      away: 'Aquí quedan tus juegos: ábrelos para editarlos, jugarlos o compartirlos.',
+    },
   )
   if (role === 'ADMIN') steps.push(
-    { title: 'Gestiona los usuarios', text: 'En Usuarios puedes consultar y administrar las cuentas de NexusPlay.', target: 'nav-users', icon: 'profile', action: 'Ver usuarios' },
-    { title: 'Edita lo que ven los demás', text: 'En Edición eliges los juegos destacados del Inicio y archivas o renombras los tipos de juego. Quien explora los ve en Comunidad, con el filtro por tipo.', target: 'nav-edition', icon: 'create', action: 'Ver edición' },
-    { title: 'La IA, bajo control', text: 'En Proveedores de IA revisas las peticiones de creación con IA y el estado de cada una.', target: 'nav-ai-providers', icon: 'create', action: 'Ver proveedores de IA' },
+    {
+      title: 'Gestiona los usuarios', text: 'En Usuarios puedes consultar y administrar las cuentas de NexusPlay.',
+      target: 'nav-users', icon: 'profile', kind: 'tap', task: 'Toca «Usuarios».',
+      away: 'Esta es la lista de cuentas. Puedes buscar, cambiar roles o desactivar cuentas.',
+    },
+    {
+      title: 'Edita lo que ven los demás', text: 'En Edición eliges los juegos destacados del Inicio y archivas o renombras los tipos de juego. Quien explora los ve en Comunidad, con el filtro por tipo.',
+      target: 'nav-edition', icon: 'create', kind: 'tap', task: 'Toca «Edición».',
+      away: 'Aquí eliges los juegos destacados del Inicio y administras los tipos de juego.',
+    },
+    {
+      title: 'La IA, bajo control', text: 'En Proveedores de IA revisas las peticiones de creación con IA y el estado de cada una.',
+      target: 'nav-ai-providers', icon: 'create', kind: 'tap', task: 'Toca «Proveedores de IA».',
+      away: 'Aquí ves las peticiones a la IA y configuras sus proveedores.',
+    },
   )
   if (role === 'ADMIN' || options.canAccessOrganization) steps.push({
-    title: 'Tu organización', text: 'Abre Organización para consultar y gestionar las organizaciones a las que tienes acceso.', target: 'nav-organization', icon: 'explore', action: 'Ver organización',
+    title: 'Tu organización', text: 'En Organización consultas y gestionas las organizaciones a las que tienes acceso.',
+    target: 'nav-organization', icon: 'explore', kind: 'tap', task: 'Toca «Organización».',
+    away: 'Este es el panel de tu organización: sus miembros, clases y métricas.',
   })
   steps.push(
-    { title: 'Encuentra un juego', text: 'Escribe en Buscar juegos y pulsa Enter o la lupa. Borra el texto para volver a ver el listado completo.', target: 'search', icon: 'explore', action: 'Probar la búsqueda' },
-    { title: 'Más espacio para jugar', text: 'Usa esta flecha para contraer o expandir el menú. Sus opciones siguen disponibles como iconos.', target: 'menu-toggle', icon: 'explore', action: 'Cambiar tamaño del menú' },
-    { title: '¡Hay un tema nuevo!', text: 'La tuerca de arriba abre tu configuración. En Temas están los nuevos temas Fantasía y Pradera, y también Claro y Oscuro si prefieres algo minimalista. La elección se recuerda en este dispositivo.', target: 'settings', icon: 'explore', action: 'Abrir configuración' },
+    {
+      title: 'Encuentra un juego', text: 'El buscador muestra los juegos que coinciden con lo que escribes. Borra el texto para volver al listado completo.',
+      target: 'search', icon: 'explore', kind: 'type', undo: 'clear-search',
+      task: 'Escribe algo en «Buscar juegos» y pulsa Enter.',
+      done: '¡Así se busca! Al seguir, la guía borra la búsqueda.',
+    },
+    {
+      title: 'Más espacio para jugar', text: 'Esta flecha contrae o expande el menú. Sus opciones siguen disponibles como iconos.',
+      target: 'menu-toggle', icon: 'explore', kind: 'tap', undo: 'toggle', task: 'Toca la flecha del menú.',
+      done: '¡Listo! Así ganas espacio. Al seguir, la guía deja el menú como estaba.',
+    },
+    {
+      title: 'Hazlo a tu gusto', text: 'La tuerca abre tu configuración: ahí están los temas Fantasía, Pradera, Claro y Oscuro. La elección se recuerda en este dispositivo.',
+      target: 'settings', icon: 'explore', kind: 'tap', task: 'Toca la tuerca de configuración.',
+      done: 'Esa es tu configuración. Al tocar «Siguiente», la guía la cierra.',
+    },
     profile,
   )
   return steps

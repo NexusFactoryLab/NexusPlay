@@ -29,17 +29,39 @@ import {
 import { FitScale } from './FitScale'
 import { loadSpaceshipAssets, spaceshipSpriteUrl, type SpaceshipAssets } from './spaceshipAssets'
 import { SPACESHIP_MAP } from './spaceshipMap'
+import type { ShipMap } from './spaceshipMap'
+import type { TfEvent, TfState } from './trueFalseMazeEngine'
 import { INTRO_MS, type Direction, type TfAnswerRecord } from './trueFalseMazeEngine'
 import type { Insets } from './TrueFalseMazeRenderer'
 import { TrueFalseMazeGuide } from './TrueFalseMazeGuide'
+import { TrueFalseMazeTutorial } from '../tutorial/TrueFalseMazeTutorial'
 import { useTrueFalseMazeSession, type TrueFalseMazeHud } from './useTrueFalseMazeSession'
 import type { TrueFalseMazeConfig, TrueFalseMazeQuestion } from './trueFalseMazeTypes'
+
+/** Una parte del tutorial jugable (issue #93): la nave real con una pregunta de práctica. */
+export type TrueFalseMazeTutorialPart = {
+  /** false mientras se lee la instrucción de la parte: la nave está quieta. */
+  active: boolean
+  /** Nave chica armada para la tarea (por defecto, la nave completa). */
+  map?: ShipMap
+  /**
+   * Tarea sin afirmación (mover, esquivar, rejilla, apagón…): sin salas ni
+   * pregunta; el tutorial mira cada cuadro y decide cuándo se logró.
+   */
+  onFrame?: (state: TfState, events: TfEvent[]) => 'freeze' | void
+  /** Terminó la pregunta: `correct` dice si la respondió bien. */
+  onFinished: (correct: boolean) => void
+  /** Una medusa lo atrapó (en el juego costaría una batería). */
+  onCaught: () => void
+}
 
 export type TrueFalseMazeGameProps = {
   title: string
   questions: TrueFalseMazeQuestion[]
   config: TrueFalseMazeConfig
   onExit: () => void
+  /** Si viene, se juega una parte del tutorial: sin guía ni pantallas de inicio y de fin. */
+  tutorial?: TrueFalseMazeTutorialPart
 }
 
 /** Movimiento mínimo (px) para que un toque sobre el mapa cuente como deslizar. */
@@ -82,17 +104,36 @@ function saveFullscreenPreference(value: boolean) {
  * pasos; se puede volver a abrir desde el botón de ayuda.
  */
 export function TrueFalseMazeGame(props: TrueFalseMazeGameProps) {
-  const [guideOpen, setGuideOpen] = useState(true)
+  const [guideOpen, setGuideOpen] = useState(!props.tutorial)
+  // Al final de la guía se ofrece el tutorial jugable (issue #93); al terminarlo
+  // empieza una partida nueva (la sesión se vuelve a montar con otra clave).
+  const [inTutorial, setInTutorial] = useState(false)
+  const [round, setRound] = useState(0)
+  if (inTutorial) {
+    return (
+      <TrueFalseMazeTutorial
+        title={props.title}
+        onFinish={() => {
+          setInTutorial(false)
+          setGuideOpen(false)
+          setRound((value) => value + 1)
+        }}
+      />
+    )
+  }
   // La guía se dibuja DENTRO de la sesión (no al lado): en pantalla completa el
   // navegador solo muestra lo que está dentro del elemento que la pidió, y una
   // guía de afuera quedaba invisible pero capturando el teclado (el juego
   // parecía trabado hasta salir de pantalla completa).
   return (
     <TrueFalseMazeSession
+      key={round}
       {...props}
       guideOpen={guideOpen}
-      onOpenGuide={() => setGuideOpen(true)}
+      // En el tutorial la guía ya se vio: el botón de ayuda no la vuelve a abrir encima.
+      onOpenGuide={() => !props.tutorial && setGuideOpen(true)}
       onCloseGuide={() => setGuideOpen(false)}
+      onStartTutorial={props.tutorial ? undefined : () => setInTutorial(true)}
     />
   )
 }
@@ -128,10 +169,12 @@ function TrueFalseMazeSession({
   questions,
   config,
   onExit,
+  tutorial,
   guideOpen,
   onOpenGuide,
   onCloseGuide,
-}: TrueFalseMazeGameProps & { guideOpen: boolean; onOpenGuide: () => void; onCloseGuide: () => void }) {
+  onStartTutorial,
+}: TrueFalseMazeGameProps & { guideOpen: boolean; onOpenGuide: () => void; onCloseGuide: () => void; onStartTutorial?: () => void }) {
   const [assets, setAssets] = useState<SpaceshipAssets | null>(null)
   const [loadError, setLoadError] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -141,10 +184,12 @@ function TrueFalseMazeSession({
   const bottomPadRef = useRef<HTMLDivElement>(null)
   const pointerStart = useRef<{ x: number; y: number } | null>(null)
   const [layout, setLayout] = useState<Layout>({ width: 0, height: 0, insets: { top: 0, right: 0, bottom: 0, left: 0 } })
-  const [fullscreen, setFullscreen] = useState(false)
+  // Puede llegar ya en pantalla completa (la que dejó puesta el tutorial).
+  const [fullscreen, setFullscreen] = useState(() => typeof document !== 'undefined' && Boolean(document.fullscreenElement))
   const [wantFullscreen, setWantFullscreen] = useState(readFullscreenPreference)
   const [fullscreenHintClosed, setFullscreenHintClosed] = useState(false)
-  const canFullscreen = typeof document !== 'undefined' && document.fullscreenEnabled
+  // En el tutorial la pantalla completa la maneja el tutorial (entra al jugar y sale para explicar).
+  const canFullscreen = !tutorial && typeof document !== 'undefined' && document.fullscreenEnabled
 
   function enterFullscreen() {
     const root = rootRef.current
@@ -173,17 +218,21 @@ function TrueFalseMazeSession({
     config,
     assets,
     canvasRef,
-    inputEnabled: !guideOpen,
+    // En el tutorial, mientras se lee la instrucción el robot no responde.
+    inputEnabled: !guideOpen && (tutorial?.active ?? true),
+    map: tutorial?.map,
+    taskMode: Boolean(tutorial?.onFrame),
+    onFrame: tutorial?.onFrame,
     // Despegar es un gesto del jugador: ahí se puede pasar a pantalla completa sin que tenga que buscar el botón.
     onBeforeStart: () => {
       if (wantFullscreen) enterFullscreen()
     },
   })
   // Celular en horizontal: el HUD pasa a una columna lateral para que la nave use toda la altura.
-  const compactLandscape = useMediaQuery('(orientation: landscape) and (max-height: 520px)')
+  const compactLandscape = useMediaQuery('(orientation: landscape) and (max-height: 520px) and (pointer: coarse)')
   // La cruceta aparece en cualquier pantalla táctil, no según el ancho.
   const coarsePointer = useMediaQuery('(pointer: coarse)')
-  const portraitPhone = useMediaQuery('(orientation: portrait) and (max-width: 600px)')
+  const portraitPhone = useMediaQuery('(orientation: portrait) and (max-width: 600px) and (pointer: coarse)')
 
   useEffect(() => {
     let cancelled = false
@@ -201,6 +250,22 @@ function TrueFalseMazeSession({
       cancelled = true
     }
   }, [])
+
+  // Tutorial: la parte arranca sola en cuanto la nave cargó, y avisa cómo terminó.
+  const tutorialRef = useRef(tutorial)
+  useEffect(() => {
+    tutorialRef.current = tutorial
+  })
+  // Tarea de tutorial sin afirmación: no hay panel de pregunta ni presentación.
+  const taskOnly = Boolean(tutorial?.onFrame)
+  const { start } = actions
+  useEffect(() => {
+    if (tutorial?.active && assets && hud.phase === 'ready') start()
+  }, [tutorial?.active, assets, hud.phase, start])
+  useEffect(() => {
+    if (hud.phase === 'caught') tutorialRef.current?.onCaught()
+    if (hud.phase === 'finished') tutorialRef.current?.onFinished(hud.answers.length > 0 && hud.answers.every((answer) => answer.correct))
+  }, [hud.phase, hud.answers])
 
   // Abrir la guía a mitad de partida pausa el juego.
   const { pause } = actions
@@ -249,18 +314,20 @@ function TrueFalseMazeSession({
       const active = !!document.fullscreenElement
       setFullscreen(active)
       // Al salir (con Esc, por ejemplo) la pantalla cambia de tamaño de golpe: la partida se pausa para no perder el hilo.
-      if (!active) pause()
+      // En el tutorial salir de pantalla completa es parte del recorrido (para explicar), no una pausa.
+      if (!active && !tutorialRef.current) pause()
     }
     document.addEventListener('fullscreenchange', onChange)
     return () => document.removeEventListener('fullscreenchange', onChange)
   }, [pause])
 
-  // Al salir del juego no se deja la pantalla completa puesta.
+  // Al salir del juego no se deja la pantalla completa puesta (en el tutorial sigue: la maneja el tutorial).
+  const partOfTutorial = Boolean(tutorial)
   useEffect(
     () => () => {
-      if (document.fullscreenElement) void document.exitFullscreen().catch(() => {})
+      if (!partOfTutorial && document.fullscreenElement) void document.exitFullscreen().catch(() => {})
     },
-    [],
+    [partOfTutorial],
   )
 
   // El manejador de teclas vive entre renders: lee siempre la versión más reciente de la función.
@@ -302,7 +369,8 @@ function TrueFalseMazeSession({
   // segundos (se va antes si el jugador pausa o termina la ronda). Se ajusta
   // durante el render, al cambiar la fase, sin un efecto de por medio.
   const [pauseHint, setPauseHint] = useState<'pending' | 'showing' | 'done'>('pending')
-  if (pauseHint === 'pending' && hud.phase === 'playing' && !paused) setPauseHint('showing')
+  // En el tutorial la barra de la tarea ya guía: no se suma este aviso.
+  if (pauseHint === 'pending' && hud.phase === 'playing' && !paused && !tutorial) setPauseHint('showing')
   if (pauseHint === 'showing' && (paused || hud.phase !== 'playing')) setPauseHint('done')
   useEffect(() => {
     if (pauseHint !== 'showing') return
@@ -369,7 +437,7 @@ function TrueFalseMazeSession({
           <div className="ml-auto">{controls}</div>
         </div>
         <HudBar hud={hud} compact className="pointer-events-auto w-full" />
-        <QuestionPanel hud={hud} title={title} relocateTotal={relocateEnabled ? config.relocateSeconds : 0} compact className="pointer-events-auto" />
+        {!taskOnly && <QuestionPanel hud={hud} title={title} relocateTotal={relocateEnabled ? config.relocateSeconds : 0} compact className="pointer-events-auto" />}
         <div className="pointer-events-none relative">{statusStack}</div>
         {coarsePointer && (
           <div className="pointer-events-auto flex justify-center pt-1">
@@ -385,15 +453,17 @@ function TrueFalseMazeSession({
           <div className="order-1 flex">{pauseButton}</div>
           <div className="order-2 ml-auto flex sm:order-3 sm:ml-0 xl:order-4">{controls}</div>
           <HudBar hud={hud} className="order-3 basis-full sm:order-2 sm:basis-0 sm:flex-1 xl:flex-none xl:basis-auto" />
-          <QuestionPanel
-            hud={hud}
-            title={title}
-            relocateTotal={relocateEnabled ? config.relocateSeconds : 0}
-            className="order-4 basis-full xl:order-3 xl:basis-0"
-          />
+          {!taskOnly && (
+            <QuestionPanel
+              hud={hud}
+              title={title}
+              relocateTotal={relocateEnabled ? config.relocateSeconds : 0}
+              className="order-4 basis-full xl:order-3 xl:basis-0"
+            />
+          )}
         </div>
         <div className="pointer-events-none relative">{statusStack}</div>
-        {portraitPhone && playing && (
+        {portraitPhone && playing && !tutorial && (
           <p className="pointer-events-none mx-auto mt-2 w-fit max-w-full rounded-full border border-white/10 bg-slate-950/70 px-3 py-1 text-center text-[11.5px] text-slate-300 backdrop-blur">
             Gira el teléfono para ver la nave más grande
           </p>
@@ -431,18 +501,19 @@ function TrueFalseMazeSession({
       {hudPanels}
 
       {!assets && <LoadingOverlay error={loadError} onExit={onExit} />}
-      {assets && hud.phase === 'ready' && (
+      {assets && hud.phase === 'ready' && !tutorial && (
         <ReadyOverlay
           total={hud.totalQuestions}
           lives={hud.maxLives}
           compact={compactLandscape}
+          touch={coarsePointer}
           fullscreen={canFullscreen ? { wanted: wantFullscreen, active: fullscreen, onChange: chooseFullscreen } : null}
           onStart={actions.start}
           onGuide={onOpenGuide}
           onExit={onExit}
         />
       )}
-      {hud.phase === 'intro' && hud.statement && (
+      {hud.phase === 'intro' && hud.statement && !taskOnly && (
         <IntroCard key={hud.questionIndex} index={hud.questionIndex} total={hud.totalQuestions} statement={hud.statement} />
       )}
       {hud.phase === 'feedback' && hud.result && (
@@ -462,8 +533,8 @@ function TrueFalseMazeSession({
           onExit={onExit}
         />
       )}
-      {hud.phase === 'finished' && <ResultsOverlay hud={hud} compact={compactLandscape} onRestart={actions.restart} onExit={onExit} />}
-      {guideOpen && <TrueFalseMazeGuide onClose={onCloseGuide} />}
+      {hud.phase === 'finished' && !tutorial && <ResultsOverlay hud={hud} compact={compactLandscape} onRestart={actions.restart} onExit={onExit} />}
+      {guideOpen && !tutorial && <TrueFalseMazeGuide onClose={onCloseGuide} onTutorial={onStartTutorial} />}
     </div>
   )
 }
@@ -694,7 +765,7 @@ function QuestionPanel({
   compact?: boolean
   className?: string
 }) {
-  let label = `${title} · Pregunta ${hud.questionIndex + 1} de ${hud.totalQuestions}`
+  let label = `Pregunta ${hud.questionIndex + 1} de ${hud.totalQuestions}`
   let statement = hud.statement ?? ''
   if (hud.phase === 'ready') {
     label = title
@@ -910,6 +981,7 @@ function FullscreenChoice({ wanted, active, onChange }: FullscreenChoiceProps) {
 function ReadyOverlay({
   total,
   lives,
+  touch,
   compact,
   fullscreen,
   onStart,
@@ -918,6 +990,7 @@ function ReadyOverlay({
 }: {
   total: number
   lives: number
+  touch: boolean
   compact: boolean
   /** null si el navegador no permite pantalla completa (por ejemplo, iPhone). */
   fullscreen: FullscreenChoiceProps | null
@@ -947,7 +1020,7 @@ function ReadyOverlay({
         </h2>
         <p className="mx-auto mt-1.5 max-w-[420px] text-[13.5px] leading-relaxed text-slate-300">
           Son <b className="text-white">{total} afirmaciones</b> y tienes <b className="text-white">{lives}</b>{' '}
-          {lives === 1 ? 'batería' : 'baterías'}. Muévete con las <b className="text-white">flechas del teclado</b> (o W A S D).
+          {lives === 1 ? 'batería' : 'baterías'}. {touch ? (<>Muévete con la <b className="text-white">cruceta</b> o <b className="text-white">deslizando el dedo</b>.</>) : (<>Muévete con las <b className="text-white">flechas del teclado</b> (o W A S D).</>)}
         </p>
         {fullscreen && <FullscreenChoice {...fullscreen} />}
         <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
@@ -976,7 +1049,7 @@ function ReadyOverlay({
         {/* En celular horizontal no sobra alto: estos consejos están en la guía y el botón Pausa ya se ve. */}
         {!compact && (
           <>
-            <p className="mt-2 text-[11.5px] text-slate-400">o presiona cualquier flecha para despegar</p>
+            {!touch && <p className="mt-2 text-[11.5px] text-slate-400">o presiona cualquier flecha para despegar</p>}
             <p className="mt-1 text-[11.5px] text-slate-400">
               ¿Necesitas parar? Usa el botón <b className="text-slate-200">Pausa</b> (arriba a la izquierda) o la tecla{' '}
               <b className="text-slate-200">P</b>.

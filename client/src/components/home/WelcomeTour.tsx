@@ -1,17 +1,69 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Compass, Gamepad2, Plus, UserRound, X } from 'lucide-react'
+import { Check, Compass, Gamepad2, Hand, Keyboard, Plus, UserRound, X } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { AuthUser } from '../../services/auth.service'
 import { getWelcomeSteps, hasGreetedThisSession, hasSeenWelcome, initialWelcomePhase, markGreetedThisSession, markWelcomeSeen, phaseAfterGreeting, welcomeStorageKey } from './welcomeTourSteps'
-import type { WelcomeOptions, WelcomePhase } from './welcomeTourSteps'
+import type { WelcomeOptions, WelcomePhase, WelcomeStep } from './welcomeTourSteps'
 import { WelcomeCard } from './WelcomeCard'
-import { WelcomeStepScene } from './WelcomeStepScene'
 import { TourSpotlight } from './TourSpotlight'
+import { WelcomeStepScene } from './WelcomeStepScene'
 import { pickCardCorner, tourCardBounds, useSpotlightRect } from './tourSpotlightLayout'
+import { getTourAway, setTourAway, useTourAway } from './tourProgress'
 import { isKidsMode } from '../../utils/kidsMode'
 
 const icons = { play: Gamepad2, create: Plus, explore: Compass, profile: UserRound }
+/** Si tocar el elemento no cambió de página en este tiempo, el paso se hizo sin salir del inicio. */
+const NAVIGATION_GRACE_MS = 600
+const STUCK_MS = 12000
+const GENERIC_AWAY ='Esta es otra sección de NexusPlay. Mírala con calma y vuelve a la guía para seguir.'
+
+/** A la vista de verdad: con tamaño, dentro de la pantalla y no `invisible` (el menú del celular se esconde así, corrido fuera de la pantalla). */
+function isShown(element: Element | null): element is HTMLElement {
+  if (!(element instanceof HTMLElement)) return false
+  const box = element.getBoundingClientRect()
+  if (box.width === 0 || box.height === 0 || box.right <= 0 || box.left >= window.innerWidth) return false
+  return element.checkVisibility?.({ visibilityProperty: true }) ?? true
+}
+
+/**
+ * Al pasar a otro paso, la pantalla vuelve a como estaba: se cierra la
+ * ventana o el menú que abrió el paso (todos se cierran con Escape) y se
+ * deshace lo que cambió (el menú contraído, la búsqueda escrita). Si no, la
+ * guía avanzaba pero la pantalla seguía mostrando lo del paso anterior.
+ */
+function tidyAfterStep(step: WelcomeStep, wasDone: boolean) {
+  const target = document.querySelector(`[data-tour="${step.target}"]`)
+  if (wasDone && step.undo === 'toggle' && isShown(target)) target.click()
+  if (wasDone && step.undo === 'clear-search') {
+    const input = target?.querySelector('input')
+    if (input && input.value) {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, '')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    }
+  }
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+}
+
+/** Lleva la pantalla a donde ocurre el paso (Kids: fuera o dentro de un mundo; celular: con el menú abierto). */
+function placeForStep(step: WelcomeStep) {
+  const back = document.querySelector('[data-tour="worlds-back"]')
+  if (step.place === 'world-list' && isShown(back)) back.click()
+  if (step.place === 'inside-world' && !isShown(back)) {
+    document.querySelector<HTMLElement>('[data-tour="worlds"] button')?.click()
+  }
+  // En celular las opciones del menú viven en un panel escondido: se abre para poder tocarlas.
+  const target = document.querySelector(`[data-tour="${step.target}"]`)
+  const opener = document.querySelector('[aria-label="Abrir menú"]')
+  if (target && !isShown(target) && target.closest('aside, nav') && isShown(opener)) opener.click()
+}
+
+/** Toques que cuentan como "hacer" el paso: en un contenedor (los mundos de Kids) solo valen sus botones y enlaces. */
+function isActionClick(target: HTMLElement, event: Event) {
+  if (target.matches('button, a, [role="button"]')) return true
+  const clicked = event.target instanceof Element ? event.target.closest('button, a, [role="button"]') : null
+  return !!clicked && target.contains(clicked)
+}
 
 /**
  * Toda carga o login (F5 incluido) que cae en el inicio abre primero la
@@ -26,8 +78,13 @@ const icons = { play: Gamepad2, create: Plus, explore: Compass, profile: UserRou
  * el resto de la pantalla se ve desenfocada y bloqueada (el overlay absorbe
  * los clics) hasta que la persona hace clic en el botón — no hay "Ahora no"
  * ni Escape para saltárselo, así todo el mundo pasa por el recorrido al
- * menos una vez. Una vez iniciado el recorrido en sí (paso a paso) sigue
- * siendo cerrable con la X o Escape, como antes.
+ * menos una vez.
+ *
+ * El recorrido es interactivo: cada paso pide HACER algo (tocar "Crear
+ * juego", abrir Áreas, buscar…) y solo avanza cuando la persona lo hace. Si
+ * el paso la lleva a otra página, el progreso queda en `tourProgress` y
+ * `TourReturnBar` (en toda la app) le explica la página y la obliga a
+ * "Volver a la guía", que la trae de nuevo aquí, al paso siguiente.
  */
 export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds }: { user: AuthUser } & WelcomeOptions) {
   const location = useLocation()
@@ -36,71 +93,173 @@ export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds }: 
   const storageKey = welcomeStorageKey(user.id, user.role)
   // No interrumpir enlaces a juegos, salas ni otras secciones.
   const atHome = location.pathname === '/' && !location.search
-  const [phase, setPhase] = useState<WelcomePhase>(() => initialWelcomePhase(atHome, hasSeenWelcome(storageKey), hasGreetedThisSession(storageKey)))
+  const buildSteps = useCallback(
+    () => getWelcomeSteps(user.role, isKids, { canAccessOrganization, canGoBackToWorlds }),
+    [user.role, isKids, canAccessOrganization, canGoBackToWorlds],
+  )
+  // Volver de otra página en mitad del recorrido lo retoma donde iba (sin saludo de por medio).
+  const [phase, setPhase] = useState<WelcomePhase>(() =>
+    getTourAway()?.owner === storageKey && getTourAway()?.status === 'resume' && atHome
+      ? 'tour'
+      : initialWelcomePhase(atHome, hasSeenWelcome(storageKey), hasGreetedThisSession(storageKey)),
+  )
+  const [steps, setSteps] = useState(buildSteps)
   const [index, setIndex] = useState(0)
+  // El paso actual ya se hizo (abrió el menú, buscó…): ahora toca "Siguiente".
+  const [stepDone, setStepDone] = useState(false)
   const [previousRoute, setPreviousRoute] = useState(location.key)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const headingRef = useRef<HTMLHeadingElement>(null)
-  // Fijar los pasos al abrir evita desplazarlos si los permisos terminan de cargar durante la guía.
   // Alto real de la tarjeta (cambia por paso): sirve para elegir la esquina libre y deslizarla hasta ahí.
   const [cardHeight, setCardHeight] = useState<number | null>(null)
   const [cardNode, setCardNode] = useState<HTMLElement | null>(null)
+  const [fullCardHeight, setFullCardHeight] = useState<number | null>(null)
+  // "Ver cómo se hace" en la tarjeta compacta: muestra el video aunque tape un poco.
+  const [showScene, setShowScene] = useState(false)
   useEffect(() => {
     if (!cardNode) return
-    const observer = new ResizeObserver(() => setCardHeight(cardNode.offsetHeight))
+    const observer = new ResizeObserver(() => {
+      setCardHeight(cardNode.offsetHeight)
+      // El alto completo (con video) se guarda aparte: decide si hace falta compactarla.
+      if (!cardNode.hasAttribute('data-compact')) setFullCardHeight(cardNode.offsetHeight)
+    })
     observer.observe(cardNode)
     return () => observer.disconnect()
   }, [cardNode])
-  const [steps, setSteps] = useState(() => getWelcomeSteps(user.role, isKids, { canAccessOrganization, canGoBackToWorlds }))
-  const step = steps[index]
+  const step: WelcomeStep = steps[Math.min(index, steps.length - 1)]
+  // Paso actual para `close` (que es estable y no ve el render en curso).
+  const stepRef = useRef({ step, done: false })
+  useEffect(() => {
+    stepRef.current = { step, done: stepDone }
+  })
   const visible = atHome && phase !== 'closed'
   // Momento obligatorio: solo antes de que la persona inicie el recorrido.
   const forcedInvite = visible && phase === 'invite'
 
-  // Reiniciar solo al cambiar de ruta evita reabrir pasos al volver con el navegador.
+  // Al volver al inicio desde la barra "Volver a la guía" (o con el botón
+  // atrás del navegador) se retoma el paso que seguía.
+  const away = useTourAway()
+  const resumeFrom = away?.owner === storageKey && away.status === 'resume' && atHome ? away.resumeIndex : null
+  useEffect(() => {
+    if (resumeFrom === null) return
+    setTourAway(null)
+    markGreetedThisSession(storageKey)
+    markWelcomeSeen(storageKey)
+    const fresh = buildSteps()
+    setSteps(fresh)
+    setStepDone(false)
+    if (resumeFrom >= fresh.length) {
+      setPhase('closed')
+      return
+    }
+    setIndex(resumeFrom)
+    setPhase('tour')
+  }, [resumeFrom, storageKey, buildSteps])
+
   if (previousRoute !== location.key) {
     setPreviousRoute(location.key)
-    if (!atHome && (phase === 'tour' || phase === 'greeting')) setPhase('closed')
+    if (!atHome && phase === 'greeting') setPhase('closed')
   }
 
+  // Una sección dentro del inicio (Áreas, Comunidad…) también es "otra
+  // página": se guarda el progreso para que la barra obligue a volver. (En
+  // un efecto: el almacén avisa a la barra, y eso no puede pasar en el render.)
+  const leftHomeInTour = !atHome && phase === 'tour'
+  useEffect(() => {
+    if (!leftHomeInTour) return
+    if (getTourAway()?.owner !== storageKey) {
+      setTourAway({
+        owner: storageKey,
+        resumeIndex: index + 1,
+        totalSteps: steps.length,
+        explanation: step.away ?? GENERIC_AWAY,
+        stepTitle: step.title,
+        status: 'away',
+      })
+    }
+    setPhase('closed')
+  }, [leftHomeInTour, storageKey, index, steps.length, step])
+
   const close = useCallback((restoreFocus = true) => {
+    tidyAfterStep(stepRef.current.step, stepRef.current.done)
     markWelcomeSeen(storageKey)
+    setTourAway(null)
     setPhase('closed')
     if (restoreFocus) triggerRef.current?.focus()
   }, [storageKey])
 
   useEffect(() => {
     // El paso obligatorio (fase "invite") no se puede saltar con Escape;
-    // una vez dentro del recorrido paso a paso sí, como siempre.
-    if (!visible || phase !== 'tour') return
+    // dentro del recorrido sí, salvo justo después de abrir un menú o una
+    // ventana: ahí Escape es para cerrar eso, no la guía.
+    if (!visible || phase !== 'tour' || stepDone) return
     function onEscape(event: KeyboardEvent) {
-      if (event.key === 'Escape') close()
+      // El Escape que manda la propia guía para cerrar ventanas no la cierra a ella.
+      if (event.key === 'Escape' && event.isTrusted) close()
     }
     document.addEventListener('keydown', onEscape)
     return () => document.removeEventListener('keydown', onEscape)
-  }, [visible, phase, close])
+  }, [visible, phase, stepDone, close])
 
+  // Lo que la persona tiene que hacer en el paso: se escucha en el propio
+  // elemento señalado, sin impedir que funcione como siempre.
+  const mountedRef = useRef(true)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
   useEffect(() => {
     if (!visible || phase !== 'tour') return
     headingRef.current?.focus({ preventScroll: true })
+    if (stepDone) return
+    placeForStep(step)
     const target = document.querySelector<HTMLElement>(`[data-tour="${step.target}"]`)
-    target?.setAttribute('data-tour-active', 'true')
+    if (!target) return
+    target.setAttribute('data-tour-active', 'true')
     // El resaltado visual lo dibuja <TourSpotlight> (ver ahí por qué); esta
     // marca apaga el contorno CSS de [data-tour-active] para no duplicarlo.
-    target?.setAttribute('data-tour-spotlight', 'true')
+    target.setAttribute('data-tour-spotlight', 'true')
     // "center" (en vez de "start") deja margen a ambos lados: con "start" un
     // objetivo pegado al borde superior (como el botón de crear juego) podía
     // terminar justo debajo del encabezado, apenas visible.
-    target?.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' })
-    // Interactuar con la aplicación termina la guía sin impedir ese clic.
-    const onUseTarget = () => close(false)
-    target?.addEventListener('click', onUseTarget)
-    return () => {
-      target?.removeAttribute('data-tour-active')
-      target?.removeAttribute('data-tour-spotlight')
-      target?.removeEventListener('click', onUseTarget)
+    target.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' })
+    let timer = 0
+    const onTap = (event: Event) => {
+      if (!isActionClick(target, event)) return
+      if (!step.away) {
+        setStepDone(true)
+        return
+      }
+      // Puede que el toque lleve a otra página (y este componente se desmonte
+      // antes de enterarse): el progreso se guarda ya, y si no hubo cambio de
+      // página se borra y el paso cuenta como hecho aquí mismo.
+      setTourAway({
+        owner: storageKey,
+        resumeIndex: index + 1,
+        totalSteps: steps.length,
+        explanation: step.away,
+        stepTitle: step.title,
+        status: 'away',
+      })
+      timer = window.setTimeout(() => {
+        if (!mountedRef.current || window.location.pathname !== '/') return
+        setTourAway(null)
+        setStepDone(true)
+      }, NAVIGATION_GRACE_MS)
     }
-  }, [visible, phase, step.target, index, close])
+    const onSubmit = () => setStepDone(true)
+    if (step.kind === 'tap') target.addEventListener('click', onTap)
+    if (step.kind === 'type') target.addEventListener('submit', onSubmit)
+    return () => {
+      target.removeAttribute('data-tour-active')
+      target.removeAttribute('data-tour-spotlight')
+      target.removeEventListener('click', onTap)
+      target.removeEventListener('submit', onSubmit)
+      window.clearTimeout(timer)
+    }
+  }, [visible, phase, step, index, stepDone, steps.length, storageKey])
 
   function dismissGreeting() {
     markGreetedThisSession(storageKey)
@@ -110,51 +269,83 @@ export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds }: 
   function start() {
     markGreetedThisSession(storageKey)
     markWelcomeSeen(storageKey)
-    setSteps(getWelcomeSteps(user.role, isKids, { canAccessOrganization, canGoBackToWorlds }))
+    setTourAway(null)
+    setSteps(buildSteps())
     setIndex(0)
+    setStepDone(false)
     setPhase('tour')
     if (!atHome) navigate('/')
   }
 
-  function tryAction() {
-    const target = document.querySelector<HTMLElement>(`[data-tour="${step.target}"]`)
-    close(false)
-    if (target?.matches('button')) {
-      target.focus()
-      target.click()
-    } else {
-      const firstControl = target?.querySelector<HTMLElement>('input') ?? target?.querySelector<HTMLElement>('button')
-      if (firstControl) firstControl.focus()
-      else triggerRef.current?.focus()
-    }
+  function goTo(next: number) {
+    tidyAfterStep(step, stepDone)
+    setStepDone(false)
+    setShowScene(false)
+    setIndex(next)
   }
 
   const Icon = icons[step.icon]
-  // Tanto el aviso obligatorio inicial como cada paso del recorrido
-  // desenfocan el resto de la pantalla. En el aviso inicial el botón "Guía"
-  // queda por encima gracias a [data-tour-active]; en cada paso del
-  // recorrido el spotlight deja un hueco nítido con la forma del elemento
-  // señalado (botón, menú, Sidebar…) y un anillo pulsante alrededor — el ojo
-  // va directo a lo que explica la tarjeta.
   const inTour = visible && phase === 'tour'
-  const spotlightRect = useSpotlightRect(inTour ? `[data-tour="${step.target}"]` : null)
+  // Con el paso hecho se apaga el resaltado: el menú o la ventana que se abrió
+  // queda libre para mirarla y cerrarla.
+  const spotlightRect = useSpotlightRect(inTour && !stepDone ? `[data-tour="${step.target}"]` : null)
+  // Si el elemento no está en pantalla (menú oculto en el celular, por
+  // ejemplo), no se puede pedir que lo toque: el paso se puede pasar.
+  const [targetMissing, setTargetMissing] = useState(false)
+  useEffect(() => {
+    if (!inTour || stepDone || step.kind === 'look') return
+    const timer = window.setTimeout(() => {
+      setTargetMissing(!isShown(document.querySelector(`[data-tour="${step.target}"]`)))
+    }, 400)
+    return () => {
+      window.clearTimeout(timer)
+      setTargetMissing(false)
+    }
+  }, [inTour, stepDone, step])
+  // Válvula de escape: si en un rato no logra el paso (un mundo sin juegos
+  // todavía, por ejemplo), aparece "Saltar este paso" para no quedarse trabado.
+  const [stuck, setStuck] = useState(false)
+  useEffect(() => {
+    if (!inTour || stepDone || step.kind === 'look') return
+    const timer = window.setTimeout(() => setStuck(true), STUCK_MS)
+    return () => {
+      window.clearTimeout(timer)
+      setStuck(false)
+    }
+  }, [inTour, stepDone, step, index])
+  const canAdvance = stepDone || step.kind === 'look' || targetMissing
+  const last = index === steps.length - 1
+
   // La tarjeta se aparta a otra esquina si taparía el elemento iluminado.
   const viewport = { width: window.innerWidth, height: window.innerHeight }
   const margin = viewport.width >= 640 ? 24 : 12
   const bounds = tourCardBounds(viewport)
-  const card = { width: bounds.width, height: cardHeight ?? bounds.height }
-  const cardCorner = pickCardCorner(spotlightRect, card, viewport, margin)
   // Posición en píxeles (no clases de esquina) para que la tarjeta se deslice
   // con transición hacia la esquina libre y no tape lo que se está mostrando.
-  const cardPosition = {
-    left: cardCorner.endsWith('right') ? viewport.width - margin - card.width : margin,
-    top: cardCorner.startsWith('bottom') ? Math.max(margin, viewport.height - margin - card.height) : margin,
+  const placeCard = (size: { width: number; height: number }) => {
+    const corner = pickCardCorner(spotlightRect, size, viewport, margin)
+    return {
+      left: corner.endsWith('right') ? viewport.width - margin - size.width : margin,
+      top: corner.startsWith('bottom') ? Math.max(margin, viewport.height - margin - size.height) : margin,
+    }
   }
+  // Si la tarjeta entera (con su video) taparía lo que hay que tocar —pasa
+  // en el celular, con el menú abierto—, se queda compacta: solo la tarea y
+  // un botón para ver el video. Se decide con el alto COMPLETO medido, así no
+  // salta entre compacta y completa.
+  const fullCard = { width: bounds.width, height: fullCardHeight ?? bounds.height }
+  const fullPosition = placeCard(fullCard)
+  const coversTarget = !!spotlightRect &&
+    fullPosition.left < spotlightRect.left + spotlightRect.width && spotlightRect.left < fullPosition.left + fullCard.width &&
+    fullPosition.top < spotlightRect.top + spotlightRect.height && spotlightRect.top < fullPosition.top + fullCard.height
+  const compact = coversTarget && !stepDone && !showScene
+  const cardPosition = compact ? placeCard({ width: bounds.width, height: cardHeight ?? 200 }) : fullPosition
+  const TaskIcon = step.kind === 'type' ? Keyboard : Hand
   return <>
     {forcedInvite && (
       <div className="fixed inset-0 z-40 bg-black/55 backdrop-blur-sm" aria-hidden="true" />
     )}
-    {inTour && <TourSpotlight rect={spotlightRect} />}
+    {inTour && !stepDone && <TourSpotlight rect={spotlightRect} />}
 
     <div className="relative inline-flex">
       <button
@@ -187,26 +378,57 @@ export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds }: 
       <WelcomeCard onClose={dismissGreeting} onQuickGuide={start} />, document.body,
     )}
 
-    {visible && phase === 'tour' && createPortal(
-      <section ref={setCardNode} style={cardPosition} aria-label="Recorrido de NexusPlay" className={`welcome-tour-card fixed z-[45] w-[min(360px,calc(100vw-24px))] rounded-3xl border border-border bg-surface p-5 text-left text-text shadow-[var(--shadow)]`}>
+    {inTour && createPortal(
+      // Con el paso hecho, la tarjeta va por encima de la ventana o el menú que se abrió: así "Siguiente" siempre se puede tocar.
+      <section ref={setCardNode} style={cardPosition} data-compact={compact ? '' : undefined} aria-label="Recorrido de NexusPlay" className={`welcome-tour-card fixed ${stepDone ? 'z-[80]' : 'z-[45]'} w-[min(360px,calc(100vw-24px))] rounded-3xl border border-border bg-surface p-5 text-left text-text shadow-[var(--shadow)]`}>
         <div className="mb-3 flex items-center justify-between gap-3">
           <span key={`icon-${index}`} className="tour-step-icon flex h-10 w-10 items-center justify-center rounded-2xl text-white shadow-md" style={{ background: 'linear-gradient(135deg, var(--accent), var(--color-accent-2, var(--accent)))' }}><Icon className="h-6 w-6" aria-hidden="true" /></span>
-          <span className="flex-1 text-xs font-semibold text-accent">{index + 1} de {steps.length} · A tu ritmo</span>
+          <span className="flex-1 text-xs font-semibold text-accent">Paso {index + 1} de {steps.length} · Hazlo tú</span>
           <button type="button" onClick={() => close()} aria-label="Cerrar recorrido" className="rounded-full p-2 text-text hover:bg-code-bg focus-visible:outline-2 focus-visible:outline-accent"><X className="h-5 w-5" /></button>
         </div>
         <div key={index} className="tour-step-in" aria-live="polite" aria-atomic="true">
-          <WelcomeStepScene target={step.target} />
-          {index === steps.length - 1 && <FinishConfetti />}
+          {/* El "video" del paso: muestra cómo se hace; debajo, la persona lo hace. En el celular sale un poco más chico. */}
+          {!compact && (
+            <div className="max-sm:[zoom:0.82]">
+              <WelcomeStepScene target={step.target} />
+            </div>
+          )}
+          {last && stepDone && <FinishConfetti />}
           <h2 ref={headingRef} tabIndex={-1} className="text-xl font-bold text-text-h outline-none">{step.title}</h2>
-          <p className="mt-2 text-sm leading-relaxed">{step.text}</p>
+          {compact ? (
+            <button type="button" onClick={() => setShowScene(true)} className="mt-1 text-xs font-semibold text-accent underline">
+              Ver cómo se hace ▾
+            </button>
+          ) : (
+            <p className="mt-2 text-sm leading-relaxed">{step.text}</p>
+          )}
+          {step.task && !stepDone && (
+            <p data-tour-task className="tour-task mt-3 flex items-center gap-2.5 rounded-2xl border-2 border-dashed border-accent/60 bg-accent/10 px-3 py-2.5 text-[14px] font-semibold text-text-h">
+              <TaskIcon className="tour-task-hand h-5 w-5 shrink-0 text-accent" aria-hidden="true" />
+              {targetMissing ? 'Esta opción no está a la vista en esta pantalla. Puedes seguir con el próximo paso.' : step.task}
+            </p>
+          )}
+          {stepDone && (
+            <p role="status" className="tour-step-in mt-3 flex items-center gap-2.5 rounded-2xl bg-emerald-500/15 px-3 py-2.5 text-[14px] font-semibold text-text-h">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white"><Check className="h-4 w-4" strokeWidth={3} aria-hidden="true" /></span>
+              {step.done ?? '¡Bien hecho!'}
+            </p>
+          )}
         </div>
-        <div className="mt-4 flex gap-1.5" aria-hidden="true">{steps.map((item, i) => <span key={item.title} className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${i <= index ? 'bg-accent' : 'bg-code-bg'} ${i === index ? 'scale-y-150' : ''}`} />)}</div>
-        {step.action && <button type="button" onClick={tryAction} className="mt-4 w-full rounded-xl border border-accent/40 px-3 py-2 text-sm font-semibold text-accent hover:bg-accent/10">{step.action} ↗</button>}
+        <div className="mt-4 flex gap-1.5" aria-hidden="true">{steps.map((item, i) => <span key={`${item.target}-${i}`} className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${i < index || (i === index && canAdvance) ? 'bg-accent' : 'bg-code-bg'} ${i === index ? 'scale-y-150' : ''}`} />)}</div>
         <div className="mt-4 flex items-center justify-between gap-2">
-          <button type="button" disabled={index === 0} onClick={() => setIndex(index - 1)} className="rounded-lg px-2 py-2 text-sm hover:bg-code-bg disabled:opacity-40">Atrás</button>
-          <button type="button" onClick={() => index === steps.length - 1 ? close() : setIndex(index + 1)} className="rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90">
-            {index === steps.length - 1 ? '¡Listo! 🎉' : 'Siguiente →'}
-          </button>
+          <button type="button" disabled={index === 0} onClick={() => goTo(index - 1)} className="rounded-lg px-2 py-2 text-sm hover:bg-code-bg disabled:opacity-40">Atrás</button>
+          {canAdvance ? (
+            <button type="button" onClick={() => last ? close() : goTo(index + 1)} className="rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90">
+              {last ? '¡Listo! 🎉' : 'Siguiente →'}
+            </button>
+          ) : stuck ? (
+            <button type="button" onClick={() => (last ? close() : goTo(index + 1))} className="rounded-lg px-2 py-2 text-xs font-semibold text-text/70 underline hover:text-accent">
+              Saltar este paso
+            </button>
+          ) : (
+            <span className="text-xs font-semibold text-text/70">Haz el paso para seguir</span>
+          )}
         </div>
       </section>, document.body,
     )}
@@ -215,7 +437,7 @@ export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds }: 
 
 const CONFETTI_COLORS = ['#ff7a1a', '#06b6d4', '#ffcc4d', '#ff4d6d', '#22c55e', '#a78bfa']
 
-/** Explosión de confeti al llegar al último paso: el recorrido termina con celebración. */
+/** Explosión de confeti al terminar el último paso: el recorrido termina con celebración. */
 function FinishConfetti() {
   return (
     <span aria-hidden="true" className="tour-scene pointer-events-none absolute top-[70px] left-1/2 block">

@@ -32,12 +32,30 @@ export type UseMemoryMatchGameOptions = {
   perZone: number
   baseTimePerZoneSeconds: number
   previewSeconds: number
+  /**
+   * Tutorial (issue #93): el orden de las cartas es siempre el mismo (cada
+   * parte vuelve a armar el tablero y, si cambiara de lugar, la persona
+   * perdería el hilo entre una parte y otra).
+   */
+  fixedOrder?: boolean
 }
 
-function shuffle<T>(items: T[]): T[] {
+/** Generador con semilla (mulberry32): mismo número de partida, misma secuencia. */
+function seededRandom(seed: number): () => number {
+  let state = seed >>> 0
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0
+    let t = state
+    t = Math.imul(t ^ (t >>> 15), t | 1)
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+function shuffle<T>(items: T[], random: () => number = Math.random): T[] {
   const copy = [...items]
   for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
+    const j = Math.floor(random() * (i + 1))
     ;[copy[i], copy[j]] = [copy[j], copy[i]]
   }
   return copy
@@ -85,8 +103,9 @@ function cardsForPair(pair: MemoryMatchPair): CardData[] {
   ]
 }
 
-function buildZones(pairs: MemoryMatchPair[], pairCount: number, perZone: number): ZoneConfig[] {
-  const chosen = shuffle(pairs).slice(0, pairCount)
+function buildZones(pairs: MemoryMatchPair[], pairCount: number, perZone: number, fixedOrder = false): ZoneConfig[] {
+  const random = fixedOrder ? seededRandom(20261025) : Math.random
+  const chosen = shuffle(pairs, random).slice(0, pairCount)
   const zones: ZoneConfig[] = []
 
   // Zonas parejas entre sí y de máximo 6 parejas, para que quepan sin scroll.
@@ -94,7 +113,7 @@ function buildZones(pairs: MemoryMatchPair[], pairCount: number, perZone: number
   for (const size of zonePairSizes(chosen.length, perZone)) {
     const slice = chosen.slice(start, start + size)
     start += size
-    zones.push({ level: zones.length + 1, cards: shuffle(slice.flatMap(cardsForPair)) })
+    zones.push({ level: zones.length + 1, cards: shuffle(slice.flatMap(cardsForPair), random) })
   }
 
   return zones
@@ -112,7 +131,7 @@ export function useMemoryMatchGame(options: UseMemoryMatchGameOptions) {
   const timePerZone = Math.max(15, Math.round(baseTimePerZoneSeconds * timeMultiplier))
 
   const zones = useMemo(
-    () => buildZones(pairs, pairCount, perZone),
+    () => buildZones(pairs, pairCount, perZone, options.fixedOrder),
     // Solo se recalcula al montar (nueva partida), no en cada render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],

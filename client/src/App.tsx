@@ -39,6 +39,8 @@ import { PublicHomePage } from './components/legal/PublicHomePage'
 import { PrivacyPolicyPage } from './components/legal/PrivacyPolicyPage'
 import { TermsOfServicePage } from './components/legal/TermsOfServicePage'
 import { useAuth } from './hooks/useAuth'
+import { TourReturnBar } from './components/home/TourReturnBar'
+import { welcomeStorageKey } from './components/home/welcomeTourSteps'
 import { invitationAuthPath, invitationDestination } from './utils/invitationDestination'
 
 // PixiJS + Matter.js solo se descargan si alguien entra a esta ruta —
@@ -111,6 +113,9 @@ function App() {
   }
 
   return (
+    <>
+    {/* Recorrido interactivo: si un paso lo llevó a otra página, la barra lo obliga a volver a la guía. */}
+    <TourReturnBar owner={welcomeStorageKey(user.id, user.role)} />
     <Routes>
       <Route path="/inicio" element={<PublicHomePage />} />
       <Route path="/privacidad" element={<PrivacyPolicyPage />} />
@@ -192,6 +197,7 @@ function App() {
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </>
   )
 }
 

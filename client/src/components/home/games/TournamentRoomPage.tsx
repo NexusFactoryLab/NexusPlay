@@ -1,3 +1,5 @@
+import { GameInstructionsGate } from './GameInstructionsGate'
+import { GuessWhoTutorial } from './tutorial/GuessWhoTutorial'
 import { ChatPanel } from './ChatPanel'
 import { TournamentLobby } from './TournamentLobby'
 import { TournamentModeratorPanel } from './TournamentModeratorPanel'
@@ -20,11 +22,15 @@ import { TOURNAMENT_LEVEL_INFO } from './tournamentLevels'
  * GuessWhoRoomPage/DominoRoomPage: reconecta al torneo en curso vía el
  * código en la URL, y no deja el Sidebar/header de HomeLayout montado detrás.
  *
- * Entrar es de un solo paso (código o enlace): la guía de cómo jugar ya no se
- * antepone, se abre a demanda desde la sala de espera.
+ * Antes de entrar se muestra la guía con el tutorial jugable (`GameInstructionsGate`);
+ * también se puede abrir a demanda desde la sala de espera.
  */
 export function TournamentRoomPage() {
-  return <TournamentSession />
+  return (
+    <GameInstructionsGate kind={'GUESS_WHO_GROUP'} tutorial={(onFinish) => <GuessWhoTutorial tournament onFinish={onFinish} />}>
+      <TournamentSession />
+    </GameInstructionsGate>
+  )
 }
 
 function TournamentSession() {

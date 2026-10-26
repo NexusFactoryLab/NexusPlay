@@ -7,10 +7,47 @@ import { ConfettiBurst } from '../../kids/ConfettiBurst'
 import { MemoryMatchFlash } from './MemoryMatchFlash'
 import { MemoryCityBackdrop } from './MemoryCityBackdrop'
 import { bestBoardGrid } from './memoryMatchLayout'
+import { MemoryMatchTutorial } from './tutorial/MemoryMatchTutorial'
+import { enterPageFullscreen } from './tutorial/TutorialRunner'
+import { Maximize, Minimize } from 'lucide-react'
+
+const FULLSCREEN_PREF_KEY = 'nexusplay-memory-fullscreen'
+
+/** "Jugar en pantalla completa" viene activado y se recuerda lo último que eligió el jugador. */
+function readFullscreenPreference(): boolean {
+  try {
+    return window.localStorage.getItem(FULLSCREEN_PREF_KEY) !== 'off'
+  } catch {
+    return true
+  }
+}
+
+function saveFullscreenPreference(value: boolean) {
+  try {
+    window.localStorage.setItem(FULLSCREEN_PREF_KEY, value ? 'on' : 'off')
+  } catch {
+    // Sin almacenamiento (modo privado): la elección vale solo para esta partida.
+  }
+}
 
 const BOARD_GAP = 8
 import { useAuth } from '../../../hooks/useAuth'
 import { recordGamePlayResult } from '../../../services/metrics.service'
+
+/**
+ * Una parte del tutorial jugable (issue #93): el tablero real con las cartas
+ * del juego, hasta lograr una sola cosa.
+ * - `preview`: mirar la vista previa hasta que las cartas se tapan.
+ * - `pair`: encontrar una pareja.
+ * - `zone`: completar la zona antes de que se acabe el tiempo.
+ */
+export type MemoryMatchTutorialPart = {
+  goal: 'preview' | 'pair' | 'zone'
+  /** La pareja que se resalta (late) para que se vea cuáles cartas tocar. */
+  focusPairId?: string
+  onDone: () => void
+  onFailed: (message: string) => void
+}
 
 type MemoryMatchGameProps = {
   title: string
@@ -28,10 +65,20 @@ type MemoryMatchGameProps = {
   subjectId?: string
   subjectName?: string
   classId?: string
+  /** Si viene, se juega una parte del tutorial (sin guía, sin pantallas de fin ni registro de la partida). */
+  tutorial?: MemoryMatchTutorialPart
 }
 
 export function MemoryMatchGame(props: MemoryMatchGameProps) {
-  return <GameInstructionsGate kind={props.pairs[0]?.mode === 'OPPOSITES' ? 'OPPOSITES' : 'PAIRS'}><MemoryMatchSession {...props} /></GameInstructionsGate>
+  if (props.tutorial) return <MemoryMatchSession {...props} />
+  return (
+    <GameInstructionsGate
+      kind={props.pairs[0]?.mode === 'OPPOSITES' ? 'OPPOSITES' : 'PAIRS'}
+      tutorial={(onFinish) => <MemoryMatchTutorial {...props} onFinish={onFinish} />}
+    >
+      <MemoryMatchSession {...props} />
+    </GameInstructionsGate>
+  )
 }
 
 function MemoryMatchSession({
@@ -49,6 +96,7 @@ function MemoryMatchSession({
   subjectId,
   subjectName,
   classId,
+  tutorial,
 }: MemoryMatchGameProps) {
   const { token } = useAuth()
   const game = useMemoryMatchGame({
@@ -59,14 +107,57 @@ function MemoryMatchSession({
     perZone,
     baseTimePerZoneSeconds: timePerZoneSeconds,
     previewSeconds,
+    fixedOrder: Boolean(tutorial),
   })
 
   // Reporta el resultado una sola vez al llegar a "finished" (issue #226,
   // conexión de un juego real a `POST /me/game-results`). `reportedRef` evita
   // un doble POST si el componente re-renderiza estando ya en esa fase.
+  // Tutorial: cada parte avisa cuando se logró (o si se acabó el tiempo).
+  const tutorialRef = useRef(tutorial)
+  useEffect(() => {
+    tutorialRef.current = tutorial
+  })
+  const goal = tutorial?.goal
+  useEffect(() => {
+    const part = tutorialRef.current
+    if (!part) return
+    if (goal === 'preview' && game.phase === 'playing') part.onDone()
+    if (goal === 'pair' && game.matchedPairIds.length > 0) part.onDone()
+    if (goal === 'zone' && game.phase === 'zone-cleared') part.onDone()
+    if (goal === 'zone' && game.phase === 'time-up') part.onFailed('Se acabó el tiempo antes de completar la zona. ¡Inténtalo otra vez!')
+  }, [goal, game.phase, game.matchedPairIds.length])
+
+  // Pantalla completa (como en el Camión y el Laberinto V/F): el navegador solo
+  // la deja pedir dentro de un gesto, así que se aplica con el primer toque al
+  // tablero; el botón de arriba la quita o la vuelve a poner (y se recuerda).
+  const canFullscreen = !tutorial && typeof document !== 'undefined' && document.fullscreenEnabled
+  const [fullscreen, setFullscreen] = useState(() => typeof document !== 'undefined' && Boolean(document.fullscreenElement))
+  const [wantFullscreen, setWantFullscreen] = useState(readFullscreenPreference)
+  useEffect(() => {
+    const onChange = () => setFullscreen(Boolean(document.fullscreenElement))
+    document.addEventListener('fullscreenchange', onChange)
+    return () => document.removeEventListener('fullscreenchange', onChange)
+  }, [])
+  const partOfTutorial = Boolean(tutorial)
+  useEffect(
+    () => () => {
+      // Al salir del juego no se deja la pantalla completa puesta (en el tutorial sigue).
+      if (!partOfTutorial && document.fullscreenElement) void document.exitFullscreen().catch(() => {})
+    },
+    [partOfTutorial],
+  )
+  function toggleFullscreen() {
+    const next = !document.fullscreenElement
+    setWantFullscreen(next)
+    saveFullscreenPreference(next)
+    if (next) enterPageFullscreen()
+    else void document.exitFullscreen().catch(() => {})
+  }
+
   const reportedRef = useRef(false)
   useEffect(() => {
-    if (game.phase !== 'finished' || reportedRef.current || !token || !gameId) return
+    if (tutorial || game.phase !== 'finished' || reportedRef.current || !token || !gameId) return
     reportedRef.current = true
     recordGamePlayResult(token, {
       gameId,
@@ -83,7 +174,7 @@ function MemoryMatchSession({
       // métricas — el jugador ya vio su resultado en pantalla.
       console.error('No se pudo registrar el resultado de la partida:', err)
     })
-  }, [game.phase, token, gameId, title, classId, subjectId, subjectName, game])
+  }, [tutorial, game.phase, token, gameId, title, classId, subjectId, subjectName, game])
 
   const minutes = Math.floor(game.timeLeft / 60)
     .toString()
@@ -111,7 +202,13 @@ function MemoryMatchSession({
   return (
     // Pantalla completa sin scroll: barra superior compacta y el tablero ocupa
     // el resto; las cartas se dimensionan para caber (ver memoryMatchLayout).
-    <div className="fixed inset-0 z-50 flex h-dvh flex-col overflow-hidden bg-bg">
+    <div
+      className="fixed inset-0 z-50 flex h-dvh flex-col overflow-hidden bg-bg"
+      data-tut-goal={tutorial?.goal}
+      onPointerDown={() => {
+        if (canFullscreen && wantFullscreen) enterPageFullscreen()
+      }}
+    >
       <MemoryCityBackdrop />
       <div className="relative mx-auto flex h-full w-full max-w-[1600px] flex-col gap-2 p-2 sm:p-3">
         {/* Encabezado y contadores en una sola placa: se lee bien encima del cielo. */}
@@ -124,6 +221,25 @@ function MemoryMatchSession({
             >
               ← Salir
             </button>
+            {canFullscreen && (
+              <button
+                type="button"
+                aria-label={fullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+                title={fullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+                className={`flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[12px] font-semibold ${
+                  fullscreen ? 'border-border bg-bg text-text-h' : 'border-accent bg-accent/10 text-accent'
+                }`}
+                onClick={(event) => {
+                  // El toque del tablero ya la pediría: este botón decide por sí solo.
+                  event.stopPropagation()
+                  toggleFullscreen()
+                }}
+                onPointerDown={(event) => event.stopPropagation()}
+              >
+                {fullscreen ? <Minimize className="h-3.5 w-3.5" /> : <Maximize className="h-3.5 w-3.5" />}
+                <span className="max-sm:hidden">{fullscreen ? 'Salir' : 'Pantalla completa'}</span>
+              </button>
+            )}
             <div className="min-w-0">
               <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-accent">{title}</p>
               <p className="text-[15px] font-semibold leading-tight text-text-h">
@@ -132,9 +248,10 @@ function MemoryMatchSession({
             </div>
           </div>
           <div className="flex items-center gap-4 sm:gap-6">
-            <Stat label="Parejas" value={`${game.matchedInZone} / ${game.totalPairsInZone}`} />
+            <Stat label="Parejas" focus="pairs" value={`${game.matchedInZone} / ${game.totalPairsInZone}`} />
             <Stat
               label="Tiempo"
+              focus="time"
               value={
                 game.phase === 'preview'
                   ? `👁️ ${game.previewSecondsLeft}s`
@@ -173,6 +290,7 @@ function MemoryMatchSession({
             </span>
             <button
               type="button"
+              data-tut-focus="skip"
               className="rounded-full px-4 py-1 text-[13px] font-bold text-white shadow-[var(--shadow)]"
               style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
               onClick={game.skipPreview}
@@ -206,6 +324,7 @@ function MemoryMatchSession({
               <button
                 key={card.cardId}
                 type="button"
+                data-tut-focus={tutorial?.focusPairId && card.pairId === tutorial.focusPairId && !isMatched ? 'pair' : undefined}
                 disabled={isMatched}
                 onClick={() => game.flipCard(card.cardId)}
                 className={`group h-full w-full [perspective:1000px] ${isShaking ? 'animate-[shake_0.4s]' : ''}`}
@@ -298,7 +417,7 @@ function MemoryMatchSession({
           onContinue={game.pausedForInfo ? game.resumeAfterInfo : undefined}
         />
 
-        {game.phase === 'zone-cleared' && (
+        {game.phase === 'zone-cleared' && !tutorial && (
           <GameEndOverlay
             title="¡Zona superada!"
             message="Encontraste todas las parejas."
@@ -309,7 +428,7 @@ function MemoryMatchSession({
           />
         )}
 
-        {game.phase === 'time-up' && (
+        {game.phase === 'time-up' && !tutorial && (
           <GameEndOverlay
             title="Se acabó el tiempo"
             message="No alcanzaste a completar la zona."
@@ -319,7 +438,7 @@ function MemoryMatchSession({
           />
         )}
 
-        {game.phase === 'finished' && (
+        {game.phase === 'finished' && !tutorial && (
           <GameEndOverlay
             title="¡Juego completado!"
             message={`Puntaje final: ${game.totalScore}`}
@@ -335,9 +454,9 @@ function MemoryMatchSession({
   )
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, focus }: { label: string; value: string; focus?: string }) {
   return (
-    <div className="flex flex-col items-center px-1">
+    <div data-tut-focus={focus} className="flex flex-col items-center rounded-lg px-1">
       <span className="text-[10px] uppercase tracking-wide text-text/70">{label}</span>
       <span className="mt-0.5 text-[16px] font-semibold text-text-h">{value}</span>
     </div>
