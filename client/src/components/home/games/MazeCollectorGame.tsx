@@ -1,11 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react'
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, BookOpen, LogOut, Maximize, Minimize, Pause, Play, X, Zap } from 'lucide-react'
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, BookOpen, CircleHelp, LogOut, Maximize, Minimize, Pause, Play, X, Zap } from 'lucide-react'
 import type { MazeCollectorConfig, MazeCollectorItem, MazeLayoutDef, CellPosition } from './mazeCollectorTypes'
 import { iconForConcept } from './mazeCollectorTypes'
 import { POWER_MODE_MS } from './mazeEngine'
 import { useMazeCollectorGame } from './useMazeCollectorGame'
-import type { Direction, MazeScenario } from './useMazeCollectorGame'
+import type { ActiveQuestion, AnswerFeedback, Direction, MazeAnswer, MazeScenario } from './useMazeCollectorGame'
+import type { MazeQuestion } from './mazeCollectorQuestions'
 import { EcoTruckSprite } from './EcoTruckSprite'
 import { PollutionGhostSprite } from './PollutionGhostSprite'
 import { BonusSprite, PetSprite, PowerPelletSprite, TrashBagSprite } from './mazeCollectibleSprites'
@@ -40,6 +41,8 @@ type MazeCollectorGameProps = {
   onExit: () => void
   /** Si viene, se juega una parte del tutorial (sin guía, sin pantalla de inicio ni de fin). */
   tutorial?: MazeTutorialPart
+  /** Preguntas de opción múltiple (issue #103): sus respuestas se reparten por el mapa. */
+  questions?: MazeQuestion[]
 }
 
 /** Celda mínima: por debajo de esto los sprites dejan de leerse (en ese caso el tablero se desplaza). */
@@ -52,7 +55,7 @@ const MAX_CELL_SIZE = 96
  * camión. Un mapa de 27x15 celdas en 390 px de ancho sería un mar de puntitos.
  */
 const CAMERA_FIT_THRESHOLD = 26
-const CAMERA_CELL_SIZE = 32
+const CAMERA_CELL_SIZE = 40
 /** Tutorial: tope de la celda al acercar la cámara a la zona que se enseña. */
 const FOCUS_MAX_CELL_SIZE = 64
 /** Cuánto hay que arrastrar el dedo sobre el mapa para que cuente como un giro. */
@@ -64,9 +67,12 @@ const DOCK_HEIGHT = 176
  * carril; las botellas van más chicas para que la vista se quede en el camión.
  */
 const TRUCK_SCALE = 2
-const GHOST_SCALE = 1.2
-const PET_SCALE = 0.55
-const POWER_SCALE = 0.9
+const GHOST_SCALE = 1.35
+const PET_SCALE = 0.62
+const POWER_SCALE = 1
+const ANSWER_SCALE = 0.95
+/** Color de cada letra de respuesta, igual en el mapa y en el panel de la pregunta. */
+const ANSWER_COLORS: Record<string, string> = { A: '#f59e0b', B: '#38bdf8', C: '#f472b6', D: '#a78bfa' }
 const BAG_SCALE = 0.8
 const BONUS_SCALE = 1
 const FULLSCREEN_PREF_KEY = 'nexusplay-maze-collector-fullscreen'
@@ -183,13 +189,21 @@ function MazeCollectorSession({
   config,
   onExit,
   tutorial,
+  questions,
   guideOpen,
   onOpenGuide,
   onCloseGuide,
   onStartTutorial,
 }: MazeCollectorGameProps & { guideOpen: boolean; onOpenGuide: () => void; onCloseGuide: () => void; onStartTutorial?: () => void }) {
   // En el tutorial, mientras se lee la instrucción el camión no responde.
-  const game = useMazeCollectorGame({ layout, items, config, inputEnabled: !guideOpen && (tutorial?.active ?? true), scenario: tutorial?.scenario })
+  const game = useMazeCollectorGame({
+    layout,
+    items,
+    config,
+    inputEnabled: !guideOpen && (tutorial?.active ?? true),
+    scenario: tutorial?.scenario,
+    questions,
+  })
   const focus = tutorial?.focus
   const isCity = config.layout === 'CITY'
   // En Ciudad, la primera y la última fila son franjas verdes decorativas: se
@@ -215,6 +229,9 @@ function MazeCollectorSession({
   const portrait = useMediaQuery('(orientation: portrait)')
   // En vertical la cruceta tiene su propia franja (no tapa el mapa); en horizontal flota sobre él.
   const dock = coarsePointer && portrait
+  // Pantalla ancha: la pregunta va en una columna al lado del mapa (el mapa ya está limitado por el alto,
+  // así ese ancho sobra). En pantallas angostas va en una franja arriba del mapa.
+  const questionAside = useMediaQuery('(min-width: 1000px) and (min-aspect-ratio: 4/3)')
 
   function enterFullscreen() {
     const root = rootRef.current
@@ -382,7 +399,7 @@ function MazeCollectorSession({
   return (
     <div
       ref={rootRef}
-      className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-[#1c2733] text-slate-100"
+      className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-[#0d141d] text-slate-100"
       style={{
         paddingTop: 'env(safe-area-inset-top)',
         paddingBottom: 'env(safe-area-inset-bottom)',
@@ -465,9 +482,11 @@ function MazeCollectorSession({
         )}
       </header>
 
+      <div className={`relative flex min-h-0 flex-1 ${questionAside ? 'flex-row' : 'flex-col'}`}>
+      {game.question && !questionAside && <QuestionPanel question={game.question} feedback={game.answerFeedback} layout="bar" />}
       <div
         ref={stageRef}
-        className={`relative min-h-0 flex-1 p-1.5 sm:p-2 ${cameraMode ? 'overflow-hidden' : 'overflow-auto'} ${coarsePointer ? 'touch-none select-none' : ''}`}
+        className={`relative min-h-0 min-w-0 flex-1 p-1.5 sm:p-2 ${cameraMode ? 'overflow-hidden' : 'overflow-auto'} ${coarsePointer ? 'touch-none select-none' : ''}`}
         onPointerDown={coarsePointer ? handleSwipeDown : undefined}
         onPointerMove={coarsePointer ? handleSwipeMove : undefined}
         onPointerUp={coarsePointer ? () => (swipeStart.current = null) : undefined}
@@ -543,7 +562,7 @@ function MazeCollectorSession({
                       </div>
                     )
                   }
-                  return <div key={key} className="bg-[#3a4b5f]" />
+                  return <div key={key} className="bg-[#18212c]" />
                 }),
               )}
             </div>
@@ -595,14 +614,24 @@ function MazeCollectorSession({
             </CenteredSprite>
           ))}
 
-          <CenteredSprite row={game.player.row} col={game.player.col} cellSize={cellSize} scale={TRUCK_SCALE}>
-            <EcoTruckSprite
-              facing={game.player.facing}
-              size={cellSize * TRUCK_SCALE}
-              energized={energized}
-              slowed={game.player.slowed}
-            />
+          <CenteredSprite row={game.player.row} col={game.player.col} cellSize={cellSize} scale={TRUCK_SCALE} zIndex={20}>
+            {/* Halo claro detrás del camión: sobre el mapa oscuro se encuentra de un vistazo. */}
+            <div className="h-full w-full [filter:drop-shadow(0_0_6px_rgba(255,255,255,0.85))_drop-shadow(0_0_14px_rgba(52,211,153,0.6))]">
+              <EcoTruckSprite
+                facing={game.player.facing}
+                size={cellSize * TRUCK_SCALE}
+                energized={energized}
+                slowed={game.player.slowed}
+              />
+            </div>
           </CenteredSprite>
+
+          {/* Respuestas de la pregunta: encima de botellas y nubes, debajo del camión. */}
+          {game.question?.answers
+            .filter((answer) => !answer.wrong)
+            .map((answer) => (
+              <AnswerMarker key={`${game.question!.id}-${answer.letter}`} answer={answer} cellSize={cellSize} style={pixelPos(answer.pos)} />
+            ))}
 
           {/* Tutorial: la zona que se enseña queda iluminada y el resto del mapa, oscurecido. */}
           {focus && (
@@ -619,7 +648,24 @@ function MazeCollectorSession({
             />
           )}
         </div>
+        {/* Con cámara (celular) solo se ve un pedazo del mapa: las respuestas que quedan fuera se señalan en el borde. */}
+        {cameraMode &&
+          game.question?.answers
+            .filter((answer) => !answer.wrong)
+            .map((answer) => (
+              <OffscreenAnswer
+                key={answer.letter}
+                answer={answer}
+                x={(answer.pos.col + 0.5) * cellSize - cameraX}
+                y={(answer.pos.row + 0.5) * cellSize - trimShift - cameraY}
+                width={windowWidth}
+                height={windowHeight}
+              />
+            ))}
         </div>
+        {game.answerFeedback && <AnswerToast key={game.answerFeedback.id} feedback={game.answerFeedback} />}
+      </div>
+      {game.question && questionAside && <QuestionPanel question={game.question} feedback={game.answerFeedback} layout="aside" />}
       </div>
 
       {game.lastCollected?.fact && playing && (
@@ -654,6 +700,11 @@ function MazeCollectorSession({
           <h2 className="mt-2 text-[22px] font-bold tracking-tight text-white [@media(max-height:520px)]:mt-0">¡A limpiar la ciudad!</h2>
           <p className="mx-auto mt-1.5 max-w-[400px] text-[13.5px] leading-relaxed text-slate-300">
             Recoge todas las botellas PET con el {config.collectorLabel.toLowerCase()} y esquiva las nubes de contaminación.{' '}
+            {game.question && (
+              <>
+                Lee la pregunta y <b className="text-white">maneja hasta la respuesta correcta</b>: una equivocada te quita una vida.{' '}
+              </>
+            )}
             {coarsePointer ? (
               <>
                 Muévete con la <b className="text-white">cruceta</b> o <b className="text-white">deslizando el dedo</b> sobre el mapa.
@@ -719,6 +770,11 @@ function MazeCollectorSession({
             <img src={mazeSpriteUrl('ui-star')} alt="" className="h-5 w-5" />
             Puntaje final: <b className="text-white">{game.score.toLocaleString('es')}</b>
           </p>
+          {game.question && (
+            <p className="-mt-2 mb-4 text-[13.5px] text-slate-300">
+              Preguntas acertadas: <b className="text-white">{game.answeredCorrect}</b>
+            </p>
+          )}
           <button
             type="button"
             className="rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2.5 text-[14px] font-bold text-white"
@@ -744,25 +800,146 @@ function MazeCollectorSession({
   )
 }
 
+/** Una respuesta en el mapa: la letra en una ficha de su color, con un pulso para que se vea entre las calles. */
+function AnswerMarker({ answer, cellSize, style }: { answer: MazeAnswer; cellSize: number; style: { left: number; top: number } }) {
+  const color = ANSWER_COLORS[answer.letter]
+  const size = cellSize * ANSWER_SCALE
+  return (
+    <div
+      className="absolute z-10 flex items-center justify-center"
+      style={{ ...style, width: cellSize, height: cellSize }}
+      aria-label={`Respuesta ${answer.letter}: ${answer.text}`}
+      data-answer={answer.letter}
+    >
+      <span
+        aria-hidden="true"
+        className="absolute animate-ping rounded-full opacity-40 motion-reduce:animate-none"
+        style={{ width: size * 0.9, height: size * 0.9, background: color }}
+      />
+      <span
+        className="relative flex items-center justify-center rounded-full border-2 border-white font-black text-slate-950 shadow-[0_4px_12px_rgba(0,0,0,0.6)]"
+        style={{ width: size, height: size, background: color, fontSize: Math.max(11, size * 0.55) }}
+      >
+        {answer.letter}
+      </span>
+    </div>
+  )
+}
+
+/** La pregunta en curso y sus respuestas (las equivocadas quedan tachadas). */
+function QuestionPanel({ question, feedback, layout }: { question: ActiveQuestion; feedback: AnswerFeedback | null; layout: 'aside' | 'bar' }) {
+  const aside = layout === 'aside'
+  return (
+    <section
+      aria-label="Pregunta"
+      aria-live="polite"
+      className={
+        aside
+          ? 'flex w-[300px] shrink-0 flex-col gap-3 overflow-y-auto border-l border-white/10 bg-slate-950/70 p-4 xl:w-[340px]'
+          : 'z-10 mx-1.5 mt-1.5 shrink-0 rounded-2xl border border-white/10 bg-slate-950/80 px-3 py-2 sm:mx-2 sm:mt-2 [@media(max-height:520px)]:py-1'
+      }
+    >
+      <p
+        key={question.id}
+        className={`flex items-start gap-2 font-bold text-white animate-[fade-in-up_0.35s_ease-out] ${aside ? 'text-[17px] leading-snug' : 'text-[14px] leading-tight sm:text-[15px]'}`}
+      >
+        <CircleHelp className={`shrink-0 text-emerald-300 ${aside ? 'mt-0.5 h-5 w-5' : 'h-4 w-4'}`} aria-hidden="true" />
+        <span>{question.question}</span>
+      </p>
+      <ul className={aside ? 'flex flex-col gap-2' : 'mt-1.5 grid grid-cols-2 gap-x-2 gap-y-1 [@media(max-height:520px)]:mt-1 [@media(max-height:520px)]:grid-cols-4'}>
+        {question.answers.map((answer) => {
+          const missed = answer.wrong
+          const flash = feedback?.letter === answer.letter && feedback.kind === 'wrong'
+          return (
+            <li
+              key={answer.letter}
+              className={`flex items-center gap-2 rounded-xl ${aside ? 'bg-white/5 px-2.5 py-2 text-[14px]' : 'text-[12.5px] sm:text-[13px]'} ${missed ? 'text-slate-500 line-through' : 'text-slate-100'} ${flash ? 'animate-[maze-answer-shake_0.4s_ease-in-out]' : ''}`}
+            >
+              <span
+                className={`flex shrink-0 items-center justify-center rounded-full font-black text-slate-950 ${aside ? 'h-7 w-7 text-[14px]' : 'h-5 w-5 text-[11px]'}`}
+                style={{ background: missed ? '#475569' : ANSWER_COLORS[answer.letter] }}
+              >
+                {answer.letter}
+              </span>
+              <span className="min-w-0 leading-tight">{answer.text}</span>
+            </li>
+          )
+        })}
+      </ul>
+      {aside && <p className="mt-auto text-[12px] leading-snug text-slate-400">Maneja hasta la letra de la respuesta correcta. Si te equivocas, pierdes una vida.</p>}
+    </section>
+  )
+}
+
+/** Ficha en el borde de la ventana que apunta hacia una respuesta fuera de la vista (solo con cámara). */
+function OffscreenAnswer({ answer, x, y, width, height }: { answer: MazeAnswer; x: number; y: number; width: number; height: number }) {
+  const margin = 18
+  if (x >= 0 && x <= width && y >= 0 && y <= height) return null
+  const clampedX = Math.min(width - margin, Math.max(margin, x))
+  const clampedY = Math.min(height - margin, Math.max(margin, y))
+  const angle = (Math.atan2(y - clampedY, x - clampedX) * 180) / Math.PI
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute z-30 flex h-8 w-8 items-center justify-center"
+      style={{ left: clampedX - 16, top: clampedY - 16 }}
+    >
+      <ArrowRight className="absolute h-8 w-8 drop-shadow" style={{ transform: `rotate(${angle}deg) translateX(14px)`, color: ANSWER_COLORS[answer.letter] }} strokeWidth={3} />
+      <span
+        className="relative flex h-6 w-6 items-center justify-center rounded-full border-2 border-white text-[12px] font-black text-slate-950 shadow"
+        style={{ background: ANSWER_COLORS[answer.letter] }}
+      >
+        {answer.letter}
+      </span>
+    </div>
+  )
+}
+
+/** Aviso corto al tocar una respuesta. */
+function AnswerToast({ feedback }: { feedback: AnswerFeedback }) {
+  const [visible, setVisible] = useState(true)
+  useEffect(() => {
+    const timer = window.setTimeout(() => setVisible(false), 1600)
+    return () => window.clearTimeout(timer)
+  }, [])
+  if (!visible) return null
+  const correct = feedback.kind === 'correct'
+  return (
+    <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center">
+      <p
+        role="status"
+        className={`animate-[maze-levelup-pop_0.35s_cubic-bezier(0.16,1,0.3,1)] rounded-3xl border-2 px-6 py-3 text-center text-[20px] font-black text-white shadow-2xl ${
+          correct ? 'border-emerald-300 bg-emerald-600/95' : 'border-rose-300 bg-rose-600/95'
+        }`}
+      >
+        {correct ? '¡Correcto! +200' : `¡Incorrecto! La ${feedback.letter} no era`}
+        {!correct && <span className="block text-[13px] font-semibold text-rose-100">Pierdes una vida</span>}
+      </p>
+    </div>
+  )
+}
+
 /** Centra un sprite más grande que su celda sobre la posición interpolada que da el motor. */
 function CenteredSprite({
   row,
   col,
   cellSize,
   scale,
+  zIndex,
   children,
 }: {
   row: number
   col: number
   cellSize: number
   scale: number
+  zIndex?: number
   children: ReactNode
 }) {
   const offset = (cellSize * (scale - 1)) / 2
   return (
     <div
       className="absolute left-0 top-0"
-      style={{ transform: `translate3d(${col * cellSize - offset}px, ${row * cellSize - offset}px, 0)` }}
+      style={{ transform: `translate3d(${col * cellSize - offset}px, ${row * cellSize - offset}px, 0)`, zIndex }}
     >
       {children}
     </div>

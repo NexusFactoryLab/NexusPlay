@@ -4,8 +4,9 @@ import type { MazeCollectorConfig, MazeCollectorItem } from '../mazeCollectorTyp
 import type { MazeScenario } from '../useMazeCollectorGame'
 import { TutorialRunner } from './TutorialRunner'
 import type { TutorialPart } from './TutorialRunner'
-import { ArtTruckBottles, ArtTruckCloud, ArtTruckDrive, ArtTruckPower } from './tutorialArt'
-import { Flag, MousePointerClick, Navigation, Shield, Sparkles, Target, Zap } from 'lucide-react'
+import { ArtTruckBottles, ArtTruckCloud, ArtTruckDrive, ArtTruckPower, ArtTruckQuestion } from './tutorialArt'
+import { SUSTAINABLE_CITY_QUESTIONS } from '../mazeCollectorQuestions'
+import { CircleHelp, Flag, Heart, MousePointerClick, Navigation, Shield, Sparkles, Target, Zap } from 'lucide-react'
 
 /** Zonas de la Ciudad Sostenible (en celdas del mapa real) donde ocurre cada parte. */
 const NORTH = { row: 1, col: 0, rows: 6, cols: 11 }
@@ -15,7 +16,8 @@ const pet = (row: number, col: number) => ({ pos: { row, col }, kind: 'PET' as c
 /**
  * Tutorial del Camión Reciclador sobre el juego de verdad: la misma ciudad,
  * el mismo camión y las mismas nubes, en cuatro partes (manejar, recoger,
- * esquivar y purificar). La cámara se acerca a la zona de cada parte.
+ * esquivar, purificar y responder una pregunta). La cámara se acerca a la
+ * zona de cada parte.
  */
 export function MazeCollectorTutorial({
   title,
@@ -47,7 +49,12 @@ export function MazeCollectorTutorial({
             focus,
             active: context.active,
             onDone: context.onDone,
-            onCaught: () => context.onMistake('¡La nube te alcanzó! En el juego perderías una vida. Vuelves a empezar esta parte.'),
+            onCaught: () =>
+              context.onMistake(
+                scenario.objective === 'answer'
+                  ? 'Esa no era la respuesta. En el juego perderías una vida. Vuelves a empezar esta parte.'
+                  : '¡La nube te alcanzó! En el juego perderías una vida. Vuelves a empezar esta parte.',
+              ),
           }}
         />
       )
@@ -105,7 +112,31 @@ export function MazeCollectorTutorial({
         { icon: <Sparkles className="h-4 w-4" />, tone: 'emerald', text: <>Con las nubes <b className="text-white">asustadas (azules)</b>, tócalas: ¡puntos extra!</> },
       ],
       render: scene(
-        { playerStart: { row: 6, col: 0 }, pickups: [{ pos: { row: 1, col: 0 }, kind: 'POWER' }], ghostSpawns: [{ row: 1, col: 6 }], ghostPersonality: 'PATROLLER', objective: 'catch' },
+        { playerStart: { row: 6, col: 0 }, pickups: [{ pos: { row: 1, col: 0 }, kind: 'POWER' }], ghostSpawns: [{ row: 1, col: 6 }], ghostPersonality: 'PATROLLER', objective: 'catch', purifier: { area: NORTH } },
+        NORTH,
+      ),
+    },
+    {
+      title: 'Responde la pregunta',
+      task: 'Lee la pregunta y maneja hasta la letra de la respuesta correcta.',
+      explain:
+        'En el juego sale una pregunta y sus respuestas quedan repartidas por el mapa, cada una con su letra. Maneja hasta la correcta: suma puntos y sale otra pregunta. Si llegas a una equivocada, pierdes una vida.',
+      success: '¡Correcto! Así se responden las preguntas.',
+      art: <ArtTruckQuestion />,
+      points: [
+        { icon: <CircleHelp className="h-4 w-4" />, tone: 'cyan', text: <>La <b className="text-white">pregunta</b> sale arriba, con sus respuestas <b className="text-white">A, B, C, D</b>.</> },
+        { icon: <Target className="h-4 w-4" />, tone: 'emerald', text: <>Maneja hasta la <b className="text-white">letra correcta</b> en el mapa.</> },
+        { icon: <Heart className="h-4 w-4" />, tone: 'rose', text: <>Una respuesta <b className="text-white">equivocada</b> te quita una vida.</> },
+      ],
+      render: scene(
+        {
+          playerStart: { row: 6, col: 0 },
+          pickups: [],
+          ghostSpawns: [],
+          objective: 'answer',
+          // La correcta (A) queda por la calle de arriba; las otras, por los caminos de abajo y del lado.
+          question: { question: SUSTAINABLE_CITY_QUESTIONS[0], positions: [{ row: 1, col: 5 }, { row: 6, col: 9 }, { row: 3, col: 5 }, { row: 1, col: 9 }] },
+        },
         NORTH,
       ),
     },

@@ -8,6 +8,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  CircleHelp,
   Footprints,
   Heart,
   Lightbulb,
@@ -21,6 +22,8 @@ import {
 import { FitScale } from './true-false-maze/FitScale'
 import { SpriteStrip, mazeSpriteUrl } from './mazeSpriteStrip'
 import { COMBO_POINTS, POINTS_BONUS, POINTS_PET, POWER_MODE_MS } from './mazeEngine'
+import { POINTS_ANSWER } from './useMazeCollectorGame'
+import { ArtTruckQuestion } from './tutorial/tutorialArt'
 import './true-false-maze/trueFalseMazeGuide.css'
 import './mazeCollectorGuide.css'
 
@@ -425,6 +428,24 @@ const STEPS: Step[] = [
         </Item>
         <Item icon={<Check className="h-4 w-4" strokeWidth={3} />} tone="teal">
           <b className="text-white">Cuando no quede ninguna, subes de nivel</b> y la ciudad se llena otra vez… con nubes más rápidas.
+        </Item>
+      </ul>
+    ),
+  },
+  {
+    id: 'preguntas',
+    title: 'Responde las preguntas',
+    art: <ArtTruckQuestion />,
+    body: (
+      <ul className="flex flex-col gap-2.5">
+        <Item icon={<CircleHelp className="h-4 w-4" />} tone="sky">
+          <b className="text-white">Sale una pregunta</b> y sus respuestas quedan repartidas por el mapa, cada una con su letra: <b className="text-white">A, B, C, D</b>.
+        </Item>
+        <Item icon={<Check className="h-4 w-4" strokeWidth={3} />} tone="emerald">
+          <b className="text-white">Maneja hasta la respuesta correcta:</b> +{POINTS_ANSWER} puntos y sale otra pregunta.
+        </Item>
+        <Item icon={<Heart className="h-4 w-4" />} tone="rose">
+          <b className="text-white">Si llegas a una equivocada, pierdes una vida</b> y esa respuesta desaparece. ¡Lee bien antes de ir!
         </Item>
       </ul>
     ),
