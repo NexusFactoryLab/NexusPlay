@@ -1,11 +1,19 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react'
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, BookOpen, LogOut, Maximize, Minimize, Pause, Play, X, Zap } from 'lucide-react'
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, BookOpen, CircleHelp, LogOut, Maximize, Minimize, Pause, Play, X, Zap } from 'lucide-react'
 import type { MazeCollectorConfig, MazeCollectorItem, MazeLayoutDef, CellPosition } from './mazeCollectorTypes'
 import { iconForConcept } from './mazeCollectorTypes'
 import { POWER_MODE_MS } from './mazeEngine'
-import { useMazeCollectorGame } from './useMazeCollectorGame'
-import type { Direction, MazeScenario } from './useMazeCollectorGame'
+import {
+  ANSWER_FEEDBACK_MS,
+  DEFAULT_ROUNDS,
+  EXTRA_CLOUD_EVERY_MS,
+  QUESTION_TIME_MS,
+  ROUND_OPTIONS,
+  useMazeCollectorGame,
+} from './useMazeCollectorGame'
+import type { ActiveQuestion, AnswerFeedback, Direction, MazeAnswer, MazeScenario } from './useMazeCollectorGame'
+import type { MazeQuestion } from './mazeCollectorQuestions'
 import { EcoTruckSprite } from './EcoTruckSprite'
 import { PollutionGhostSprite } from './PollutionGhostSprite'
 import { BonusSprite, PetSprite, PowerPelletSprite, TrashBagSprite } from './mazeCollectibleSprites'
@@ -14,6 +22,8 @@ import { SpriteStrip, mazeSpriteUrl } from './mazeSpriteStrip'
 import { MazeCollectorGuide } from './MazeCollectorGuide'
 import { MazeCollectorTutorial } from './tutorial/MazeCollectorTutorial'
 import { ConfettiBurst } from '../../kids/ConfettiBurst'
+import { CartoonClock } from './CartoonClock'
+import { isDarkTheme, useTheme } from '../../../hooks/useTheme'
 
 /**
  * Una parte del tutorial jugable (issue #93): la misma ciudad y el mismo
@@ -40,6 +50,8 @@ type MazeCollectorGameProps = {
   onExit: () => void
   /** Si viene, se juega una parte del tutorial (sin guía, sin pantalla de inicio ni de fin). */
   tutorial?: MazeTutorialPart
+  /** Preguntas de opción múltiple (issue #103): sus respuestas se reparten por el mapa. */
+  questions?: MazeQuestion[]
 }
 
 /** Celda mínima: por debajo de esto los sprites dejan de leerse (en ese caso el tablero se desplaza). */
@@ -52,7 +64,7 @@ const MAX_CELL_SIZE = 96
  * camión. Un mapa de 27x15 celdas en 390 px de ancho sería un mar de puntitos.
  */
 const CAMERA_FIT_THRESHOLD = 26
-const CAMERA_CELL_SIZE = 32
+const CAMERA_CELL_SIZE = 40
 /** Tutorial: tope de la celda al acercar la cámara a la zona que se enseña. */
 const FOCUS_MAX_CELL_SIZE = 64
 /** Cuánto hay que arrastrar el dedo sobre el mapa para que cuente como un giro. */
@@ -64,9 +76,16 @@ const DOCK_HEIGHT = 176
  * carril; las botellas van más chicas para que la vista se quede en el camión.
  */
 const TRUCK_SCALE = 2
-const GHOST_SCALE = 1.2
-const PET_SCALE = 0.55
-const POWER_SCALE = 0.9
+const GHOST_SCALE = 1.35
+const PET_SCALE = 0.62
+const POWER_SCALE = 1
+const ANSWER_SCALE = 0.95
+/** Pausa corta tras cerrar la pregunta para ubicarse en el mapa. */
+const LOCATE_MS = 1500
+/** Botellas más claras y sin tanto brillo: se leen sin competir con el camión ni con las respuestas. */
+const PET_FILTER = 'saturate(0.5) brightness(1.15) contrast(0.85)'
+/** Color de cada letra de respuesta, igual en el mapa y en el panel de la pregunta. */
+const ANSWER_COLORS: Record<string, string> = { A: '#f59e0b', B: '#38bdf8', C: '#f472b6', D: '#a78bfa' }
 const BAG_SCALE = 0.8
 const BONUS_SCALE = 1
 const FULLSCREEN_PREF_KEY = 'nexusplay-maze-collector-fullscreen'
@@ -145,6 +164,8 @@ export function MazeCollectorGame(props: MazeCollectorGameProps) {
   // empieza una partida nueva (la sesión se vuelve a montar con otra clave).
   const [inTutorial, setInTutorial] = useState(false)
   const [round, setRound] = useState(0)
+  // Rondas elegidas en la pantalla de inicio: se recuerdan al jugar otra vez.
+  const [rounds, setRounds] = useState<number>(DEFAULT_ROUNDS)
   if (inTutorial) {
     return (
       <MazeCollectorTutorial
@@ -171,6 +192,9 @@ export function MazeCollectorGame(props: MazeCollectorGameProps) {
       onOpenGuide={() => !props.tutorial && setGuideOpen(true)}
       onCloseGuide={() => setGuideOpen(false)}
       onStartTutorial={props.tutorial ? undefined : () => setInTutorial(true)}
+      rounds={rounds}
+      onRoundsChange={setRounds}
+      onPlayAgain={() => setRound((value) => value + 1)}
     />
   )
 }
@@ -183,13 +207,32 @@ function MazeCollectorSession({
   config,
   onExit,
   tutorial,
+  questions,
   guideOpen,
   onOpenGuide,
   onCloseGuide,
   onStartTutorial,
-}: MazeCollectorGameProps & { guideOpen: boolean; onOpenGuide: () => void; onCloseGuide: () => void; onStartTutorial?: () => void }) {
+  rounds,
+  onRoundsChange,
+  onPlayAgain,
+}: MazeCollectorGameProps & {
+  guideOpen: boolean
+  onOpenGuide: () => void
+  onCloseGuide: () => void
+  onStartTutorial?: () => void
+  rounds: number
+  onRoundsChange: (rounds: number) => void
+  onPlayAgain: () => void
+}) {
   // En el tutorial, mientras se lee la instrucción el camión no responde.
-  const game = useMazeCollectorGame({ layout, items, config, inputEnabled: !guideOpen && (tutorial?.active ?? true), scenario: tutorial?.scenario })
+  const game = useMazeCollectorGame({
+    layout,
+    items,
+    config,
+    inputEnabled: !guideOpen && (tutorial?.active ?? true),
+    scenario: tutorial?.scenario,
+    questions,
+  })
   const focus = tutorial?.focus
   const isCity = config.layout === 'CITY'
   // En Ciudad, la primera y la última fila son franjas verdes decorativas: se
@@ -215,6 +258,14 @@ function MazeCollectorSession({
   const portrait = useMediaQuery('(orientation: portrait)')
   // En vertical la cruceta tiene su propia franja (no tapa el mapa); en horizontal flota sobre él.
   const dock = coarsePointer && portrait
+  // Pantalla ancha: la pregunta va en una columna al lado del mapa (el mapa ya está limitado por el alto,
+  // así ese ancho sobra). En pantallas angostas va en una franja arriba del mapa.
+  const questionAside = useMediaQuery('(min-width: 1000px) and (min-aspect-ratio: 4/3)')
+  // Con la columna de la pregunta, vidas, puntos y reloj se muestran en ella (no en el encabezado).
+  const statsAside = Boolean(game.question) && questionAside
+  // Borde del mapa según el tema: blanco suave en los oscuros, negro en los claros (nada de verde chillón).
+  const { theme } = useTheme()
+  const mapBorder = isDarkTheme(theme) ? 'rgba(255,255,255,0.6)' : '#000000'
 
   function enterFullscreen() {
     const root = rootRef.current
@@ -273,11 +324,51 @@ function MazeCollectorSession({
     return () => observer.disconnect()
   }, [layout.cols, layout.rows, trimmedRows, focus?.row, focus?.col, focus?.rows, focus?.cols])
 
-  const { pause, resume } = game
+  const { pause, resume, setRounds } = game
+  // Las rondas se fijan antes de empezar (en el tutorial no aplican: no se pasa de ronda).
+  useEffect(() => {
+    if (!tutorial) setRounds(rounds)
+  }, [rounds, setRounds, tutorial])
   // Abrir la guía a mitad de partida pausa el juego.
   useEffect(() => {
     if (guideOpen) pause()
   }, [guideOpen, pause])
+
+  // Cada pregunta nueva sale primero en grande con el juego en pausa (como en el
+  // Laberinto V/F): se lee tranquilo y recién después se sale a buscar la respuesta.
+  const [seenQuestionId, setSeenQuestionId] = useState<number | null>(null)
+  // Tras acertar, primero se ve el «¡Correcto!» y después la pregunta nueva.
+  const questionIntro =
+    game.question && game.phase === 'playing' && !game.feedbackActive && game.question.id !== seenQuestionId ? game.question : null
+  const introId = questionIntro?.id
+  useEffect(() => {
+    if (introId !== undefined) pause()
+  }, [introId, pause])
+
+  // Al cerrar la pregunta el juego espera un momento quieto para que el jugador
+  // encuentre su camión y las letras antes de que todo se mueva.
+  const [locating, setLocating] = useState(false)
+  useEffect(() => {
+    if (!locating) return
+    const timer = window.setTimeout(() => setLocating(false), LOCATE_MS)
+    return () => window.clearTimeout(timer)
+  }, [locating])
+
+  // Cada nube extra que llega se anuncia: si no, se confunde con las de siempre.
+  const [cloudAlert, setCloudAlert] = useState(0)
+  const previousExtras = useRef(game.extraClouds)
+  useEffect(() => {
+    if (game.extraClouds > previousExtras.current) setCloudAlert((value) => value + 1)
+    previousExtras.current = game.extraClouds
+  }, [game.extraClouds])
+
+  function startSearching() {
+    if (!game.question) return
+    setSeenQuestionId(game.question.id)
+    resume()
+    game.hold(LOCATE_MS)
+    setLocating(true)
+  }
 
   useEffect(() => {
     const onChange = () => {
@@ -301,9 +392,9 @@ function MazeCollectorSession({
   )
 
   // El manejador de teclas vive entre renders: lee siempre la versión más reciente.
-  const keysRef = useRef({ toggleFullscreen, enterFullscreen, phase: game.phase, paused: game.paused, wantFullscreen })
+  const keysRef = useRef({ toggleFullscreen, enterFullscreen, phase: game.phase, paused: game.paused, wantFullscreen, intro: false })
   useEffect(() => {
-    keysRef.current = { toggleFullscreen, enterFullscreen, phase: game.phase, paused: game.paused, wantFullscreen }
+    keysRef.current = { toggleFullscreen, enterFullscreen, phase: game.phase, paused: game.paused, wantFullscreen, intro: Boolean(questionIntro) }
   })
   useEffect(() => {
     if (guideOpen) return
@@ -313,6 +404,8 @@ function MazeCollectorSession({
       if (event.key === 'f' || event.key === 'F') {
         keys.toggleFullscreen()
       } else if (event.key === 'p' || event.key === 'P' || event.key === 'Escape') {
+        // Con la pregunta en pantalla la pausa no se quita con P/Esc: se sale con «¡A buscarla!».
+        if (keys.intro) return
         if (keys.paused) resume()
         else pause()
       } else if (keys.phase === 'ready' && keys.wantFullscreen && event.key.startsWith('Arrow')) {
@@ -382,7 +475,7 @@ function MazeCollectorSession({
   return (
     <div
       ref={rootRef}
-      className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-[#1c2733] text-slate-100"
+      className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-[#0d141d] text-slate-100"
       style={{
         paddingTop: 'env(safe-area-inset-top)',
         paddingBottom: 'env(safe-area-inset-bottom)',
@@ -411,13 +504,15 @@ function MazeCollectorSession({
               <span className="truncate">{title}</span>
             </p>
           )}
-          <div className="flex items-center gap-0.5" aria-label={`Vidas: ${game.lives}`}>
-            {Array.from({ length: Math.max(0, game.lives) }, (_, index) => (
-              <img key={index} src={mazeSpriteUrl('ui-life')} alt="" className="h-5 w-5 sm:h-6 sm:w-6" />
-            ))}
-          </div>
+          {!statsAside && (
+            <div className="flex items-center gap-0.5" aria-label={`Vidas: ${game.lives}`}>
+              {Array.from({ length: Math.max(0, game.lives) }, (_, index) => (
+                <img key={index} src={mazeSpriteUrl('ui-life')} alt="" className="h-5 w-5 sm:h-6 sm:w-6" />
+              ))}
+            </div>
+          )}
           <span className="max-[400px]:hidden">
-            <Stat label="Nivel" value={String(game.level)} />
+            <Stat label="Ronda" value={tutorial ? String(game.level) : `${game.level}/${game.targetRounds}`} />
           </span>
           <span className="flex items-center gap-1.5">
             <span className="max-[420px]:hidden">
@@ -425,10 +520,12 @@ function MazeCollectorSession({
             </span>
             <Stat label="PET" value={`${game.collectedPet}/${game.totalPet}`} />
           </span>
-          <span className="flex items-center gap-1.5 sm:ml-auto">
-            <img src={mazeSpriteUrl('ui-star')} alt="" className="h-5 w-5 sm:h-6 sm:w-6" />
-            <Stat label="Puntos" value={game.score.toLocaleString('es')} />
-          </span>
+          {!statsAside && (
+            <span className="flex items-center gap-1.5 sm:ml-auto">
+              <img src={mazeSpriteUrl('ui-star')} alt="" className="h-5 w-5 sm:h-6 sm:w-6" />
+              <Stat label="Puntos" value={game.score.toLocaleString('es')} />
+            </span>
+          )}
         </div>
 
         <button
@@ -465,9 +562,13 @@ function MazeCollectorSession({
         )}
       </header>
 
+      <div className={`relative flex min-h-0 flex-1 ${questionAside ? 'flex-row' : 'flex-col'}`}>
+      {game.question && !questionAside && (
+        <QuestionPanel question={game.question} feedback={game.answerFeedback} remainingMs={game.questionRemainingMs} layout="bar" />
+      )}
       <div
         ref={stageRef}
-        className={`relative min-h-0 flex-1 p-1.5 sm:p-2 ${cameraMode ? 'overflow-hidden' : 'overflow-auto'} ${coarsePointer ? 'touch-none select-none' : ''}`}
+        className={`relative min-h-0 min-w-0 flex-1 p-1.5 sm:p-2 ${cameraMode ? 'overflow-hidden' : 'overflow-auto'} ${coarsePointer ? 'touch-none select-none' : ''}`}
         onPointerDown={coarsePointer ? handleSwipeDown : undefined}
         onPointerMove={coarsePointer ? handleSwipeMove : undefined}
         onPointerUp={coarsePointer ? () => (swipeStart.current = null) : undefined}
@@ -492,7 +593,7 @@ function MazeCollectorSession({
             width: windowWidth,
             height: windowHeight,
             marginTop: cameraMode ? Math.max(0, (view.height - windowHeight) / 2) : undefined,
-            outline: `2px solid ${isCity ? '#2ecc71' : primaryColor}`,
+            outline: `2px solid ${mapBorder}`,
           }}
         >
         <div
@@ -543,7 +644,7 @@ function MazeCollectorSession({
                       </div>
                     )
                   }
-                  return <div key={key} className="bg-[#3a4b5f]" />
+                  return <div key={key} className="bg-[#18212c]" />
                 }),
               )}
             </div>
@@ -554,7 +655,13 @@ function MazeCollectorSession({
             const { left, top } = pixelPos(pickup.pos)
             return (
               <div key={pickup.id} className="absolute flex items-center justify-center" style={{ left, top, width: cellSize, height: cellSize }}>
-                {pickup.kind === 'PET' ? <PetSprite size={cellSize * PET_SCALE} /> : <PowerPelletSprite size={cellSize * POWER_SCALE} />}
+                {pickup.kind === 'PET' ? (
+                  <span className="flex" style={{ filter: PET_FILTER }}>
+                    <PetSprite size={cellSize * PET_SCALE} />
+                  </span>
+                ) : (
+                  <PowerPelletSprite size={cellSize * POWER_SCALE} />
+                )}
               </div>
             )
           })}
@@ -584,25 +691,47 @@ function MazeCollectorSession({
 
           {/* Capa 3: entidades vivas — posición interpolada por el motor cada frame. */}
           {game.ghosts.map((ghost) => (
-            <CenteredSprite key={ghost.id} row={ghost.row} col={ghost.col} cellSize={cellSize} scale={GHOST_SCALE}>
-              <PollutionGhostSprite
-                personality={ghost.personality}
-                mode={ghost.mode}
-                facing={ghost.facing}
-                size={cellSize * GHOST_SCALE}
-                warning={energyWarning}
-              />
+            <CenteredSprite key={ghost.id} cloudId={ghost.id} row={ghost.row} col={ghost.col} cellSize={cellSize} scale={GHOST_SCALE}>
+              {/* Las nubes extra (por demorarse en responder) llegan con un "puf" y un brillo rojo. */}
+              <div
+                className={ghost.id.startsWith('extra-') ? 'animate-[maze-cloud-arrive_0.9s_ease-out] [filter:drop-shadow(0_0_8px_rgba(244,63,94,0.85))]' : undefined}
+              >
+                <PollutionGhostSprite
+                  personality={ghost.personality}
+                  mode={ghost.mode}
+                  facing={ghost.facing}
+                  size={cellSize * GHOST_SCALE}
+                  warning={energyWarning}
+                />
+              </div>
             </CenteredSprite>
           ))}
 
-          <CenteredSprite row={game.player.row} col={game.player.col} cellSize={cellSize} scale={TRUCK_SCALE}>
-            <EcoTruckSprite
-              facing={game.player.facing}
-              size={cellSize * TRUCK_SCALE}
-              energized={energized}
-              slowed={game.player.slowed}
-            />
+          <CenteredSprite row={game.player.row} col={game.player.col} cellSize={cellSize} scale={TRUCK_SCALE} zIndex={20}>
+            {/* Mientras se ubica, un aro late alrededor del camión. */}
+            {locating && (
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-[-25%] animate-ping rounded-full border-4 border-amber-300 motion-reduce:animate-none"
+              />
+            )}
+            {/* Halo claro detrás del camión: sobre el mapa oscuro se encuentra de un vistazo. */}
+            <div className="h-full w-full [filter:drop-shadow(0_0_7px_rgba(255,255,255,0.95))_drop-shadow(0_0_16px_rgba(52,211,153,0.75))]">
+              <EcoTruckSprite
+                facing={game.player.facing}
+                size={cellSize * TRUCK_SCALE}
+                energized={energized}
+                slowed={game.player.slowed}
+              />
+            </div>
           </CenteredSprite>
+
+          {/* Respuestas de la pregunta: encima de botellas y nubes, debajo del camión. */}
+          {game.question?.answers
+            .filter((answer) => !answer.wrong)
+            .map((answer) => (
+              <AnswerMarker key={`${game.question!.id}-${answer.letter}`} answer={answer} cellSize={cellSize} style={pixelPos(answer.pos)} />
+            ))}
 
           {/* Tutorial: la zona que se enseña queda iluminada y el resto del mapa, oscurecido. */}
           {focus && (
@@ -619,7 +748,39 @@ function MazeCollectorSession({
             />
           )}
         </div>
+        {/* Con cámara (celular) solo se ve un pedazo del mapa: las respuestas que quedan fuera se señalan en el borde. */}
+        {cameraMode &&
+          game.question?.answers
+            .filter((answer) => !answer.wrong)
+            .map((answer) => (
+              <OffscreenAnswer
+                key={answer.letter}
+                answer={answer}
+                x={(answer.pos.col + 0.5) * cellSize - cameraX}
+                y={(answer.pos.row + 0.5) * cellSize - trimShift - cameraY}
+                width={windowWidth}
+                height={windowHeight}
+              />
+            ))}
         </div>
+        {game.answerFeedback && <AnswerToast key={game.answerFeedback.id} feedback={game.answerFeedback} />}
+        {cloudAlert > 0 && <CloudAlert key={cloudAlert} />}
+        {locating && (
+          <p
+            role="status"
+            className="pointer-events-none absolute left-1/2 top-4 z-40 -translate-x-1/2 rounded-full border-2 border-amber-300 bg-slate-950/90 px-5 py-2 text-[16px] font-black text-amber-200 shadow-xl"
+          >
+            ¡Ubícate! Busca tu camión y las letras
+          </p>
+        )}
+      </div>
+      {game.question && questionAside && (
+        // Dos recuadros separados: la pregunta arriba (donde va la atención) y el estado de la partida abajo.
+        <aside className="flex w-[300px] shrink-0 flex-col gap-3 overflow-y-auto border-l border-white/10 bg-slate-950/50 p-3 xl:w-[340px]">
+          <QuestionPanel question={game.question} feedback={game.answerFeedback} remainingMs={game.questionRemainingMs} layout="aside" />
+          <GameStatusCard lives={game.lives} score={game.score} remainingMs={game.questionRemainingMs} />
+        </aside>
+      )}
       </div>
 
       {game.lastCollected?.fact && playing && (
@@ -653,7 +814,12 @@ function MazeCollectorSession({
           </div>
           <h2 className="mt-2 text-[22px] font-bold tracking-tight text-white [@media(max-height:520px)]:mt-0">¡A limpiar la ciudad!</h2>
           <p className="mx-auto mt-1.5 max-w-[400px] text-[13.5px] leading-relaxed text-slate-300">
-            Recoge todas las botellas PET con el {config.collectorLabel.toLowerCase()} y esquiva las nubes de contaminación.{' '}
+            Para salvar la ciudad, <b className="text-white">recoge todas las botellas PET</b> con el {config.collectorLabel.toLowerCase()} y esquiva las nubes de contaminación.{' '}
+            {game.question && (
+              <>
+                Lee la pregunta y <b className="text-white">maneja hasta la respuesta correcta</b> antes de que se acabe el tiempo: una equivocada te quita una vida.{' '}
+              </>
+            )}
             {coarsePointer ? (
               <>
                 Muévete con la <b className="text-white">cruceta</b> o <b className="text-white">deslizando el dedo</b> sobre el mapa.
@@ -664,6 +830,7 @@ function MazeCollectorSession({
               </>
             )}
           </p>
+          <RoundPicker value={rounds} onChange={onRoundsChange} />
           {canFullscreen && !compact && (
             <FullscreenChoice wanted={wantFullscreen} active={fullscreen} onChange={chooseFullscreen} />
           )}
@@ -706,8 +873,11 @@ function MazeCollectorSession({
       {game.phase === 'levelup' && (
         <Overlay celebrate>
           <img src={mazeSpriteUrl('ui-trophy')} alt="" className="mx-auto h-20 w-20 animate-[maze-levelup-pop_0.4s_cubic-bezier(0.16,1,0.3,1)]" />
-          <h2 className="mt-1 text-[22px] font-bold text-white">¡Ciudad limpia!</h2>
-          <p className="text-[14px] text-slate-300">Nivel {game.level + 1} — las nubes vienen más rápido…</p>
+          <h2 className="mt-1 text-[22px] font-bold text-white">¡Ronda {game.level} superada!</h2>
+          <p className="text-[14px] text-slate-300">
+            {game.targetRounds - game.level === 1 ? 'Falta 1 ronda' : `Faltan ${game.targetRounds - game.level} rondas`} para salvar la ciudad — las nubes vienen más
+            rápido…
+          </p>
         </Overlay>
       )}
 
@@ -719,17 +889,40 @@ function MazeCollectorSession({
             <img src={mazeSpriteUrl('ui-star')} alt="" className="h-5 w-5" />
             Puntaje final: <b className="text-white">{game.score.toLocaleString('es')}</b>
           </p>
-          <button
-            type="button"
-            className="rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2.5 text-[14px] font-bold text-white"
-            onClick={onExit}
-          >
-            Salir
-          </button>
+          {game.question && (
+            <p className="-mt-2 mb-4 text-[13.5px] text-slate-300">
+              Preguntas acertadas: <b className="text-white">{game.answeredCorrect}</b>
+            </p>
+          )}
+          <EndButtons onPlayAgain={onPlayAgain} onExit={onExit} />
         </Overlay>
       )}
 
-      {game.paused && !guideOpen && (
+      {game.phase === 'won' && (
+        <Overlay celebrate>
+          <img src={mazeSpriteUrl('ui-trophy')} alt="" className="mx-auto h-20 w-20 animate-[maze-levelup-pop_0.4s_cubic-bezier(0.16,1,0.3,1)]" />
+          <h2 className="mt-1 text-[24px] font-bold text-white">¡Salvaste la ciudad!</h2>
+          <p className="mt-1 text-[14px] text-slate-300">
+            Limpiaste la ciudad {game.targetRounds === 1 ? 'en 1 ronda' : `en las ${game.targetRounds} rondas`}. ¡Gracias, reciclador!
+          </p>
+          <p className="mt-3 mb-1 flex items-center justify-center gap-1.5 text-[14px] text-slate-300">
+            <img src={mazeSpriteUrl('ui-star')} alt="" className="h-5 w-5" />
+            Puntaje final: <b className="text-white">{game.score.toLocaleString('es')}</b>
+          </p>
+          {game.question && (
+            <p className="mb-4 text-[13.5px] text-slate-300">
+              Preguntas acertadas: <b className="text-white">{game.answeredCorrect}</b>
+            </p>
+          )}
+          <EndButtons onPlayAgain={onPlayAgain} onExit={onExit} />
+        </Overlay>
+      )}
+
+      {questionIntro && !guideOpen && (
+        <QuestionIntro question={questionIntro} number={game.answeredCorrect + 1} timed={!tutorial} onGo={startSearching} />
+      )}
+
+      {game.paused && !guideOpen && !questionIntro && (
         <PauseOverlay
           fullscreen={fullscreen}
           onGuide={onOpenGuide}
@@ -744,25 +937,342 @@ function MazeCollectorSession({
   )
 }
 
+/** Una respuesta en el mapa: la letra en una ficha de su color, con un pulso para que se vea entre las calles. */
+function AnswerMarker({ answer, cellSize, style }: { answer: MazeAnswer; cellSize: number; style: { left: number; top: number } }) {
+  const color = ANSWER_COLORS[answer.letter]
+  const size = cellSize * ANSWER_SCALE
+  return (
+    <div
+      className="absolute z-10 flex items-center justify-center"
+      style={{ ...style, width: cellSize, height: cellSize }}
+      aria-label={`Respuesta ${answer.letter}: ${answer.text}`}
+      data-answer={answer.letter}
+    >
+      <span
+        aria-hidden="true"
+        className="absolute animate-ping rounded-full opacity-40 motion-reduce:animate-none"
+        style={{ width: size * 0.9, height: size * 0.9, background: color }}
+      />
+      <span
+        className="relative flex items-center justify-center rounded-full border-2 border-white font-black text-slate-950 shadow-[0_4px_12px_rgba(0,0,0,0.6)]"
+        style={{ width: size, height: size, background: color, fontSize: Math.max(11, size * 0.55) }}
+      >
+        {answer.letter}
+      </span>
+    </div>
+  )
+}
+
+/** La pregunta en curso y sus respuestas (las equivocadas quedan tachadas). */
+function QuestionPanel({
+  question,
+  feedback,
+  remainingMs,
+  layout,
+}: {
+  question: ActiveQuestion
+  feedback: AnswerFeedback | null
+  /** 0 = sin reloj (tutorial). */
+  remainingMs: number
+  layout: 'aside' | 'bar'
+}) {
+  const aside = layout === 'aside'
+  return (
+    <section
+      aria-label="Pregunta"
+      aria-live="polite"
+      className={
+        aside
+          ? 'flex flex-col gap-3 rounded-2xl border border-white/15 bg-slate-900/80 p-4 shadow-[0_12px_30px_-18px_rgba(0,0,0,0.9)]'
+          : 'z-10 mx-1.5 mt-1.5 shrink-0 rounded-2xl border border-white/10 bg-slate-950/80 px-3 py-2 sm:mx-2 sm:mt-2 [@media(max-height:520px)]:py-1'
+      }
+    >
+      <p
+        key={question.id}
+        className={`flex items-start gap-2 font-bold text-white animate-[fade-in-up_0.35s_ease-out] ${aside ? 'text-[17px] leading-snug' : 'text-[14px] leading-tight sm:text-[15px]'}`}
+      >
+        <CircleHelp className={`shrink-0 text-emerald-300 ${aside ? 'mt-0.5 h-5 w-5' : 'h-4 w-4'}`} aria-hidden="true" />
+        <span className="min-w-0 flex-1">{question.question}</span>
+        {remainingMs > 0 && !aside && <QuestionClock remainingMs={remainingMs} compact />}
+      </p>
+
+      <ul className={aside ? 'flex flex-col gap-2' : 'mt-1.5 grid grid-cols-2 gap-x-2 gap-y-1 [@media(max-height:520px)]:mt-1 [@media(max-height:520px)]:grid-cols-4'}>
+        {question.answers.map((answer) => {
+          const missed = answer.wrong
+          const flash = feedback?.letter === answer.letter && feedback.kind === 'wrong'
+          return (
+            <li
+              key={answer.letter}
+              className={`flex items-center gap-2 rounded-xl ${aside ? 'bg-white/5 px-2.5 py-2 text-[14px]' : 'text-[12.5px] sm:text-[13px]'} ${missed ? 'text-slate-500 line-through' : 'text-slate-100'} ${flash ? 'animate-[maze-answer-shake_0.4s_ease-in-out]' : ''}`}
+            >
+              <span
+                className={`flex shrink-0 items-center justify-center rounded-full font-black text-slate-950 ${aside ? 'h-7 w-7 text-[14px]' : 'h-5 w-5 text-[11px]'}`}
+                style={{ background: missed ? '#475569' : ANSWER_COLORS[answer.letter] }}
+              >
+                {answer.letter}
+              </span>
+              <span className="min-w-0 leading-tight">{answer.text}</span>
+            </li>
+          )
+        })}
+      </ul>
+      {aside && <p className="text-[12px] leading-snug text-slate-400">Maneja hasta la letra de la respuesta correcta. Si te equivocas o se acaba el tiempo, pierdes una vida.</p>}
+    </section>
+  )
+}
+
+/** Cuántas rondas hay que limpiar la ciudad para salvarla (se elige antes de empezar). */
+function RoundPicker({ value, onChange }: { value: number; onChange: (rounds: number) => void }) {
+  return (
+    <div role="radiogroup" aria-label="Rondas para salvar la ciudad" className="mx-auto mt-3 max-w-[400px] rounded-2xl border border-emerald-300/30 bg-emerald-400/[0.07] p-2.5">
+      <p className="text-[13px] font-bold text-white">¿Cuántas rondas para salvar la ciudad?</p>
+      <div className="mt-2 flex justify-center gap-2">
+        {ROUND_OPTIONS.map((option) => {
+          const selected = option === value
+          return (
+            <button
+              key={option}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              className={`h-10 min-w-12 rounded-xl border px-3 text-[16px] font-black transition-colors ${
+                selected ? 'border-emerald-300 bg-emerald-500 text-white shadow-[0_0_16px_-4px_rgba(52,211,153,0.9)]' : 'border-white/15 bg-white/5 text-slate-200 hover:bg-white/10'
+              }`}
+              onClick={() => onChange(option)}
+            >
+              {option}
+            </button>
+          )
+        })}
+      </div>
+      <p className="mt-1.5 text-[11.5px] leading-snug text-slate-400">Cada ronda es limpiar toda la ciudad: recoger todas las botellas.</p>
+    </div>
+  )
+}
+
+function EndButtons({ onPlayAgain, onExit }: { onPlayAgain: () => void; onExit: () => void }) {
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-2">
+      <button
+        type="button"
+        autoFocus
+        className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2.5 text-[14px] font-bold text-white"
+        onClick={onPlayAgain}
+      >
+        <Play className="h-4 w-4" fill="currentColor" /> Jugar otra vez
+      </button>
+      <button type="button" className="rounded-2xl border border-white/15 px-5 py-2.5 text-[14px] font-medium text-slate-200 hover:bg-white/5" onClick={onExit}>
+        Salir
+      </button>
+    </div>
+  )
+}
+
+/** La pregunta en grande antes de salir a buscar la respuesta (el juego queda en pausa). */
+function QuestionIntro({ question, number, timed, onGo }: { question: ActiveQuestion; number: number; timed: boolean; onGo: () => void }) {
+  return (
+    <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#0b1220]/75 p-2 backdrop-blur-[2px] sm:p-6">
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-label="Pregunta"
+        className="max-h-full w-full max-w-[600px] animate-[maze-levelup-pop_0.45s_cubic-bezier(0.16,1,0.3,1)] overflow-y-auto rounded-3xl border-2 border-emerald-300/50 bg-slate-950/95 p-4 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.8)] sm:p-6"
+      >
+        <p className="flex items-center gap-2 text-[12px] font-bold tracking-[0.14em] text-emerald-300 uppercase">
+          <CircleHelp className="h-4 w-4" aria-hidden="true" /> Pregunta {number}
+        </p>
+        <h2 className="mt-2 text-[19px] leading-snug font-bold text-white sm:text-[23px]">{question.question}</h2>
+        <ul className="mt-4 grid gap-2 sm:grid-cols-2 [@media(max-height:520px)]:mt-2 [@media(max-height:520px)]:grid-cols-2">
+          {question.answers
+            .filter((answer) => !answer.wrong)
+            .map((answer) => (
+              <li key={answer.letter} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-[15px] text-slate-100 [@media(max-height:520px)]:py-1.5">
+                <span
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-white text-[17px] font-black text-slate-950"
+                  style={{ background: ANSWER_COLORS[answer.letter] }}
+                >
+                  {answer.letter}
+                </span>
+                <span className="min-w-0 leading-tight">{answer.text}</span>
+              </li>
+            ))}
+        </ul>
+        <p className="mt-4 text-center text-[13px] leading-snug text-slate-300 [@media(max-height:520px)]:mt-2">
+          Las letras están repartidas por el mapa: <b className="text-white">maneja hasta la correcta</b>. Si llegas a una equivocada, pierdes una vida.
+          {timed && (
+            <>
+              {' '}
+              Tienes <b className="text-amber-300">{QUESTION_TIME_MS / 1000} segundos</b>: si se acaban, también pierdes una vida. Y cada{' '}
+              {EXTRA_CLOUD_EVERY_MS / 1000} segundos sin responder <b className="text-rose-300">llega una nube más</b>.
+            </>
+          )}
+        </p>
+        <div className="mt-4 flex justify-center [@media(max-height:520px)]:mt-2">
+          <button
+            type="button"
+            autoFocus
+            className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 px-6 py-3 text-[15px] font-bold text-white shadow-[0_12px_30px_-10px_rgba(52,211,153,0.7)] transition-transform hover:-translate-y-0.5"
+            onClick={onGo}
+          >
+            <Play className="h-4 w-4" fill="currentColor" /> ¡A buscarla!
+          </button>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+/** Ficha en el borde de la ventana que apunta hacia una respuesta fuera de la vista (solo con cámara). */
+function OffscreenAnswer({ answer, x, y, width, height }: { answer: MazeAnswer; x: number; y: number; width: number; height: number }) {
+  const margin = 18
+  if (x >= 0 && x <= width && y >= 0 && y <= height) return null
+  const clampedX = Math.min(width - margin, Math.max(margin, x))
+  const clampedY = Math.min(height - margin, Math.max(margin, y))
+  const angle = (Math.atan2(y - clampedY, x - clampedX) * 180) / Math.PI
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute z-30 flex h-8 w-8 items-center justify-center"
+      style={{ left: clampedX - 16, top: clampedY - 16 }}
+    >
+      <ArrowRight className="absolute h-8 w-8 drop-shadow" style={{ transform: `rotate(${angle}deg) translateX(14px)`, color: ANSWER_COLORS[answer.letter] }} strokeWidth={3} />
+      <span
+        className="relative flex h-6 w-6 items-center justify-center rounded-full border-2 border-white text-[12px] font-black text-slate-950 shadow"
+        style={{ background: ANSWER_COLORS[answer.letter] }}
+      >
+        {answer.letter}
+      </span>
+    </div>
+  )
+}
+
+/** Recuadro de la partida en la columna derecha: tiempo (con reloj), vidas y puntos. */
+function GameStatusCard({ lives, score, remainingMs }: { lives: number; score: number; remainingMs: number }) {
+  return (
+    <section aria-label="Estado de la partida" className="flex flex-col gap-3 rounded-2xl border border-white/15 bg-slate-900/80 p-4">
+      {remainingMs > 0 && (
+        <div className="flex items-center gap-3">
+          <CartoonClock className="h-14 w-14 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold tracking-[0.12em] text-slate-400 uppercase">Tiempo</p>
+            <QuestionClock remainingMs={remainingMs} />
+          </div>
+        </div>
+      )}
+      <div className="grid grid-cols-2 gap-2 border-t border-white/10 pt-3">
+        <div aria-label={`Vidas: ${lives}`}>
+          <p className="text-[11px] font-semibold tracking-[0.12em] text-slate-400 uppercase">Vidas</p>
+          <div className="mt-1 flex items-center gap-0.5">
+            {Array.from({ length: Math.max(0, lives) }, (_, index) => (
+              <img key={index} src={mazeSpriteUrl('ui-life')} alt="" className="h-7 w-7" />
+            ))}
+          </div>
+        </div>
+        <div>
+          <p className="text-[11px] font-semibold tracking-[0.12em] text-slate-400 uppercase">Puntos</p>
+          <p className="mt-1 flex items-center gap-1.5 text-[22px] font-black text-white tabular-nums">
+            <img src={mazeSpriteUrl('ui-star')} alt="" className="h-6 w-6" />
+            {score.toLocaleString('es')}
+          </p>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/** Tiempo que queda para responder: barra y segundos; en los últimos 10 s se pone roja y late. */
+function QuestionClock({ remainingMs, compact }: { remainingMs: number; compact?: boolean }) {
+  const seconds = Math.ceil(remainingMs / 1000)
+  const urgent = seconds <= 10
+  const color = urgent ? 'bg-rose-500' : seconds <= 20 ? 'bg-amber-400' : 'bg-emerald-400'
+  const label = `Quedan ${seconds} segundos`
+  if (compact) {
+    return (
+      <span
+        aria-label={label}
+        className={`flex h-7 min-w-11 shrink-0 items-center justify-center gap-1 rounded-full px-2 text-[13px] font-black text-slate-950 tabular-nums ${color} ${urgent ? 'animate-pulse' : ''}`}
+      >
+        ⏱ {seconds}
+      </span>
+    )
+  }
+  return (
+    <div aria-label={label} className="flex items-center gap-2">
+      <span className={`text-[20px] font-black tabular-nums ${urgent ? 'animate-pulse text-rose-400' : 'text-white'}`}>⏱ {seconds}s</span>
+      <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-white/10">
+        <div className={`h-full rounded-full transition-[width] duration-200 ease-linear ${color}`} style={{ width: `${(remainingMs / QUESTION_TIME_MS) * 100}%` }} />
+      </div>
+    </div>
+  )
+}
+
+/** Aviso de que llegó una nube más por demorarse en responder. */
+function CloudAlert() {
+  const [visible, setVisible] = useState(true)
+  useEffect(() => {
+    const timer = window.setTimeout(() => setVisible(false), 2200)
+    return () => window.clearTimeout(timer)
+  }, [])
+  if (!visible) return null
+  return (
+    <p
+      role="status"
+      className="pointer-events-none absolute left-1/2 top-4 z-40 -translate-x-1/2 animate-[fade-in-up_0.3s_ease-out] rounded-full border-2 border-rose-300 bg-rose-950/90 px-5 py-2 text-center text-[15px] font-black text-rose-100 shadow-xl"
+    >
+      ☁️ ¡Llegó otra nube! Responde la pregunta
+    </p>
+  )
+}
+
+/** Aviso corto al tocar una respuesta. */
+function AnswerToast({ feedback }: { feedback: AnswerFeedback }) {
+  const [visible, setVisible] = useState(true)
+  useEffect(() => {
+    const timer = window.setTimeout(() => setVisible(false), ANSWER_FEEDBACK_MS)
+    return () => window.clearTimeout(timer)
+  }, [])
+  if (!visible) return null
+  const correct = feedback.kind === 'correct'
+  return (
+    <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center">
+      <p
+        role="status"
+        className={`animate-[maze-levelup-pop_0.35s_cubic-bezier(0.16,1,0.3,1)] rounded-3xl border-2 px-6 py-3 text-center text-[20px] font-black text-white shadow-2xl ${
+          correct ? 'border-emerald-300 bg-emerald-600/95' : 'border-rose-300 bg-rose-600/95'
+        }`}
+      >
+        {correct ? '¡Correcto! +200' : feedback.kind === 'timeout' ? '¡Se acabó el tiempo!' : `¡Incorrecto! La ${feedback.letter} no era`}
+        {!correct && <span className="block text-[13px] font-semibold text-rose-100">Pierdes una vida</span>}
+      </p>
+    </div>
+  )
+}
+
 /** Centra un sprite más grande que su celda sobre la posición interpolada que da el motor. */
 function CenteredSprite({
   row,
   col,
   cellSize,
   scale,
+  zIndex,
+  cloudId,
   children,
 }: {
+  /** Solo nubes: queda en el DOM para contarlas (pruebas) y distinguir las extra. */
+  cloudId?: string
   row: number
   col: number
   cellSize: number
   scale: number
+  zIndex?: number
   children: ReactNode
 }) {
   const offset = (cellSize * (scale - 1)) / 2
   return (
     <div
       className="absolute left-0 top-0"
-      style={{ transform: `translate3d(${col * cellSize - offset}px, ${row * cellSize - offset}px, 0)` }}
+      data-cloud={cloudId}
+      style={{ transform: `translate3d(${col * cellSize - offset}px, ${row * cellSize - offset}px, 0)`, zIndex }}
     >
       {children}
     </div>

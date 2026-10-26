@@ -192,18 +192,29 @@ describe('chooseGhostDirection', () => {
 })
 
 describe('buildLevelBoard', () => {
-  it('llena todas las calles libres (menos arranques/canecas/bolsas) con PET', () => {
+  it('pone PET de a dos con un espacio, sin pisar arranques, canecas ni bolsas', () => {
     const layout = crossLayout()
     const board = buildLevelBoard(layout)
 
-    const petCount = board.pickups.filter((p) => p.kind === 'PET').length
+    const pets = board.pickups.filter((p) => p.kind === 'PET')
     const powerCount = board.pickups.filter((p) => p.kind === 'POWER').length
-    const openCellCount = layout.grid.flat().filter((cell) => cell === 0).length
+    const reserved = new Set(
+      [layout.playerStart, ...layout.enemySpawns, ...board.pickups.filter((p) => p.kind === 'POWER').map((p) => p.pos), ...board.bags.map((b) => b.pos)].map(
+        (cell) => `${cell.row}:${cell.col}`,
+      ),
+    )
+    const expected = layout.grid
+      .flatMap((cells, row) => cells.map((cell, col) => ({ cell, row, col })))
+      .filter(({ cell, row, col }) => cell === 0 && (row + col) % 3 !== 0 && !reserved.has(`${row}:${col}`)).length
 
     expect(powerCount).toBe(4)
     expect(board.bags).toHaveLength(3)
-    // playerStart + 4 enemySpawns + 4 power + 3 bags quedan reservados, el resto es PET.
-    expect(petCount).toBe(openCellCount - 1 - 4 - 4 - 3)
+    expect(pets).toHaveLength(expected)
+    // Nunca tres botellas seguidas en una fila: siempre queda un espacio.
+    const at = (row: number, col: number) => pets.some((p) => p.pos.row === row && p.pos.col === col)
+    for (const pet of pets) {
+      expect(at(pet.pos.row, pet.pos.col + 1) && at(pet.pos.row, pet.pos.col + 2)).toBe(false)
+    }
   })
 
   it('nunca coloca una caneca de energía sobre el arranque del jugador o de una nube', () => {

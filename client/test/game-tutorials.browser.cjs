@@ -19,8 +19,9 @@ let el;
 if ('${game}'==='MAZE') {
   const T=await import('/src/components/home/games/mazeCollectorTypes.ts');
   const {MazeCollectorGame}=await import('/src/components/home/games/MazeCollectorGame.tsx');
+  const Q=await import('/src/components/home/games/mazeCollectorQuestions.ts');
   const items=['Botella','Lata','Caja','Vidrio'].map((l,i)=>({itemId:'i'+i,label:l,icon:'target',color:'#2ecc71'}));
-  el=React.createElement(MazeCollectorGame,{title:'Camión reciclador',primaryColor:'#2ecc71',layout:T.MAZE_LAYOUTS.CITY,items,config:{...T.DEFAULT_MAZE_CONFIG,layout:'CITY'},onExit:()=>{window.exited=1}});
+  el=React.createElement(MazeCollectorGame,{title:'Camión reciclador',primaryColor:'#2ecc71',layout:T.MAZE_LAYOUTS.CITY,items,config:{...T.DEFAULT_MAZE_CONFIG,layout:'CITY'},questions:Q.SUSTAINABLE_CITY_QUESTIONS,onExit:()=>{window.exited=1}});
 }
 if ('${game}'==='TF') {
   const {TrueFalseMazeGame}=await import('/src/components/home/games/true-false-maze/TrueFalseMazeGame.tsx');
@@ -143,7 +144,7 @@ async function mazeTutorial(browser, viewport, touch) {
   const { page, errors } = await openGame(browser, 'MAZE', viewport, touch)
   const guide = page.locator('[data-game-guide="MAZE_COLLECTOR"]')
   await guide.waitFor()
-  for (let i = 0; i < 4; i++) await guide.getByRole('button', { name: /Siguiente/ }).click()
+  for (let i = 0; i < 5; i++) await guide.getByRole('button', { name: /Siguiente/ }).click()
   await guide.getByRole('group', { name: '¿Deseas jugar un tutorial?' }).waitFor()
   assert.equal(await guide.evaluate((el) => el.scrollHeight <= el.clientHeight + 1), true, 'La guía no tiene scroll')
   await page.screenshot({ path: `.scratch/tutorial-maze-pregunta-${tag}.png` })
@@ -151,7 +152,7 @@ async function mazeTutorial(browser, viewport, touch) {
 
   const runner = page.locator('[data-game-tutorial]')
   await runner.waitFor()
-  await understood(page, 'Parte 1 de 4')
+  await understood(page, 'Parte 1 de 5')
   await page.waitForTimeout(800)
   await page.screenshot({ path: `.scratch/tutorial-maze-parte1-${tag}.png` })
   if (touch) {
@@ -164,7 +165,7 @@ async function mazeTutorial(browser, viewport, touch) {
     await press(page, 'ArrowDown')
   }
   const card = page.getByRole('dialog', { name: /Tutorial de/ })
-  await card.getByText('Parte 2 de 4').waitFor({ timeout: 8000 })
+  await card.getByText('Parte 2 de 5').waitFor({ timeout: 8000 })
   await page.screenshot({ path: `.scratch/tutorial-maze-entre-partes-${tag}.png` })
   await understood(page)
 
@@ -174,7 +175,7 @@ async function mazeTutorial(browser, viewport, touch) {
     await press(page, 'ArrowDown', 1550)
     await press(page, 'ArrowLeft', 1400)
     await press(page, 'ArrowRight')
-    await card.getByText('Parte 3 de 4').waitFor({ timeout: 8000 })
+    await card.getByText('Parte 3 de 5').waitFor({ timeout: 8000 })
     await page.screenshot({ path: `.scratch/tutorial-maze-parte3-${tag}.png` })
     await understood(page)
     await page.waitForTimeout(700)

@@ -4,8 +4,9 @@ import type { MazeCollectorConfig, MazeCollectorItem } from '../mazeCollectorTyp
 import type { MazeScenario } from '../useMazeCollectorGame'
 import { TutorialRunner } from './TutorialRunner'
 import type { TutorialPart } from './TutorialRunner'
-import { ArtTruckBottles, ArtTruckCloud, ArtTruckDrive, ArtTruckPower } from './tutorialArt'
-import { Flag, MousePointerClick, Navigation, Shield, Sparkles, Target, Zap } from 'lucide-react'
+import { ArtTruckBottles, ArtTruckCloud, ArtTruckDrive, ArtTruckPower, ArtTruckQuestion } from './tutorialArt'
+import { SUSTAINABLE_CITY_QUESTIONS } from '../mazeCollectorQuestions'
+import { CircleHelp, Flag, Heart, MousePointerClick, Navigation, Shield, Sparkles, Target, Zap } from 'lucide-react'
 
 /** Zonas de la Ciudad Sostenible (en celdas del mapa real) donde ocurre cada parte. */
 const NORTH = { row: 1, col: 0, rows: 6, cols: 11 }
@@ -15,7 +16,8 @@ const pet = (row: number, col: number) => ({ pos: { row, col }, kind: 'PET' as c
 /**
  * Tutorial del Camión Reciclador sobre el juego de verdad: la misma ciudad,
  * el mismo camión y las mismas nubes, en cuatro partes (manejar, recoger,
- * esquivar y purificar). La cámara se acerca a la zona de cada parte.
+ * esquivar, purificar y responder una pregunta). La cámara se acerca a la
+ * zona de cada parte.
  */
 export function MazeCollectorTutorial({
   title,
@@ -32,8 +34,10 @@ export function MazeCollectorTutorial({
 }) {
   // Siempre la ciudad (es el escenario del Camión) y nubes a la velocidad más amable.
   const tutorialConfig: MazeCollectorConfig = { ...DEFAULT_MAZE_CONFIG, ...config, layout: 'CITY', enemySpeed: 1 }
-  const scene = (scenario: MazeScenario, focus: typeof NORTH): TutorialPart['render'] =>
-    function ScenePart(context) {
+  // Cada parte se juega solo en su zona: el camión y las nubes no pueden salir de lo iluminado.
+  const scene = (scenarioInZone: MazeScenario, focus: typeof NORTH): TutorialPart['render'] => {
+    const scenario: MazeScenario = { ...scenarioInZone, area: focus }
+    return function ScenePart(context) {
       return (
         <MazeCollectorGame
           title={title}
@@ -47,11 +51,17 @@ export function MazeCollectorTutorial({
             focus,
             active: context.active,
             onDone: context.onDone,
-            onCaught: () => context.onMistake('¡La nube te alcanzó! En el juego perderías una vida. Vuelves a empezar esta parte.'),
+            onCaught: () =>
+              context.onMistake(
+                scenario.objective === 'answer'
+                  ? 'Esa no era la respuesta. En el juego perderías una vida. Vuelves a empezar esta parte.'
+                  : '¡La nube te alcanzó! En el juego perderías una vida. Vuelves a empezar esta parte.',
+              ),
           }}
         />
       )
     }
+  }
 
   const parts: TutorialPart[] = [
     {
@@ -70,12 +80,14 @@ export function MazeCollectorTutorial({
     {
       title: 'Recoge las botellas',
       task: 'Recoge las 4 botellas PET de esta zona.',
-      explain: 'Para limpiar la ciudad hay que recoger todas las botellas PET: basta con pasar por encima. En el juego, al recogerlas todas pasas de nivel.',
-      success: '¡Calles limpias! Cada botella suma puntos.',
+      explain:
+        'Tu misión es salvar la ciudad: hay que recoger TODAS las botellas PET (basta con pasar por encima). En el juego, antes de empezar eliges cuántas rondas jugar (1, 2, 3 o 5). Cada ronda es limpiar toda la ciudad; el contador PET te dice cuántas botellas faltan. Al superar todas las rondas, ¡salvaste la ciudad!',
+      success: '¡Calles limpias! Así se supera cada ronda: sin dejar ni una botella.',
       art: <ArtTruckBottles />,
       points: [
-        { icon: <Target className="h-4 w-4" />, tone: 'emerald', text: <>Recoge <b className="text-white">todas las botellas PET</b> para limpiar la ciudad.</> },
+        { icon: <Target className="h-4 w-4" />, tone: 'emerald', text: <>Recoge <b className="text-white">todas las botellas PET</b> para salvar la ciudad.</> },
         { icon: <MousePointerClick className="h-4 w-4" />, tone: 'cyan', text: <>Basta con <b className="text-white">pasar por encima</b>: no hay que frenar.</> },
+        { icon: <Flag className="h-4 w-4" />, tone: 'amber', text: <>Ciudad limpia = <b className="text-white">ronda superada</b>. Supera las rondas que elegiste y ¡salvas la ciudad!</> },
       ],
       render: scene({ playerStart: { row: 1, col: 1 }, pickups: [pet(1, 5), pet(4, 5), pet(6, 2), pet(6, 8)], ghostSpawns: [], objective: 'collect' }, NORTH),
     },
@@ -105,7 +117,31 @@ export function MazeCollectorTutorial({
         { icon: <Sparkles className="h-4 w-4" />, tone: 'emerald', text: <>Con las nubes <b className="text-white">asustadas (azules)</b>, tócalas: ¡puntos extra!</> },
       ],
       render: scene(
-        { playerStart: { row: 6, col: 0 }, pickups: [{ pos: { row: 1, col: 0 }, kind: 'POWER' }], ghostSpawns: [{ row: 1, col: 6 }], ghostPersonality: 'PATROLLER', objective: 'catch' },
+        { playerStart: { row: 6, col: 0 }, pickups: [{ pos: { row: 1, col: 0 }, kind: 'POWER' }], ghostSpawns: [{ row: 1, col: 6 }], ghostPersonality: 'PATROLLER', objective: 'catch', purifier: true },
+        NORTH,
+      ),
+    },
+    {
+      title: 'Responde la pregunta',
+      task: 'Lee la pregunta y maneja hasta la letra de la respuesta correcta.',
+      explain:
+        'En el juego, cada pregunta sale primero en grande y el juego espera a que la leas. Luego sus respuestas quedan repartidas por el mapa, cada una con su letra: maneja hasta la correcta. Tienes 15 segundos; si llegas a una equivocada o se acaba el tiempo, pierdes una vida. Y cada 8 segundos sin responder llega una nube más.',
+      success: '¡Correcto! Así se responden las preguntas.',
+      art: <ArtTruckQuestion />,
+      points: [
+        { icon: <CircleHelp className="h-4 w-4" />, tone: 'cyan', text: <>La <b className="text-white">pregunta</b> sale arriba, con sus respuestas <b className="text-white">A, B, C, D</b>.</> },
+        { icon: <Target className="h-4 w-4" />, tone: 'emerald', text: <>Maneja hasta la <b className="text-white">letra correcta</b> en el mapa.</> },
+        { icon: <Heart className="h-4 w-4" />, tone: 'rose', text: <>Equivocarte o <b className="text-white">pasar de 15 segundos</b> te quita una vida; y cada 8 s sin responder llega una nube más.</> },
+      ],
+      render: scene(
+        {
+          playerStart: { row: 6, col: 0 },
+          pickups: [],
+          ghostSpawns: [],
+          objective: 'answer',
+          // La correcta (A) queda por la calle de arriba; las otras, por los caminos de abajo y del lado.
+          question: { question: SUSTAINABLE_CITY_QUESTIONS[0], positions: [{ row: 1, col: 5 }, { row: 6, col: 9 }, { row: 3, col: 5 }, { row: 1, col: 9 }] },
+        },
         NORTH,
       ),
     },

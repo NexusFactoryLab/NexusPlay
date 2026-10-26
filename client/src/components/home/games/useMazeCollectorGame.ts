@@ -19,9 +19,14 @@ import {
 } from './mazeEngine'
 import type { Collectible, Direction, GhostPersonality } from './mazeEngine'
 import { celebrateMatch, primeGameFeedback, signalMismatch } from '../../../utils/gameFeedback'
+import { ANSWER_LETTERS } from './mazeCollectorQuestions'
+import type { MazeQuestion } from './mazeCollectorQuestions'
 
 export type { Direction }
-export type MazePhase = 'ready' | 'playing' | 'levelup' | 'lost'
+export type MazePhase = 'ready' | 'playing' | 'levelup' | 'lost' | 'won'
+/** Rondas que se pueden elegir antes de jugar (cada ronda = limpiar toda la ciudad). */
+export const ROUND_OPTIONS = [1, 2, 3, 5] as const
+export const DEFAULT_ROUNDS = 2
 export type GhostMode = 'NORMAL' | 'FRIGHTENED' | 'EATEN'
 
 const REVERSE_DIRECTION: Record<Direction, Direction> = {
@@ -54,6 +59,28 @@ const COLLISION_RADIUS = 0.6
 /** Nunca dejar que un frame con lag (pestaña en segundo plano, etc.) mueva a alguien varias celdas de un salto. */
 const MAX_DELTA_SECONDS = 0.05
 const LEVELUP_PAUSE_MS = 1600
+/** Puntos por llegar a la respuesta correcta (issue #103). */
+export const POINTS_ANSWER = 200
+/** Distancia mínima (en pasos por la calle) entre el camión y una respuesta recién puesta. */
+const ANSWER_MIN_DISTANCE = 6
+
+/** Una respuesta en el mapa: el camión la toma al pasar por su celda. */
+export type MazeAnswer = { letter: string; text: string; correct: boolean; pos: CellPosition; wrong: boolean }
+export type ActiveQuestion = { id: number; question: string; answers: MazeAnswer[] }
+/** Lo último que pasó con una respuesta, para el aviso en pantalla (`id` cambia con cada intento). */
+export type AnswerFeedback = { id: number; kind: 'correct' | 'wrong' | 'timeout'; letter: string }
+/** Tiempo para llegar a la respuesta correcta; solo corre mientras se juega (no en pausa ni con la pregunta en pantalla). */
+export const QUESTION_TIME_MS = 15000
+/**
+ * Mientras una pregunta sigue sin responder, cada tanto llega una nube más
+ * (hasta `MAX_EXTRA_CLOUDS`): así no conviene recoger botellas ignorando las
+ * preguntas. Al cambiar de pregunta las nubes extra se van.
+ */
+export const EXTRA_CLOUD_EVERY_MS = 8000
+export const MAX_EXTRA_CLOUDS = 3
+const EXTRA_CLOUD_PREFIX = 'extra-'
+/** Lo que dura el aviso de correcto / incorrecto / tiempo agotado: mientras tanto el juego (y su reloj) se congela. */
+export const ANSWER_FEEDBACK_MS = 1600
 
 /**
  * Las 4 nubes son fijas: mismo orden que `layout.enemySpawns` (que ya viene
@@ -111,7 +138,21 @@ export type MazeScenario = {
   ghostPersonality?: GhostPersonality
   /** Celda a la que hay que llegar (objetivo `reach`). */
   goal?: CellPosition
-  objective: 'reach' | 'collect' | 'catch'
+  objective: 'reach' | 'collect' | 'catch' | 'answer'
+  /**
+   * Zona del escenario: ni el camión ni las nubes salen de ella (los bordes
+   * hacen de pared, también en las bocas de los túneles). Así la parte se
+   * juega solo en lo que se ve iluminado.
+   */
+  area?: { row: number; col: number; rows: number; cols: number }
+  /**
+   * Parte del purificador: la nube espera quieta hasta que se toma la caneca
+   * y el purificador no se acaba hasta atraparla (sin esto la nube se
+   * escapaba y se acababa el tiempo).
+   */
+  purifier?: boolean
+  /** Objetivo `answer`: una pregunta con sus respuestas en celdas fijas (en el orden de `options`). */
+  question?: { question: MazeQuestion; positions: CellPosition[] }
 }
 
 type InternalState = {
@@ -122,6 +163,8 @@ type InternalState = {
   caughtCount: number
   phase: MazePhase
   level: number
+  /** Rondas para salvar la ciudad: al limpiar la ciudad en la última, se gana. */
+  targetRounds: number
   score: number
   lives: number
   /** Config.enemySpeed no cambia durante la partida — se guarda acá una sola vez. */
@@ -140,6 +183,18 @@ type InternalState = {
   comboIndex: number
   lastCollected: MazeCollectorItem | null
   levelUpUntil: number | null
+  /** Preguntas del juego (vacío = sin preguntas) y el orden barajado en que salen. */
+  questions: MazeQuestion[]
+  questionOrder: number[]
+  question: ActiveQuestion | null
+  answeredCorrect: number
+  answerFeedback: AnswerFeedback | null
+  /** Momento (reloj del juego) en que se acaba el tiempo de la pregunta; null = todavía no empezó a correr. */
+  questionDeadline: number | null
+  /** Hasta cuándo dura el aviso de la última respuesta; mientras tanto nada se mueve. */
+  feedbackUntil: number | null
+  /** Cuándo llega la próxima nube extra (reloj del juego); null = todavía no empezó a contar. */
+  nextExtraCloudAt: number | null
 }
 
 function ghostSpeed(level: number, enemySpeedConfig: number): number {
@@ -199,11 +254,203 @@ function startLevel(layout: MazeLayoutDef, items: MazeCollectorItem[]): {
   }
 }
 
+function shuffled<T>(list: T[]): T[] {
+  const copy = [...list]
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[copy[i], copy[j]] = [copy[j], copy[i]]
+  }
+  return copy
+}
+
+/** Pasos reales por la calle (no en línea recta) desde `from` hasta cada celda abierta. */
+function streetDistances(layout: MazeLayoutDef, from: CellPosition): Map<string, number> {
+  const key = (pos: CellPosition) => `${pos.row}:${pos.col}`
+  const distances = new Map([[key(from), 0]])
+  const queue = [from]
+  while (queue.length > 0) {
+    const current = queue.shift()!
+    for (const direction of ['UP', 'DOWN', 'LEFT', 'RIGHT'] as Direction[]) {
+      const next = tryDirectionFrom(layout, current, direction)
+      if (!next || distances.has(key(next))) continue
+      distances.set(key(next), distances.get(key(current))! + 1)
+      queue.push(next)
+    }
+  }
+  return distances
+}
+
+/**
+ * Reparte las respuestas por el mapa: una por cuadrante (así quedan
+ * "alrededor"), lejos del camión y sin pisar canecas, bolsas, nidos de nubes
+ * ni las bocas de los túneles. Las botellas cubren casi todas las calles: la
+ * que quede debajo de una respuesta se retira (y deja de contar para el nivel).
+ */
+function placeAnswers(layout: MazeLayoutDef, state: InternalState, count: number): CellPosition[] {
+  const distances = streetDistances(layout, state.player.pos)
+  const taken = new Set(
+    [
+      ...state.pickups.filter((item) => item.kind !== 'PET').map((item) => item.pos),
+      ...state.bags.map((item) => item.pos),
+      ...layout.enemySpawns,
+    ].map((pos) => `${pos.row}:${pos.col}`),
+  )
+  const candidates: CellPosition[] = []
+  for (let row = 0; row < layout.rows; row++) {
+    for (let col = 1; col < layout.cols - 1; col++) {
+      const distance = distances.get(`${row}:${col}`)
+      if (distance === undefined || distance < ANSWER_MIN_DISTANCE || taken.has(`${row}:${col}`)) continue
+      candidates.push({ row, col })
+    }
+  }
+  const quadrant = (pos: CellPosition) => (pos.row < layout.rows / 2 ? 0 : 2) + (pos.col < layout.cols / 2 ? 0 : 1)
+  const chosen: CellPosition[] = []
+  for (const q of shuffled([0, 1, 2, 3])) {
+    if (chosen.length === count) break
+    const inQuadrant = candidates.filter((pos) => quadrant(pos) === q)
+    if (inQuadrant.length > 0) chosen.push(inQuadrant[Math.floor(Math.random() * inQuadrant.length)])
+  }
+  // Mapas chicos: si a algún cuadrante no le cupo, se completa con celdas que no queden pegadas a otra respuesta.
+  for (const pos of shuffled(candidates)) {
+    if (chosen.length === count) break
+    if (chosen.every((other) => Math.abs(other.row - pos.row) + Math.abs(other.col - pos.col) >= 3)) chosen.push(pos)
+  }
+  const before = state.pickups.length
+  state.pickups = state.pickups.filter((item) => !chosen.some((pos) => samePos(pos, item.pos)))
+  state.petTotalThisLevel -= before - state.pickups.length
+  return chosen
+}
+
+function buildQuestion(source: MazeQuestion, positions: CellPosition[], id: number, shuffle: boolean): ActiveQuestion {
+  const order = source.options.map((_, index) => index)
+  const sequence = shuffle ? shuffled(order) : order
+  return {
+    id,
+    question: source.question,
+    answers: sequence.slice(0, positions.length).map((optionIndex, slot) => ({
+      letter: ANSWER_LETTERS[slot],
+      text: source.options[optionIndex],
+      correct: optionIndex === source.correctIndex,
+      pos: positions[slot],
+      wrong: false,
+    })),
+  }
+}
+
+/** Saca la siguiente pregunta del mazo (se rebaraja al acabarse) y reparte sus respuestas. */
+function nextQuestion(state: InternalState, layout: MazeLayoutDef) {
+  if (state.questions.length === 0) return
+  if (state.questionOrder.length === 0) state.questionOrder = shuffled(state.questions.map((_, index) => index))
+  const source = state.questions[state.questionOrder.shift()!]
+  const positions = placeAnswers(layout, state, Math.min(source.options.length, ANSWER_LETTERS.length))
+  state.question = buildQuestion(source, positions, (state.question?.id ?? 0) + 1, true)
+  state.questionDeadline = null
+  // Pregunta nueva: se van las nubes extra y su cuenta vuelve a empezar.
+  state.ghosts = state.ghosts.filter((ghost) => !ghost.id.startsWith(EXTRA_CLOUD_PREFIX))
+  state.nextExtraCloudAt = null
+}
+
+/** Tras perder una vida todo vuelve a su esquina, pero las nubes extra de la pregunta siguen ahí. */
+function resetGhostsKeepingExtras(state: InternalState, layout: MazeLayoutDef) {
+  const extras = state.ghosts.filter((ghost) => ghost.id.startsWith(EXTRA_CLOUD_PREFIX)).length
+  state.ghosts = spawnGhosts(layout)
+  for (let i = 0; i < extras; i++) spawnExtraCloud(state, layout)
+}
+
+/** Llega una nube más, por la esquina más lejana al camión (nunca encima de él). */
+function spawnExtraCloud(state: InternalState, layout: MazeLayoutDef) {
+  const extras = state.ghosts.filter((ghost) => ghost.id.startsWith(EXTRA_CLOUD_PREFIX)).length
+  if (extras >= MAX_EXTRA_CLOUDS) return
+  const player = state.player.pos
+  const spawn = [...layout.enemySpawns].sort(
+    (a, b) => Math.abs(b.row - player.row) + Math.abs(b.col - player.col) - (Math.abs(a.row - player.row) + Math.abs(a.col - player.col)),
+  )[0]
+  const def = GHOST_PERSONALITIES[extras % GHOST_PERSONALITIES.length]
+  state.ghosts.push({
+    id: `${EXTRA_CLOUD_PREFIX}${state.question?.id ?? 0}-${extras}`,
+    name: def.name,
+    personality: def.personality,
+    pos: { ...spawn },
+    nextPos: { ...spawn },
+    progress: 0,
+    facing: 'UP',
+    pivot: { ...spawn },
+    spawn: { ...spawn },
+    mode: 'NORMAL',
+  })
+}
+
+/** Misma pregunta, respuestas en otro lugar (al cambiar de nivel el tablero es otro). */
+function replaceAnswers(state: InternalState, layout: MazeLayoutDef) {
+  if (!state.question) return
+  const remaining = state.question.answers.filter((answer) => !answer.wrong)
+  const positions = placeAnswers(layout, state, remaining.length)
+  state.question = { ...state.question, answers: remaining.map((answer, index) => ({ ...answer, pos: positions[index] ?? answer.pos })) }
+}
+
+function scenarioQuestion(scenario: MazeScenario | null): ActiveQuestion | null {
+  return scenario?.question ? buildQuestion(scenario.question.question, scenario.question.positions, 1, false) : null
+}
+
+/** El camión llegó a la celda de una respuesta. */
+function resolveAnswer(state: InternalState, layout: MazeLayoutDef, answer: MazeAnswer, now: number) {
+  const feedbackId = (state.answerFeedback?.id ?? 0) + 1
+  state.answerFeedback = { id: feedbackId, kind: answer.correct ? 'correct' : 'wrong', letter: answer.letter }
+  if (!state.scenario) state.feedbackUntil = now + ANSWER_FEEDBACK_MS
+  if (answer.correct) {
+    celebrateMatch()
+    state.score += POINTS_ANSWER
+    state.answeredCorrect += 1
+    if (state.scenario) state.scenarioDone = true
+    else nextQuestion(state, layout)
+    return
+  }
+
+  signalMismatch()
+  if (state.scenario) {
+    // Tutorial: sin vidas que perder; la parte vuelve a empezar con la misma pregunta.
+    state.caughtCount += 1
+    state.player = resetPlayer(layout, state.scenario)
+    state.ghosts = spawnGhosts(layout, state.scenario)
+    state.question = scenarioQuestion(state.scenario)
+    return
+  }
+  // La respuesta incorrecta desaparece del mapa y cuesta una vida; el camión vuelve a su punto de partida.
+  answer.wrong = true
+  state.lives -= 1
+  if (state.lives <= 0) {
+    state.phase = 'lost'
+    return
+  }
+  state.player = resetPlayer(layout)
+  resetGhostsKeepingExtras(state, layout)
+  state.energizedUntil = null
+  state.comboIndex = 0
+}
+
+/** Se acabó el tiempo: cuesta una vida y sale otra pregunta. */
+function questionTimedOut(state: InternalState, layout: MazeLayoutDef, now: number) {
+  signalMismatch()
+  state.answerFeedback = { id: (state.answerFeedback?.id ?? 0) + 1, kind: 'timeout', letter: '' }
+  state.feedbackUntil = now + ANSWER_FEEDBACK_MS
+  state.lives -= 1
+  if (state.lives <= 0) {
+    state.phase = 'lost'
+    return
+  }
+  state.player = resetPlayer(layout)
+  state.ghosts = spawnGhosts(layout)
+  state.energizedUntil = null
+  state.comboIndex = 0
+  nextQuestion(state, layout)
+}
+
 function createInitialState(
   layout: MazeLayoutDef,
   items: MazeCollectorItem[],
   config: MazeCollectorConfig,
   scenario: MazeScenario | null = null,
+  questions: MazeQuestion[] = [],
 ): InternalState {
   const level = startLevel(layout, scenario ? [] : items)
   // En un escenario solo están las botellas y canecas que enseña; sin bolsas ni bonus.
@@ -213,12 +460,13 @@ function createInitialState(
   const bags = scenario ? [] : level.bags
   const { bonusQueue, bonusThresholdsRemaining, bonusSpawnPoint } = level
   const petTotalThisLevel = scenario ? pickups.filter((pickup) => pickup.kind === 'PET').length : level.petTotalThisLevel
-  return {
+  const state: InternalState = {
     scenario,
     scenarioDone: false,
     caughtCount: 0,
     phase: 'ready',
     level: 1,
+    targetRounds: DEFAULT_ROUNDS,
     score: 0,
     lives: config.lives,
     baseEnemySpeed: config.enemySpeed,
@@ -236,7 +484,17 @@ function createInitialState(
     comboIndex: 0,
     lastCollected: null,
     levelUpUntil: null,
+    questions: scenario ? [] : questions,
+    questionOrder: [],
+    question: scenarioQuestion(scenario),
+    answeredCorrect: 0,
+    answerFeedback: null,
+    questionDeadline: null,
+    feedbackUntil: null,
+    nextExtraCloudAt: null,
   }
+  if (!scenario) nextQuestion(state, layout)
+  return state
 }
 
 function tryDirectionFrom(layout: MazeLayoutDef, pos: CellPosition, direction: Direction | null): CellPosition | null {
@@ -264,17 +522,26 @@ function tickPlayer(state: InternalState, layout: MazeLayoutDef, now: number, dt
   const arrived = advance(player, speed, dt)
 
   if (arrived || samePos(player.pos, player.nextPos)) {
-    const viaDesired = tryDirectionFrom(layout, player.pos, player.desiredDirection)
-    const viaFacing = viaDesired ?? tryDirectionFrom(layout, player.pos, player.facing)
+    // En un escenario con zona, salir de ella es como chocar con una pared.
+    const area = state.scenario?.area
+    const within = (next: CellPosition | null) => (next && (!area || insideArea(next, area)) ? next : null)
+    const viaDesired = within(tryDirectionFrom(layout, player.pos, player.desiredDirection))
+    const viaFacing = viaDesired ?? within(tryDirectionFrom(layout, player.pos, player.facing))
     if (viaDesired) player.facing = player.desiredDirection as Direction
     player.nextPos = viaFacing ?? player.pos
   }
 
-  if (arrived) resolvePlayerArrival(state, now)
+  if (arrived) resolvePlayerArrival(state, layout, now)
 }
 
-function resolvePlayerArrival(state: InternalState, now: number) {
+function resolvePlayerArrival(state: InternalState, layout: MazeLayoutDef, now: number) {
   const pos = state.player.pos
+
+  const answer = state.question?.answers.find((candidate) => !candidate.wrong && samePos(candidate.pos, pos))
+  if (answer) {
+    resolveAnswer(state, layout, answer, now)
+    if (state.phase === 'lost' || state.scenarioDone || answer.wrong || state.scenario) return
+  }
 
   const pickupIndex = state.pickups.findIndex((p) => samePos(p.pos, pos))
   if (pickupIndex !== -1) {
@@ -284,7 +551,7 @@ function resolvePlayerArrival(state: InternalState, now: number) {
       state.petCollectedThisLevel += 1
     } else {
       state.score += POINTS_POWER
-      state.energizedUntil = now + POWER_MODE_MS
+      state.energizedUntil = state.scenario?.purifier ? Number.POSITIVE_INFINITY : now + POWER_MODE_MS
       state.comboIndex = 0
       for (const ghost of state.ghosts) {
         if (ghost.mode === 'NORMAL') {
@@ -319,6 +586,11 @@ function resolvePlayerArrival(state: InternalState, now: number) {
   maybeSpawnBonus(state, now)
 
   if (state.pickups.length === 0) {
+    // Ciudad limpia: si era la última ronda, ¡la ciudad está salvada!
+    if (state.level >= state.targetRounds) {
+      state.phase = 'won'
+      return
+    }
     state.phase = 'levelup'
     state.levelUpUntil = now + LEVELUP_PAUSE_MS
   }
@@ -346,6 +618,8 @@ function tickGhost(ghost: InternalGhost, state: InternalState, layout: MazeLayou
     ghost.mode = 'NORMAL'
   }
 
+  const area = state.scenario?.area
+  if (state.scenario?.purifier && ghost.mode === 'NORMAL') return
   const speedFactor = ghost.mode === 'FRIGHTENED' ? FRIGHTENED_SPEED_FACTOR : ghost.mode === 'EATEN' ? EATEN_SPEED_FACTOR : 1
   const speed = ghostSpeed(state.level, state.baseEnemySpeed) * speedFactor
   const arrived = advance(ghost, speed, dt)
@@ -371,23 +645,53 @@ function tickGhost(ghost: InternalGhost, state: InternalState, layout: MazeLayou
     )
     ghost.facing = direction
     ghost.nextPos = stepWithTeleport(ghost.pos, direction, layout.cols, layout.tunnelRows)
+    if (area && !insideArea(ghost.nextPos, area)) {
+      // Se queda en la zona: da la vuelta por la primera salida que siga adentro.
+      const inside = (['UP', 'DOWN', 'LEFT', 'RIGHT'] as Direction[]).find((candidate) => {
+        const next = tryDirectionFrom(layout, ghost.pos, candidate)
+        return next !== null && insideArea(next, area)
+      })
+      ghost.facing = inside ?? ghost.facing
+      ghost.nextPos = inside ? stepWithTeleport(ghost.pos, inside, layout.cols, layout.tunnelRows) : ghost.pos
+    }
   }
 }
 
-function interpolated(entity: Moving): { row: number; col: number } {
-  return {
-    row: entity.pos.row + (entity.nextPos.row - entity.pos.row) * entity.progress,
-    col: entity.pos.col + (entity.nextPos.col - entity.pos.col) * entity.progress,
-  }
+function insideArea(pos: CellPosition, area: { row: number; col: number; rows: number; cols: number }): boolean {
+  return pos.row >= area.row && pos.row < area.row + area.rows && pos.col >= area.col && pos.col < area.col + area.cols
+}
+
+/**
+ * Posición entre dos celdas. Al cruzar un túnel `pos` y `nextPos` quedan en
+ * bordes opuestos: antes se interpolaba atravesando TODO el mapa (el camión
+ * parecía "arrastrado" de un lado al otro y podía chocar con una nube del
+ * medio). Ahora avanza una sola celda hacia afuera del borde y reaparece por
+ * el otro lado.
+ */
+function interpolated(entity: Moving, cols: number): { row: number; col: number } {
+  let deltaCol = entity.nextPos.col - entity.pos.col
+  if (Math.abs(deltaCol) > 1) deltaCol = deltaCol > 0 ? deltaCol - cols : deltaCol + cols
+  let col = entity.pos.col + deltaCol * entity.progress
+  // Pasada la mitad del cruce ya se dibuja entrando por el otro borde.
+  if (col < -0.5) col += cols
+  else if (col > cols - 0.5) col -= cols
+  return { row: entity.pos.row + (entity.nextPos.row - entity.pos.row) * entity.progress, col }
+}
+
+/** Distancia entre dos puntos del mapa contando el atajo de los túneles. */
+function wrappedDistance(a: { row: number; col: number }, b: { row: number; col: number }, cols: number): number {
+  let deltaCol = Math.abs(a.col - b.col)
+  if (deltaCol > cols / 2) deltaCol = cols - deltaCol
+  return Math.hypot(a.row - b.row, deltaCol)
 }
 
 function resolveGhostCollisions(state: InternalState, layout: MazeLayoutDef) {
-  const playerPoint = interpolated(state.player)
+  const playerPoint = interpolated(state.player, layout.cols)
 
   for (const ghost of state.ghosts) {
     if (ghost.mode === 'EATEN') continue
-    const ghostPoint = interpolated(ghost)
-    const distance = Math.hypot(playerPoint.row - ghostPoint.row, playerPoint.col - ghostPoint.col)
+    const ghostPoint = interpolated(ghost, layout.cols)
+    const distance = wrappedDistance(playerPoint, ghostPoint, layout.cols)
     if (distance > COLLISION_RADIUS) continue
 
     if (ghost.mode === 'FRIGHTENED') {
@@ -418,7 +722,7 @@ function resolveGhostCollisions(state: InternalState, layout: MazeLayoutDef) {
       return
     }
     state.player = resetPlayer(layout)
-    state.ghosts = spawnGhosts(layout)
+    resetGhostsKeepingExtras(state, layout)
     state.energizedUntil = null
     state.comboIndex = 0
     return
@@ -449,7 +753,10 @@ function tickEngine(state: InternalState, layout: MazeLayoutDef, items: MazeColl
       state.comboIndex = 0
       state.player = resetPlayer(layout)
       state.ghosts = spawnGhosts(layout)
+      replaceAnswers(state, layout)
       state.levelUpUntil = null
+      // Tablero nuevo: el tiempo de la pregunta vuelve a empezar.
+      state.questionDeadline = null
       state.phase = 'playing'
     }
     return
@@ -457,11 +764,40 @@ function tickEngine(state: InternalState, layout: MazeLayoutDef, items: MazeColl
 
   if (state.phase !== 'playing') return
 
+  // Aviso de la respuesta en pantalla: todo queda quieto y los plazos (reloj de la
+  // pregunta, purificador, bonus) se corren lo mismo que dura, para no perder tiempo.
+  if (state.feedbackUntil !== null) {
+    if (now < state.feedbackUntil) {
+      const frozenMs = dtRaw * 1000
+      if (state.questionDeadline !== null) state.questionDeadline += frozenMs
+      if (state.energizedUntil !== null) state.energizedUntil += frozenMs
+      if (state.activeBonus) state.activeBonus.expiresAt += frozenMs
+      if (state.nextExtraCloudAt !== null) state.nextExtraCloudAt += frozenMs
+      state.player.slowUntil += frozenMs
+      return
+    }
+    state.feedbackUntil = null
+  }
+
   if (state.energizedUntil !== null && now >= state.energizedUntil) {
     state.energizedUntil = null
     state.comboIndex = 0
     for (const ghost of state.ghosts) {
       if (ghost.mode === 'FRIGHTENED') ghost.mode = 'NORMAL'
+    }
+  }
+
+  // Reloj de la pregunta (no en el tutorial): arranca en el primer cuadro que se juega con ella.
+  if (state.question && !state.scenario) {
+    if (state.questionDeadline === null) state.questionDeadline = now + QUESTION_TIME_MS
+    else if (now >= state.questionDeadline) {
+      questionTimedOut(state, layout, now)
+      return
+    }
+    if (state.nextExtraCloudAt === null) state.nextExtraCloudAt = now + EXTRA_CLOUD_EVERY_MS
+    else if (now >= state.nextExtraCloudAt) {
+      spawnExtraCloud(state, layout)
+      state.nextExtraCloudAt = now + EXTRA_CLOUD_EVERY_MS
     }
   }
 
@@ -477,6 +813,7 @@ function tickEngine(state: InternalState, layout: MazeLayoutDef, items: MazeColl
 export type MazeGameSnapshot = {
   phase: MazePhase
   level: number
+  targetRounds: number
   score: number
   lives: number
   player: { row: number; col: number; facing: Direction; slowed: boolean }
@@ -491,18 +828,28 @@ export type MazeGameSnapshot = {
   collectedPet: number
   scenarioDone: boolean
   caughtCount: number
+  question: ActiveQuestion | null
+  answeredCorrect: number
+  answerFeedback: AnswerFeedback | null
+  /** Lo que queda para responder (0 si la pregunta no tiene reloj). */
+  questionRemainingMs: number
+  /** El aviso de la última respuesta sigue en pantalla (el juego está congelado). */
+  feedbackActive: boolean
+  /** Nubes que llegaron por demorarse en responder la pregunta actual. */
+  extraClouds: number
 }
 
-function toSnapshot(state: InternalState, now: number): MazeGameSnapshot {
-  const playerPoint = interpolated(state.player)
+function toSnapshot(state: InternalState, now: number, cols: number): MazeGameSnapshot {
+  const playerPoint = interpolated(state.player, cols)
   return {
     phase: state.phase,
     level: state.level,
+    targetRounds: state.targetRounds,
     score: state.score,
     lives: state.lives,
     player: { row: playerPoint.row, col: playerPoint.col, facing: state.player.facing, slowed: now < state.player.slowUntil },
     ghosts: state.ghosts.map((ghost) => {
-      const point = interpolated(ghost)
+      const point = interpolated(ghost, cols)
       return {
         id: ghost.id,
         name: ghost.name,
@@ -516,13 +863,21 @@ function toSnapshot(state: InternalState, now: number): MazeGameSnapshot {
     pickups: state.pickups,
     bags: state.bags,
     bonus: state.activeBonus,
-    energizedRemainingMs: state.energizedUntil !== null ? Math.max(0, state.energizedUntil - now) : 0,
+    energizedRemainingMs:
+      state.energizedUntil === null ? 0 : state.energizedUntil === Number.POSITIVE_INFINITY ? POWER_MODE_MS : Math.max(0, state.energizedUntil - now),
     comboIndex: state.comboIndex,
     lastCollected: state.lastCollected,
     totalPet: state.petTotalThisLevel,
     collectedPet: state.petCollectedThisLevel,
     scenarioDone: state.scenarioDone,
     caughtCount: state.caughtCount,
+    question: state.question,
+    answeredCorrect: state.answeredCorrect,
+    answerFeedback: state.answerFeedback,
+    extraClouds: state.ghosts.filter((ghost) => ghost.id.startsWith(EXTRA_CLOUD_PREFIX)).length,
+    feedbackActive: state.feedbackUntil !== null,
+    questionRemainingMs:
+      state.question && !state.scenario ? (state.questionDeadline === null ? QUESTION_TIME_MS : Math.min(QUESTION_TIME_MS, Math.max(0, state.questionDeadline - now))) : 0,
   }
 }
 
@@ -534,15 +889,17 @@ export type UseMazeCollectorGameOptions = {
   inputEnabled?: boolean
   /** Parte de un tutorial: se juega este escenario en vez de la partida completa. */
   scenario?: MazeScenario
+  /** Preguntas de opción múltiple (issue #103); sin ellas el juego es solo recoger botellas. */
+  questions?: MazeQuestion[]
 }
 
-export function useMazeCollectorGame({ layout, items, config, inputEnabled = true, scenario }: UseMazeCollectorGameOptions) {
+export function useMazeCollectorGame({ layout, items, config, inputEnabled = true, scenario, questions }: UseMazeCollectorGameOptions) {
   const stateRef = useRef<InternalState | undefined>(undefined)
   if (!stateRef.current) {
-    stateRef.current = createInitialState(layout, items, config, scenario ?? null)
+    stateRef.current = createInitialState(layout, items, config, scenario ?? null, questions)
   }
 
-  const [snapshot, setSnapshot] = useState<MazeGameSnapshot>(() => toSnapshot(stateRef.current!, 0))
+  const [snapshot, setSnapshot] = useState<MazeGameSnapshot>(() => toSnapshot(stateRef.current!, 0, layout.cols))
   const frameRef = useRef<number>(0)
   const lastTimeRef = useRef<number | null>(null)
   // Reloj de juego (issue #82): solo avanza fuera de la pausa. El motor guarda
@@ -564,7 +921,7 @@ export function useMazeCollectorGame({ layout, items, config, inputEnabled = tru
       if (pausedRef.current) return
       clockRef.current += elapsedMs
       tickEngine(stateRef.current!, layout, items, clockRef.current, elapsedMs / 1000)
-      setSnapshot(toSnapshot(stateRef.current!, clockRef.current))
+      setSnapshot(toSnapshot(stateRef.current!, clockRef.current, layout.cols))
     }
     frameRef.current = requestAnimationFrame(frame)
     return () => {
@@ -587,6 +944,19 @@ export function useMazeCollectorGame({ layout, items, config, inputEnabled = tru
     setPaused(false)
   }, [])
 
+  /** Se elige en la pantalla de inicio, antes de empezar a jugar. */
+  const setRounds = useCallback((rounds: number) => {
+    const state = stateRef.current!
+    if (state.phase !== 'ready') return
+    state.targetRounds = rounds
+    setSnapshot((current) => ({ ...current, targetRounds: rounds }))
+  }, [])
+
+  /** Congela el juego unos instantes (sin pausa): el reloj de la pregunta no corre y ya se puede elegir hacia dónde arrancar. */
+  const hold = useCallback((ms: number) => {
+    stateRef.current!.feedbackUntil = clockRef.current + ms
+  }, [])
+
   const setDirection = useCallback((direction: Direction) => {
     if (pausedRef.current) return
     primeGameFeedback()
@@ -607,5 +977,8 @@ export function useMazeCollectorGame({ layout, items, config, inputEnabled = tru
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [setDirection, inputEnabled])
 
-  return { ...snapshot, paused, pause, resume, setDirection }
+  return { ...snapshot, paused, pause, resume, setDirection, setRounds, hold }
 }
+
+/** Solo para pruebas del motor. */
+export const __engineForTests = { createInitialState, tickEngine, interpolated, wrappedDistance }

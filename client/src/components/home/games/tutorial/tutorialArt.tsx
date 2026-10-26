@@ -80,6 +80,34 @@ export function ArtTruckPower() {
   )
 }
 
+export function ArtTruckQuestion() {
+  const letters = [
+    { letter: 'A', color: '#f59e0b', left: '58%', top: '14%', ok: true },
+    { letter: 'B', color: '#38bdf8', left: '80%', top: '40%', ok: false },
+    { letter: 'C', color: '#f472b6', left: '58%', top: '62%', ok: false },
+  ]
+  return (
+    <Scene>
+      <Floor />
+      <At style={{ left: '6%', top: '6%', width: '44%', borderRadius: '0.8cqw', background: 'rgba(15,23,42,0.85)', border: '1px solid rgba(255,255,255,0.2)', padding: '1.2cqw 1.6cqw', fontSize: cqw(3.2), fontWeight: 700, color: 'white', lineHeight: 1.25 }}>
+        ¿Qué es una ciudad sostenible?
+      </At>
+      {letters.map(({ letter, color, left, top, ok }, i) => (
+        <At
+          key={letter}
+          style={{ left, top, width: cqw(10), height: cqw(10), borderRadius: '50%', background: color, border: '0.5cqw solid white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: cqw(5.5), fontWeight: 900, color: '#0f172a', ...loop(ok ? 'gg-pulse' : 'gg-bob', ok ? 1.2 : 2, i * 0.3) }}
+        >
+          {letter}
+        </At>
+      ))}
+      <Strip name="truck-drive" frames={4} size={24} left="14%" top="46%" ms={640} style={{ animation: 'gg-run-right 6s ease-in-out infinite' }} />
+      <Tag tone="true" style={{ left: '8%', top: '84%' }}>
+        Maneja hasta la respuesta correcta
+      </Tag>
+    </Scene>
+  )
+}
+
 // ==================== Laberinto V/F ====================
 
 export function ArtTfMove() {

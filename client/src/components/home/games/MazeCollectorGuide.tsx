@@ -8,6 +8,8 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  CircleHelp,
+  CloudFog,
   Footprints,
   Heart,
   Lightbulb,
@@ -15,12 +17,15 @@ import {
   Pause,
   Route,
   Snail,
+
   X,
   Zap,
 } from 'lucide-react'
 import { FitScale } from './true-false-maze/FitScale'
 import { SpriteStrip, mazeSpriteUrl } from './mazeSpriteStrip'
 import { COMBO_POINTS, POINTS_BONUS, POINTS_PET, POWER_MODE_MS } from './mazeEngine'
+import { EXTRA_CLOUD_EVERY_MS, POINTS_ANSWER, QUESTION_TIME_MS } from './useMazeCollectorGame'
+import { ArtTruckQuestion } from './tutorial/tutorialArt'
 import './true-false-maze/trueFalseMazeGuide.css'
 import './mazeCollectorGuide.css'
 
@@ -377,8 +382,9 @@ const STEPS: Step[] = [
     body: (
       <>
         <p>
-          Conduces el <b className="text-emerald-300">camión reciclador</b> por las calles de la Ciudad Sostenible. Recoge todas las{' '}
-          <b className="text-sky-300">botellas PET</b> y esquiva las <b className="text-rose-300">nubes de contaminación</b>.
+          <b className="text-white">Salva la ciudad</b> con el <b className="text-emerald-300">camión reciclador</b>: antes de empezar{' '}
+          <b className="text-white">eliges cuántas rondas</b> (1, 2, 3 o 5). En cada ronda recoge <b className="text-sky-300">todas las botellas PET</b>, responde las{' '}
+          <b className="text-amber-300">preguntas</b> y esquiva las <b className="text-rose-300">nubes</b>. ¡Supera todas las rondas y la salvaste!
         </p>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-emerald-300/25 bg-emerald-400/[0.07] p-3">
           <ArrowKeys size="clamp(1.9rem, 5.2dvh, 2.7rem)" />
@@ -398,8 +404,8 @@ const STEPS: Step[] = [
             <b className="text-white">Esc</b> o <b className="text-white">P</b>.
           </span>
         </p>
-        {/* En celular horizontal no cabe otro renglón sin encoger el texto: ahí la pantalla completa se ofrece al empezar. */}
-        <p className="flex items-center gap-2 [@media(orientation:landscape)_and_(max-height:520px)]:hidden">
+        {/* En pantallas táctiles no se usa la pantalla completa (y en celular el renglón no cabe): ahí no se muestra. */}
+        <p className="flex items-center gap-2 [@media(orientation:landscape)_and_(max-height:520px)]:hidden [@media(pointer:coarse)]:hidden">
           <span className="flex h-7 shrink-0 items-center gap-1 rounded-lg border border-white/25 bg-white/10 px-2 text-[0.8em] font-bold text-white">
             <Maximize className="h-3.5 w-3.5" /> Completa
           </span>
@@ -424,7 +430,29 @@ const STEPS: Step[] = [
           <b className="text-white">Pasa por encima de las botellas</b> para recogerlas: +{POINTS_PET} puntos cada una.
         </Item>
         <Item icon={<Check className="h-4 w-4" strokeWidth={3} />} tone="teal">
-          <b className="text-white">Cuando no quede ninguna, subes de nivel</b> y la ciudad se llena otra vez… con nubes más rápidas.
+          <b className="text-white">Recógelas todas para superar la ronda:</b> el contador <b className="text-white">PET</b> de arriba te dice cuántas faltan. Si quedan
+          rondas, la ciudad se llena otra vez… con nubes más rápidas. Al superar la última ronda que elegiste, <b className="text-white">¡salvaste la ciudad!</b>
+        </Item>
+      </ul>
+    ),
+  },
+  {
+    id: 'preguntas',
+    title: 'Responde las preguntas',
+    art: <ArtTruckQuestion />,
+    body: (
+      <ul className="flex flex-col gap-2.5">
+        <Item icon={<CircleHelp className="h-4 w-4" />} tone="sky">
+          <b className="text-white">Sale una pregunta</b> y sus respuestas quedan repartidas por el mapa, cada una con su letra: <b className="text-white">A, B, C, D</b>.
+        </Item>
+        <Item icon={<Check className="h-4 w-4" strokeWidth={3} />} tone="emerald">
+          <b className="text-white">Maneja hasta la respuesta correcta:</b> +{POINTS_ANSWER} puntos y sale otra pregunta.
+        </Item>
+        <Item icon={<Heart className="h-4 w-4" />} tone="rose">
+          <b className="text-white">Una equivocada o pasar de {QUESTION_TIME_MS / 1000} segundos</b> te quita una vida.
+        </Item>
+        <Item icon={<CloudFog className="h-4 w-4" />} tone="amber">
+          <b className="text-white">Cada {EXTRA_CLOUD_EVERY_MS / 1000} s sin responder llega una nube más.</b> ¡No solo recojas botellas!
         </Item>
       </ul>
     ),
@@ -497,7 +525,7 @@ const STEPS: Step[] = [
           <b className="text-white">Celular e-waste:</b> aparece de vez en cuando en el centro. Recógelo rápido para ganar +{POINTS_BONUS} y un dato curioso.
         </Item>
         <Item icon={<Route className="h-4 w-4" />} tone="emerald">
-          <b className="text-white">Túneles:</b> en las avenidas, sal por un borde de la ciudad y apareces por el otro. ¡Ideal para escapar!
+          <b className="text-white">Túneles:</b> en las 2 avenidas del centro (las del arco verde), sal por un borde de la ciudad y apareces por el otro. ¡Ideal para escapar!
         </Item>
       </ul>
     ),
