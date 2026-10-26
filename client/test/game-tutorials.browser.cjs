@@ -325,6 +325,12 @@ async function guessWhoTutorial(browser, viewport, touch) {
   // 1. Mirar la tarjeta secreta: tocar «Tú eres…».
   await page.waitForTimeout(500)
   await page.screenshot({ path: `.scratch/tutorial-quienes-parte1-${tag}.png` })
+  // Solo se puede tocar lo que la parte pide: «Pasar turno» y una tarjeta del tablero no responden.
+  await page.getByRole('button', { name: /Pasar turno/ }).click({ force: true })
+  await boardCard('Pulpo').click({ force: true })
+  await page.waitForTimeout(300)
+  assert.equal(await page.getByText('En el tutorial no hace falta pasar el turno').count(), 0, 'Pasar turno no responde en esta parte')
+  assert.equal(await page.locator('.guess-who-board-cards button[aria-pressed="true"]').count(), 0, 'Las tarjetas no se descartan en esta parte')
   await page.getByRole('button', { name: 'Tu tarjeta secreta' }).click()
   await next(2)
   // 2. Preguntar desde el chat guiado.

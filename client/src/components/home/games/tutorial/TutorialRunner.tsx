@@ -42,9 +42,13 @@ export type TutorialPart = {
   render: (context: TutorialPartContext) => ReactNode
 }
 
+/** Lo que dura el telón que oscurece la parte que termina (después se cambia de parte, ya sin que se note). */
+const CURTAIN_MS = 450
+
 type Stage =
   | { kind: 'brief'; previous: { result: 'done' | 'failed'; message: string } | null }
   | { kind: 'play' }
+  | { kind: 'leaving'; result: 'done' | 'failed'; message: string }
   | { kind: 'finished'; message: string }
 
 function useCoarsePointer() {
@@ -114,15 +118,26 @@ export function TutorialRunner({
   function finishPart(result: 'done' | 'failed', message: string) {
     setMistake(null)
     setStatus(null)
-    if (result === 'done' && index === parts.length - 1) {
-      setStage({ kind: 'finished', message })
-      return
-    }
-    // La parte siguiente (o la misma, si hay que reintentar) se monta ya, quieta detrás de su instrucción.
-    if (result === 'done') setIndex(index + 1)
-    setAttempt((value) => value + 1)
-    setStage({ kind: 'brief', previous: { result, message } })
+    // Primero cae un telón sobre la parte que terminó; el cambio de parte se hace detrás de él (abajo).
+    // Una parte solo termina una vez (un segundo aviso mientras cae el telón no cuenta).
+    setStage((current) => (current.kind === 'play' ? { kind: 'leaving', result, message } : current))
   }
+
+  const leaving = stage.kind === 'leaving' ? stage : null
+  useEffect(() => {
+    if (!leaving) return
+    const timer = window.setTimeout(() => {
+      if (leaving.result === 'done' && index === parts.length - 1) {
+        setStage({ kind: 'finished', message: leaving.message })
+        return
+      }
+      // La parte siguiente (o la misma, si hay que reintentar) se monta quieta detrás de su instrucción.
+      if (leaving.result === 'done') setIndex(index + 1)
+      setAttempt((value) => value + 1)
+      setStage({ kind: 'brief', previous: { result: leaving.result, message: leaving.message } })
+    }, CURTAIN_MS)
+    return () => window.clearTimeout(timer)
+  }, [leaving, index, parts.length])
 
   const context: TutorialPartContext = {
     active: stage.kind === 'play',
@@ -146,7 +161,11 @@ export function TutorialRunner({
         {part.render(context)}
       </div>
 
-      {stage.kind === 'play' && (
+      {/* Telón: oscurece la parte que termina (entra) y deja ver la siguiente poco a poco (sale). */}
+      {stage.kind === 'leaving' && <div className="gg-curtain gg-curtain-in" aria-hidden="true" />}
+      {(stage.kind === 'brief' || stage.kind === 'finished') && <div key={`${index}-${attempt}-${stage.kind}`} className="gg-curtain gg-curtain-out" aria-hidden="true" />}
+
+      {(stage.kind === 'play' || stage.kind === 'leaving') && (
         // La tarea queda arriba, visible pero sin tapar: los toques sobre el texto pasan al juego.
         <div
           className={`pointer-events-none fixed inset-x-0 z-[65] flex justify-center px-3 ${
@@ -184,7 +203,7 @@ export function TutorialRunner({
         </div>
       )}
 
-      {stage.kind !== 'play' && (
+      {stage.kind !== 'play' && stage.kind !== 'leaving' && (
         <div
           className="fixed inset-0 z-[70] flex items-center justify-center bg-[#03040c]/80 p-2 text-slate-100 backdrop-blur-sm sm:p-5"
           style={{ animation: 'gg-fade-in 0.45s ease-out' }}

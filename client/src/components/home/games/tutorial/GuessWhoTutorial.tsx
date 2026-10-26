@@ -57,6 +57,25 @@ const yesNo = (question: GuidedQuestion, secret: string) => (question.cardIds.in
 
 type Goal = 'secret' | 'ask' | 'discard-one' | 'discard' | 'answer' | 'open-guess' | 'guess'
 
+/**
+ * Solo se puede tocar lo que la parte pide: todo lo demás (otras tarjetas, otros
+ * botones, el cuadro de texto del chat, el fondo de la selección) no responde.
+ */
+const ALLOWED: Record<Goal, string> = {
+  secret: "[data-tut-focus='secret']",
+  ask: "[data-tut-focus='questions'], [data-tut-focus='questions'] *",
+  'discard-one': '[data-card-id] button',
+  discard: '[data-card-id] button',
+  answer: "[data-tut-focus='answer'] button",
+  'open-guess': "[data-tut-focus='guess-btn']",
+  guess: "[data-tut-focus='pick'] button, [data-tut-focus='confirm']",
+}
+
+function lockCss(goal: Goal): string {
+  return `.tut-lock button, .tut-lock [role="button"], .tut-lock [role="listitem"], .tut-lock input, .tut-lock textarea, .tut-lock [role="presentation"] { pointer-events: none !important; }
+.tut-lock :is(${ALLOWED[goal]}) { pointer-events: auto !important; }`
+}
+
 type Setup = {
   isMyTurn: boolean
   discarded: string[]
@@ -132,7 +151,8 @@ function TutorialMatch({ setup, goal, context }: { setup: Setup; goal: Goal; con
   }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-bg" data-tut-goal={goal}>
+    <div className="tut-lock fixed inset-0 z-50 overflow-y-auto bg-bg" data-tut-goal={goal}>
+      <style>{lockCss(goal)}</style>
       <GameThemeBackdrop />
       {/* Las tarjetas que faltan por descartar laten para que se vea cuáles tocar. */}
       {(goal === 'discard' || goal === 'discard-one') && (

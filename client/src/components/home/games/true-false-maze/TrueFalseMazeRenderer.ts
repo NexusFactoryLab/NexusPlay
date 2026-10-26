@@ -486,7 +486,7 @@ export class TrueFalseMazeRenderer {
     const cell = this.map.goalDoor
     if (!cell) return
     const here = state.player.pos.row === cell.row && state.player.pos.col === cell.col
-    this.doorOpen += ((here ? 1 : 0) - this.doorOpen) * Math.min(1, dt / 110)
+    this.doorOpen += ((here ? 1 : 0) - this.doorOpen) * Math.min(1, dt / 55)
     const open = this.doorOpen
     const pulse = 0.5 + 0.5 * Math.sin(state.now / 260)
     // Una compuerta con marco, centrada en SU casilla: se levanta sobre el piso

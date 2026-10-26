@@ -130,7 +130,12 @@ type Options = {
    */
   taskMode?: boolean
   /** Se llama en cada cuadro con el estado y lo que pasó (el tutorial mira ahí si se logró la tarea). */
-  onFrame?: (state: TfState, events: TfEvent[]) => void
+  /**
+   * Se llama en cada cuadro. Si devuelve `'freeze'`, el juego se detiene tal
+   * cual (nadie se mueve; la imagen sigue dibujándose): el tutorial lo usa al
+   * llegar a la puerta, para que una medusa no alcance al robot mientras se abre.
+   */
+  onFrame?: (state: TfState, events: TfEvent[]) => 'freeze' | void
 }
 
 /**
@@ -150,6 +155,7 @@ export function useTrueFalseMazeSession({
   onFrame,
 }: Options) {
   const [initialState] = useState(() => createTfState({ map, questions, config }))
+  const frozenRef = useRef(false)
   const onFrameRef = useRef(onFrame)
   useEffect(() => {
     onFrameRef.current = onFrame
@@ -205,6 +211,10 @@ export function useTrueFalseMazeSession({
       last = time
       if (pausedRef.current) return
       const state = stateRef.current
+      if (frozenRef.current) {
+        rendererRef.current?.draw(state, dt)
+        return
+      }
       // Tarea de tutorial: sin la presentación de la afirmación (se juega en cuanto arranca).
       if (taskMode && state.phase === 'intro') state.phaseUntil = state.now
       // Sub-pasos de 25 ms: aunque el navegador dibuje lento (equipos sin
@@ -225,7 +235,7 @@ export function useTrueFalseMazeSession({
       }
       // En una tarea no hay salas: sus movimientos (hacia ningún lado) no se anuncian ni se dibujan.
       const events = drainTfEvents(state).filter((event) => !taskMode || (event.type !== 'zones-move' && event.type !== 'zones-warning'))
-      onFrameRef.current?.(state, events)
+      if (onFrameRef.current?.(state, events) === 'freeze') frozenRef.current = true
       const current = rendererRef.current
       // Solo en desarrollo (se elimina del build): deja el estado a mano para las pruebas en navegador.
       if (import.meta.env.DEV) (window as unknown as { __tfMaze?: unknown }).__tfMaze = { state, renderer: current }

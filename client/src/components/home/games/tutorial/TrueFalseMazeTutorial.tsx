@@ -37,8 +37,8 @@ function ship(ascii: string[], options: { door?: CellPosition; patrol?: CellPosi
 // Naves angostas (9 columnas): también se ven grandes en un celular en vertical.
 const MOVE = ship(['#########', '#,,,,,,,#', '#,,,P,,,#', '#,,,,,,,#', '#########'])
 
-const CORRIDOR = ship(['#########', '#,,,N,,,#', '#P,,,,,,#', '#,,,,,,,#', '#########'], {
-  door: { row: 2, col: 7 },
+const CORRIDOR = ship(['#########', '#,,,N,,,#', '#,,,,,,,#', '#P,,,,,,#', '#########'], {
+  door: { row: 3, col: 7 },
   patrol: [{ row: 2, col: 4 }],
 })
 
@@ -69,20 +69,11 @@ const CALM: TrueFalseMazeConfig = {
 /** Una pregunta de relleno para las tareas (no se ve: en las tareas no hay salas ni afirmación). */
 const FILLER: TrueFalseMazeQuestion[] = [{ questionId: 'tarea', statement: 'Tarea del tutorial.', answer: true }]
 
-/** Cuánto se queda la puerta abierta antes de pasar a la parte siguiente (se ve cómo se abre). */
-const DOOR_OPEN_MS = 700
-
 type Memo = Record<string, unknown>
 
-/** Llegó a la puerta: se abre y, un momento después, la parte se da por lograda. */
-function openedDoor(state: TfState, door: CellPosition, memo: Memo): boolean {
-  const here = state.player.pos.row === door.row && state.player.pos.col === door.col
-  if (!here) {
-    memo.arrivedAt = undefined
-    return false
-  }
-  memo.arrivedAt ??= state.worldTime
-  return state.worldTime - (memo.arrivedAt as number) >= DOOR_OPEN_MS
+/** Llegó a la puerta: el juego se congela ahí (ninguna medusa puede alcanzar al robot) y la puerta se abre. */
+function openedDoor(state: TfState, door: CellPosition): boolean {
+  return state.player.pos.row === door.row && state.player.pos.col === door.col
 }
 
 const DIRECTIONS = [
@@ -164,10 +155,10 @@ function TaskPart({
           }
           if (!done.current && state.phase === 'playing' && check(state, events, memo.current, context)) {
             done.current = true
-            // El logro se disfruta un momento antes de cambiar de parte (si no, el corte es brusco):
-            // la medusa aturdida alcanza a volver a su nido y la puerta termina de abrirse.
-            const enjoy = events.some((event) => event.type === 'zap') ? 1500 : 450
-            window.setTimeout(context.onDone, enjoy)
+            // El logro se ve un momento antes de cambiar de parte (si no, el corte es brusco): la
+            // medusa aturdida vuelve a su nido, o la puerta se abre con el robot congelado frente a ella.
+            window.setTimeout(context.onDone, events.some((event) => event.type === 'zap') ? 1100 : 650)
+            if (map.goalDoor) return 'freeze'
           }
         },
         onFinished: () => context.onFailed('Te quedaste sin baterías. ¡Inténtalo otra vez!'),
@@ -212,7 +203,13 @@ export function TrueFalseMazeTutorial({ title, onFinish }: { title: string; onFi
         { icon: <ShieldAlert className="h-4 w-4" />, tone: 'rose', text: <>Si la medusa te toca, <b className="text-white">pierdes una batería</b>.</> },
         { icon: <KeyRound className="h-4 w-4" />, tone: 'emerald', text: <>Llega a la <b className="text-white">puerta</b>: se abre apenas estés ahí.</> },
       ],
-      render: task(CORRIDOR, { ...CALM, enemyCount: 1 }, (state, _events, memo) => openedDoor(state, { row: 2, col: 7 }, memo)),
+      render: task(
+        CORRIDOR,
+        { ...CALM, enemyCount: 1 },
+        (state) => openedDoor(state, { row: 3, col: 7 }),
+        // La medusa sale un poco después de arrancar: hay tiempo de ver hacia dónde va.
+        (state) => state.jellies.forEach((jelly) => (jelly.releaseAt = state.worldTime + 900)),
+      ),
     },
     {
       title: 'Aturde a la medusa',
@@ -252,7 +249,7 @@ export function TrueFalseMazeTutorial({ title, onFinish }: { title: string; onFi
       render: task(
         DARK,
         { ...CALM, lightsOut: true },
-        (state, _events, memo) => openedDoor(state, { row: 5, col: 7 }, memo),
+        (state) => openedDoor(state, { row: 5, col: 7 }),
         (state) => {
           state.nextLightsOutAt = state.worldTime + 400
         },

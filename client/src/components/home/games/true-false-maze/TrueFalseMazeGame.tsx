@@ -48,7 +48,7 @@ export type TrueFalseMazeTutorialPart = {
    * Tarea sin afirmación (mover, esquivar, rejilla, apagón…): sin salas ni
    * pregunta; el tutorial mira cada cuadro y decide cuándo se logró.
    */
-  onFrame?: (state: TfState, events: TfEvent[]) => void
+  onFrame?: (state: TfState, events: TfEvent[]) => 'freeze' | void
   /** Terminó la pregunta: `correct` dice si la respondió bien. */
   onFinished: (correct: boolean) => void
   /** Una medusa lo atrapó (en el juego costaría una batería). */
