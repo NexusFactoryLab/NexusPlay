@@ -1,0 +1,197 @@
+import type { DuoQuestionFormat, DuoRole } from './shared/duoTypes.js';
+
+/**
+ * Preguntas de las Puertas del Saber. Viven solo en el servidor: el cliente
+ * recibe las opciones barajadas y nunca cuál es la correcta.
+ *
+ * Tres formatos, todos exigen que los dos acierten:
+ *  - MIRROR: la misma pregunta para los dos, cada uno responde en secreto.
+ *  - SPLIT: cada uno ve solo la mitad de los datos; tienen que contárselos.
+ *  - TWO_PART: cada uno resuelve su parte de un mismo problema.
+ *
+ * El primer elemento de cada lista de opciones es el correcto (se barajan al mostrarlas).
+ */
+interface QuestionBase {
+  id: string;
+  /** Pistas que se destapan con las fichas recogidas en el tramo. */
+  hints: string[];
+  /** Se muestra al acertar los dos: lo que se aprende. */
+  explanation: string;
+}
+
+export interface DuoMirrorQuestion extends QuestionBase {
+  format: 'MIRROR';
+  prompt: string;
+  options: string[];
+}
+
+export interface DuoSplitQuestion extends QuestionBase {
+  format: 'SPLIT';
+  prompt: string;
+  clues: Record<DuoRole, string>;
+  options: string[];
+}
+
+export interface DuoTwoPartQuestion extends QuestionBase {
+  format: 'TWO_PART';
+  prompt: string;
+  parts: Record<DuoRole, { prompt: string; options: string[] }>;
+}
+
+export type DuoQuestion = DuoMirrorQuestion | DuoSplitQuestion | DuoTwoPartQuestion;
+
+export const DUO_QUESTION_BANK: readonly DuoQuestion[] = [
+  // ---- Espejo ----
+  {
+    id: 'paramo-agua',
+    format: 'MIRROR',
+    prompt: '¿Qué ecosistema de alta montaña funciona como una "fábrica de agua" para ciudades como Bogotá?',
+    options: ['El páramo', 'El desierto de la Tatacoa', 'El manglar', 'La sabana de los Llanos'],
+    hints: ['Está por encima de los 3.000 metros de altura.', 'Allí crecen los frailejones.'],
+    explanation: 'Los páramos, como Chingaza y Sumapaz, atrapan el agua de la niebla y la lluvia y la sueltan poco a poco. Colombia tiene cerca de la mitad de los páramos del mundo.',
+  },
+  {
+    id: 'frailejon',
+    format: 'MIRROR',
+    prompt: '¿Qué planta del páramo atrapa el agua de la niebla con sus hojas peludas y la entrega poco a poco al suelo?',
+    options: ['El frailejón', 'El cactus', 'La palma de cera', 'El girasol'],
+    hints: ['Crece muy despacio: más o menos un centímetro al año.', 'Su nombre empieza por F.'],
+    explanation: 'Los frailejones son esponjas vivas del páramo. Como crecen tan despacio, uno de un metro puede tener casi cien años: por eso hay que cuidarlos.',
+  },
+  {
+    id: 'corredor-biologico',
+    format: 'MIRROR',
+    prompt: 'En una ciudad sostenible, ¿para qué sirve un corredor biológico?',
+    options: [
+      'Para unir zonas verdes y que los animales puedan moverse entre ellas',
+      'Para que los carros lleguen más rápido',
+      'Para construir más centros comerciales',
+      'Para guardar los escombros de las obras',
+    ],
+    hints: ['Piensa en las aves, las ardillas y las abejas de la ciudad.', 'Une parques, quebradas y cerros con árboles.'],
+    explanation: 'Los corredores biológicos, como los que unen los cerros con los humedales, permiten que la fauna se mueva, se alimente y se reproduzca dentro de la ciudad.',
+  },
+  {
+    id: 'humedales',
+    format: 'MIRROR',
+    prompt: 'Bogotá protege humedales como La Conejera y Juan Amarillo. ¿Por qué son importantes para la ciudad?',
+    options: [
+      'Guardan agua de lluvia, evitan inundaciones y son hogar de aves',
+      'Sirven para botar la basura de los barrios',
+      'Son el mejor lugar para construir edificios',
+      'Producen la electricidad de la ciudad',
+    ],
+    hints: ['Funcionan como una esponja cuando llueve mucho.', 'Allí llegan aves migratorias.'],
+    explanation: 'Los humedales absorben el agua de los aguaceros, la limpian y dan refugio a muchas especies, entre ellas aves que viajan desde Norteamérica.',
+  },
+  // ---- Información dividida ----
+  {
+    id: 'ahorro-agua',
+    format: 'SPLIT',
+    prompt: 'Una familia cambió dos hábitos. ¿Cuántos litros de agua ahorra en total cada día?',
+    clues: {
+      FIRE: 'Cerrar la llave mientras se cepillan los dientes le ahorra 12 litros al día.',
+      WATER: 'Bañarse en 5 minutos en vez de 10 le ahorra 40 litros al día.',
+    },
+    options: ['52 litros', '40 litros', '12 litros', '28 litros'],
+    hints: ['Tienen que juntar los dos datos.', 'Es una suma.'],
+    explanation: 'Los pequeños hábitos se suman: con 52 litros diarios la familia ahorra más de 18.000 litros en un año.',
+  },
+  {
+    id: 'arboles-faltan',
+    format: 'SPLIT',
+    prompt: 'El colegio está reforestando la quebrada con árboles nativos. ¿Cuántos árboles faltan por sembrar?',
+    clues: {
+      FIRE: 'La meta es sembrar 120 árboles nativos.',
+      WATER: 'Ya se sembraron 85 árboles.',
+    },
+    options: ['35 árboles', '85 árboles', '120 árboles', '205 árboles'],
+    hints: ['Uno tiene la meta y el otro lo que ya se hizo.', 'Es una resta.'],
+    explanation: 'Los árboles nativos, como el aliso o el guayacán, protegen las orillas de las quebradas y atraen a la fauna de la región.',
+  },
+  {
+    id: 'manglar',
+    format: 'SPLIT',
+    prompt: '¿De qué ecosistema colombiano hablan las dos pistas?',
+    clues: {
+      FIRE: 'Está en la costa, donde los ríos se juntan con el mar.',
+      WATER: 'Sus árboles tienen raíces que salen del agua salada y frenan las olas.',
+    },
+    options: ['El manglar', 'El páramo', 'El bosque seco', 'El nevado'],
+    hints: ['Hay en el Pacífico y en el Caribe colombiano.', 'Sus raíces parecen zancos.'],
+    explanation: 'Los manglares protegen la costa de la erosión y son guardería de peces y cangrejos. Colombia los tiene en sus dos océanos.',
+  },
+  {
+    id: 'condor',
+    format: 'SPLIT',
+    prompt: '¿De qué animal hablan las dos pistas?',
+    clues: {
+      FIRE: 'Es una de las aves voladoras más grandes del mundo y está en el escudo de Colombia.',
+      WATER: 'Vive en los Andes y planea sobre las montañas casi sin aletear.',
+    },
+    options: ['El cóndor de los Andes', 'El colibrí', 'La guacamaya', 'El tucán'],
+    hints: ['Con las alas abiertas puede medir más de tres metros.', 'Es símbolo nacional.'],
+    explanation: 'El cóndor de los Andes está en peligro. Cuidar los páramos y las montañas donde vive ayuda a que no desaparezca.',
+  },
+  // ---- Dos partes ----
+  {
+    id: 'movilidad',
+    format: 'TWO_PART',
+    prompt: 'La ciudad quiere que la gente se mueva sin llenar el aire de humo.',
+    parts: {
+      FIRE: {
+        prompt: '¿Qué transporte eléctrico lleva a muchas personas a la vez, como el de Medellín?',
+        options: ['El metro', 'La camioneta a gasolina', 'La moto', 'El avión'],
+      },
+      WATER: {
+        prompt: '¿Qué transporte no usa combustible y se mueve con la fuerza de las piernas?',
+        options: ['La bicicleta', 'El bus diésel', 'El taxi', 'El carro particular'],
+      },
+    },
+    hints: ['Una parte es para muchas personas; la otra, para una sola.', 'Ninguno de los dos echa humo.'],
+    explanation: 'Combinar transporte masivo eléctrico con ciclorrutas, como en Medellín y Bogotá, reduce el humo y el ruido de la ciudad.',
+  },
+  {
+    id: 'rio-limpio',
+    format: 'TWO_PART',
+    prompt: 'El río que atraviesa la ciudad está contaminado. Cada uno propone una solución.',
+    parts: {
+      FIRE: {
+        prompt: '¿Qué limpia el agua sucia de las casas antes de que llegue al río?',
+        options: ['Una planta de tratamiento de aguas residuales', 'Más tubos que desemboquen en el río', 'Pintar las orillas', 'Un parqueadero junto al río'],
+      },
+      WATER: {
+        prompt: '¿Qué protege las orillas del río y ayuda a filtrar el agua de lluvia?',
+        options: ['Sembrar árboles nativos en la orilla', 'Cubrir las orillas con cemento', 'Poner vallas publicitarias', 'Quitar toda la vegetación'],
+      },
+    },
+    hints: ['Una solución es una obra; la otra es naturaleza.', 'Una actúa antes del río y la otra en su orilla.'],
+    explanation: 'Tratar las aguas residuales y recuperar el bosque de las orillas son las dos mitades de la limpieza de ríos como el Bogotá o el Medellín.',
+  },
+  {
+    id: 'energia-limpia',
+    format: 'TWO_PART',
+    prompt: 'El colegio quiere funcionar con energía limpia.',
+    parts: {
+      FIRE: {
+        prompt: '¿Qué aprovecha la luz del sol para producir electricidad?',
+        options: ['Los paneles solares', 'Una planta de carbón', 'Un generador diésel', 'La leña'],
+      },
+      WATER: {
+        prompt: '¿Qué aprovecha la fuerza del viento, como en La Guajira?',
+        options: ['Los aerogeneradores', 'Una planta de carbón', 'Un generador a gasolina', 'Las velas de cera'],
+      },
+    },
+    hints: ['Una fuente viene del cielo de día; la otra sopla.', 'Ninguna se quema.'],
+    explanation: 'Colombia tiene mucho sol y, en La Guajira, vientos fuertes y constantes: dos fuentes renovables que no contaminan el aire.',
+  },
+];
+
+export function questionsOf(format: DuoQuestionFormat): DuoQuestion[] {
+  return DUO_QUESTION_BANK.filter((q) => q.format === format);
+}
+
+/** Opciones que le tocan a un rol (en TWO_PART cada uno tiene las suyas). */
+export function optionsFor(question: DuoQuestion, role: DuoRole): string[] {
+  return question.format === 'TWO_PART' ? question.parts[role].options : question.options;
+}

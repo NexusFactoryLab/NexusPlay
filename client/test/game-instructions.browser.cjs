@@ -27,7 +27,7 @@ async function main() {
   let structure
   const visualExamples = new Map()
   try {
-    for (const [kind, close] of [['PAIRS', 'backdrop'], ['OPPOSITES', 'escape'], ['DUAL_QUEST_PIXI', 'button'], ['DEMO', 'button']]) {
+    for (const [kind, close] of [['PAIRS', 'backdrop'], ['OPPOSITES', 'escape'], ['DUAL_QUEST_PIXI', 'button']]) {
       const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' })
       page.setDefaultTimeout(15000)
       const errors = []
@@ -48,14 +48,14 @@ async function main() {
         if (url.origin === base || url.protocol === 'data:') return route.continue()
         return route.abort()
       })
-      await page.goto(base + (kind === 'DEMO' ? '/dual-quest/pixi-demo' : kind === 'DUAL_QUEST_PIXI' ? '/dual-quest-pixi/test-game' : '/test-game'))
+      await page.goto(base + (kind === 'DUAL_QUEST_PIXI' ? '/dual-quest-pixi/test-game' : '/test-game'))
       if (['PAIRS', 'OPPOSITES'].includes(kind)) {
         await page.getByRole('button', { name: 'Jugar', exact: true }).click()
         await page.getByRole('button', { name: 'Empezar', exact: true }).click()
       }
       const intro = page.locator('[data-game-instructions]')
       await intro.waitFor()
-      assert.equal(await intro.getAttribute('data-game-instructions'), kind === 'DEMO' ? 'DUAL_QUEST_PIXI' : kind)
+      assert.equal(await intro.getAttribute('data-game-instructions'), kind)
       assert.equal(await page.locator('canvas').count(), 0)
       assert.equal(await page.getByText(/Zona 1 de/).count(), 0)
       assert.equal(await page.getByRole('heading', { name: /nubes de contaminación/ }).count(), 0)
@@ -68,8 +68,7 @@ async function main() {
       assert.equal(icons.length, 4)
       assert.ok(icons.every(icon => icon.size === 'h-6 w-6' && icon.hidden === 'true'))
       const signature = JSON.stringify(icons.map(icon => icon.drawing))
-      if (kind === 'DEMO') assert.equal(signature, visualExamples.get('DUAL_QUEST_PIXI'))
-      else { assert.ok(![...visualExamples.values()].includes(signature), 'Cada mecánica tiene sus propios iconos'); visualExamples.set(kind, signature) }
+      { assert.ok(![...visualExamples.values()].includes(signature), 'Cada mecánica tiene sus propios iconos'); visualExamples.set(kind, signature) }
       assert.equal(await intro.locator('button').count(), 1)
       await page.screenshot({ path: `.scratch/instructions-${kind}-desktop.png` })
       await page.setViewportSize({ width: 390, height: 844 })
