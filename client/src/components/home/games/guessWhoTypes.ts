@@ -166,6 +166,8 @@ export type TournamentStateView = {
   turnDurationSeconds: number
   phase: TournamentPhase
   currentRound: number
+  /** El juego que se sorteó para la ronda en curso; `null` antes de que arranque la primera. */
+  currentRoundGame: { title: string; level: TournamentLevel; gameType: TournamentGameType } | null
   totalRounds: number
   creatorUserId: string
   /** true para el administrador que modera: ve el panel y no juega. */

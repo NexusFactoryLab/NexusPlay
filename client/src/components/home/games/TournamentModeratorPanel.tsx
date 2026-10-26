@@ -1,8 +1,16 @@
-import { useEffect, useRef, useState } from 'react'
-import { Bot, Crown, LogOut, Medal, Radio, Swords, Trophy } from 'lucide-react'
+import { useMemo } from 'react'
+import type { ReactNode } from 'react'
+import { Bot, Crown, Layers, LogOut, Medal, Radio, Swords, Trophy, Users } from 'lucide-react'
+import { AvatarCircle } from '../../avatar/AvatarCircle'
+import { usePlayersAvatars } from '../../avatar/usePlayersAvatars'
+import type { AvatarConfig } from '../../../services/avatar.service'
 import { useFlip } from '../../../hooks/useFlip'
-import type { TournamentStateView } from './guessWhoTypes'
-import { TOURNAMENT_LEVEL_INFO } from './tournamentLevels'
+import type { TournamentLiveMatch, TournamentStateView } from './guessWhoTypes'
+import { PointsValue } from './PointsValue'
+import { TournamentPodium } from './TournamentPodium'
+import { TournamentPointsChart } from './TournamentPointsChart'
+import { TOURNAMENT_GAME_LABEL, TOURNAMENT_LEVEL_INFO } from './tournamentLevels'
+import { buildPointsHistory, rankParticipants } from './tournamentStats'
 
 type Props = {
   tournament: TournamentStateView
@@ -14,48 +22,125 @@ type Props = {
 
 const MEDAL_TONES = ['text-[#d4a017]', 'text-[#9aa3b2]', 'text-[#b4753c]']
 
-/** Puntos con un "latido" cada vez que cambian, para que se note quién acaba de sumar. */
-function Points({ value }: { value: number }) {
-  const previous = useRef(value)
-  const [bump, setBump] = useState(0)
-  useEffect(() => {
-    if (previous.current !== value) {
-      previous.current = value
-      setBump((current) => current + 1)
-    }
-  }, [value])
+const CARD = 'rounded-2xl border border-border bg-surface p-4 shadow-[var(--shadow)]'
+
+const stagger = (index: number) => ({ '--stagger': index }) as React.CSSProperties
+
+/** Avatar de una persona o, si es el bot, su icono (no tiene avatar). */
+function PlayerAvatar({ userId, name, avatars, className }: { userId: string; name: string; avatars: Record<string, AvatarConfig | null>; className: string }) {
+  if (userId.startsWith('bot:')) {
+    return (
+      <span className={`flex shrink-0 items-center justify-center rounded-full bg-accent/15 text-accent ${className}`} aria-hidden="true">
+        <Bot className="h-[60%] w-[60%]" strokeWidth={2} />
+      </span>
+    )
+  }
+  return <AvatarCircle config={avatars[userId]} name={name} className={className} />
+}
+
+function StatTile({ icon, label, value, caption, index }: { icon: ReactNode; label: string; value: ReactNode; caption: string; index: number }) {
   return (
-    <span key={bump} className={bump > 0 ? 'value-bump' : undefined}>
-      {value}
-    </span>
+    <div className={`stagger-in flex items-center gap-3 ${CARD} !p-3.5`} style={stagger(index)}>
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/12 text-accent">{icon}</span>
+      <div className="min-w-0">
+        <p className="text-[12px] text-text">{label}</p>
+        <p className="text-[22px] leading-tight font-bold tracking-tight text-text-h">{value}</p>
+        <p className="truncate text-[11.5px] text-text">{caption}</p>
+      </div>
+    </div>
+  )
+}
+
+/** Lo que pasa en una partida de la ronda: quién va, cómo va y cómo terminó. */
+function MatchStatus({ match }: { match: TournamentLiveMatch }) {
+  const nameOf = (userId: string | null) => match.players.find((p) => p.userId === userId)?.displayName
+  if (match.gameType === 'TRUE_FALSE_MAZE' && match.maze) {
+    const { answered, total, wrong } = match.maze
+    const percent = total > 0 ? Math.round((answered / total) * 100) : 0
+    if (match.phase === 'FINISHED') {
+      return (
+        <p className="flex items-center gap-1.5 text-[11.5px] text-text">
+          <Trophy className="h-3 w-3 shrink-0 text-accent" strokeWidth={2} />
+          {match.winnerUserId
+            ? 'Respondió todo bien: +1 punto'
+            : wrong > 0
+              ? `Sin punto: ${wrong} ${wrong === 1 ? 'error' : 'errores'}`
+              : 'Sin punto: no terminó'}
+        </p>
+      )
+    }
+    return (
+      <div className="flex items-center gap-2 text-[11.5px] text-text">
+        <div className="progress-track min-w-0 flex-1" role="progressbar" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100} aria-label="Respuestas">
+          <div className="progress-fill" style={{ width: `${percent}%` }} />
+        </div>
+        <span className="shrink-0 tabular-nums">
+          {answered}/{total}
+          {wrong > 0 ? ` · ${wrong} ${wrong === 1 ? 'error' : 'errores'}` : ''}
+        </span>
+      </div>
+    )
+  }
+  if (match.phase === 'FINISHED') {
+    const winner = nameOf(match.winnerUserId)
+    return (
+      <p className="flex items-center gap-1.5 text-[11.5px] text-text">
+        <Trophy className="h-3 w-3 shrink-0 text-accent" strokeWidth={2} />
+        {winner ? `Ganó ${winner}` : 'Cerrada sin ganador'}
+      </p>
+    )
+  }
+  const active = nameOf(match.activePlayerUserId)
+  return (
+    <p className="flex items-center gap-1.5 text-[11.5px] text-text">
+      <Radio className="h-3 w-3 shrink-0 text-accent" strokeWidth={2} />
+      <span className="truncate">
+        Turno de {active ?? '—'} ·{' '}
+        {match.gameType === 'DOMINO'
+          ? `fichas en mano ${match.players.map((p) => p.handCount ?? '—').join(' · ')}`
+          : `descartes ${match.players.map((p) => `${p.discardedCount}/${match.totalCards}`).join(' · ')}`}
+      </span>
+    </p>
   )
 }
 
 /**
  * Panel en vivo del administrador durante y después del torneo (issue #102):
- * quién va ganando, métricas por persona y las partidas de la ronda en curso.
+ * podio con avatares, gráfica de puntos por ronda, clasificación y las partidas
+ * de la ronda en curso. Todo se recalcula con cada estado que llega por socket.
  */
 export function TournamentModeratorPanel({ tournament, error, onClose, onEndRound, onExit }: Props) {
-  const ranking = [...tournament.participants].sort(
-    (a, b) => b.points - a.points || a.wrongAccusations - b.wrongAccusations || a.displayName.localeCompare(b.displayName),
-  )
+  const ranking = useMemo(() => rankParticipants(tournament.participants), [tournament.participants])
+  const history = useMemo(() => buildPointsHistory(tournament), [tournament])
   const finished = tournament.phase === 'FINISHED'
   const winner = tournament.participants.find((p) => p.userId === tournament.winnerUserId)
   const playing = tournament.liveMatches.filter((m) => m.phase === 'PLAYING').length
   const roundsDone = finished ? tournament.totalRounds : Math.max(0, tournament.currentRound - 1)
   const progress = Math.round((roundsDone / tournament.totalRounds) * 100)
   const rowsRef = useFlip<HTMLDivElement>()
-  const roundGame = tournament.games[(Math.max(1, tournament.currentRound) - 1) % tournament.games.length]
-  const roundInfo = TOURNAMENT_LEVEL_INFO[roundGame.level]
+  const roundGame = tournament.currentRoundGame
+  const roundInfo = roundGame ? TOURNAMENT_LEVEL_INFO[roundGame.level] : null
+  const totalPoints = tournament.participants.reduce((sum, participant) => sum + participant.points, 0)
+  const topPoints = Math.max(1, ...tournament.participants.map((participant) => participant.points))
+
+  // Avatares de todas las personas que se ven en el panel (el bot no tiene).
+  const avatarIds = useMemo(
+    () =>
+      [...new Set([...tournament.participants.map((p) => p.userId), ...tournament.liveMatches.flatMap((m) => m.players.map((p) => p.userId))])].filter(
+        (id) => !id.startsWith('bot:'),
+      ),
+    [tournament.participants, tournament.liveMatches],
+  )
+  const avatars = usePlayersAvatars(avatarIds)
 
   return (
     <div className="page-fade fixed inset-0 z-50 overflow-y-auto bg-bg">
-      <div className="mx-auto flex min-h-full max-w-[1200px] flex-col gap-5 p-5 sm:p-8">
-        <header className="stagger-in flex flex-wrap items-start justify-between gap-3" style={{ '--stagger': 0 } as React.CSSProperties}>
+      <div className="mx-auto flex min-h-full max-w-[1240px] flex-col gap-5 p-5 sm:p-8">
+        <header className="stagger-in flex flex-wrap items-start justify-between gap-3" style={stagger(0)}>
           <div className="min-w-0">
             <p className="text-[11px] font-semibold tracking-[0.18em] text-accent uppercase">Panel del administrador</p>
-            <h2 className="truncate text-[24px] font-bold tracking-tight text-text-h">{tournament.gameTitle}</h2>
-            <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[12.5px] text-text">
+            <h2 className="truncate text-[26px] font-bold tracking-tight text-text-h">{tournament.gameTitle}</h2>
+            <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-text">
               <span>
                 Código <strong className="tracking-widest text-text-h">{tournament.code}</strong>
               </span>
@@ -63,12 +148,14 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
               {finished ? (
                 <span>Torneo terminado</span>
               ) : (
-                <span className="inline-flex items-center gap-1.5">
+                <span className="inline-flex flex-wrap items-center gap-1.5">
                   <span className="live-dot" aria-hidden="true" />
-                  Ronda {tournament.currentRound} de {tournament.totalRounds} · {playing} en juego
-                  <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${roundInfo.tone}`}>
-                    {roundGame.title} · {roundInfo.label} ({roundInfo.audience})
-                  </span>
+                  En vivo
+                  {roundGame && roundInfo && (
+                    <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${roundInfo.tone}`}>
+                      {roundGame.title} · {roundInfo.label} ({roundInfo.audience})
+                    </span>
+                  )}
                 </span>
               )}
             </p>
@@ -104,28 +191,47 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
           </div>
         </header>
 
-        <div className="stagger-in" style={{ '--stagger': 1 } as React.CSSProperties}>
-          <div className="mb-1.5 flex items-center justify-between text-[11.5px] font-medium text-text">
-            <span>Avance del torneo</span>
-            <span>
-              {roundsDone} / {tournament.totalRounds} rondas
-            </span>
-          </div>
-          <div className="progress-track" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
-            <div className="progress-fill" style={{ width: `${progress}%` }} />
-          </div>
-        </div>
-
         {error && (
           <p className="rounded-lg border border-danger/35 bg-danger/10 px-3 py-2 text-sm text-danger" role="alert">
             {error}
           </p>
         )}
 
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatTile index={1} icon={<Users className="h-5 w-5" strokeWidth={2} />} label="Participantes" value={`${tournament.participants.length}/${tournament.maxParticipants}`} caption="en la sala" />
+          <StatTile
+            index={2}
+            icon={<Layers className="h-5 w-5" strokeWidth={2} />}
+            label="Ronda"
+            value={`${finished ? tournament.totalRounds : tournament.currentRound}/${tournament.totalRounds}`}
+            caption={finished ? 'Terminado' : roundGame ? roundGame.title : 'Sin iniciar'}
+          />
+          <StatTile
+            index={3}
+            icon={<Radio className="h-5 w-5" strokeWidth={2} />}
+            label="Partidas en juego"
+            value={playing}
+            caption={finished ? 'ya terminaron todas' : `de ${tournament.liveMatches.length} en esta ronda`}
+          />
+          <StatTile index={4} icon={<Trophy className="h-5 w-5" strokeWidth={2} />} label="Puntos repartidos" value={totalPoints} caption={totalPoints === 1 ? 'punto en total' : 'puntos en total'} />
+        </div>
+
+        <div className="stagger-in" style={stagger(5)}>
+          <div className="mb-1.5 flex items-center justify-between text-[11.5px] font-medium text-text">
+            <span>Avance del torneo</span>
+            <span>
+              {roundsDone} / {tournament.totalRounds} rondas
+            </span>
+          </div>
+          <div className="progress-track" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label="Avance del torneo">
+            <div className="progress-fill" style={{ width: `${progress}%` }} />
+          </div>
+        </div>
+
         {finished && winner && (
           <div
             className="stagger-in flex items-center gap-4 rounded-2xl border border-accent/30 p-4"
-            style={{ '--stagger': 2, background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent) 10%, transparent), color-mix(in srgb, var(--accent-2) 8%, transparent))' } as React.CSSProperties}
+            style={{ ...stagger(6), background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent) 10%, transparent), color-mix(in srgb, var(--accent-2) 8%, transparent))' }}
           >
             <span
               className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-white animate-[trophy-pop-in_0.6s_cubic-bezier(0.16,1,0.3,1)]"
@@ -139,112 +245,117 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
           </div>
         )}
 
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-          <section className="stagger-in rounded-2xl border border-border bg-surface p-4 shadow-[var(--shadow)]" style={{ '--stagger': 3 } as React.CSSProperties}>
-            <p className="mb-3 flex items-center gap-1.5 text-[13px] font-semibold text-text-h">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+          <section className={`stagger-in ${CARD}`} style={stagger(6)} aria-labelledby="podio-titulo">
+            <p id="podio-titulo" className="mb-2 flex items-center gap-1.5 text-[13px] font-semibold text-text-h">
               <Crown className="h-4 w-4 text-accent" strokeWidth={2} />
-              Clasificación
+              Podio
+              {!finished && <span className="live-dot ml-1" aria-hidden="true" />}
             </p>
-            <div className="overflow-x-auto">
-              <div className="min-w-[560px]">
-                <div className="grid grid-cols-[36px_minmax(0,1fr)_repeat(6,56px)] gap-x-2 px-2 pb-1.5 text-[11.5px] font-medium text-text">
-                  <span>#</span>
-                  <span>Participante</span>
-                  <span className="text-right">Pts</span>
-                  <span className="text-right">G</span>
-                  <span className="text-right">P</span>
-                  <span className="text-right">Preg.</span>
-                  <span className="text-right">Fallos</span>
-                  <span className="text-right">Bot</span>
-                </div>
-                <div ref={rowsRef} className="relative flex flex-col gap-1">
-                  {ranking.map((participant, index) => (
-                    <div
-                      key={participant.userId}
-                      data-flip-key={participant.userId}
-                      className={`rank-row grid grid-cols-[36px_minmax(0,1fr)_repeat(6,56px)] items-center gap-x-2 rounded-lg px-2 py-1.5 text-[12.5px] text-text-h ${
-                        index < 3 && participant.points > 0 ? 'rank-row--top' : ''
-                      }`}
-                    >
-                      <span className="font-semibold">
-                        {index < 3 && participant.points > 0 ? (
-                          <Medal className={`h-4 w-4 ${MEDAL_TONES[index]}`} strokeWidth={2.25} aria-label={`Puesto ${index + 1}`} />
-                        ) : (
-                          index + 1
-                        )}
-                      </span>
-                      <span className="truncate font-medium">{participant.displayName}</span>
-                      <span className="text-right font-bold">
-                        <Points value={participant.points} />
-                      </span>
-                      <span className="text-right">{participant.wins}</span>
-                      <span className="text-right">{participant.losses}</span>
-                      <span className="text-right">{participant.questionsAsked}</span>
-                      <span className="text-right">{participant.wrongAccusations}</span>
-                      <span className="text-right">{participant.botMatches}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <p className="mt-3 text-[11.5px] text-text">
-              G = ganadas · P = perdidas · Fallos = acusaciones equivocadas (desempata: menos es mejor) · Bot = partidas contra el bot
-            </p>
+            <TournamentPodium ranking={ranking} avatars={avatars} finished={finished} />
           </section>
 
-          <section className="stagger-in rounded-2xl border border-border bg-surface p-4 shadow-[var(--shadow)]" style={{ '--stagger': 4 } as React.CSSProperties}>
-            <p className="mb-3 flex items-center gap-1.5 text-[13px] font-semibold text-text-h">
+          <section className={`stagger-in ${CARD}`} style={stagger(7)} aria-labelledby="grafica-titulo">
+            <p id="grafica-titulo" className="mb-3 flex items-center gap-1.5 text-[13px] font-semibold text-text-h">
+              <Swords className="h-4 w-4 text-accent" strokeWidth={2} />
+              Puntos por ronda
+            </p>
+            <TournamentPointsChart
+              history={history}
+              ranking={ranking}
+              totalRounds={tournament.totalRounds}
+              currentRound={tournament.currentRound}
+              finished={finished}
+              avatars={avatars}
+            />
+          </section>
+        </div>
+
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+          <section className={`stagger-in ${CARD}`} style={stagger(8)} aria-labelledby="clasificacion-titulo">
+            <p id="clasificacion-titulo" className="mb-3 flex items-center gap-1.5 text-[13px] font-semibold text-text-h">
+              <Medal className="h-4 w-4 text-accent" strokeWidth={2} />
+              Clasificación
+            </p>
+            <div ref={rowsRef} className="relative flex flex-col gap-1.5">
+              {ranking.map((participant, index) => {
+                const medal = index < 3 && participant.points > 0
+                return (
+                  <div
+                    key={participant.userId}
+                    data-flip-key={participant.userId}
+                    className={`rank-row flex items-center gap-3 rounded-xl border border-transparent px-2.5 py-2 text-[12.5px] text-text-h ${medal ? 'rank-row--top' : 'hover:bg-code-bg/50'}`}
+                  >
+                    <span className="flex w-6 shrink-0 justify-center font-semibold">
+                      {medal ? <Medal className={`h-[18px] w-[18px] ${MEDAL_TONES[index]}`} strokeWidth={2.25} aria-label={`Puesto ${index + 1}`} /> : index + 1}
+                    </span>
+                    <AvatarCircle config={avatars[participant.userId]} name={participant.displayName} className="h-9 w-9 text-[12px]" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[13.5px] font-semibold">{participant.displayName}</p>
+                      <div className="mt-1 flex items-center gap-2">
+                        <div className="progress-track max-w-[220px] flex-1" aria-hidden="true">
+                          <div className="progress-fill" style={{ width: `${Math.round((participant.points / topPoints) * 100)}%` }} />
+                        </div>
+                        <span className="hidden text-[11px] text-text sm:inline">
+                          {participant.wins}G · {participant.losses}P
+                        </span>
+                      </div>
+                    </div>
+                    <div className="hidden shrink-0 items-center gap-1.5 text-[11px] text-text md:flex">
+                      <span className="rounded-md bg-code-bg px-1.5 py-0.5" title="Preguntas hechas">
+                        {participant.questionsAsked} preg.
+                      </span>
+                      <span className="rounded-md bg-code-bg px-1.5 py-0.5" title="Acusaciones equivocadas (desempata: menos es mejor)">
+                        {participant.wrongAccusations} fallos
+                      </span>
+                      <span className="rounded-md bg-code-bg px-1.5 py-0.5" title="Partidas contra el bot">
+                        {participant.botMatches} bot
+                      </span>
+                    </div>
+                    <span className="w-[46px] shrink-0 text-right text-[18px] leading-none font-bold">
+                      <PointsValue value={participant.points} />
+                      <span className="block text-[10px] font-medium text-text">{participant.points === 1 ? 'punto' : 'puntos'}</span>
+                    </span>
+                  </div>
+                )
+              })}
+              {ranking.length === 0 && <p className="text-[13px] text-text">Todavía no hay participantes.</p>}
+            </div>
+            <p className="mt-3 text-[11.5px] text-text">G = ganadas · P = perdidas · Fallos = acusaciones equivocadas (desempata: menos es mejor) · Bot = partidas contra el bot</p>
+          </section>
+
+          <section className={`stagger-in ${CARD}`} style={stagger(9)} aria-labelledby="partidas-titulo">
+            <p id="partidas-titulo" className="mb-3 flex items-center gap-1.5 text-[13px] font-semibold text-text-h">
               <Swords className="h-4 w-4 text-accent" strokeWidth={2} />
               Partidas de la ronda {tournament.currentRound}
             </p>
             <div className="flex max-h-[520px] flex-col gap-2 overflow-y-auto pr-1">
-              {tournament.liveMatches.map((match, index) => {
-                const active = match.players.find((p) => p.userId === match.activePlayerUserId)
-                return (
-                  <div
-                    key={match.matchCode}
-                    className="stagger-in rounded-xl border border-border/70 bg-code-bg/60 px-3 py-2 text-[12.5px] text-text-h transition-colors duration-300 hover:border-accent/40"
-                    style={{ '--stagger': index } as React.CSSProperties}
-                  >
-                    <p className="flex items-center gap-1.5 font-medium">
-                      {match.vsBot && <Bot className="h-3.5 w-3.5 shrink-0 text-accent" strokeWidth={2} />}
-                      <span className="truncate">{match.players.map((p) => p.displayName).join(' vs ')}</span>
-                    </p>
-                    {match.phase === 'FINISHED' ? (
-                      <p className="mt-0.5 flex items-center gap-1.5 text-[11.5px] text-text">
-                        <Trophy className="h-3 w-3 text-accent" strokeWidth={2} />
-                        {match.gameType === 'TRUE_FALSE_MAZE'
-                          ? match.winnerUserId
-                            ? 'Respondió todo bien: +1 punto'
-                            : match.maze && match.maze.wrong > 0
-                              ? `Sin punto: ${match.maze.wrong} ${match.maze.wrong === 1 ? 'error' : 'errores'}`
-                              : 'Sin punto: no terminó'
-                          : match.players.find((p) => p.userId === match.winnerUserId)?.displayName
-                            ? `Ganó ${match.players.find((p) => p.userId === match.winnerUserId)?.displayName}`
-                            : 'Cerrada sin ganador'}
-                      </p>
-                    ) : match.gameType === 'TRUE_FALSE_MAZE' && match.maze ? (
-                      <p className="mt-0.5 flex items-center gap-1.5 text-[11.5px] text-text">
-                        <Radio className="h-3 w-3 text-accent" strokeWidth={2} />
-                        <span className="truncate">
-                          Respondió {match.maze.answered}/{match.maze.total}
-                          {match.maze.wrong > 0 ? ` · ${match.maze.wrong} ${match.maze.wrong === 1 ? 'error' : 'errores'}` : ''}
-                        </span>
-                      </p>
-                    ) : (
-                      <p className="mt-0.5 flex items-center gap-1.5 text-[11.5px] text-text">
-                        <Radio className="h-3 w-3 text-accent" strokeWidth={2} />
-                        <span className="truncate">
-                          Turno de {active?.displayName ?? '—'} ·{' '}
-                          {match.gameType === 'DOMINO'
-                            ? `fichas en mano ${match.players.map((p) => p.handCount ?? '—').join(' · ')}`
-                            : `descartes ${match.players.map((p) => `${p.discardedCount}/${match.totalCards}`).join(' · ')}`}
-                        </span>
-                      </p>
-                    )}
+              {tournament.liveMatches.map((match, index) => (
+                <div
+                  key={match.matchCode}
+                  className={`stagger-in rounded-xl border border-border/70 bg-code-bg/60 px-3 py-2.5 text-[12.5px] text-text-h transition-colors duration-300 hover:border-accent/40 ${match.phase === 'FINISHED' ? 'opacity-80' : ''}`}
+                  style={stagger(index)}
+                >
+                  <div className="mb-1.5 flex items-center gap-2">
+                    <div className="flex shrink-0 -space-x-2">
+                      {match.players.map((player) => (
+                        <PlayerAvatar
+                          key={player.userId}
+                          userId={player.userId}
+                          name={player.displayName}
+                          avatars={avatars}
+                          className="h-7 w-7 border-2 border-surface text-[10px]"
+                        />
+                      ))}
+                    </div>
+                    <p className="min-w-0 flex-1 truncate font-medium">{match.players.map((p) => p.displayName).join(' vs ')}</p>
+                    <span className="shrink-0 rounded-full border border-border px-2 py-0.5 text-[10.5px] font-medium text-text">
+                      {TOURNAMENT_GAME_LABEL[match.gameType]}
+                    </span>
                   </div>
-                )
-              })}
+                  <MatchStatus match={match} />
+                </div>
+              ))}
               {tournament.liveMatches.length === 0 && <p className="text-[13px] text-text">Sin partidas todavía.</p>}
             </div>
           </section>

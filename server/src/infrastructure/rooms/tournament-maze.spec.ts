@@ -177,6 +177,13 @@ describe('Misión Galáctica en el torneo', () => {
     expect(tournament.currentRound).toBe(2);
   });
 
+  it('el estado informa el juego sorteado para la ronda en curso (el panel del administrador lo muestra)', async () => {
+    const { emitted } = await start(2, 2);
+    const states = emitted.filter((e) => e.event === 'tournament:state' && e.target === 'admin');
+    const view = (states[states.length - 1].payload as { currentRoundGame: unknown }).currentRoundGame;
+    expect(view).toEqual({ title: 'Misión Galáctica', level: 'MEDIUM', gameType: 'TRUE_FALSE_MAZE' });
+  });
+
   it('el estado que reciben los jugadores muestra su avance pero nunca las respuestas correctas', async () => {
     const { gateway, emitted, players } = await start(2, 2);
     await gateway.handleTournamentMazeAnswer(players[0], { questionId: 'q1', chosen: true });

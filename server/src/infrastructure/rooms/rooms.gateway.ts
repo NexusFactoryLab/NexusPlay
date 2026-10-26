@@ -198,6 +198,17 @@ function mazeAnswerKey(content: unknown): Map<string, boolean> {
   return answers;
 }
 
+/** Juego y nivel de la ronda en curso, tomados de sus partidas; `null` antes de que arranque la primera. */
+function currentRoundGameOf(tournament: TournamentState) {
+  const match = tournament.matches.find((m) => m.round === tournament.currentRound);
+  if (!match) return null;
+  return {
+    title: match.gameTitle ?? tournament.gameTitle,
+    level: match.level ?? ('MEDIUM' as TournamentLevel),
+    gameType: match.gameType ?? 'GUESS_WHO',
+  };
+}
+
 /** Vista pública del torneo que se envía a un participante dado. */
 function toTournamentClientView(
   tournament: TournamentState,
@@ -216,6 +227,8 @@ function toTournamentClientView(
     turnDurationSeconds: tournament.turnDurationSeconds,
     phase: tournament.phase,
     currentRound: tournament.currentRound,
+    // El juego que se sorteó para la ronda en curso (con el sorteo, ya no es `games[ronda % n]`).
+    currentRoundGame: currentRoundGameOf(tournament),
     totalRounds: tournament.totalRounds,
     creatorUserId: tournament.creatorUserId,
     /** El administrador modera: ve el panel completo y no juega. */

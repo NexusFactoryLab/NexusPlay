@@ -7310,6 +7310,22 @@ code {
   transform: translateY(-2px);
 }
 
+/* Línea de la gráfica de puntos: se dibuja una sola vez al aparecer (`pathLength` = 1,
+ * así el trazo cabe en cualquier largo) y después solo crece con cada ronda. */
+@keyframes pts-line-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.pts-line {
+  stroke-dasharray: 1;
+  animation: pts-line-draw 0.9s var(--ease-smooth) backwards;
+}
+
 /* Fila de clasificación: el reordenamiento lo anima el hook useFlip. */
 .rank-row {
   transition:
@@ -7325,6 +7341,7 @@ code {
   .page-transition,
   .page-fade,
   .stagger-in,
+  .pts-line,
   .carousel-arrow-in,
   .chip-pop,
   .value-bump,
