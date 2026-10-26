@@ -499,7 +499,7 @@ export function tournamentGuideSteps(): GuideStep[] {
       body: (
         <>
           <p>
-            El administrador elige los juegos del torneo y, <b className={strong('text-violet-300')}>en cada ronda, se sortea uno al azar</b>. Un mismo juego puede repetirse.
+            El administrador elige los juegos del torneo y, <b className={strong('text-violet-300')}>en cada ronda, se sortea uno al azar</b>. Nunca toca el mismo juego dos rondas seguidas, pero sí puede volver después.
           </p>
           <ul className="flex flex-col gap-2.5">
             <Item icon={<Shuffle className="h-4 w-4" />} tone="violet">

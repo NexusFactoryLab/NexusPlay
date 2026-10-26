@@ -78,7 +78,7 @@ export function TournamentSettingsModal({ games, loading, current, saving, onSub
             {current?.enabled ? 'Editar torneo' : 'Habilitar torneo'}
           </h2>
           <p className="mt-0.5 text-[13px] text-text">
-            Elige los juegos del torneo y la complejidad de cada uno. En cada ronda se sortea uno de ellos al azar, para que no se vuelva monótono.
+            Elige los juegos del torneo y la complejidad de cada uno. En cada ronda se sortea uno de ellos al azar y nunca se repite el de la ronda anterior (con 2 o más juegos), para que no se vuelva monótono.
           </p>
         </div>
 

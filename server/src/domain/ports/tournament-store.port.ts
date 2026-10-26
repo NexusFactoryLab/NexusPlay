@@ -118,7 +118,7 @@ export interface TournamentState {
   turnDurationSeconds: number;
   phase: TournamentPhase;
   participants: TournamentParticipant[];
-  /** Juegos del torneo, en orden: la ronda N usa el juego (N-1) % cantidad. Vacío = solo `gameId`. */
+  /** Juegos del torneo: cada ronda sortea uno sin repetir el de la ronda anterior (ver `pickRoundGameIndex`). Vacío = solo `gameId`. */
   games?: { gameId: string; title: string; level: TournamentLevel; gameType?: TournamentGameType }[];
   /** Administrador que modera el torneo: no juega ni entra al emparejamiento. */
   creatorUserId: string;
