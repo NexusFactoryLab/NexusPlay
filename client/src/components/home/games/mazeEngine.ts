@@ -305,8 +305,9 @@ export function buildLevelBoard(layout: MazeLayoutDef): LevelBoard {
   const bagCells = pickSpreadCells(open, BAG_COUNT, reserved)
   bagCells.forEach((cell) => reserved.add(cellKey(cell)))
 
-  // Una botella sí y otra no (en damero): con espacio entre ellas el mapa no se ve amontonado.
-  const petCells = open.filter((cell) => !reserved.has(cellKey(cell)) && (cell.row + cell.col) % 2 === 0)
+  // Dos botellas y un espacio a lo largo de cada calle: cerca unas de otras, pero sin
+  // llenar todas las celdas (así el mapa no se ve amontonado).
+  const petCells = open.filter((cell) => !reserved.has(cellKey(cell)) && (cell.row + cell.col) % 3 !== 0)
 
   const center = { row: Math.floor(layout.rows / 2), col: Math.floor(layout.cols / 2) }
   const bonusSpawnPoint = closestCellTo(open, center)

@@ -867,7 +867,7 @@ function toSnapshot(state: InternalState, now: number, cols: number): MazeGameSn
     answerFeedback: state.answerFeedback,
     feedbackActive: state.feedbackUntil !== null,
     questionRemainingMs:
-      state.question && !state.scenario ? (state.questionDeadline === null ? QUESTION_TIME_MS : Math.max(0, state.questionDeadline - now)) : 0,
+      state.question && !state.scenario ? (state.questionDeadline === null ? QUESTION_TIME_MS : Math.min(QUESTION_TIME_MS, Math.max(0, state.questionDeadline - now))) : 0,
   }
 }
 
@@ -942,6 +942,11 @@ export function useMazeCollectorGame({ layout, items, config, inputEnabled = tru
     setSnapshot((current) => ({ ...current, targetRounds: rounds }))
   }, [])
 
+  /** Congela el juego unos instantes (sin pausa): el reloj de la pregunta no corre y ya se puede elegir hacia dónde arrancar. */
+  const hold = useCallback((ms: number) => {
+    stateRef.current!.feedbackUntil = clockRef.current + ms
+  }, [])
+
   const setDirection = useCallback((direction: Direction) => {
     if (pausedRef.current) return
     primeGameFeedback()
@@ -962,7 +967,7 @@ export function useMazeCollectorGame({ layout, items, config, inputEnabled = tru
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [setDirection, inputEnabled])
 
-  return { ...snapshot, paused, pause, resume, setDirection, setRounds }
+  return { ...snapshot, paused, pause, resume, setDirection, setRounds, hold }
 }
 
 /** Solo para pruebas del motor. */

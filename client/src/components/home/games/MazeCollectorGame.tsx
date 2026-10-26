@@ -80,6 +80,8 @@ const GHOST_SCALE = 1.35
 const PET_SCALE = 0.62
 const POWER_SCALE = 1
 const ANSWER_SCALE = 0.95
+/** Pausa corta tras cerrar la pregunta para ubicarse en el mapa. */
+const LOCATE_MS = 1500
 /** Botellas más claras y sin tanto brillo: se leen sin competir con el camión ni con las respuestas. */
 const PET_FILTER = 'saturate(0.5) brightness(1.15) contrast(0.85)'
 /** Color de cada letra de respuesta, igual en el mapa y en el panel de la pregunta. */
@@ -343,10 +345,21 @@ function MazeCollectorSession({
     if (introId !== undefined) pause()
   }, [introId, pause])
 
+  // Al cerrar la pregunta el juego espera un momento quieto para que el jugador
+  // encuentre su camión y las letras antes de que todo se mueva.
+  const [locating, setLocating] = useState(false)
+  useEffect(() => {
+    if (!locating) return
+    const timer = window.setTimeout(() => setLocating(false), LOCATE_MS)
+    return () => window.clearTimeout(timer)
+  }, [locating])
+
   function startSearching() {
     if (!game.question) return
     setSeenQuestionId(game.question.id)
     resume()
+    game.hold(LOCATE_MS)
+    setLocating(true)
   }
 
   useEffect(() => {
@@ -682,6 +695,13 @@ function MazeCollectorSession({
           ))}
 
           <CenteredSprite row={game.player.row} col={game.player.col} cellSize={cellSize} scale={TRUCK_SCALE} zIndex={20}>
+            {/* Mientras se ubica, un aro late alrededor del camión. */}
+            {locating && (
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-[-25%] animate-ping rounded-full border-4 border-amber-300 motion-reduce:animate-none"
+              />
+            )}
             {/* Halo claro detrás del camión: sobre el mapa oscuro se encuentra de un vistazo. */}
             <div className="h-full w-full [filter:drop-shadow(0_0_7px_rgba(255,255,255,0.95))_drop-shadow(0_0_16px_rgba(52,211,153,0.75))]">
               <EcoTruckSprite
@@ -731,6 +751,14 @@ function MazeCollectorSession({
             ))}
         </div>
         {game.answerFeedback && <AnswerToast key={game.answerFeedback.id} feedback={game.answerFeedback} />}
+        {locating && (
+          <p
+            role="status"
+            className="pointer-events-none absolute left-1/2 top-4 z-40 -translate-x-1/2 rounded-full border-2 border-amber-300 bg-slate-950/90 px-5 py-2 text-[16px] font-black text-amber-200 shadow-xl"
+          >
+            ¡Ubícate! Busca tu camión y las letras
+          </p>
+        )}
       </div>
       {game.question && questionAside && (
         // Dos recuadros separados: la pregunta arriba (donde va la atención) y el estado de la partida abajo.

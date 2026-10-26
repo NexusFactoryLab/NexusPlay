@@ -192,7 +192,7 @@ describe('chooseGhostDirection', () => {
 })
 
 describe('buildLevelBoard', () => {
-  it('pone PET en una calle sí y otra no (en damero), sin pisar arranques, canecas ni bolsas', () => {
+  it('pone PET de a dos con un espacio, sin pisar arranques, canecas ni bolsas', () => {
     const layout = crossLayout()
     const board = buildLevelBoard(layout)
 
@@ -205,15 +205,15 @@ describe('buildLevelBoard', () => {
     )
     const expected = layout.grid
       .flatMap((cells, row) => cells.map((cell, col) => ({ cell, row, col })))
-      .filter(({ cell, row, col }) => cell === 0 && (row + col) % 2 === 0 && !reserved.has(`${row}:${col}`)).length
+      .filter(({ cell, row, col }) => cell === 0 && (row + col) % 3 !== 0 && !reserved.has(`${row}:${col}`)).length
 
     expect(powerCount).toBe(4)
     expect(board.bags).toHaveLength(3)
     expect(pets).toHaveLength(expected)
-    // Nunca dos botellas pegadas en la misma calle.
+    // Nunca tres botellas seguidas en una fila: siempre queda un espacio.
+    const at = (row: number, col: number) => pets.some((p) => p.pos.row === row && p.pos.col === col)
     for (const pet of pets) {
-      const neighbour = pets.find((other) => Math.abs(other.pos.row - pet.pos.row) + Math.abs(other.pos.col - pet.pos.col) === 1)
-      expect(neighbour).toBeUndefined()
+      expect(at(pet.pos.row, pet.pos.col + 1) && at(pet.pos.row, pet.pos.col + 2)).toBe(false)
     }
   })
 
