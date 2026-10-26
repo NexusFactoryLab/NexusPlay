@@ -617,20 +617,37 @@ function insideArea(pos: CellPosition, area: { row: number; col: number; rows: n
   return pos.row >= area.row && pos.row < area.row + area.rows && pos.col >= area.col && pos.col < area.col + area.cols
 }
 
-function interpolated(entity: Moving): { row: number; col: number } {
-  return {
-    row: entity.pos.row + (entity.nextPos.row - entity.pos.row) * entity.progress,
-    col: entity.pos.col + (entity.nextPos.col - entity.pos.col) * entity.progress,
-  }
+/**
+ * Posición entre dos celdas. Al cruzar un túnel `pos` y `nextPos` quedan en
+ * bordes opuestos: antes se interpolaba atravesando TODO el mapa (el camión
+ * parecía "arrastrado" de un lado al otro y podía chocar con una nube del
+ * medio). Ahora avanza una sola celda hacia afuera del borde y reaparece por
+ * el otro lado.
+ */
+function interpolated(entity: Moving, cols: number): { row: number; col: number } {
+  let deltaCol = entity.nextPos.col - entity.pos.col
+  if (Math.abs(deltaCol) > 1) deltaCol = deltaCol > 0 ? deltaCol - cols : deltaCol + cols
+  let col = entity.pos.col + deltaCol * entity.progress
+  // Pasada la mitad del cruce ya se dibuja entrando por el otro borde.
+  if (col < -0.5) col += cols
+  else if (col > cols - 0.5) col -= cols
+  return { row: entity.pos.row + (entity.nextPos.row - entity.pos.row) * entity.progress, col }
+}
+
+/** Distancia entre dos puntos del mapa contando el atajo de los túneles. */
+function wrappedDistance(a: { row: number; col: number }, b: { row: number; col: number }, cols: number): number {
+  let deltaCol = Math.abs(a.col - b.col)
+  if (deltaCol > cols / 2) deltaCol = cols - deltaCol
+  return Math.hypot(a.row - b.row, deltaCol)
 }
 
 function resolveGhostCollisions(state: InternalState, layout: MazeLayoutDef) {
-  const playerPoint = interpolated(state.player)
+  const playerPoint = interpolated(state.player, layout.cols)
 
   for (const ghost of state.ghosts) {
     if (ghost.mode === 'EATEN') continue
-    const ghostPoint = interpolated(ghost)
-    const distance = Math.hypot(playerPoint.row - ghostPoint.row, playerPoint.col - ghostPoint.col)
+    const ghostPoint = interpolated(ghost, layout.cols)
+    const distance = wrappedDistance(playerPoint, ghostPoint, layout.cols)
     if (distance > COLLISION_RADIUS) continue
 
     if (ghost.mode === 'FRIGHTENED') {
@@ -770,8 +787,8 @@ export type MazeGameSnapshot = {
   feedbackActive: boolean
 }
 
-function toSnapshot(state: InternalState, now: number): MazeGameSnapshot {
-  const playerPoint = interpolated(state.player)
+function toSnapshot(state: InternalState, now: number, cols: number): MazeGameSnapshot {
+  const playerPoint = interpolated(state.player, cols)
   return {
     phase: state.phase,
     level: state.level,
@@ -780,7 +797,7 @@ function toSnapshot(state: InternalState, now: number): MazeGameSnapshot {
     lives: state.lives,
     player: { row: playerPoint.row, col: playerPoint.col, facing: state.player.facing, slowed: now < state.player.slowUntil },
     ghosts: state.ghosts.map((ghost) => {
-      const point = interpolated(ghost)
+      const point = interpolated(ghost, cols)
       return {
         id: ghost.id,
         name: ghost.name,
@@ -829,7 +846,7 @@ export function useMazeCollectorGame({ layout, items, config, inputEnabled = tru
     stateRef.current = createInitialState(layout, items, config, scenario ?? null, questions)
   }
 
-  const [snapshot, setSnapshot] = useState<MazeGameSnapshot>(() => toSnapshot(stateRef.current!, 0))
+  const [snapshot, setSnapshot] = useState<MazeGameSnapshot>(() => toSnapshot(stateRef.current!, 0, layout.cols))
   const frameRef = useRef<number>(0)
   const lastTimeRef = useRef<number | null>(null)
   // Reloj de juego (issue #82): solo avanza fuera de la pausa. El motor guarda
@@ -851,7 +868,7 @@ export function useMazeCollectorGame({ layout, items, config, inputEnabled = tru
       if (pausedRef.current) return
       clockRef.current += elapsedMs
       tickEngine(stateRef.current!, layout, items, clockRef.current, elapsedMs / 1000)
-      setSnapshot(toSnapshot(stateRef.current!, clockRef.current))
+      setSnapshot(toSnapshot(stateRef.current!, clockRef.current, layout.cols))
     }
     frameRef.current = requestAnimationFrame(frame)
     return () => {
@@ -906,4 +923,4 @@ export function useMazeCollectorGame({ layout, items, config, inputEnabled = tru
 }
 
 /** Solo para pruebas del motor. */
-export const __engineForTests = { createInitialState, tickEngine }
+export const __engineForTests = { createInitialState, tickEngine, interpolated, wrappedDistance }

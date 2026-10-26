@@ -524,7 +524,7 @@ const STEPS: Step[] = [
           <b className="text-white">Celular e-waste:</b> aparece de vez en cuando en el centro. Recógelo rápido para ganar +{POINTS_BONUS} y un dato curioso.
         </Item>
         <Item icon={<Route className="h-4 w-4" />} tone="emerald">
-          <b className="text-white">Túneles:</b> en las avenidas, sal por un borde de la ciudad y apareces por el otro. ¡Ideal para escapar!
+          <b className="text-white">Túneles:</b> en las 2 avenidas del centro (las del arco verde), sal por un borde de la ciudad y apareces por el otro. ¡Ideal para escapar!
         </Item>
       </ul>
     ),

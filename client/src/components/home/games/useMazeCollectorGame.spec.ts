@@ -107,6 +107,34 @@ describe('Camión Reciclador: purificador del tutorial', () => {
   })
 })
 
+describe('Camión Reciclador: túneles', () => {
+  it('solo las 2 avenidas centrales tienen túnel', () => {
+    expect(city.tunnelRows).toEqual([6, 13])
+  })
+
+  it('al cruzar un túnel avanza hacia el borde y reaparece del otro lado (no cruza todo el mapa)', () => {
+    const crossing = { pos: { row: 6, col: 0 }, nextPos: { row: 6, col: city.cols - 1 }, progress: 0.3, facing: 'LEFT' as const }
+    expect(engine.interpolated(crossing, city.cols).col).toBeCloseTo(-0.3)
+    expect(engine.interpolated({ ...crossing, progress: 0.7 }, city.cols).col).toBeCloseTo(city.cols - 0.7)
+  })
+
+  it('una nube en medio del mapa no alcanza al camión que cruza el túnel', () => {
+    const atEdge = { row: 6, col: -0.3 }
+    expect(engine.wrappedDistance(atEdge, { row: 6, col: 12 }, city.cols)).toBeGreaterThan(5)
+    // Y una que espera del otro lado del túnel sí está cerca.
+    expect(engine.wrappedDistance(atEdge, { row: 6, col: city.cols - 1 }, city.cols)).toBeLessThan(1)
+  })
+
+  it('el camión no se teletransporta por una avenida sin túnel', () => {
+    const state = engine.createInitialState(city, [], config)
+    state.ghosts = []
+    state.phase = 'playing'
+    state.player = { pos: { row: 10, col: 1 }, nextPos: { row: 10, col: 1 }, progress: 0, facing: 'LEFT', desiredDirection: 'LEFT', slowUntil: 0 }
+    for (let now = 16; now < 2000; now += 16) engine.tickEngine(state, city, [], now, FRAME)
+    expect(state.player.pos.col).toBeLessThan(city.cols / 2)
+  })
+})
+
 describe('Camión Reciclador: rondas para salvar la ciudad', () => {
   /** Deja una sola botella en el mapa y maneja hasta ella. */
   function cleanCity(state: State) {
