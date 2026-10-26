@@ -4623,6 +4623,13 @@ code {
   .home-fit .home-hero-inner {
     flex-wrap: nowrap;
   }
+
+  /* PageTransition envuelve la página con `min-h-full`, que no es un alto
+   * definido: sin esto `lg:h-full` de la sección se pierde, el carrusel
+   * (container-type: size) colapsa a 0 de alto y las tarjetas no se ven. */
+  .page-transition:has(> .home-fit) {
+    height: 100%;
+  }
 }
 
 .home-fit .home-hero {
