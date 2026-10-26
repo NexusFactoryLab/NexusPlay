@@ -90,7 +90,7 @@ export function ArtTruckQuestion() {
     <Scene>
       <Floor />
       <At style={{ left: '6%', top: '6%', width: '44%', borderRadius: '0.8cqw', background: 'rgba(15,23,42,0.85)', border: '1px solid rgba(255,255,255,0.2)', padding: '1.2cqw 1.6cqw', fontSize: cqw(3.2), fontWeight: 700, color: 'white', lineHeight: 1.25 }}>
-        ¿De qué color es la caneca para lo aprovechable?
+        ¿Qué es una ciudad sostenible?
       </At>
       {letters.map(({ letter, color, left, top, ok }, i) => (
         <At

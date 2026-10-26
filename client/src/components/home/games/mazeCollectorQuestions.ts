@@ -4,10 +4,14 @@
  * que llegar a la correcta. Una respuesta incorrecta quita una vida.
  *
  * Quien crea el juego escribe sus propias preguntas (`config.questions`); los
- * juegos que no tienen usan este banco sobre ciudades sostenibles de Colombia.
- * Fuentes: Resolución 2184 de 2019 (código de colores de las canecas),
- * Ministerio de Vivienda (recicladores de oficio), Semana / La República
- * (tasa de reciclaje cercana al 17 %), Alcaldías de Bogotá, Medellín y Cali.
+ * juegos que no tienen usan este banco. Cada pregunta enseña un concepto de
+ * ciudad sostenible y cómo se aplica en una ciudad de Colombia (no datos
+ * sueltos para memorizar).
+ *
+ * Fuentes: Alcaldía de Bogotá y TransMilenio (flota eléctrica, TransMiCable,
+ * Ciclovía, humedales), estudio TrUST sobre TransMiCable, PNUMA / ONU Medio
+ * Ambiente (Corredores Verdes de Medellín), WWF (Montería en el One Planet
+ * City Challenge), Ministerio de Vivienda (recicladores de oficio), ONU (ODS 11).
  */
 // En el banco la correcta va primero por claridad; el juego baraja las respuestas al mostrarlas.
 export type MazeQuestion = {
@@ -27,84 +31,104 @@ export const MAX_OPTION_LENGTH = 60
 export const ANSWER_LETTERS = ['A', 'B', 'C', 'D'] as const
 
 export const SUSTAINABLE_CITY_QUESTIONS: MazeQuestion[] = [
+  // ---- Qué es una ciudad sostenible ----
   {
-    question: 'En Colombia, ¿de qué color es la caneca para los residuos aprovechables (plástico, vidrio, papel, metal)?',
-    options: ['Blanca', 'Negra', 'Verde', 'Roja'],
+    question: '¿Qué es una ciudad sostenible?',
+    options: [
+      'Cuida el ambiente, a su gente y su economía, hoy y mañana',
+      'Tiene muchos edificios altos',
+      'Todos andan en carro',
+      'Solo siembra árboles',
+    ],
     correctIndex: 0,
   },
   {
-    question: '¿Qué va en la caneca verde?',
-    options: ['Restos de comida y cáscaras', 'Botellas de plástico', 'Pilas usadas', 'Latas'],
+    question: '¿Qué Objetivo de Desarrollo Sostenible (ODS) busca ciudades inclusivas, seguras y sostenibles?',
+    options: ['El ODS 11', 'El ODS 1', 'El ODS 4', 'El ODS 14'],
+    correctIndex: 0,
+  },
+  // ---- Movilidad sostenible ----
+  {
+    question: 'Bogotá tiene una de las flotas de buses eléctricos más grandes del mundo fuera de China. ¿Por qué ayuda a la ciudad?',
+    options: ['No echan humo: el aire queda más limpio', 'Van más rápido que un avión', 'No necesitan conductor', 'Son más baratos de pintar'],
     correctIndex: 0,
   },
   {
-    question: '¿Qué va en la caneca negra?',
-    options: ['Papel higiénico y servilletas usadas', 'Botellas de vidrio', 'Cartón limpio', 'Cáscaras de fruta'],
+    question: 'El TransMiCable de Ciudad Bolívar (Bogotá) es un cable aéreo. ¿Qué cambió para quienes viven en esas lomas?',
+    options: ['Llegan mucho más rápido al resto de la ciudad', 'Ya no pueden salir del barrio', 'Tienen que pagar peaje', 'Hay más trancones en la loma'],
     correctIndex: 0,
   },
   {
-    question: '¿Qué ciudad colombiana fue pionera en usar teleféricos (Metrocable) como transporte público?',
-    options: ['Medellín', 'Cartagena', 'Barranquilla', 'Santa Marta'],
+    question: 'Medellín unió sus barrios de montaña al metro con el Metrocable. ¿Qué idea de ciudad sostenible muestra?',
+    options: [
+      'Transporte público que incluye a todos los barrios',
+      'Que cada familia compre su carro',
+      'Cerrar los barrios de montaña',
+      'Quitar el metro de la ciudad',
+    ],
     correctIndex: 0,
   },
   {
-    question: '¿Cómo se llama el sistema de buses de tránsito rápido de Bogotá?',
-    options: ['TransMilenio', 'MIO', 'Megabús', 'Metrolínea'],
+    question: 'Los domingos y festivos la Ciclovía de Bogotá cierra calles a los carros. ¿Qué gana la ciudad?',
+    options: ['Espacio para caminar, pedalear y hacer ejercicio', 'Más ruido de motores', 'Más parqueaderos', 'Menos gente en la calle'],
     correctIndex: 0,
   },
   {
-    question: '¿Cómo se llama el sistema de transporte masivo de Cali?',
-    options: ['MIO', 'TransMilenio', 'Transcaribe', 'Metroplús'],
+    question: 'Montería fue reconocida por WWF por su plan de movilidad sostenible. ¿Qué medio de transporte impulsó?',
+    options: ['La bicicleta, con ciclorrutas', 'El avión para viajes cortos', 'Las motos sin casco', 'Los carros de un solo pasajero'],
+    correctIndex: 0,
+  },
+  // ---- Naturaleza en la ciudad ----
+  {
+    question: 'Una «isla de calor» es una zona de la ciudad con mucho cemento y pocas plantas. ¿Qué le pasa?',
+    options: ['Se calienta mucho más que su alrededor', 'Se inunda de nieve', 'Se queda sin luz', 'Se vuelve una isla de verdad'],
     correctIndex: 0,
   },
   {
-    question: 'La Ciclovía de Bogotá cierra calles a los carros para bicicletas y peatones. ¿Cuándo?',
-    options: ['Domingos y festivos', 'Solo en diciembre', 'Todas las noches', 'Nunca'],
+    question: 'Medellín sembró árboles y plantas en calles y quebradas: los Corredores Verdes. ¿Qué lograron?',
+    options: ['Bajar la temperatura y mejorar el aire', 'Más tráfico en esas calles', 'Que llueva menos', 'Tapar las quebradas'],
     correctIndex: 0,
   },
   {
-    question: '¿Quiénes son los recicladores de oficio?',
-    options: ['Personas que recuperan y clasifican material reciclable como trabajo', 'Máquinas que queman basura', 'Turistas', 'Policías de tránsito'],
+    question: 'Bogotá protege sus humedales. ¿Para qué le sirven a la ciudad?',
+    options: ['Guardan el agua de lluvia y son hogar de aves', 'Sirven para botar escombros', 'Producen plástico', 'Calientan el aire'],
     correctIndex: 0,
   },
   {
-    question: 'Más o menos, ¿cuánto de la basura que se produce en Colombia se recicla?',
-    options: ['Menos del 20 %', 'Cerca de la mitad', 'Más del 80 %', 'Toda'],
+    question: 'Cuando llueve fuerte, ¿qué ayuda a que una ciudad no se inunde?',
+    options: ['Parques, zonas verdes y humedales que absorben el agua', 'Pavimentar todo', 'Tapar los desagües', 'Construir sobre los ríos'],
+    correctIndex: 0,
+  },
+  // ---- Residuos y economía circular ----
+  {
+    question: '¿Qué es la economía circular?',
+    options: [
+      'Volver a usar y reciclar los materiales en lugar de botarlos',
+      'Comprar y botar cada vez más rápido',
+      'Pagar todo con monedas',
+      'Enterrar la basura en círculos',
+    ],
     correctIndex: 0,
   },
   {
-    question: 'Los Corredores Verdes de Medellín llenan calles de árboles y plantas. ¿Para qué sirven?',
-    options: ['Bajar el calor y limpiar el aire', 'Tener más parqueaderos', 'Hacer más ruido', 'Gastar más agua'],
+    question: 'En Colombia los recicladores de oficio son parte del servicio de aseo. ¿Cómo les ayudamos desde la casa?',
+    options: ['Separando lo reciclable limpio y seco', 'Mezclando todo en una bolsa', 'Quemando la basura', 'Botando los residuos al río'],
     correctIndex: 0,
   },
   {
-    question: '¿Qué significa «separar en la fuente»?',
-    options: ['Clasificar los residuos en casa, donde se producen', 'Tirar todo a la misma bolsa', 'Lavar la calle', 'Quemar la basura'],
+    question: 'En Colombia se recicla menos del 20 % de la basura. ¿Qué haría subir esa cifra?',
+    options: ['Separar los residuos en casa, donde se producen', 'Usar más bolsas de un solo uso', 'Botar todo junto', 'Producir más basura'],
+    correctIndex: 0,
+  },
+  // ---- Energía y calidad del aire ----
+  {
+    question: 'La Guajira tiene mucho sol y viento. ¿Por qué es importante para una Colombia sostenible?',
+    options: ['Puede producir energía limpia solar y eólica', 'Allí se quema más carbón', 'No tiene ninguna importancia', 'Porque allí no llueve nunca'],
     correctIndex: 0,
   },
   {
-    question: '¿Cuáles son las 3R del cuidado ambiental?',
-    options: ['Reducir, reutilizar y reciclar', 'Romper, regar y repetir', 'Rápido, ruido y recoger', 'Reír, rodar y remar'],
-    correctIndex: 0,
-  },
-  {
-    question: '¿Cuál de estos es un medio de transporte sostenible?',
-    options: ['La bicicleta', 'Un carro solo con una persona', 'Una moto vieja que bota humo', 'Un avión para ir a la tienda'],
-    correctIndex: 0,
-  },
-  {
-    question: '¿Qué hacen los humedales de ciudades como Bogotá?',
-    options: ['Guardan agua y son hogar de aves', 'Producen plástico', 'Contaminan el aire', 'Sirven de basurero'],
-    correctIndex: 0,
-  },
-  {
-    question: 'La mayor parte de la electricidad de Colombia se produce con…',
-    options: ['Agua (hidroeléctricas)', 'Carbón', 'Petróleo', 'Leña'],
-    correctIndex: 0,
-  },
-  {
-    question: '¿Qué Objetivo de Desarrollo Sostenible (ODS) habla de las ciudades?',
-    options: ['ODS 11: Ciudades y comunidades sostenibles', 'ODS 1: Fin de la pobreza', 'ODS 4: Educación de calidad', 'ODS 14: Vida submarina'],
+    question: 'Cuando el aire del Valle de Aburrá (Medellín) está muy contaminado, ¿qué medida ayuda?',
+    options: ['Usar menos el carro y más el transporte público', 'Quemar hojas en el patio', 'Prender más motores', 'Cerrar los parques'],
     correctIndex: 0,
   },
 ]
