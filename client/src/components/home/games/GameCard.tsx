@@ -56,7 +56,7 @@ export function GameCard({
       type="button"
       onClick={handleClick}
       data-just-created={justCreated ? 'true' : undefined}
-      className={`game-card group relative flex h-full min-w-0 w-full flex-col overflow-hidden rounded-2xl border bg-surface text-left shadow-[var(--shadow)] transition-transform hover:-translate-y-1 ${
+      className={`game-card group relative flex h-full min-w-0 w-full flex-col overflow-hidden rounded-2xl border bg-surface text-left shadow-[var(--shadow)] transition-transform duration-300 ease-[var(--ease-smooth)] hover:-translate-y-1.5 active:translate-y-0 ${
         justCreated
           ? 'border-accent ring-2 ring-accent/60 shadow-[0_0_0_4px_rgba(var(--accent-rgb,59,130,246),0.15),0_0_28px_-4px_var(--accent)] animate-[glow-pulse_1.8s_ease-in-out_infinite]'
           : 'border-border'

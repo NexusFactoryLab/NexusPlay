@@ -78,7 +78,7 @@ function CarouselArrow({ side, onClick, children }: { side: 'left' | 'right'; on
       type="button"
       onClick={onClick}
       aria-label={side === 'left' ? 'Ver juegos anteriores' : 'Ver más juegos'}
-      className={`games-carousel-arrow absolute top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-surface text-text-h shadow-[var(--shadow)] transition-transform hover:scale-110 ${
+      className={`games-carousel-arrow carousel-arrow-in absolute top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-surface text-text-h shadow-[var(--shadow)] transition-transform duration-300 ease-[var(--ease-smooth)] hover:scale-110 active:scale-95 ${
         side === 'left' ? '-left-3' : '-right-3'
       }`}
     >

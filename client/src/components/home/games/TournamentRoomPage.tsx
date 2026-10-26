@@ -15,6 +15,12 @@ import { MatchBoard } from './MatchBoard'
 import { MIN_DISCARDS_TO_ACCUSE } from './guessWhoTypes'
 import { TOURNAMENT_LEVEL_INFO } from './tournamentLevels'
 
+/** Cuánto se ve el anuncio de emparejamiento; el aviso se desvanece justo al cumplirse (`.overlay-timed`). */
+const PAIRING_OVERLAY_MS = 3200
+/** Espera antes de entrar a la partida de Dominó o a la misión: es lo que dura su anuncio. */
+const MATCH_ENTRY_DELAY_MS = 2600
+const MAZE_ENTRY_DELAY_MS = MATCH_ENTRY_DELAY_MS
+
 /**
  * Sala de torneo por puntos, moderado por un administrador ("¿Quién Es?" grupal) en página propia (ruta
  * `/quien-es/torneo/:code?`, ver App.tsx), mismo criterio que
@@ -91,7 +97,7 @@ function TournamentSession() {
     const timeout = setTimeout(() => {
       setShowPairingOverlay(false)
       clearPairingAnnouncement()
-    }, 3200)
+    }, PAIRING_OVERLAY_MS)
     return () => clearTimeout(timeout)
   }, [pairingAnnouncement, clearPairingAnnouncement])
 
@@ -102,7 +108,7 @@ function TournamentSession() {
   useEffect(() => {
     if (!dominoMatch?.dominoRoomCode || !tournament) return
     const target = `/domino/sala/${encodeURIComponent(dominoMatch.dominoRoomCode)}?torneo=${encodeURIComponent(tournament.code)}`
-    const timeout = setTimeout(() => navigate(target), 2600)
+    const timeout = setTimeout(() => navigate(target), MATCH_ENTRY_DELAY_MS)
     return () => clearTimeout(timeout)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dominoMatch?.matchCode])
@@ -113,7 +119,7 @@ function TournamentSession() {
   useEffect(() => {
     if (!mazeMatch || !tournament) return
     const target = `/laberinto-vf/torneo/${encodeURIComponent(tournament.code)}`
-    const timeout = setTimeout(() => navigate(target), 2600)
+    const timeout = setTimeout(() => navigate(target), MAZE_ENTRY_DELAY_MS)
     return () => clearTimeout(timeout)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mazeMatch?.matchCode])
@@ -265,6 +271,7 @@ function TournamentSession() {
         <PairingAnnouncementOverlay
           announcement={{ round: dominoMatch.round, pairing: dominoMatch.players.map((p) => ({ userId: p.userId, displayName: p.displayName })) }}
           selfUserId={user?.id ?? null}
+          durationMs={MATCH_ENTRY_DELAY_MS}
         />
       )}
       {mazeMatch && <MazeRoundAnnouncement round={mazeMatch.round} title={mazeMatch.gameTitle} />}
@@ -546,7 +553,10 @@ function RoundsRanking({
 /** Aviso de una ronda de Misión Galáctica: no hay pareja, cada persona juega sola. */
 function MazeRoundAnnouncement({ round, title }: { round: number; title: string }) {
   return (
-    <div className="page-fade fixed inset-0 z-[70] flex flex-col items-center justify-center gap-4 bg-black/75 px-5 text-center text-white backdrop-blur-md">
+    <div
+      className="overlay-timed fixed inset-0 z-[70] flex flex-col items-center justify-center gap-4 bg-black/75 px-5 text-center text-white backdrop-blur-md"
+      style={{ '--overlay-ms': `${MAZE_ENTRY_DELAY_MS}ms` } as React.CSSProperties}
+    >
       <p className="stagger-in text-[13px] font-semibold tracking-[0.22em] text-white/70 uppercase">Ronda {round}</p>
       <p className="stagger-in text-[26px] font-bold sm:text-[32px]" style={{ '--stagger': 1 } as React.CSSProperties}>
         {title}
@@ -561,16 +571,22 @@ function MazeRoundAnnouncement({ round, title }: { round: number; title: string 
 function PairingAnnouncementOverlay({
   announcement,
   selfUserId,
+  durationMs = PAIRING_OVERLAY_MS,
 }: {
   announcement: { round: number; pairing: { userId: string; displayName: string }[] }
   selfUserId: string | null
+  /** Cuánto se muestra: coincide con el temporizador que lo retira o que navega a la partida. */
+  durationMs?: number
 }) {
   const self = announcement.pairing.find((p) => p.userId === selfUserId)
   const rival = announcement.pairing.find((p) => p.userId !== selfUserId)
   const rivalIsBot = rival?.userId.startsWith('bot:') === true
 
   return (
-    <div className="page-fade fixed inset-0 z-[70] flex flex-col items-center justify-center gap-6 bg-black/75 px-5 text-center backdrop-blur-md">
+    <div
+      className="overlay-timed fixed inset-0 z-[70] flex flex-col items-center justify-center gap-6 bg-black/75 px-5 text-center backdrop-blur-md"
+      style={{ '--overlay-ms': `${durationMs}ms` } as React.CSSProperties}
+    >
       <p className="stagger-in text-[13px] font-semibold tracking-[0.22em] text-white/70 uppercase">Ronda {announcement.round}</p>
       <div className="flex w-full max-w-[640px] items-center justify-center gap-4 sm:gap-8">
         <div className="versus-left min-w-0 flex-1 rounded-2xl border border-white/15 bg-white/10 px-4 py-5 text-white">

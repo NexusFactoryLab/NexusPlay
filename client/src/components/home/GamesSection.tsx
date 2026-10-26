@@ -1265,10 +1265,8 @@ export function GamesSection({
                 filteredGames.map((game, index) => (
                   <div
                     key={game.id}
-                    className={`animate-[fade-in-up_0.35s_ease-out_backwards] ${
-                      mode === 'all' ? 'games-carousel-item shrink-0 snap-start' : ''
-                    }`}
-                    style={{ animationDelay: `${Math.min(index, 8) * 40}ms` }}
+                    className={`stagger-in ${mode === 'all' ? 'games-carousel-item shrink-0 snap-start' : ''}`}
+                    style={{ '--stagger': index } as React.CSSProperties}
                   >
                     <GameCard
                       game={game}

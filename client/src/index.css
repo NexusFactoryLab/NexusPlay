@@ -7111,6 +7111,55 @@ code {
   animation-delay: calc(min(var(--stagger, 0), 14) * 38ms);
 }
 
+/* Salida de popups (Modal.tsx): lo contrario de la entrada, más corta, para que
+ * cerrar se sienta tan cuidado como abrir y no un corte seco. */
+@keyframes modal-backdrop-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes modal-panel-out {
+  to {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}
+
+/* Aviso a pantalla completa con tiempo propio (anuncio de duelo, de misión): entra,
+ * se queda y se desvanece justo antes de que el componente lo quite. La duración
+ * la fija `--overlay-ms`, que debe coincidir con el temporizador que lo retira;
+ * `pointer-events: none` por si queda invisible un instante de más. */
+@keyframes overlay-in-out {
+  0% {
+    opacity: 0;
+  }
+  10%,
+  86% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.overlay-timed {
+  pointer-events: none;
+  animation: overlay-in-out var(--overlay-ms, 3000ms) var(--ease-smooth) forwards;
+}
+
+/* Flechas del carrusel: aparecen y no "saltan" al pasar a la siguiente página.
+ * Solo opacidad: ya llevan su propio transform para centrarse. */
+@keyframes arrow-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.carousel-arrow-in {
+  animation: arrow-fade-in 0.3s var(--ease-smooth) backwards;
+}
+
 /* Participante que entra a la sala de espera. */
 @keyframes chip-pop {
   0% {
@@ -7276,6 +7325,7 @@ code {
   .page-transition,
   .page-fade,
   .stagger-in,
+  .carousel-arrow-in,
   .chip-pop,
   .value-bump,
   .live-dot,
