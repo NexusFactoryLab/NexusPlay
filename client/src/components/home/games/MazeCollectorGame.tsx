@@ -4,7 +4,7 @@ import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, BookOpen, CircleHelp, LogOut
 import type { MazeCollectorConfig, MazeCollectorItem, MazeLayoutDef, CellPosition } from './mazeCollectorTypes'
 import { iconForConcept } from './mazeCollectorTypes'
 import { POWER_MODE_MS } from './mazeEngine'
-import { useMazeCollectorGame } from './useMazeCollectorGame'
+import { QUESTION_TIME_MS, useMazeCollectorGame } from './useMazeCollectorGame'
 import type { ActiveQuestion, AnswerFeedback, Direction, MazeAnswer, MazeScenario } from './useMazeCollectorGame'
 import type { MazeQuestion } from './mazeCollectorQuestions'
 import { EcoTruckSprite } from './EcoTruckSprite'
@@ -500,7 +500,9 @@ function MazeCollectorSession({
       </header>
 
       <div className={`relative flex min-h-0 flex-1 ${questionAside ? 'flex-row' : 'flex-col'}`}>
-      {game.question && !questionAside && <QuestionPanel question={game.question} feedback={game.answerFeedback} layout="bar" />}
+      {game.question && !questionAside && (
+        <QuestionPanel question={game.question} feedback={game.answerFeedback} remainingMs={game.questionRemainingMs} layout="bar" />
+      )}
       <div
         ref={stageRef}
         className={`relative min-h-0 min-w-0 flex-1 p-1.5 sm:p-2 ${cameraMode ? 'overflow-hidden' : 'overflow-auto'} ${coarsePointer ? 'touch-none select-none' : ''}`}
@@ -682,7 +684,9 @@ function MazeCollectorSession({
         </div>
         {game.answerFeedback && <AnswerToast key={game.answerFeedback.id} feedback={game.answerFeedback} />}
       </div>
-      {game.question && questionAside && <QuestionPanel question={game.question} feedback={game.answerFeedback} layout="aside" />}
+      {game.question && questionAside && (
+        <QuestionPanel question={game.question} feedback={game.answerFeedback} remainingMs={game.questionRemainingMs} layout="aside" />
+      )}
       </div>
 
       {game.lastCollected?.fact && playing && (
@@ -716,10 +720,10 @@ function MazeCollectorSession({
           </div>
           <h2 className="mt-2 text-[22px] font-bold tracking-tight text-white [@media(max-height:520px)]:mt-0">¡A limpiar la ciudad!</h2>
           <p className="mx-auto mt-1.5 max-w-[400px] text-[13.5px] leading-relaxed text-slate-300">
-            Recoge todas las botellas PET con el {config.collectorLabel.toLowerCase()} y esquiva las nubes de contaminación.{' '}
+            Para salvar la ciudad, <b className="text-white">recoge todas las botellas PET</b> con el {config.collectorLabel.toLowerCase()} y esquiva las nubes de contaminación.{' '}
             {game.question && (
               <>
-                Lee la pregunta y <b className="text-white">maneja hasta la respuesta correcta</b>: una equivocada te quita una vida.{' '}
+                Lee la pregunta y <b className="text-white">maneja hasta la respuesta correcta</b> antes de que se acabe el tiempo: una equivocada te quita una vida.{' '}
               </>
             )}
             {coarsePointer ? (
@@ -803,7 +807,7 @@ function MazeCollectorSession({
       )}
 
       {questionIntro && !guideOpen && (
-        <QuestionIntro question={questionIntro} number={game.answeredCorrect + 1} onGo={startSearching} />
+        <QuestionIntro question={questionIntro} number={game.answeredCorrect + 1} timed={!tutorial} onGo={startSearching} />
       )}
 
       {game.paused && !guideOpen && !questionIntro && (
@@ -848,7 +852,18 @@ function AnswerMarker({ answer, cellSize, style }: { answer: MazeAnswer; cellSiz
 }
 
 /** La pregunta en curso y sus respuestas (las equivocadas quedan tachadas). */
-function QuestionPanel({ question, feedback, layout }: { question: ActiveQuestion; feedback: AnswerFeedback | null; layout: 'aside' | 'bar' }) {
+function QuestionPanel({
+  question,
+  feedback,
+  remainingMs,
+  layout,
+}: {
+  question: ActiveQuestion
+  feedback: AnswerFeedback | null
+  /** 0 = sin reloj (tutorial). */
+  remainingMs: number
+  layout: 'aside' | 'bar'
+}) {
   const aside = layout === 'aside'
   return (
     <section
@@ -865,8 +880,10 @@ function QuestionPanel({ question, feedback, layout }: { question: ActiveQuestio
         className={`flex items-start gap-2 font-bold text-white animate-[fade-in-up_0.35s_ease-out] ${aside ? 'text-[17px] leading-snug' : 'text-[14px] leading-tight sm:text-[15px]'}`}
       >
         <CircleHelp className={`shrink-0 text-emerald-300 ${aside ? 'mt-0.5 h-5 w-5' : 'h-4 w-4'}`} aria-hidden="true" />
-        <span>{question.question}</span>
+        <span className="min-w-0 flex-1">{question.question}</span>
+        {remainingMs > 0 && !aside && <QuestionClock remainingMs={remainingMs} compact />}
       </p>
+      {remainingMs > 0 && aside && <QuestionClock remainingMs={remainingMs} />}
       <ul className={aside ? 'flex flex-col gap-2' : 'mt-1.5 grid grid-cols-2 gap-x-2 gap-y-1 [@media(max-height:520px)]:mt-1 [@media(max-height:520px)]:grid-cols-4'}>
         {question.answers.map((answer) => {
           const missed = answer.wrong
@@ -887,13 +904,13 @@ function QuestionPanel({ question, feedback, layout }: { question: ActiveQuestio
           )
         })}
       </ul>
-      {aside && <p className="mt-auto text-[12px] leading-snug text-slate-400">Maneja hasta la letra de la respuesta correcta. Si te equivocas, pierdes una vida.</p>}
+      {aside && <p className="mt-auto text-[12px] leading-snug text-slate-400">Maneja hasta la letra de la respuesta correcta. Si te equivocas o se acaba el tiempo, pierdes una vida.</p>}
     </section>
   )
 }
 
 /** La pregunta en grande antes de salir a buscar la respuesta (el juego queda en pausa). */
-function QuestionIntro({ question, number, onGo }: { question: ActiveQuestion; number: number; onGo: () => void }) {
+function QuestionIntro({ question, number, timed, onGo }: { question: ActiveQuestion; number: number; timed: boolean; onGo: () => void }) {
   return (
     <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#0b1220]/75 p-2 backdrop-blur-[2px] sm:p-6">
       <section
@@ -923,6 +940,12 @@ function QuestionIntro({ question, number, onGo }: { question: ActiveQuestion; n
         </ul>
         <p className="mt-4 text-center text-[13px] leading-snug text-slate-300 [@media(max-height:520px)]:mt-2">
           Las letras están repartidas por el mapa: <b className="text-white">maneja hasta la correcta</b>. Si llegas a una equivocada, pierdes una vida.
+          {timed && (
+            <>
+              {' '}
+              Tienes <b className="text-amber-300">{QUESTION_TIME_MS / 1000} segundos</b>: si se acaban, también pierdes una vida.
+            </>
+          )}
         </p>
         <div className="mt-4 flex justify-center [@media(max-height:520px)]:mt-2">
           <button
@@ -963,6 +986,32 @@ function OffscreenAnswer({ answer, x, y, width, height }: { answer: MazeAnswer; 
   )
 }
 
+/** Tiempo que queda para responder: barra y segundos; en los últimos 10 s se pone roja y late. */
+function QuestionClock({ remainingMs, compact }: { remainingMs: number; compact?: boolean }) {
+  const seconds = Math.ceil(remainingMs / 1000)
+  const urgent = seconds <= 10
+  const color = urgent ? 'bg-rose-500' : seconds <= 20 ? 'bg-amber-400' : 'bg-emerald-400'
+  const label = `Quedan ${seconds} segundos`
+  if (compact) {
+    return (
+      <span
+        aria-label={label}
+        className={`flex h-7 min-w-11 shrink-0 items-center justify-center gap-1 rounded-full px-2 text-[13px] font-black text-slate-950 tabular-nums ${color} ${urgent ? 'animate-pulse' : ''}`}
+      >
+        ⏱ {seconds}
+      </span>
+    )
+  }
+  return (
+    <div aria-label={label} className="flex items-center gap-2">
+      <span className={`text-[20px] font-black tabular-nums ${urgent ? 'animate-pulse text-rose-400' : 'text-white'}`}>⏱ {seconds}s</span>
+      <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-white/10">
+        <div className={`h-full rounded-full transition-[width] duration-200 ease-linear ${color}`} style={{ width: `${(remainingMs / QUESTION_TIME_MS) * 100}%` }} />
+      </div>
+    </div>
+  )
+}
+
 /** Aviso corto al tocar una respuesta. */
 function AnswerToast({ feedback }: { feedback: AnswerFeedback }) {
   const [visible, setVisible] = useState(true)
@@ -980,7 +1029,7 @@ function AnswerToast({ feedback }: { feedback: AnswerFeedback }) {
           correct ? 'border-emerald-300 bg-emerald-600/95' : 'border-rose-300 bg-rose-600/95'
         }`}
       >
-        {correct ? '¡Correcto! +200' : `¡Incorrecto! La ${feedback.letter} no era`}
+        {correct ? '¡Correcto! +200' : feedback.kind === 'timeout' ? '¡Se acabó el tiempo!' : `¡Incorrecto! La ${feedback.letter} no era`}
         {!correct && <span className="block text-[13px] font-semibold text-rose-100">Pierdes una vida</span>}
       </p>
     </div>

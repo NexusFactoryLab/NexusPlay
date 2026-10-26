@@ -65,7 +65,9 @@ const ANSWER_MIN_DISTANCE = 6
 export type MazeAnswer = { letter: string; text: string; correct: boolean; pos: CellPosition; wrong: boolean }
 export type ActiveQuestion = { id: number; question: string; answers: MazeAnswer[] }
 /** Lo último que pasó con una respuesta, para el aviso en pantalla (`id` cambia con cada intento). */
-export type AnswerFeedback = { id: number; kind: 'correct' | 'wrong'; letter: string }
+export type AnswerFeedback = { id: number; kind: 'correct' | 'wrong' | 'timeout'; letter: string }
+/** Tiempo para llegar a la respuesta correcta; solo corre mientras se juega (no en pausa ni con la pregunta en pantalla). */
+export const QUESTION_TIME_MS = 30000
 
 /**
  * Las 4 nubes son fijas: mismo orden que `layout.enemySpawns` (que ya viene
@@ -166,6 +168,8 @@ type InternalState = {
   question: ActiveQuestion | null
   answeredCorrect: number
   answerFeedback: AnswerFeedback | null
+  /** Momento (reloj del juego) en que se acaba el tiempo de la pregunta; null = todavía no empezó a correr. */
+  questionDeadline: number | null
 }
 
 function ghostSpeed(level: number, enemySpeedConfig: number): number {
@@ -315,6 +319,7 @@ function nextQuestion(state: InternalState, layout: MazeLayoutDef) {
   const source = state.questions[state.questionOrder.shift()!]
   const positions = placeAnswers(layout, state, Math.min(source.options.length, ANSWER_LETTERS.length))
   state.question = buildQuestion(source, positions, (state.question?.id ?? 0) + 1, true)
+  state.questionDeadline = null
 }
 
 /** Misma pregunta, respuestas en otro lugar (al cambiar de nivel el tablero es otro). */
@@ -364,6 +369,22 @@ function resolveAnswer(state: InternalState, layout: MazeLayoutDef, answer: Maze
   state.comboIndex = 0
 }
 
+/** Se acabó el tiempo: cuesta una vida y sale otra pregunta. */
+function questionTimedOut(state: InternalState, layout: MazeLayoutDef) {
+  signalMismatch()
+  state.answerFeedback = { id: (state.answerFeedback?.id ?? 0) + 1, kind: 'timeout', letter: '' }
+  state.lives -= 1
+  if (state.lives <= 0) {
+    state.phase = 'lost'
+    return
+  }
+  state.player = resetPlayer(layout)
+  state.ghosts = spawnGhosts(layout)
+  state.energizedUntil = null
+  state.comboIndex = 0
+  nextQuestion(state, layout)
+}
+
 function createInitialState(
   layout: MazeLayoutDef,
   items: MazeCollectorItem[],
@@ -407,6 +428,7 @@ function createInitialState(
     question: scenarioQuestion(scenario),
     answeredCorrect: 0,
     answerFeedback: null,
+    questionDeadline: null,
   }
   if (!scenario) nextQuestion(state, layout)
   return state
@@ -645,6 +667,8 @@ function tickEngine(state: InternalState, layout: MazeLayoutDef, items: MazeColl
       state.ghosts = spawnGhosts(layout)
       replaceAnswers(state, layout)
       state.levelUpUntil = null
+      // Tablero nuevo: el tiempo de la pregunta vuelve a empezar.
+      state.questionDeadline = null
       state.phase = 'playing'
     }
     return
@@ -657,6 +681,15 @@ function tickEngine(state: InternalState, layout: MazeLayoutDef, items: MazeColl
     state.comboIndex = 0
     for (const ghost of state.ghosts) {
       if (ghost.mode === 'FRIGHTENED') ghost.mode = 'NORMAL'
+    }
+  }
+
+  // Reloj de la pregunta (no en el tutorial): arranca en el primer cuadro que se juega con ella.
+  if (state.question && !state.scenario) {
+    if (state.questionDeadline === null) state.questionDeadline = now + QUESTION_TIME_MS
+    else if (now >= state.questionDeadline) {
+      questionTimedOut(state, layout)
+      return
     }
   }
 
@@ -689,6 +722,8 @@ export type MazeGameSnapshot = {
   question: ActiveQuestion | null
   answeredCorrect: number
   answerFeedback: AnswerFeedback | null
+  /** Lo que queda para responder (0 si la pregunta no tiene reloj). */
+  questionRemainingMs: number
 }
 
 function toSnapshot(state: InternalState, now: number): MazeGameSnapshot {
@@ -725,6 +760,8 @@ function toSnapshot(state: InternalState, now: number): MazeGameSnapshot {
     question: state.question,
     answeredCorrect: state.answeredCorrect,
     answerFeedback: state.answerFeedback,
+    questionRemainingMs:
+      state.question && !state.scenario ? (state.questionDeadline === null ? QUESTION_TIME_MS : Math.max(0, state.questionDeadline - now)) : 0,
   }
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { __engineForTests as engine } from './useMazeCollectorGame'
+import { QUESTION_TIME_MS, __engineForTests as engine } from './useMazeCollectorGame'
 import type { MazeScenario } from './useMazeCollectorGame'
 import { DEFAULT_MAZE_CONFIG, MAZE_LAYOUTS } from './mazeCollectorTypes'
 import type { CellPosition } from './mazeCollectorTypes'
@@ -129,6 +129,25 @@ describe('Camión Reciclador: preguntas de opción múltiple', () => {
     expect(state.answerFeedback).toMatchObject({ kind: 'wrong', letter: wrong.letter })
     expect(state.question!.answers.find((answer) => answer.letter === wrong.letter)!.wrong).toBe(true)
     expect(state.player.pos).toEqual(city.playerStart)
+  })
+
+  it('si se acaba el tiempo de la pregunta, quita una vida y sale otra pregunta', () => {
+    const state = engine.createInitialState(city, [], config, null, SUSTAINABLE_CITY_QUESTIONS)
+    state.ghosts = []
+    state.phase = 'playing'
+    const firstId = state.question!.id
+    let now = 0
+    while (now < QUESTION_TIME_MS + 500 && state.lives === config.lives) {
+      now += 16
+      // Quieto en su celda: nunca llega a una respuesta.
+      state.player.nextPos = state.player.pos
+      state.player.desiredDirection = null
+      engine.tickEngine(state, city, [], now, FRAME)
+    }
+    expect(now).toBeGreaterThanOrEqual(QUESTION_TIME_MS)
+    expect(state.lives).toBe(config.lives - 1)
+    expect(state.answerFeedback?.kind).toBe('timeout')
+    expect(state.question!.id).toBe(firstId + 1)
   })
 
   it('en el tutorial la respuesta incorrecta no quita vidas: la parte vuelve a empezar', () => {

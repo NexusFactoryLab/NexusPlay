@@ -16,13 +16,14 @@ import {
   Pause,
   Route,
   Snail,
+  Timer,
   X,
   Zap,
 } from 'lucide-react'
 import { FitScale } from './true-false-maze/FitScale'
 import { SpriteStrip, mazeSpriteUrl } from './mazeSpriteStrip'
 import { COMBO_POINTS, POINTS_BONUS, POINTS_PET, POWER_MODE_MS } from './mazeEngine'
-import { POINTS_ANSWER } from './useMazeCollectorGame'
+import { POINTS_ANSWER, QUESTION_TIME_MS } from './useMazeCollectorGame'
 import { ArtTruckQuestion } from './tutorial/tutorialArt'
 import './true-false-maze/trueFalseMazeGuide.css'
 import './mazeCollectorGuide.css'
@@ -380,8 +381,9 @@ const STEPS: Step[] = [
     body: (
       <>
         <p>
-          Conduces el <b className="text-emerald-300">camión reciclador</b> por las calles de la Ciudad Sostenible. Recoge todas las{' '}
-          <b className="text-sky-300">botellas PET</b> y esquiva las <b className="text-rose-300">nubes de contaminación</b>.
+          Conduces el <b className="text-emerald-300">camión reciclador</b> por las calles de la Ciudad Sostenible.{' '}
+          <b className="text-white">Para salvar la ciudad tienes que recoger todas las</b> <b className="text-sky-300">botellas PET</b>, responder las{' '}
+          <b className="text-amber-300">preguntas</b> y esquivar las <b className="text-rose-300">nubes de contaminación</b>.
         </p>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-emerald-300/25 bg-emerald-400/[0.07] p-3">
           <ArrowKeys size="clamp(1.9rem, 5.2dvh, 2.7rem)" />
@@ -427,7 +429,8 @@ const STEPS: Step[] = [
           <b className="text-white">Pasa por encima de las botellas</b> para recogerlas: +{POINTS_PET} puntos cada una.
         </Item>
         <Item icon={<Check className="h-4 w-4" strokeWidth={3} />} tone="teal">
-          <b className="text-white">Cuando no quede ninguna, subes de nivel</b> y la ciudad se llena otra vez… con nubes más rápidas.
+          <b className="text-white">Recógelas todas para salvar la ciudad:</b> cuando no queda ninguna, subes de nivel y la ciudad se llena otra vez… con nubes más
+          rápidas. El contador <b className="text-white">PET</b> de arriba te dice cuántas faltan.
         </Item>
       </ul>
     ),
@@ -446,6 +449,9 @@ const STEPS: Step[] = [
         </Item>
         <Item icon={<Heart className="h-4 w-4" />} tone="rose">
           <b className="text-white">Si llegas a una equivocada, pierdes una vida</b> y esa respuesta desaparece. ¡Lee bien antes de ir!
+        </Item>
+        <Item icon={<Timer className="h-4 w-4" />} tone="amber">
+          <b className="text-white">Tienes {QUESTION_TIME_MS / 1000} segundos</b> para llegar. Si se acaban, pierdes una vida y sale otra pregunta.
         </Item>
       </ul>
     ),

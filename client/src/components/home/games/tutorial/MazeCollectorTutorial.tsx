@@ -77,11 +77,12 @@ export function MazeCollectorTutorial({
     {
       title: 'Recoge las botellas',
       task: 'Recoge las 4 botellas PET de esta zona.',
-      explain: 'Para limpiar la ciudad hay que recoger todas las botellas PET: basta con pasar por encima. En el juego, al recogerlas todas pasas de nivel.',
-      success: '¡Calles limpias! Cada botella suma puntos.',
+      explain:
+        'Tu misión es salvar la ciudad: para eso hay que recoger TODAS las botellas PET (basta con pasar por encima). En el juego, el contador PET te dice cuántas faltan y, cuando no queda ninguna, la ciudad se salva y pasas de nivel.',
+      success: '¡Calles limpias! Así se salva la ciudad: sin dejar ni una botella.',
       art: <ArtTruckBottles />,
       points: [
-        { icon: <Target className="h-4 w-4" />, tone: 'emerald', text: <>Recoge <b className="text-white">todas las botellas PET</b> para limpiar la ciudad.</> },
+        { icon: <Target className="h-4 w-4" />, tone: 'emerald', text: <>Recoge <b className="text-white">todas las botellas PET</b> para salvar la ciudad.</> },
         { icon: <MousePointerClick className="h-4 w-4" />, tone: 'cyan', text: <>Basta con <b className="text-white">pasar por encima</b>: no hay que frenar.</> },
       ],
       render: scene({ playerStart: { row: 1, col: 1 }, pickups: [pet(1, 5), pet(4, 5), pet(6, 2), pet(6, 8)], ghostSpawns: [], objective: 'collect' }, NORTH),
@@ -120,13 +121,13 @@ export function MazeCollectorTutorial({
       title: 'Responde la pregunta',
       task: 'Lee la pregunta y maneja hasta la letra de la respuesta correcta.',
       explain:
-        'En el juego sale una pregunta y sus respuestas quedan repartidas por el mapa, cada una con su letra. Maneja hasta la correcta: suma puntos y sale otra pregunta. Si llegas a una equivocada, pierdes una vida.',
+        'En el juego, cada pregunta sale primero en grande y el juego espera a que la leas. Luego sus respuestas quedan repartidas por el mapa, cada una con su letra: maneja hasta la correcta. Tienes 30 segundos; si llegas a una equivocada o se acaba el tiempo, pierdes una vida.',
       success: '¡Correcto! Así se responden las preguntas.',
       art: <ArtTruckQuestion />,
       points: [
         { icon: <CircleHelp className="h-4 w-4" />, tone: 'cyan', text: <>La <b className="text-white">pregunta</b> sale arriba, con sus respuestas <b className="text-white">A, B, C, D</b>.</> },
         { icon: <Target className="h-4 w-4" />, tone: 'emerald', text: <>Maneja hasta la <b className="text-white">letra correcta</b> en el mapa.</> },
-        { icon: <Heart className="h-4 w-4" />, tone: 'rose', text: <>Una respuesta <b className="text-white">equivocada</b> te quita una vida.</> },
+        { icon: <Heart className="h-4 w-4" />, tone: 'rose', text: <>Equivocarte o <b className="text-white">pasar de 30 segundos</b> te quita una vida.</> },
       ],
       render: scene(
         {
