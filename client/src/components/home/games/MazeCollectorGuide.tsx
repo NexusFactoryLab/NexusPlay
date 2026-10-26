@@ -36,6 +36,8 @@ import './mazeCollectorGuide.css'
 type MazeCollectorGuideProps = {
   /** Se llama al terminar (último paso) o al saltar la guía. */
   onClose: () => void
+  /** Si viene, el último paso pregunta «¿Deseas jugar un tutorial?» (Sí: tutorial jugable; No: al juego). */
+  onTutorial?: () => void
 }
 
 type Step = { id: string; title: string; art: ReactNode; body: ReactNode }
@@ -504,15 +506,17 @@ const STEPS: Step[] = [
 
 // ==================== guía ====================
 
-export function MazeCollectorGuide({ onClose }: MazeCollectorGuideProps) {
+export function MazeCollectorGuide({ onClose, onTutorial }: MazeCollectorGuideProps) {
   const [index, setIndex] = useState(0)
   const last = index === STEPS.length - 1
   const step = STEPS[index]
 
   const next = useCallback(() => {
-    if (last) onClose()
-    else setIndex((current) => current + 1)
-  }, [last, onClose])
+    // Con la pregunta del tutorial, el último paso se responde con Sí o No (no con Enter).
+    if (last) {
+      if (!onTutorial) onClose()
+    } else setIndex((current) => current + 1)
+  }, [last, onClose, onTutorial])
   const back = useCallback(() => setIndex((current) => Math.max(0, current - 1)), [])
 
   useEffect(() => {
@@ -602,14 +606,36 @@ export function MazeCollectorGuide({ onClose }: MazeCollectorGuideProps) {
               />
             ))}
           </div>
-          <button
-            type="button"
-            autoFocus
-            className="flex shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-2 text-[13.5px] font-bold text-white shadow-[0_10px_26px_-10px_rgba(52,211,153,0.8)] transition-transform hover:-translate-y-0.5 sm:px-5"
-            onClick={next}
-          >
-            {last ? '¡A jugar!' : 'Siguiente'} {!last && <ChevronRight className="h-4 w-4" />}
-          </button>
+          {last && onTutorial ? (
+            // Al final de la guía: ¿practicar en el juego de verdad antes de la partida?
+            <div className="flex shrink-0 items-center gap-2" role="group" aria-label="¿Deseas jugar un tutorial?">
+              <span className="text-[13px] font-semibold text-white max-sm:hidden">¿Deseas jugar un tutorial?</span>
+              <button
+                type="button"
+                autoFocus
+                className="flex shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-2 text-[13.5px] font-bold text-white shadow-[0_10px_26px_-10px_rgba(52,211,153,0.8)] transition-transform hover:-translate-y-0.5"
+                onClick={onTutorial}
+              >
+                <span className="sm:hidden">Tutorial:</span> Sí
+              </button>
+              <button
+                type="button"
+                className="rounded-xl border border-white/15 px-4 py-2 text-[13.5px] font-semibold text-slate-100 transition-colors hover:bg-white/10"
+                onClick={onClose}
+              >
+                No, jugar
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              autoFocus
+              className="flex shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-2 text-[13.5px] font-bold text-white shadow-[0_10px_26px_-10px_rgba(52,211,153,0.8)] transition-transform hover:-translate-y-0.5 sm:px-5"
+              onClick={next}
+            >
+              {last ? '¡A jugar!' : 'Siguiente'} {!last && <ChevronRight className="h-4 w-4" />}
+            </button>
+          )}
         </footer>
       </div>
     </div>

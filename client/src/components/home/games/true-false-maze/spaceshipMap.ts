@@ -100,6 +100,11 @@ export type ShipMap = {
   patrolPoints: CellPosition[]
   rooms: ShipRoom[]
   decor: ShipDecor
+  /**
+   * Tutorial: una puerta DENTRO del tablero (en una casilla de piso) que se
+   * abre cuando el robot llega a ella. No existe en la nave del juego.
+   */
+  goalDoor?: CellPosition
 }
 
 const WALKABLE = new Set(['.', ',', 'o', 'P', 'N', 'A', 'g', 'x', '1', '2', '3', '4', '5', '6', '7', '8', '9'])
@@ -107,7 +112,7 @@ const WITH_DOT = new Set(['.', 'g', 'x'])
 
 export function parseShipMap(
   ascii: readonly string[],
-  extras: { rooms: ShipRoom[]; patrolPoints: CellPosition[]; decor: Omit<ShipDecor, 'cables' | 'grates'> },
+  extras: { rooms: ShipRoom[]; patrolPoints: CellPosition[]; decor: Omit<ShipDecor, 'cables' | 'grates'>; goalDoor?: CellPosition },
 ): ShipMap {
   const rows = ascii.length
   const cols = ascii[0].length
@@ -179,6 +184,7 @@ export function parseShipMap(
     patrolPoints: extras.patrolPoints,
     rooms: extras.rooms,
     decor: { ...extras.decor, cables, grates },
+    goalDoor: extras.goalDoor,
   }
 }
 

@@ -1,4 +1,5 @@
 import { GameInstructionsGate } from './GameInstructionsGate'
+import { GuessWhoTutorial } from './tutorial/GuessWhoTutorial'
 import { ChatPanel } from './ChatPanel'
 import { MultiplayerLobby } from './MultiplayerLobby'
 import { useEffect, useRef, useState } from 'react'
@@ -21,7 +22,11 @@ const MIN_PARTICIPANTS_LIMIT = 2
  * código en la URL, y no deja el Sidebar/header de HomeLayout montado detrás.
  */
 export function TournamentRoomPage() {
-  return <GameInstructionsGate kind={'GUESS_WHO_GROUP'}><TournamentSession /></GameInstructionsGate>
+  return (
+    <GameInstructionsGate kind={'GUESS_WHO_GROUP'} tutorial={(onFinish) => <GuessWhoTutorial tournament onFinish={onFinish} />}>
+      <TournamentSession />
+    </GameInstructionsGate>
+  )
 }
 
 function TournamentSession() {
