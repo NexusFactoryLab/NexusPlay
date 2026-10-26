@@ -4,6 +4,8 @@ import { AnalyticsModule } from './analytics.module.js';
 import { GAME_REPOSITORY } from '../domain/ports/game.repository.port.js';
 import { ROOM_STORE } from '../domain/ports/room-store.port.js';
 import { TOURNAMENT_STORE } from '../domain/ports/tournament-store.port.js';
+import { TOURNAMENT_SETTINGS_REPOSITORY } from '../domain/ports/tournament-settings.repository.port.js';
+import { MongoTournamentSettingsRepository } from './persistence/mongo/mongo-tournament-settings.repository.js';
 import { DOMINO_ROOM_STORE } from '../domain/ports/domino-room-store.port.js';
 import { SNAKES_LADDERS_ROOM_STORE } from '../domain/ports/snakes-ladders-room-store.port.js';
 import { DUAL_QUEST_ROOM_STORE } from '../domain/ports/dual-quest-room-store.port.js';
@@ -27,6 +29,7 @@ import { AiCoreModule } from './ai-core.module.js';
   providers: [
     MongoService,
     { provide: GAME_REPOSITORY, useClass: MongoGameRepository },
+    { provide: TOURNAMENT_SETTINGS_REPOSITORY, useClass: MongoTournamentSettingsRepository },
     { provide: ROOM_STORE, useClass: InMemoryRoomStore },
     // Memoria como fuente viva + volcado a Postgres con soft delete (issue #102).
     PrismaService,

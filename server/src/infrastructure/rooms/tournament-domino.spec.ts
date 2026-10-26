@@ -4,6 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import type { Server } from 'socket.io';
 import type { GameRepository } from '../../domain/ports/game.repository.port.js';
 import type { UserRepository } from '../../domain/ports/user.repository.port.js';
+import type { TournamentSettingsRepository } from '../../domain/ports/tournament-settings.repository.port.js';
 import type { AnalyticsTrackerService } from '../../application/services/analytics-tracker.service.js';
 import { RoomsGateway } from './rooms.gateway.js';
 import { InMemoryRoomStore } from './in-memory-room.store.js';
@@ -33,16 +34,16 @@ const concepts = ['Sol', 'Agua', 'Aire', 'Tierra'].map((label, i) => ({
 
 type FinishFn = (room: unknown, winner: string | null, byBlock: boolean) => void;
 
-function setup() {
+function setup(level: 'EASY' | 'MEDIUM' | 'HARD' = 'EASY') {
   const domino = new InMemoryDominoRoomStore();
   const tournaments = new InMemoryTournamentStore();
   const dominoGame = {
     id: 'dom',
     title: 'Dominexo',
     gameType: { getName: () => 'DOMINO' },
+    status: { getName: () => 'PUBLISHED' },
     config: { handSize: 3 },
     content: concepts,
-    tournamentEnabled: true,
   };
   const gateway = new RoomsGateway(
     new JwtService(),
@@ -54,15 +55,26 @@ function setup() {
     new InMemorySnakesLaddersRoomStore(),
     new InMemoryDualQuestRoomStore(),
     { track: async () => {} } as unknown as AnalyticsTrackerService,
+    undefined,
+    undefined,
+    {
+      get: async () => ({
+        games: [{ gameId: 'dom', level }],
+        maxParticipants: 8,
+        totalRounds: 1,
+        updatedByUserId: 'admin',
+        updatedAt: new Date(),
+      }),
+    } as unknown as TournamentSettingsRepository,
   );
   gateway.server = { to: () => ({ emit: () => {} }), in: () => ({ socketsLeave: () => {} }) } as unknown as Server;
   return { gateway, domino, tournaments };
 }
 
 async function start(playerCount: number, level: 'EASY' | 'MEDIUM' | 'HARD' = 'EASY') {
-  const h = setup();
+  const h = setup(level);
   const admin = client('admin');
-  await h.gateway.handleTournamentCreate(admin, { games: [{ gameId: 'dom', level }], maxParticipants: 8, totalRounds: 1 });
+  await h.gateway.handleTournamentCreate(admin);
   const tournament = h.tournaments.findBySocketId('admin')!;
   for (let i = 0; i < playerCount; i++) h.gateway.handleTournamentJoin(client(`p${i}`), { code: tournament.code });
   h.gateway.handleTournamentStart(admin);

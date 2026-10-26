@@ -35,7 +35,12 @@ import { UpdateGameUseCase } from '../application/use-cases/update-game.use-case
 import { PublishGameUseCase } from '../application/use-cases/publish-game.use-case.js';
 import { UnpublishGameUseCase } from '../application/use-cases/unpublish-game.use-case.js';
 import { SetGameFeaturedUseCase } from '../application/use-cases/set-game-featured.use-case.js';
-import { SetGameTournamentEnabledUseCase } from '../application/use-cases/set-game-tournament-enabled.use-case.js';
+import { GetTournamentSettingsUseCase } from '../application/use-cases/get-tournament-settings.use-case.js';
+import { SaveTournamentSettingsUseCase } from '../application/use-cases/save-tournament-settings.use-case.js';
+import { ClearTournamentSettingsUseCase } from '../application/use-cases/clear-tournament-settings.use-case.js';
+import { TournamentSettingsController } from './http/controllers/tournament-settings.controller.js';
+import { TOURNAMENT_SETTINGS_REPOSITORY } from '../domain/ports/tournament-settings.repository.port.js';
+import { MongoTournamentSettingsRepository } from './persistence/mongo/mongo-tournament-settings.repository.js';
 import { DeleteGameUseCase } from '../application/use-cases/delete-game.use-case.js';
 import { DonateGameToOrganizationUseCase } from '../application/use-cases/donate-game-to-organization.use-case.js';
 import { ImportGamesBatchUseCase } from '../application/use-cases/import-games-batch.use-case.js';
@@ -94,6 +99,7 @@ import { AiProviderAttemptsController } from './http/controllers/ai-provider-att
   controllers: [
     GameCreationDraftController,
     GameController,
+    TournamentSettingsController,
     GameImportController,
     GameAiDraftController,
     GameTypeSettingController,
@@ -111,6 +117,7 @@ import { AiProviderAttemptsController } from './http/controllers/ai-provider-att
     GameCreationDraftService,
     GameCreationDraftExpirationJob,
     { provide: GAME_REPOSITORY, useClass: MongoGameRepository },
+    { provide: TOURNAMENT_SETTINGS_REPOSITORY, useClass: MongoTournamentSettingsRepository },
     { provide: GAME_TYPE_SETTING_REPOSITORY, useClass: PrismaGameTypeSettingRepository },
     { provide: GAME_IMPORT_JOB_REPOSITORY, useClass: MongoGameImportJobRepository },
     { provide: TRANSACTION_RUNNER, useClass: MongoSessionFactory },
@@ -136,7 +143,9 @@ import { AiProviderAttemptsController } from './http/controllers/ai-provider-att
     PublishGameUseCase,
     UnpublishGameUseCase,
     SetGameFeaturedUseCase,
-    SetGameTournamentEnabledUseCase,
+    GetTournamentSettingsUseCase,
+    SaveTournamentSettingsUseCase,
+    ClearTournamentSettingsUseCase,
     DeleteGameUseCase,
     DonateGameToOrganizationUseCase,
     ImportGamesBatchUseCase,

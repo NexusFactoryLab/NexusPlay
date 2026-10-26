@@ -1,7 +1,6 @@
 import type { GuessWhoChatMessage } from './guessWhoTypes'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { io, type Socket } from 'socket.io-client'
-import type { TournamentLevel } from './tournamentLevels'
 import type { TournamentMatchStateView, TournamentPairingAnnouncement, TournamentStateView } from './guessWhoTypes'
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:3000'
@@ -79,8 +78,9 @@ export function useGuessWhoTournament(token: string | null) {
   }, [token])
 
   const createTournament = useCallback(
-    (games: { gameId: string; level: TournamentLevel }[], maxParticipants: number, totalRounds: number) => {
-      socketRef.current?.emit('tournament:create', { games, maxParticipants, totalRounds })
+    () => {
+      // Juegos, niveles, cupo y rondas los lee el servidor del torneo habilitado en Edición.
+      socketRef.current?.emit('tournament:create')
     },
     [],
   )

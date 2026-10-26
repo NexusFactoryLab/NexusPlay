@@ -4,6 +4,9 @@ import { JwtService } from '@nestjs/jwt';
 import type { Server } from 'socket.io';
 import type { GameRepository } from '../../domain/ports/game.repository.port.js';
 import type { UserRepository } from '../../domain/ports/user.repository.port.js';
+import type { TournamentSettingsRepository } from '../../domain/ports/tournament-settings.repository.port.js';
+import { TOURNAMENT_LEVELS } from '../../domain/ports/tournament-store.port.js';
+import { pickRoundGameIndex } from './tournament-round-game.js';
 import type { AnalyticsTrackerService } from '../../application/services/analytics-tracker.service.js';
 import { RoomsGateway } from './rooms.gateway.js';
 import { InMemoryRoomStore } from './in-memory-room.store.js';
@@ -22,14 +25,20 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function setup() {
+type Settings = {
+  games: { gameId: string; level: 'EASY' | 'MEDIUM' | 'HARD' }[];
+  maxParticipants: number;
+  totalRounds: number;
+};
+
+function setup(settings: Settings | null = { games: [{ gameId: 'g', level: 'MEDIUM' }], maxParticipants: 40, totalRounds: 2 }) {
   const tournaments = new InMemoryTournamentStore();
   const game = {
     id: 'g',
     title: 'Banderas',
     gameType: { getName: () => 'GUESS_WHO' },
+    status: { getName: () => 'PUBLISHED' },
     config: { turnDurationSeconds: 30 },
-    tournamentEnabled: true,
     content: Array.from({ length: 30 }, (_, i) => ({ cardId: `c${i}`, label: `C${i}`, imageUrl: '', audioUrl: null, info: null, traits: [] })),
   };
   const users = { findById: async (id: string) => ({ isAdmin: () => id === 'admin' }) } as unknown as UserRepository;
@@ -43,6 +52,9 @@ function setup() {
     new InMemorySnakesLaddersRoomStore(),
     new InMemoryDualQuestRoomStore(),
     { track: async () => {} } as unknown as AnalyticsTrackerService,
+    undefined,
+    undefined,
+    { get: async () => (settings ? { ...settings, updatedByUserId: 'admin', updatedAt: new Date() } : null) } as unknown as TournamentSettingsRepository,
   );
   const events: { target: string; event: string; payload: unknown }[] = [];
   gateway.server = {
@@ -52,9 +64,9 @@ function setup() {
 }
 
 async function start(playerCount: number, totalRounds = 2) {
-  const h = setup();
+  const h = setup({ games: [{ gameId: 'g', level: 'MEDIUM' }], maxParticipants: 40, totalRounds });
   const admin = client('admin');
-  await h.gateway.handleTournamentCreate(admin, { gameId: 'g', maxParticipants: 40, totalRounds });
+  await h.gateway.handleTournamentCreate(admin);
   const tournament = h.tournaments.findBySocketId('admin')!;
   const players = Array.from({ length: playerCount }, (_, i) => client(`p${i}`));
   for (const p of players) h.gateway.handleTournamentJoin(p, { code: tournament.code });
@@ -64,7 +76,7 @@ async function start(playerCount: number, totalRounds = 2) {
 describe('torneo grupal administrado', () => {
   it('solo un administrador puede crear torneos', async () => {
     const h = setup();
-    await expect(h.gateway.handleTournamentCreate(client('p0'), { gameId: 'g', maxParticipants: 8 })).rejects.toThrow(/administrador/);
+    await expect(h.gateway.handleTournamentCreate(client('p0'))).rejects.toThrow(/administrador/);
   });
 
   it('el administrador modera: no es participante y solo él arranca', async () => {
@@ -148,18 +160,30 @@ describe('torneo grupal administrado', () => {
 });
 
 describe('varios juegos y reparto del bot', () => {
-  it('cada ronda usa un juego distinto, rotando', async () => {
-    const h = setup();
+  it('cada ronda sortea uno de los juegos elegidos por el administrador', async () => {
+    const h = setup({
+      games: [
+        { gameId: 'g', level: 'MEDIUM' },
+        { gameId: 'g2', level: 'MEDIUM' },
+      ],
+      maxParticipants: 8,
+      totalRounds: 3,
+    });
     const admin = client('admin');
-    await h.gateway.handleTournamentCreate(admin, { gameIds: ['g', 'g2'], maxParticipants: 8, totalRounds: 3 });
+    await h.gateway.handleTournamentCreate(admin);
     const tournament = h.tournaments.findBySocketId('admin')!;
     for (const id of ['a', 'b']) h.gateway.handleTournamentJoin(client(id), { code: tournament.code });
     h.gateway.handleTournamentStart(admin);
     expect(tournament.gameTitle).toBe('Banderas + Animales');
-    expect(tournament.matches.find((m) => m.round === 1)!.gameTitle).toBe('Banderas');
-    tournament.matches.forEach((m) => (m.phase = 'FINISHED'));
-    (h.gateway as unknown as { maybeAdvanceTournamentRound: (t: unknown) => void }).maybeAdvanceTournamentRound(tournament);
-    expect(tournament.matches.find((m) => m.round === 2)!.gameTitle).toBe('Animales');
+
+    const seed = `${tournament.code}:${tournament.createdAt}`;
+    const expectedTitle = (round: number) => ['Banderas', 'Animales'][pickRoundGameIndex(seed, round, 2)];
+    expect(tournament.matches.find((m) => m.round === 1)!.gameTitle).toBe(expectedTitle(1));
+    for (const round of [2, 3]) {
+      tournament.matches.forEach((m) => (m.phase = 'FINISHED'));
+      (h.gateway as unknown as { maybeAdvanceTournamentRound: (t: unknown) => void }).maybeAdvanceTournamentRound(tournament);
+      expect(tournament.matches.find((m) => m.round === round)!.gameTitle).toBe(expectedTitle(round));
+    }
   });
 
   it('el bot no se le asigna siempre a la misma persona', async () => {
@@ -175,31 +199,34 @@ describe('varios juegos y reparto del bot', () => {
 });
 
 describe('complejidad por juego', () => {
-  async function startWithLevels(levels: ('EASY' | 'MEDIUM' | 'HARD')[], playerCount: number) {
-    const h = setup();
-    const admin = client('admin');
-    const ids = ['g', 'g2', 'g3'].slice(0, levels.length);
-    await h.gateway.handleTournamentCreate(admin, {
-      games: ids.map((gameId, i) => ({ gameId, level: levels[i] })),
+  async function startWithLevels(levels: ('EASY' | 'MEDIUM' | 'HARD')[], playerCount: number, totalRounds = levels.length) {
+    const h = setup({
+      games: ['g', 'g2', 'g3'].slice(0, levels.length).map((gameId, i) => ({ gameId, level: levels[i] })),
       maxParticipants: 8,
-      totalRounds: levels.length,
+      totalRounds,
     });
+    const admin = client('admin');
+    await h.gateway.handleTournamentCreate(admin);
     const tournament = h.tournaments.findBySocketId('admin')!;
     for (let i = 0; i < playerCount; i++) h.gateway.handleTournamentJoin(client(`p${i}`), { code: tournament.code });
     h.gateway.handleTournamentStart(admin);
     return { ...h, tournament };
   }
 
-  it('cada nivel fija el tamaño del tablero y los segundos por turno de su ronda', async () => {
-    const { tournament, gateway } = await startWithLevels(['EASY', 'HARD'], 2);
-    const easy = tournament.matches.find((m) => m.round === 1)!;
-    expect(easy.cards).toHaveLength(12);
-    expect(easy.turnDurationSeconds).toBe(45);
-    tournament.matches.forEach((m) => (m.phase = 'FINISHED'));
-    (gateway as unknown as { maybeAdvanceTournamentRound: (t: unknown) => void }).maybeAdvanceTournamentRound(tournament);
-    const hard = tournament.matches.find((m) => m.round === 2)!;
-    expect(hard.cards).toHaveLength(24);
-    expect(hard.turnDurationSeconds).toBe(20);
+  it('cada ronda toma el tablero y los segundos por turno del nivel del juego que le tocó', async () => {
+    const { tournament, gateway } = await startWithLevels(['EASY', 'HARD'], 2, 6);
+    const advance = (gateway as unknown as { maybeAdvanceTournamentRound: (t: unknown) => void }).maybeAdvanceTournamentRound.bind(gateway);
+    const levelsSeen = new Set<string>();
+    for (let round = 1; round <= 6; round++) {
+      const match = tournament.matches.find((m) => m.round === round)!;
+      const preset = TOURNAMENT_LEVELS[match.level!];
+      expect(match.cards).toHaveLength(preset.boardSize);
+      expect(match.turnDurationSeconds).toBe(preset.turnSeconds);
+      levelsSeen.add(match.level!);
+      tournament.matches.forEach((m) => (m.phase = 'FINISHED'));
+      if (round < 6) advance(tournament);
+    }
+    expect([...levelsSeen].every((level) => level === 'EASY' || level === 'HARD')).toBe(true);
   });
 
   it('el bot adopta la dificultad del nivel', async () => {
@@ -208,20 +235,43 @@ describe('complejidad por juego', () => {
     expect(botMatch.players.find((p) => p.bot)!.bot!.difficulty).toBe('HARD');
   });
 
-  it('rechaza una complejidad inválida', async () => {
-    const h = setup();
-    await expect(
-      h.gateway.handleTournamentCreate(client('admin'), { games: [{ gameId: 'g', level: 'EXTREME' as never }], maxParticipants: 8 }),
-    ).rejects.toThrow(/complejidad/);
-  });
 });
 
 describe('torneo habilitado desde Edición', () => {
-  it('no se puede crear si el administrador no habilitó el torneo del juego', async () => {
-    const h = setup();
-    (h.gateway as unknown as { gameRepository: { findById: () => Promise<unknown> } }).gameRepository = {
-      findById: async () => ({ id: 'g', title: 'Banderas', gameType: { getName: () => 'GUESS_WHO' }, config: {}, content: [], tournamentEnabled: false }),
+  it('no se puede crear si el administrador no habilitó el torneo', async () => {
+    const h = setup(null);
+    await expect(h.gateway.handleTournamentCreate(client('admin'))).rejects.toThrow(/No hay un torneo habilitado/);
+  });
+
+  it('usa el cupo y las rondas guardados, no los del cliente', async () => {
+    const h = setup({ games: [{ gameId: 'g', level: 'MEDIUM' }], maxParticipants: 12, totalRounds: 4 });
+    await h.gateway.handleTournamentCreate(client('admin'));
+    const tournament = h.tournaments.findBySocketId('admin')!;
+    expect(tournament.maxParticipants).toBe(12);
+    expect(tournament.totalRounds).toBe(4);
+  });
+
+  it('omite los juegos despublicados desde que se habilitó, y falla si no queda ninguno', async () => {
+    const h = setup({
+      games: [
+        { gameId: 'g', level: 'MEDIUM' },
+        { gameId: 'g2', level: 'MEDIUM' },
+      ],
+      maxParticipants: 8,
+      totalRounds: 2,
+    });
+    const repo = h.gateway as unknown as { gameRepository: { findById: (id: string) => Promise<unknown> } };
+    const base = repo.gameRepository.findById;
+    repo.gameRepository = {
+      findById: async (id: string) => {
+        const found = (await base(id)) as Record<string, unknown>;
+        return id === 'g2' ? { ...found, status: { getName: () => 'DRAFT' } } : found;
+      },
     };
-    await expect(h.gateway.handleTournamentCreate(client('admin'), { gameId: 'g', maxParticipants: 8 })).rejects.toThrow(/habilitado/);
+    await h.gateway.handleTournamentCreate(client('admin'));
+    expect(h.tournaments.findBySocketId('admin')!.games!.map((g) => g.gameId)).toEqual(['g']);
+
+    repo.gameRepository = { findById: async () => null };
+    await expect(h.gateway.handleTournamentCreate(client('admin'))).rejects.toThrow(/ya no están disponibles/);
   });
 });

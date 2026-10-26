@@ -4,7 +4,7 @@ import { ChatPanel } from './ChatPanel'
 import { TournamentLobby } from './TournamentLobby'
 import { TournamentModeratorPanel } from './TournamentModeratorPanel'
 import { TournamentCodeEntry } from './TournamentCodeEntry'
-import { TournamentSetupForm } from './TournamentSetupForm'
+import { TournamentCreateConfirm } from './TournamentCreateConfirm'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Bot, Crown, LogOut, Swords, Trophy } from 'lucide-react'
@@ -13,7 +13,6 @@ import { useGuessWhoTournament } from './useGuessWhoTournament'
 import { Modal } from './Modal'
 import { MatchBoard } from './MatchBoard'
 import { MIN_DISCARDS_TO_ACCUSE } from './guessWhoTypes'
-import { listGames, type GameSummary } from '../../../services/game.service'
 import { TOURNAMENT_LEVEL_INFO } from './tournamentLevels'
 
 /**
@@ -36,7 +35,8 @@ export function TournamentRoomPage() {
 function TournamentSession() {
   const { code: codeFromUrl } = useParams<{ code?: string }>()
   const [searchParams] = useSearchParams()
-  const gameIdToCreate = searchParams.get('gameId')
+  // `?crear=1` (botón "Abrir sala del torneo" del Inicio): el administrador abre la sala con el torneo habilitado.
+  const wantsToCreate = searchParams.get('crear') === '1'
   const navigate = useNavigate()
   const { token, user } = useAuth()
   const {
@@ -65,18 +65,7 @@ function TournamentSession() {
 
   const startedRef = useRef(false)
   const [joinCodeInput, setJoinCodeInput] = useState('')
-  // Juegos con el torneo habilitado, para armar el torneo (solo el administrador llega a este formulario).
-  const [enabledGames, setEnabledGames] = useState<GameSummary[]>([])
-  const [loadingGames, setLoadingGames] = useState(Boolean(gameIdToCreate))
   const [showPairingOverlay, setShowPairingOverlay] = useState(false)
-
-  useEffect(() => {
-    if (!token || !gameIdToCreate) return
-    listGames(token, { tournamentEnabled: true, pageSize: 50 })
-      .then((result) => setEnabledGames(result.items))
-      .catch(() => setEnabledGames([]))
-      .finally(() => setLoadingGames(false))
-  }, [token, gameIdToCreate])
 
   // Arranque de la sala: si la URL trae un código en el path, se une a esa
   // sala — mismo patrón de reconexión que Dominó/Escaleras/GuessWho.
@@ -158,10 +147,8 @@ function TournamentSession() {
     )
   }
 
-  // Sin código ni gameId en la URL: solo cabe unirse con un código (crear
-  // una sala nueva siempre requiere el gameId, que llega desde "Crear una
-  // partida" en el detalle del juego).
-  if (!codeFromUrl && !gameIdToCreate && !connecting && !tournament) {
+  // Sin código en la URL ni `?crear=1`: solo cabe unirse con un código.
+  if (!codeFromUrl && !wantsToCreate && !connecting && !tournament) {
     return (
       <div className="page-fade fixed inset-0 z-50 overflow-y-auto bg-bg">
         <div className="mx-auto flex min-h-full max-w-[460px] flex-col justify-center p-5 sm:p-8">
@@ -190,19 +177,15 @@ function TournamentSession() {
     )
   }
 
-  // Con gameId (viene de "Crear una partida" en el detalle del juego, ya
-  // decidido el formato de grupo) pero sin código todavía: el administrador
-  // arma el torneo — no aplica cuando ya se está uniendo por código.
-  if (gameIdToCreate && !codeFromUrl && !tournament && !connecting && !startedRef.current) {
+  // Con `?crear=1` y sin código todavía: el administrador confirma y abre la
+  // sala con el torneo que habilitó en Edición — no aplica al unirse por código.
+  if (wantsToCreate && !codeFromUrl && !tournament && !connecting && !startedRef.current) {
     return (
-      <TournamentSetupForm
-        games={enabledGames}
-        loading={loadingGames}
-        initialGameId={gameIdToCreate}
+      <TournamentCreateConfirm
         onCancel={handleExit}
-        onSubmit={(setup) => {
+        onCreate={() => {
           startedRef.current = true
-          createTournament(setup.games, setup.maxParticipants, setup.totalRounds)
+          createTournament()
         }}
       />
     )

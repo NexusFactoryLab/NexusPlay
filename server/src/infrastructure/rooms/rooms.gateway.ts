@@ -11,7 +11,12 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import type { Server, Socket } from 'socket.io';
+import { pickRoundGameIndex } from './tournament-round-game.js';
 import { GAME_REPOSITORY, type GameRepository } from '../../domain/ports/game.repository.port.js';
+import {
+  TOURNAMENT_SETTINGS_REPOSITORY,
+  type TournamentSettingsRepository,
+} from '../../domain/ports/tournament-settings.repository.port.js';
 import { USER_REPOSITORY, type UserRepository } from '../../domain/ports/user.repository.port.js';
 import { ROOM_STORE, type RoomStore, type RoomState } from '../../domain/ports/room-store.port.js';
 import {
@@ -141,12 +146,6 @@ const DUAL_QUEST_DIRECTION_DELTAS: Record<DualQuestDirection, DualQuestCellPosit
 /** Largo máximo de un mensaje de chat de sala; se recorta, no se rechaza. */
 const MAX_CHAT_MESSAGE_LENGTH = 500;
 
-/** Cupo máximo absoluto de una sala de torneo (modo grupo de "¿Quién Es?"): la prueba con un curso completo (issue #102). */
-const TOURNAMENT_MAX_PARTICIPANTS = 40;
-/** Rondas por defecto y tope de un torneo por puntos. */
-const TOURNAMENT_DEFAULT_ROUNDS = 3;
-const TOURNAMENT_MAX_ROUNDS = 10;
-const TOURNAMENT_MAX_GAMES = 5;
 /** Espera antes de repartir una partida de dominó del torneo: es lo que dura el anuncio del duelo. */
 const TOURNAMENT_DOMINO_DEAL_DELAY_MS = 2800;
 
@@ -696,6 +695,8 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     private readonly analyticsTracker: AnalyticsTrackerService,
     @Optional() @Inject(GUESS_WHO_BOT_POLICY) botPolicy: GuessWhoBotPolicy = new HeuristicGuessWhoBotPolicy(),
     @Optional() @Inject(GUESS_WHO_FREE_ANSWERER) freeAnswerer?: GuessWhoFreeAnswerer,
+    // Al final y opcional para no mover los argumentos de las pruebas; solo lo usa `tournament:create`.
+    @Optional() @Inject(TOURNAMENT_SETTINGS_REPOSITORY) private readonly tournamentSettings?: TournamentSettingsRepository,
   ) {
     this.botRunner = new GuessWhoBotRunner(
       {
@@ -1538,56 +1539,31 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   // ---------------------------------------------------------------------
 
   @SubscribeMessage('tournament:create')
-  async handleTournamentCreate(
-    @ConnectedSocket() socket: AuthenticatedSocket,
-    @MessageBody()
-    body: {
-      gameId?: string;
-      gameIds?: string[];
-      /** Cada juego con su complejidad; si falta, se usa `gameIds`/`gameId` en nivel medio. */
-      games?: { gameId: string; level?: TournamentLevel }[];
-      maxParticipants: number;
-      totalRounds?: number;
-    },
-  ) {
+  async handleTournamentCreate(@ConnectedSocket() socket: AuthenticatedSocket) {
     // Solo el administrador de la plataforma crea y modera torneos (issue #102).
     const requester = await this.userRepository.findById(socket.data.userId);
     if (!requester?.isAdmin()) throw new Error('Solo un administrador puede crear torneos.');
 
-    // Varios juegos por torneo (issue #102): la ronda N usa el juego N, rotando.
-    const requested: { gameId: string; level?: TournamentLevel }[] = body.games?.length
-      ? body.games
-      : (body.gameIds?.length ? body.gameIds : body.gameId ? [body.gameId] : []).map((gameId) => ({ gameId }));
-    const picks: { gameId: string; level: TournamentLevel }[] = [];
-    for (const pick of requested) {
-      const level = pick.level ?? 'MEDIUM';
-      if (!isTournamentLevel(level)) throw new Error('La complejidad debe ser EASY, MEDIUM o HARD.');
-      if (!picks.some((p) => p.gameId === pick.gameId)) picks.push({ gameId: pick.gameId, level });
-    }
-    const gameIds = picks.map((p) => p.gameId);
-    if (gameIds.length === 0 || gameIds.length > TOURNAMENT_MAX_GAMES) {
-      throw new Error(`Elige entre 1 y ${TOURNAMENT_MAX_GAMES} juegos para el torneo.`);
-    }
-    const loaded = await Promise.all(gameIds.map((id) => this.gameRepository.findById(id)));
-    for (const candidate of loaded) {
-      const type = candidate?.gameType.getName();
-      if (!candidate || (type !== 'GUESS_WHO' && type !== 'DOMINO')) {
-        throw new Error('Juego no encontrado o sin torneo: solo "¿Quién Es?" y Dominó lo admiten.');
-      }
-      // El administrador lo habilita antes desde Edición (issue #102).
-      if (!candidate.tournamentEnabled) throw new Error(`El torneo no está habilitado para "${candidate.title}".`);
-    }
-    const games = loaded as NonNullable<(typeof loaded)[number]>[];
-    const game = games[0];
+    // El torneo lo habilita el administrador desde Edición: juegos, complejidad,
+    // cupo y rondas salen de ahí, no del cliente (issue #102).
+    const settings = await this.tournamentSettings?.get();
+    if (!settings) throw new Error('No hay un torneo habilitado. Habilítalo en Edición.');
 
-    const maxParticipants = body.maxParticipants;
-    if (!Number.isInteger(maxParticipants) || maxParticipants < 2 || maxParticipants > TOURNAMENT_MAX_PARTICIPANTS) {
-      throw new Error(`El cupo debe ser un entero entre 2 y ${TOURNAMENT_MAX_PARTICIPANTS}.`);
-    }
-    const totalRounds = body.totalRounds ?? Math.max(TOURNAMENT_DEFAULT_ROUNDS, games.length);
-    if (!Number.isInteger(totalRounds) || totalRounds < 1 || totalRounds > TOURNAMENT_MAX_ROUNDS) {
-      throw new Error(`Las rondas deben ser un entero entre 1 y ${TOURNAMENT_MAX_ROUNDS}.`);
-    }
+    const loaded = await Promise.all(settings.games.map((pick) => this.gameRepository.findById(pick.gameId)));
+    // Un juego borrado, despublicado o de otro tipo desde que se habilitó se omite en vez de tumbar el torneo.
+    const available = settings.games.flatMap((pick, index) => {
+      const candidate = loaded[index];
+      const type = candidate?.gameType.getName();
+      return candidate && candidate.status.getName() === 'PUBLISHED' && (type === 'GUESS_WHO' || type === 'DOMINO')
+        ? [{ game: candidate, level: pick.level }]
+        : [];
+    });
+    if (available.length === 0) throw new Error('Los juegos del torneo ya no están disponibles. Vuelve a habilitarlo en Edición.');
+
+    const games = available.map((entry) => entry.game);
+    const picks = available.map((entry) => ({ level: entry.level }));
+    const game = games[0];
+    const { maxParticipants, totalRounds } = settings;
 
     const code = this.generateUniqueRoomCode();
 
@@ -2157,7 +2133,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
         ? tournament.games
         : [{ gameId: tournament.gameId, title: tournament.gameTitle, level: 'MEDIUM' as TournamentLevel }]
     ).map((g) => ({ ...g, gameType: ('gameType' in g && g.gameType) || ('GUESS_WHO' as TournamentGameType) }));
-    return games[(round - 1) % games.length];
+    return games[pickRoundGameIndex(`${tournament.code}:${tournament.createdAt}`, round, games.length)];
   }
 
   /**

@@ -24,12 +24,6 @@ export class ListGamesQueryDto {
   @IsBoolean()
   featured?: boolean;
 
-  /** Inicio: solo los juegos con torneo habilitado por un ADMIN (issue #102). */
-  @IsOptional()
-  @Transform(({ value }) => value === 'true' || value === true)
-  @IsBoolean()
-  tournamentEnabled?: boolean;
-
   @IsOptional()
   @IsString()
   search?: string;

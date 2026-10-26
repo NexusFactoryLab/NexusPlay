@@ -150,7 +150,6 @@ export class MongoGameRepository implements GameRepository, OnModuleInit {
     if (filter.status) query.status = filter.status;
     if (filter.creatorUserId) query.creatorUserId = filter.creatorUserId;
     if (filter.featured) query.featured = true;
-    if (filter.tournamentEnabled) query.tournamentEnabled = true;
     if (filter.categoryId) query.categoryId = filter.categoryId;
     if (filter.organizationId) query.organizationId = filter.organizationId;
     // El caller (list-games.use-case.ts) ya corta antes de llegar aquí si
@@ -219,11 +218,6 @@ export class MongoGameRepository implements GameRepository, OnModuleInit {
 
   async setFeatured(id: string, featured: boolean): Promise<boolean> {
     const result = await this.collection.updateOne({ _id: id }, { $set: { featured } });
-    return result.matchedCount > 0;
-  }
-
-  async setTournamentEnabled(id: string, enabled: boolean): Promise<boolean> {
-    const result = await this.collection.updateOne({ _id: id }, { $set: { tournamentEnabled: enabled } });
     return result.matchedCount > 0;
   }
 }

@@ -21,8 +21,6 @@ export type GameSummary = {
   sourceGameId: string | null
   /** Destacado por un ADMIN: es lo que muestra el Inicio. */
   featured: boolean
-  /** Torneos habilitados por un ADMIN para este juego (issue #102). */
-  tournamentEnabled: boolean
   /** Solo viene en el listado de "Comunidad". */
   creatorDisplayName?: string
   createdAt: string
@@ -51,8 +49,6 @@ export type ListGamesParams = {
   community?: boolean
   /** Inicio: solo los juegos destacados por un ADMIN. */
   featured?: boolean
-  /** Solo los juegos con torneo habilitado (acceso temporal del Inicio, issue #102). */
-  tournamentEnabled?: boolean
   categoryId?: string
   /** Filtra por tipo de juego exacto (vista de catálogo de tipos, issue #156). */
   gameType?: string
@@ -70,7 +66,6 @@ export function listGames(token: string, params: ListGamesParams = {}): Promise<
   if (params.onlyMine) query.set('onlyMine', 'true')
   if (params.community) query.set('community', 'true')
   if (params.featured) query.set('featured', 'true')
-  if (params.tournamentEnabled) query.set('tournamentEnabled', 'true')
   if (params.categoryId) query.set('categoryId', params.categoryId)
   if (params.gameType) query.set('gameType', params.gameType)
   if (params.organizationId) query.set('organizationId', params.organizationId)
@@ -324,11 +319,6 @@ export function publishGame(token: string, gameId: string): Promise<GameDetail> 
 /** PATCH /games/:id/featured — solo ADMIN: fija o quita el juego como destacado del Inicio. */
 export function setGameFeatured(token: string, gameId: string, featured: boolean): Promise<GameDetail> {
   return request<GameDetail>(`/games/${gameId}/featured`, { method: 'PATCH', token, body: { featured } })
-}
-
-/** PATCH /games/:id/tournament — solo ADMIN: habilita o deshabilita los torneos grupales del juego (issue #102). */
-export function setGameTournamentEnabled(token: string, gameId: string, enabled: boolean): Promise<GameDetail> {
-  return request<GameDetail>(`/games/${gameId}/tournament`, { method: 'PATCH', token, body: { enabled } })
 }
 
 /** DELETE /games/:id — borrado lógico; solo el creador o un admin. */

@@ -21,7 +21,6 @@ import { UpdateGameUseCase } from '../../../application/use-cases/update-game.us
 import { PublishGameUseCase } from '../../../application/use-cases/publish-game.use-case.js';
 import { UnpublishGameUseCase } from '../../../application/use-cases/unpublish-game.use-case.js';
 import { SetGameFeaturedUseCase } from '../../../application/use-cases/set-game-featured.use-case.js';
-import { SetGameTournamentEnabledUseCase } from '../../../application/use-cases/set-game-tournament-enabled.use-case.js';
 import { DeleteGameUseCase } from '../../../application/use-cases/delete-game.use-case.js';
 import { DonateGameToOrganizationUseCase } from '../../../application/use-cases/donate-game-to-organization.use-case.js';
 import { GameCreationDraftService } from '../../../application/services/game-creation-draft.service.js';
@@ -33,7 +32,6 @@ import { ListGamesQueryDto } from '../dtos/list-games-query.dto.js';
 import { DonateGameDto } from '../dtos/donate-game.dto.js';
 import { AdaptGameDto } from '../dtos/adapt-game.dto.js';
 import { SetGameFeaturedDto } from '../dtos/set-game-featured.dto.js';
-import { SetGameTournamentDto } from '../dtos/set-game-tournament.dto.js';
 
 @Controller('games')
 @UseGuards(JwtAuthGuard)
@@ -47,7 +45,6 @@ export class GameController {
     private readonly publishGameUseCase: PublishGameUseCase,
     private readonly unpublishGameUseCase: UnpublishGameUseCase,
     private readonly setGameFeaturedUseCase: SetGameFeaturedUseCase,
-    private readonly setGameTournamentEnabledUseCase: SetGameTournamentEnabledUseCase,
     private readonly deleteGameUseCase: DeleteGameUseCase,
     private readonly donateGameUseCase: DonateGameToOrganizationUseCase,
     private readonly adaptGameUseCase: AdaptGameUseCase,
@@ -82,7 +79,6 @@ export class GameController {
       status: query.status,
       onlyMine: query.onlyMine,
       onlyFeatured: query.featured,
-      onlyTournamentEnabled: query.tournamentEnabled,
       includeCreatorNames: query.community,
       search: query.search,
       categoryId: query.categoryId,
@@ -132,20 +128,6 @@ export class GameController {
     return this.setGameFeaturedUseCase.execute({
       gameId,
       featured: dto.featured,
-      requestingUserId,
-    });
-  }
-
-  /** Solo ADMIN: habilita o deshabilita los torneos grupales del juego (issue #102). */
-  @Patch(':id/tournament')
-  setTournamentEnabled(
-    @CurrentUserId() requestingUserId: string,
-    @Param('id') gameId: string,
-    @Body() dto: SetGameTournamentDto,
-  ) {
-    return this.setGameTournamentEnabledUseCase.execute({
-      gameId,
-      enabled: dto.enabled,
       requestingUserId,
     });
   }

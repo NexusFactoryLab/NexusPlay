@@ -58,7 +58,6 @@ function setup(options: {
     delete: vi.fn(),
     countPublishedByCategory: vi.fn(),
     setFeatured: vi.fn(),
-    setTournamentEnabled: vi.fn(),
     publishAllDraftsByCategory: vi.fn(),
   };
 

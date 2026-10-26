@@ -55,13 +55,6 @@ export interface GameProps {
    * dueño con una copia vieja del juego no pise lo que decidió el admin.
    */
   featured: boolean;
-  /**
-   * Torneo habilitado (issue #102): mientras sea `true`, un ADMIN puede crear
-   * torneos grupales de este juego y el Inicio muestra el acceso por código.
-   * Igual que `featured`, solo se escribe por
-   * `GameRepository.setTournamentEnabled`, nunca por `save()`.
-   */
-  tournamentEnabled: boolean;
 }
 
 /**
@@ -121,14 +114,13 @@ export class Game {
       updatedAt: now,
       version: 0,
       featured: false,
-      tournamentEnabled: false,
     });
   }
 
   static fromPersistence(
-    props: Omit<GameProps, 'featured' | 'tournamentEnabled'> & { featured?: boolean; tournamentEnabled?: boolean },
+    props: Omit<GameProps, 'featured'> & { featured?: boolean },
   ): Game {
-    return new Game({ ...props, featured: props.featured ?? false, tournamentEnabled: props.tournamentEnabled ?? false });
+    return new Game({ ...props, featured: props.featured ?? false });
   }
 
   get id(): string {
@@ -173,10 +165,6 @@ export class Game {
 
   get featured(): boolean {
     return this.props.featured;
-  }
-
-  get tournamentEnabled(): boolean {
-    return this.props.tournamentEnabled;
   }
 
   /** `true` si el juego pertenece a una organización (institucional). */

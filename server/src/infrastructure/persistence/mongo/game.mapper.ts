@@ -28,8 +28,6 @@ export interface GameDocument {
    * `toPersistence` no lo incluye a propósito (ver `GameProps.featured`).
    */
   featured?: boolean;
-  /** Ausente = torneo no habilitado. Solo lo escribe `MongoGameRepository.setTournamentEnabled`. */
-  tournamentEnabled?: boolean;
 }
 
 export class GameMapper {
@@ -52,11 +50,10 @@ export class GameMapper {
       updatedAt: doc.updatedAt,
       version: doc.version ?? 0,
       featured: doc.featured ?? false,
-      tournamentEnabled: doc.tournamentEnabled ?? false,
     });
   }
 
-  static toPersistence(game: Game): Omit<GameDocument, 'featured' | 'tournamentEnabled'> {
+  static toPersistence(game: Game): Omit<GameDocument, 'featured'> {
     const props = game.toPersistence();
 
     return {

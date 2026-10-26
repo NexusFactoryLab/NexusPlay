@@ -8,8 +8,6 @@ export interface FindAllGamesFilter {
   creatorUserId?: string;
   /** Solo los juegos destacados por un ADMIN (los que muestra el Inicio). */
   featured?: boolean;
-  /** Solo los juegos con torneo habilitado por un ADMIN (issue #102). */
-  tournamentEnabled?: boolean;
   categoryId?: string;
   /** Filtra juegos institucionales de una organización concreta. */
   organizationId?: string;
@@ -74,6 +72,4 @@ export interface GameRepository {
    * del juego. Devuelve `false` si el juego no existe.
    */
   setFeatured(id: string, featured: boolean): Promise<boolean>;
-  /** Habilita o deshabilita los torneos del juego (issue #102); mismo criterio que `setFeatured`. */
-  setTournamentEnabled(id: string, enabled: boolean): Promise<boolean>;
 }
