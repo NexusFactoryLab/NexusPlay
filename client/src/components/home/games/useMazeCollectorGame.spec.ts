@@ -243,6 +243,26 @@ describe('Camión Reciclador: preguntas de opción múltiple', () => {
     expect(state.ghosts.filter((ghost) => ghost.id.startsWith('extra-'))).toHaveLength(0)
   })
 
+  it('si una nube te alcanza, las nubes extra de la pregunta siguen ahí', () => {
+    const state = engine.createInitialState(city, [], config, null, SUSTAINABLE_CITY_QUESTIONS)
+    state.ghosts = []
+    state.phase = 'playing'
+    let now = 0
+    while (now < EXTRA_CLOUD_EVERY_MS + 100) {
+      now += 16
+      state.player.nextPos = state.player.pos
+      state.player.desiredDirection = null
+      engine.tickEngine(state, city, [], now, FRAME)
+    }
+    expect(state.ghosts).toHaveLength(1)
+    // La nube extra aparece encima del camión: lo alcanza y se pierde una vida.
+    state.ghosts[0].pos = { ...state.player.pos }
+    state.ghosts[0].nextPos = { ...state.player.pos }
+    engine.tickEngine(state, city, [], now + 16, FRAME)
+    expect(state.lives).toBe(config.lives - 1)
+    expect(state.ghosts.filter((ghost) => ghost.id.startsWith('extra-'))).toHaveLength(1)
+  })
+
   it('mientras sale el aviso de la respuesta, el juego y el reloj de la pregunta se detienen', () => {
     const state = engine.createInitialState(city, [], config, null, SUSTAINABLE_CITY_QUESTIONS)
     state.ghosts = []

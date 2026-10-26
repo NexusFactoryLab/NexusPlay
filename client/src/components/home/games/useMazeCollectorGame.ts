@@ -350,6 +350,13 @@ function nextQuestion(state: InternalState, layout: MazeLayoutDef) {
   state.nextExtraCloudAt = null
 }
 
+/** Tras perder una vida todo vuelve a su esquina, pero las nubes extra de la pregunta siguen ahí. */
+function resetGhostsKeepingExtras(state: InternalState, layout: MazeLayoutDef) {
+  const extras = state.ghosts.filter((ghost) => ghost.id.startsWith(EXTRA_CLOUD_PREFIX)).length
+  state.ghosts = spawnGhosts(layout)
+  for (let i = 0; i < extras; i++) spawnExtraCloud(state, layout)
+}
+
 /** Llega una nube más, por la esquina más lejana al camión (nunca encima de él). */
 function spawnExtraCloud(state: InternalState, layout: MazeLayoutDef) {
   const extras = state.ghosts.filter((ghost) => ghost.id.startsWith(EXTRA_CLOUD_PREFIX)).length
@@ -416,7 +423,7 @@ function resolveAnswer(state: InternalState, layout: MazeLayoutDef, answer: Maze
     return
   }
   state.player = resetPlayer(layout)
-  state.ghosts = spawnGhosts(layout)
+  resetGhostsKeepingExtras(state, layout)
   state.energizedUntil = null
   state.comboIndex = 0
 }
@@ -715,7 +722,7 @@ function resolveGhostCollisions(state: InternalState, layout: MazeLayoutDef) {
       return
     }
     state.player = resetPlayer(layout)
-    state.ghosts = spawnGhosts(layout)
+    resetGhostsKeepingExtras(state, layout)
     state.energizedUntil = null
     state.comboIndex = 0
     return
@@ -828,6 +835,8 @@ export type MazeGameSnapshot = {
   questionRemainingMs: number
   /** El aviso de la última respuesta sigue en pantalla (el juego está congelado). */
   feedbackActive: boolean
+  /** Nubes que llegaron por demorarse en responder la pregunta actual. */
+  extraClouds: number
 }
 
 function toSnapshot(state: InternalState, now: number, cols: number): MazeGameSnapshot {
@@ -865,6 +874,7 @@ function toSnapshot(state: InternalState, now: number, cols: number): MazeGameSn
     question: state.question,
     answeredCorrect: state.answeredCorrect,
     answerFeedback: state.answerFeedback,
+    extraClouds: state.ghosts.filter((ghost) => ghost.id.startsWith(EXTRA_CLOUD_PREFIX)).length,
     feedbackActive: state.feedbackUntil !== null,
     questionRemainingMs:
       state.question && !state.scenario ? (state.questionDeadline === null ? QUESTION_TIME_MS : Math.min(QUESTION_TIME_MS, Math.max(0, state.questionDeadline - now))) : 0,

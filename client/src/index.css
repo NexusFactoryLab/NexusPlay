@@ -1971,6 +1971,21 @@ code {
 }
 
 /* Camión Reciclador (#103): la respuesta equivocada tiembla en el panel de la pregunta. */
+/* Camión Reciclador (#103): llega una nube extra con un "puf". */
+@keyframes maze-cloud-arrive {
+  0% {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.35);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 @keyframes maze-answer-shake {
   0%, 100% {
     transform: translateX(0);

@@ -354,6 +354,14 @@ function MazeCollectorSession({
     return () => window.clearTimeout(timer)
   }, [locating])
 
+  // Cada nube extra que llega se anuncia: si no, se confunde con las de siempre.
+  const [cloudAlert, setCloudAlert] = useState(0)
+  const previousExtras = useRef(game.extraClouds)
+  useEffect(() => {
+    if (game.extraClouds > previousExtras.current) setCloudAlert((value) => value + 1)
+    previousExtras.current = game.extraClouds
+  }, [game.extraClouds])
+
   function startSearching() {
     if (!game.question) return
     setSeenQuestionId(game.question.id)
@@ -683,14 +691,19 @@ function MazeCollectorSession({
 
           {/* Capa 3: entidades vivas — posición interpolada por el motor cada frame. */}
           {game.ghosts.map((ghost) => (
-            <CenteredSprite key={ghost.id} row={ghost.row} col={ghost.col} cellSize={cellSize} scale={GHOST_SCALE}>
-              <PollutionGhostSprite
-                personality={ghost.personality}
-                mode={ghost.mode}
-                facing={ghost.facing}
-                size={cellSize * GHOST_SCALE}
-                warning={energyWarning}
-              />
+            <CenteredSprite key={ghost.id} cloudId={ghost.id} row={ghost.row} col={ghost.col} cellSize={cellSize} scale={GHOST_SCALE}>
+              {/* Las nubes extra (por demorarse en responder) llegan con un "puf" y un brillo rojo. */}
+              <div
+                className={ghost.id.startsWith('extra-') ? 'animate-[maze-cloud-arrive_0.9s_ease-out] [filter:drop-shadow(0_0_8px_rgba(244,63,94,0.85))]' : undefined}
+              >
+                <PollutionGhostSprite
+                  personality={ghost.personality}
+                  mode={ghost.mode}
+                  facing={ghost.facing}
+                  size={cellSize * GHOST_SCALE}
+                  warning={energyWarning}
+                />
+              </div>
             </CenteredSprite>
           ))}
 
@@ -751,6 +764,7 @@ function MazeCollectorSession({
             ))}
         </div>
         {game.answerFeedback && <AnswerToast key={game.answerFeedback.id} feedback={game.answerFeedback} />}
+        {cloudAlert > 0 && <CloudAlert key={cloudAlert} />}
         {locating && (
           <p
             role="status"
@@ -1192,6 +1206,24 @@ function QuestionClock({ remainingMs, compact }: { remainingMs: number; compact?
   )
 }
 
+/** Aviso de que llegó una nube más por demorarse en responder. */
+function CloudAlert() {
+  const [visible, setVisible] = useState(true)
+  useEffect(() => {
+    const timer = window.setTimeout(() => setVisible(false), 2200)
+    return () => window.clearTimeout(timer)
+  }, [])
+  if (!visible) return null
+  return (
+    <p
+      role="status"
+      className="pointer-events-none absolute left-1/2 top-4 z-40 -translate-x-1/2 animate-[fade-in-up_0.3s_ease-out] rounded-full border-2 border-rose-300 bg-rose-950/90 px-5 py-2 text-center text-[15px] font-black text-rose-100 shadow-xl"
+    >
+      ☁️ ¡Llegó otra nube! Responde la pregunta
+    </p>
+  )
+}
+
 /** Aviso corto al tocar una respuesta. */
 function AnswerToast({ feedback }: { feedback: AnswerFeedback }) {
   const [visible, setVisible] = useState(true)
@@ -1223,8 +1255,11 @@ function CenteredSprite({
   cellSize,
   scale,
   zIndex,
+  cloudId,
   children,
 }: {
+  /** Solo nubes: queda en el DOM para contarlas (pruebas) y distinguir las extra. */
+  cloudId?: string
   row: number
   col: number
   cellSize: number
@@ -1236,6 +1271,7 @@ function CenteredSprite({
   return (
     <div
       className="absolute left-0 top-0"
+      data-cloud={cloudId}
       style={{ transform: `translate3d(${col * cellSize - offset}px, ${row * cellSize - offset}px, 0)`, zIndex }}
     >
       {children}
