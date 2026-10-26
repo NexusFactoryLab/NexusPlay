@@ -85,7 +85,7 @@ interface AuthenticatedSocket extends Socket {
 }
 
 /** El `kind` que le dice al cliente a qué pantalla enrutar tras resolver un código. */
-type RoomKind = 'room' | 'tournament' | 'domino' | 'snakes-ladders' | 'dual-quest';
+export type RoomKind = 'room' | 'tournament' | 'domino' | 'snakes-ladders' | 'dual-quest' | 'duo-logico';
 
 /**
  * Las 5 salas (1v1 de "¿Quién Es?", torneo, dominó, escaleras y serpientes,
@@ -96,11 +96,11 @@ type RoomKind = 'room' | 'tournament' | 'domino' | 'snakes-ladders' | 'dual-ques
  * entrada a `roomRegistry` (constructor) en vez de tocar `handleResolveCode`
  * y el generador de código a mano.
  */
-interface MinimalRoomStore {
+export interface MinimalRoomStore {
   get(code: string): { gameId: string; gameTitle: string } | undefined;
 }
 
-interface RoomRegistryEntry {
+export interface RoomRegistryEntry {
   kind: RoomKind;
   store: MinimalRoomStore;
 }
@@ -643,6 +643,14 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   }
 
   /**
+   * Para los gateways de juegos que viven aparte (DuoLogicoGateway): suman su
+   * store al registro, así sus códigos se resuelven y no se repiten.
+   */
+  registerRoomStore(entry: RoomRegistryEntry) {
+    this.roomRegistry.push(entry);
+  }
+
+  /**
    * Genera un código de 6 caracteres único entre TODAS las salas activas
    * (sin importar el tipo de juego) — antes cada `*:create` generaba su
    * código chequeando solo su propio store, así que dos tipos de juego
@@ -650,9 +658,9 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
    * el alfabeto de 32 símbolos eso es poco probable pero no imposible, y de
    * pasar, `handleResolveCode` resolvía silenciosamente al primer tipo que
    * encontrara en su orden de chequeo, mandando al jugador a la sala
-   * equivocada.
+   * equivocada. Público: DuoLogicoGateway también lo usa.
    */
-  private generateUniqueRoomCode(): string {
+  generateUniqueRoomCode(): string {
     let code = generateRoomCode();
     while (this.roomRegistry.some((entry) => entry.store.get(code))) {
       code = generateRoomCode();

@@ -62,10 +62,10 @@ export const gameInstructions: Record<InstructionKind, Instruction> = {
     caption: 'Llega a la sala correcta antes de quedarte sin baterías.',
   },
   DUAL_QUEST_PIXI: {
-    text: 'Controlen a Lumen con A/D y a Gota con las flechas. W y ↑ sirven para saltar o nadar; S y ↓ para bucear. Cooperen con los mecanismos y lleven a ambos personajes al portal para completar el nivel.',
-    exampleTitle: 'Ejemplo de cooperación', labels: ['Muévete', 'Salta', 'Coopera', 'Portal'],
+    text: 'Juegan en pareja, cada uno desde su dispositivo: Lumen nada en la lava y Gota en el agua. Muévete con las flechas o A/D, salta con ↑, W o espacio (en celular, con los botones). Ayúdense con botones, palancas y cajas, y párense juntos en los pedestales de cada Puerta del Saber: solo pasan si los dos responden bien.',
+    exampleTitle: 'Ejemplo de cooperación', labels: ['Muévete', 'Salta', 'Coopera', 'Respondan'],
     icons: [Footprints, ArrowUp, Handshake, DoorOpen],
-    caption: 'Ambos personajes deben llegar al portal.',
+    caption: 'Tres Puertas del Saber y tres corazones compartidos.',
   },
 }
 

@@ -16,7 +16,6 @@
     "@tailwindcss/vite": "^4.3.3",
     "@vercel/analytics": "^2.0.1",
     "lucide-react": "^1.39.0",
-    "matter-js": "^0.20.0",
     "pixi.js": "^8.20.1",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.8",
@@ -26,7 +25,6 @@
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
-    "@types/matter-js": "^0.20.2",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",

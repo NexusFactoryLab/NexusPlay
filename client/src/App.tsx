@@ -43,13 +43,10 @@ import { TourReturnBar } from './components/home/TourReturnBar'
 import { welcomeStorageKey } from './components/home/welcomeTourSteps'
 import { invitationAuthPath, invitationDestination } from './utils/invitationDestination'
 
-// PixiJS + Matter.js solo se descargan si alguien entra a esta ruta —
-// van cargados de fábrica (~700 KB) y nadie más en el sitio los necesita.
-const DualQuestPixiDemoPage = lazy(() =>
-  import('./components/home/games/DualQuestPixiDemoPage').then((m) => ({ default: m.DualQuestPixiDemoPage })),
-)
-const DualQuestPixiPlayPage = lazy(() =>
-  import('./components/home/games/DualQuestPixiPlayPage').then((m) => ({ default: m.DualQuestPixiPlayPage })),
+// Dúo Lógico con sprites (issue #105): PixiJS y los sprites solo se
+// descargan si alguien entra a jugarlo.
+const DuoLogicoPage = lazy(() =>
+  import('./components/home/games/duo-logico/DuoLogicoPage').then((m) => ({ default: m.DuoLogicoPage })),
 )
 // Laberinto Verdadero o Falso: motor + renderer en canvas y ~60 sprites; se
 // descarga solo al entrar a jugarlo.
@@ -158,18 +155,18 @@ function App() {
       <Route path="/quien-es/sala/:code?" element={<GuessWhoRoomPage />} />
       <Route path="/quien-es/torneo/:code?" element={<TournamentRoomPage />} />
       <Route
-        path="/dual-quest/pixi-demo"
+        path="/dual-quest-pixi/sala/:code"
         element={
-          <Suspense fallback={<main className="flex flex-1 items-center justify-center">Cargando motor del juego…</main>}>
-            <DualQuestPixiDemoPage />
+          <Suspense fallback={<main className="flex flex-1 items-center justify-center">Cargando Dúo Lógico…</main>}>
+            <DuoLogicoPage />
           </Suspense>
         }
       />
       <Route
         path="/dual-quest-pixi/:slug"
         element={
-          <Suspense fallback={<main className="flex flex-1 items-center justify-center">Cargando motor del juego…</main>}>
-            <DualQuestPixiPlayPage />
+          <Suspense fallback={<main className="flex flex-1 items-center justify-center">Cargando Dúo Lógico…</main>}>
+            <DuoLogicoPage />
           </Suspense>
         }
       />
