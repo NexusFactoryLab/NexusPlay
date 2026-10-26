@@ -296,6 +296,21 @@ function MazeCollectorSession({
     if (guideOpen) pause()
   }, [guideOpen, pause])
 
+  // Cada pregunta nueva sale primero en grande con el juego en pausa (como en el
+  // Laberinto V/F): se lee tranquilo y recién después se sale a buscar la respuesta.
+  const [seenQuestionId, setSeenQuestionId] = useState<number | null>(null)
+  const questionIntro = game.question && game.phase === 'playing' && game.question.id !== seenQuestionId ? game.question : null
+  const introId = questionIntro?.id
+  useEffect(() => {
+    if (introId !== undefined) pause()
+  }, [introId, pause])
+
+  function startSearching() {
+    if (!game.question) return
+    setSeenQuestionId(game.question.id)
+    resume()
+  }
+
   useEffect(() => {
     const onChange = () => {
       const active = !!document.fullscreenElement
@@ -318,9 +333,9 @@ function MazeCollectorSession({
   )
 
   // El manejador de teclas vive entre renders: lee siempre la versión más reciente.
-  const keysRef = useRef({ toggleFullscreen, enterFullscreen, phase: game.phase, paused: game.paused, wantFullscreen })
+  const keysRef = useRef({ toggleFullscreen, enterFullscreen, phase: game.phase, paused: game.paused, wantFullscreen, intro: false })
   useEffect(() => {
-    keysRef.current = { toggleFullscreen, enterFullscreen, phase: game.phase, paused: game.paused, wantFullscreen }
+    keysRef.current = { toggleFullscreen, enterFullscreen, phase: game.phase, paused: game.paused, wantFullscreen, intro: Boolean(questionIntro) }
   })
   useEffect(() => {
     if (guideOpen) return
@@ -330,6 +345,8 @@ function MazeCollectorSession({
       if (event.key === 'f' || event.key === 'F') {
         keys.toggleFullscreen()
       } else if (event.key === 'p' || event.key === 'P' || event.key === 'Escape') {
+        // Con la pregunta en pantalla la pausa no se quita con P/Esc: se sale con «¡A buscarla!».
+        if (keys.intro) return
         if (keys.paused) resume()
         else pause()
       } else if (keys.phase === 'ready' && keys.wantFullscreen && event.key.startsWith('Arrow')) {
@@ -785,7 +802,11 @@ function MazeCollectorSession({
         </Overlay>
       )}
 
-      {game.paused && !guideOpen && (
+      {questionIntro && !guideOpen && (
+        <QuestionIntro question={questionIntro} number={game.answeredCorrect + 1} onGo={startSearching} />
+      )}
+
+      {game.paused && !guideOpen && !questionIntro && (
         <PauseOverlay
           fullscreen={fullscreen}
           onGuide={onOpenGuide}
@@ -868,6 +889,53 @@ function QuestionPanel({ question, feedback, layout }: { question: ActiveQuestio
       </ul>
       {aside && <p className="mt-auto text-[12px] leading-snug text-slate-400">Maneja hasta la letra de la respuesta correcta. Si te equivocas, pierdes una vida.</p>}
     </section>
+  )
+}
+
+/** La pregunta en grande antes de salir a buscar la respuesta (el juego queda en pausa). */
+function QuestionIntro({ question, number, onGo }: { question: ActiveQuestion; number: number; onGo: () => void }) {
+  return (
+    <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#0b1220]/75 p-2 backdrop-blur-[2px] sm:p-6">
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-label="Pregunta"
+        className="max-h-full w-full max-w-[600px] animate-[maze-levelup-pop_0.45s_cubic-bezier(0.16,1,0.3,1)] overflow-y-auto rounded-3xl border-2 border-emerald-300/50 bg-slate-950/95 p-4 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.8)] sm:p-6"
+      >
+        <p className="flex items-center gap-2 text-[12px] font-bold tracking-[0.14em] text-emerald-300 uppercase">
+          <CircleHelp className="h-4 w-4" aria-hidden="true" /> Pregunta {number}
+        </p>
+        <h2 className="mt-2 text-[19px] leading-snug font-bold text-white sm:text-[23px]">{question.question}</h2>
+        <ul className="mt-4 grid gap-2 sm:grid-cols-2 [@media(max-height:520px)]:mt-2 [@media(max-height:520px)]:grid-cols-2">
+          {question.answers
+            .filter((answer) => !answer.wrong)
+            .map((answer) => (
+              <li key={answer.letter} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-[15px] text-slate-100 [@media(max-height:520px)]:py-1.5">
+                <span
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-white text-[17px] font-black text-slate-950"
+                  style={{ background: ANSWER_COLORS[answer.letter] }}
+                >
+                  {answer.letter}
+                </span>
+                <span className="min-w-0 leading-tight">{answer.text}</span>
+              </li>
+            ))}
+        </ul>
+        <p className="mt-4 text-center text-[13px] leading-snug text-slate-300 [@media(max-height:520px)]:mt-2">
+          Las letras están repartidas por el mapa: <b className="text-white">maneja hasta la correcta</b>. Si llegas a una equivocada, pierdes una vida.
+        </p>
+        <div className="mt-4 flex justify-center [@media(max-height:520px)]:mt-2">
+          <button
+            type="button"
+            autoFocus
+            className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 px-6 py-3 text-[15px] font-bold text-white shadow-[0_12px_30px_-10px_rgba(52,211,153,0.7)] transition-transform hover:-translate-y-0.5"
+            onClick={onGo}
+          >
+            <Play className="h-4 w-4" fill="currentColor" /> ¡A buscarla!
+          </button>
+        </div>
+      </section>
+    </div>
   )
 }
 
