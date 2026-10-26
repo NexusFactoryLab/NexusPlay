@@ -15,6 +15,8 @@ import { SpriteStrip, mazeSpriteUrl } from './mazeSpriteStrip'
 import { MazeCollectorGuide } from './MazeCollectorGuide'
 import { MazeCollectorTutorial } from './tutorial/MazeCollectorTutorial'
 import { ConfettiBurst } from '../../kids/ConfettiBurst'
+import { CartoonClock } from './CartoonClock'
+import { isDarkTheme, useTheme } from '../../../hooks/useTheme'
 
 /**
  * Una parte del tutorial jugable (issue #93): la misma ciudad y el mismo
@@ -71,6 +73,8 @@ const GHOST_SCALE = 1.35
 const PET_SCALE = 0.62
 const POWER_SCALE = 1
 const ANSWER_SCALE = 0.95
+/** Botellas más claras y sin tanto brillo: se leen sin competir con el camión ni con las respuestas. */
+const PET_FILTER = 'saturate(0.5) brightness(1.15) contrast(0.85)'
 /** Color de cada letra de respuesta, igual en el mapa y en el panel de la pregunta. */
 const ANSWER_COLORS: Record<string, string> = { A: '#f59e0b', B: '#38bdf8', C: '#f472b6', D: '#a78bfa' }
 const BAG_SCALE = 0.8
@@ -248,6 +252,11 @@ function MazeCollectorSession({
   // Pantalla ancha: la pregunta va en una columna al lado del mapa (el mapa ya está limitado por el alto,
   // así ese ancho sobra). En pantallas angostas va en una franja arriba del mapa.
   const questionAside = useMediaQuery('(min-width: 1000px) and (min-aspect-ratio: 4/3)')
+  // Con la columna de la pregunta, vidas, puntos y reloj se muestran en ella (no en el encabezado).
+  const statsAside = Boolean(game.question) && questionAside
+  // Borde del mapa según el tema: blanco suave en los oscuros, negro en los claros (nada de verde chillón).
+  const { theme } = useTheme()
+  const mapBorder = isDarkTheme(theme) ? 'rgba(255,255,255,0.6)' : '#000000'
 
   function enterFullscreen() {
     const root = rootRef.current
@@ -467,11 +476,13 @@ function MazeCollectorSession({
               <span className="truncate">{title}</span>
             </p>
           )}
-          <div className="flex items-center gap-0.5" aria-label={`Vidas: ${game.lives}`}>
-            {Array.from({ length: Math.max(0, game.lives) }, (_, index) => (
-              <img key={index} src={mazeSpriteUrl('ui-life')} alt="" className="h-5 w-5 sm:h-6 sm:w-6" />
-            ))}
-          </div>
+          {!statsAside && (
+            <div className="flex items-center gap-0.5" aria-label={`Vidas: ${game.lives}`}>
+              {Array.from({ length: Math.max(0, game.lives) }, (_, index) => (
+                <img key={index} src={mazeSpriteUrl('ui-life')} alt="" className="h-5 w-5 sm:h-6 sm:w-6" />
+              ))}
+            </div>
+          )}
           <span className="max-[400px]:hidden">
             <Stat label="Ronda" value={tutorial ? String(game.level) : `${game.level}/${game.targetRounds}`} />
           </span>
@@ -481,10 +492,12 @@ function MazeCollectorSession({
             </span>
             <Stat label="PET" value={`${game.collectedPet}/${game.totalPet}`} />
           </span>
-          <span className="flex items-center gap-1.5 sm:ml-auto">
-            <img src={mazeSpriteUrl('ui-star')} alt="" className="h-5 w-5 sm:h-6 sm:w-6" />
-            <Stat label="Puntos" value={game.score.toLocaleString('es')} />
-          </span>
+          {!statsAside && (
+            <span className="flex items-center gap-1.5 sm:ml-auto">
+              <img src={mazeSpriteUrl('ui-star')} alt="" className="h-5 w-5 sm:h-6 sm:w-6" />
+              <Stat label="Puntos" value={game.score.toLocaleString('es')} />
+            </span>
+          )}
         </div>
 
         <button
@@ -552,7 +565,7 @@ function MazeCollectorSession({
             width: windowWidth,
             height: windowHeight,
             marginTop: cameraMode ? Math.max(0, (view.height - windowHeight) / 2) : undefined,
-            outline: `2px solid ${isCity ? '#2ecc71' : primaryColor}`,
+            outline: `2px solid ${mapBorder}`,
           }}
         >
         <div
@@ -614,7 +627,13 @@ function MazeCollectorSession({
             const { left, top } = pixelPos(pickup.pos)
             return (
               <div key={pickup.id} className="absolute flex items-center justify-center" style={{ left, top, width: cellSize, height: cellSize }}>
-                {pickup.kind === 'PET' ? <PetSprite size={cellSize * PET_SCALE} /> : <PowerPelletSprite size={cellSize * POWER_SCALE} />}
+                {pickup.kind === 'PET' ? (
+                  <span className="flex" style={{ filter: PET_FILTER }}>
+                    <PetSprite size={cellSize * PET_SCALE} />
+                  </span>
+                ) : (
+                  <PowerPelletSprite size={cellSize * POWER_SCALE} />
+                )}
               </div>
             )
           })}
@@ -707,7 +726,11 @@ function MazeCollectorSession({
         {game.answerFeedback && <AnswerToast key={game.answerFeedback.id} feedback={game.answerFeedback} />}
       </div>
       {game.question && questionAside && (
-        <QuestionPanel question={game.question} feedback={game.answerFeedback} remainingMs={game.questionRemainingMs} layout="aside" />
+        // Dos recuadros separados: la pregunta arriba (donde va la atención) y el estado de la partida abajo.
+        <aside className="flex w-[300px] shrink-0 flex-col gap-3 overflow-y-auto border-l border-white/10 bg-slate-950/50 p-3 xl:w-[340px]">
+          <QuestionPanel question={game.question} feedback={game.answerFeedback} remainingMs={game.questionRemainingMs} layout="aside" />
+          <GameStatusCard lives={game.lives} score={game.score} remainingMs={game.questionRemainingMs} />
+        </aside>
       )}
       </div>
 
@@ -911,7 +934,7 @@ function QuestionPanel({
       aria-live="polite"
       className={
         aside
-          ? 'flex w-[300px] shrink-0 flex-col gap-3 overflow-y-auto border-l border-white/10 bg-slate-950/70 p-4 xl:w-[340px]'
+          ? 'flex flex-col gap-3 rounded-2xl border border-white/15 bg-slate-900/80 p-4 shadow-[0_12px_30px_-18px_rgba(0,0,0,0.9)]'
           : 'z-10 mx-1.5 mt-1.5 shrink-0 rounded-2xl border border-white/10 bg-slate-950/80 px-3 py-2 sm:mx-2 sm:mt-2 [@media(max-height:520px)]:py-1'
       }
     >
@@ -923,7 +946,7 @@ function QuestionPanel({
         <span className="min-w-0 flex-1">{question.question}</span>
         {remainingMs > 0 && !aside && <QuestionClock remainingMs={remainingMs} compact />}
       </p>
-      {remainingMs > 0 && aside && <QuestionClock remainingMs={remainingMs} />}
+
       <ul className={aside ? 'flex flex-col gap-2' : 'mt-1.5 grid grid-cols-2 gap-x-2 gap-y-1 [@media(max-height:520px)]:mt-1 [@media(max-height:520px)]:grid-cols-4'}>
         {question.answers.map((answer) => {
           const missed = answer.wrong
@@ -944,7 +967,7 @@ function QuestionPanel({
           )
         })}
       </ul>
-      {aside && <p className="mt-auto text-[12px] leading-snug text-slate-400">Maneja hasta la letra de la respuesta correcta. Si te equivocas o se acaba el tiempo, pierdes una vida.</p>}
+      {aside && <p className="text-[12px] leading-snug text-slate-400">Maneja hasta la letra de la respuesta correcta. Si te equivocas o se acaba el tiempo, pierdes una vida.</p>}
     </section>
   )
 }
@@ -1070,6 +1093,40 @@ function OffscreenAnswer({ answer, x, y, width, height }: { answer: MazeAnswer; 
         {answer.letter}
       </span>
     </div>
+  )
+}
+
+/** Recuadro de la partida en la columna derecha: tiempo (con reloj), vidas y puntos. */
+function GameStatusCard({ lives, score, remainingMs }: { lives: number; score: number; remainingMs: number }) {
+  return (
+    <section aria-label="Estado de la partida" className="flex flex-col gap-3 rounded-2xl border border-white/15 bg-slate-900/80 p-4">
+      {remainingMs > 0 && (
+        <div className="flex items-center gap-3">
+          <CartoonClock className="h-14 w-14 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold tracking-[0.12em] text-slate-400 uppercase">Tiempo</p>
+            <QuestionClock remainingMs={remainingMs} />
+          </div>
+        </div>
+      )}
+      <div className="grid grid-cols-2 gap-2 border-t border-white/10 pt-3">
+        <div aria-label={`Vidas: ${lives}`}>
+          <p className="text-[11px] font-semibold tracking-[0.12em] text-slate-400 uppercase">Vidas</p>
+          <div className="mt-1 flex items-center gap-0.5">
+            {Array.from({ length: Math.max(0, lives) }, (_, index) => (
+              <img key={index} src={mazeSpriteUrl('ui-life')} alt="" className="h-7 w-7" />
+            ))}
+          </div>
+        </div>
+        <div>
+          <p className="text-[11px] font-semibold tracking-[0.12em] text-slate-400 uppercase">Puntos</p>
+          <p className="mt-1 flex items-center gap-1.5 text-[22px] font-black text-white tabular-nums">
+            <img src={mazeSpriteUrl('ui-star')} alt="" className="h-6 w-6" />
+            {score.toLocaleString('es')}
+          </p>
+        </div>
+      </div>
+    </section>
   )
 }
 

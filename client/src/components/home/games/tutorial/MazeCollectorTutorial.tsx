@@ -34,8 +34,10 @@ export function MazeCollectorTutorial({
 }) {
   // Siempre la ciudad (es el escenario del Camión) y nubes a la velocidad más amable.
   const tutorialConfig: MazeCollectorConfig = { ...DEFAULT_MAZE_CONFIG, ...config, layout: 'CITY', enemySpeed: 1 }
-  const scene = (scenario: MazeScenario, focus: typeof NORTH): TutorialPart['render'] =>
-    function ScenePart(context) {
+  // Cada parte se juega solo en su zona: el camión y las nubes no pueden salir de lo iluminado.
+  const scene = (scenarioInZone: MazeScenario, focus: typeof NORTH): TutorialPart['render'] => {
+    const scenario: MazeScenario = { ...scenarioInZone, area: focus }
+    return function ScenePart(context) {
       return (
         <MazeCollectorGame
           title={title}
@@ -59,6 +61,7 @@ export function MazeCollectorTutorial({
         />
       )
     }
+  }
 
   const parts: TutorialPart[] = [
     {
@@ -114,7 +117,7 @@ export function MazeCollectorTutorial({
         { icon: <Sparkles className="h-4 w-4" />, tone: 'emerald', text: <>Con las nubes <b className="text-white">asustadas (azules)</b>, tócalas: ¡puntos extra!</> },
       ],
       render: scene(
-        { playerStart: { row: 6, col: 0 }, pickups: [{ pos: { row: 1, col: 0 }, kind: 'POWER' }], ghostSpawns: [{ row: 1, col: 6 }], ghostPersonality: 'PATROLLER', objective: 'catch', purifier: { area: NORTH } },
+        { playerStart: { row: 6, col: 0 }, pickups: [{ pos: { row: 1, col: 0 }, kind: 'POWER' }], ghostSpawns: [{ row: 1, col: 6 }], ghostPersonality: 'PATROLLER', objective: 'catch', purifier: true },
         NORTH,
       ),
     },

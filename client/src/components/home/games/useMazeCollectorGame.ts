@@ -132,11 +132,17 @@ export type MazeScenario = {
   goal?: CellPosition
   objective: 'reach' | 'collect' | 'catch' | 'answer'
   /**
-   * Parte del purificador: la nube espera quieta hasta que se toma la caneca,
-   * el purificador no se acaba hasta atraparla y la nube asustada no sale de
-   * esta zona (sin esto se escapaba por el túnel y se acababa el tiempo).
+   * Zona del escenario: ni el camión ni las nubes salen de ella (los bordes
+   * hacen de pared, también en las bocas de los túneles). Así la parte se
+   * juega solo en lo que se ve iluminado.
    */
-  purifier?: { area: { row: number; col: number; rows: number; cols: number } }
+  area?: { row: number; col: number; rows: number; cols: number }
+  /**
+   * Parte del purificador: la nube espera quieta hasta que se toma la caneca
+   * y el purificador no se acaba hasta atraparla (sin esto la nube se
+   * escapaba y se acababa el tiempo).
+   */
+  purifier?: boolean
   /** Objetivo `answer`: una pregunta con sus respuestas en celdas fijas (en el orden de `options`). */
   question?: { question: MazeQuestion; positions: CellPosition[] }
 }
@@ -472,8 +478,11 @@ function tickPlayer(state: InternalState, layout: MazeLayoutDef, now: number, dt
   const arrived = advance(player, speed, dt)
 
   if (arrived || samePos(player.pos, player.nextPos)) {
-    const viaDesired = tryDirectionFrom(layout, player.pos, player.desiredDirection)
-    const viaFacing = viaDesired ?? tryDirectionFrom(layout, player.pos, player.facing)
+    // En un escenario con zona, salir de ella es como chocar con una pared.
+    const area = state.scenario?.area
+    const within = (next: CellPosition | null) => (next && (!area || insideArea(next, area)) ? next : null)
+    const viaDesired = within(tryDirectionFrom(layout, player.pos, player.desiredDirection))
+    const viaFacing = viaDesired ?? within(tryDirectionFrom(layout, player.pos, player.facing))
     if (viaDesired) player.facing = player.desiredDirection as Direction
     player.nextPos = viaFacing ?? player.pos
   }
@@ -565,8 +574,8 @@ function tickGhost(ghost: InternalGhost, state: InternalState, layout: MazeLayou
     ghost.mode = 'NORMAL'
   }
 
-  const purifier = state.scenario?.purifier
-  if (purifier && ghost.mode === 'NORMAL') return
+  const area = state.scenario?.area
+  if (state.scenario?.purifier && ghost.mode === 'NORMAL') return
   const speedFactor = ghost.mode === 'FRIGHTENED' ? FRIGHTENED_SPEED_FACTOR : ghost.mode === 'EATEN' ? EATEN_SPEED_FACTOR : 1
   const speed = ghostSpeed(state.level, state.baseEnemySpeed) * speedFactor
   const arrived = advance(ghost, speed, dt)
@@ -592,11 +601,11 @@ function tickGhost(ghost: InternalGhost, state: InternalState, layout: MazeLayou
     )
     ghost.facing = direction
     ghost.nextPos = stepWithTeleport(ghost.pos, direction, layout.cols, layout.tunnelRows)
-    if (purifier && !insideArea(ghost.nextPos, purifier.area)) {
+    if (area && !insideArea(ghost.nextPos, area)) {
       // Se queda en la zona: da la vuelta por la primera salida que siga adentro.
       const inside = (['UP', 'DOWN', 'LEFT', 'RIGHT'] as Direction[]).find((candidate) => {
         const next = tryDirectionFrom(layout, ghost.pos, candidate)
-        return next !== null && insideArea(next, purifier.area)
+        return next !== null && insideArea(next, area)
       })
       ghost.facing = inside ?? ghost.facing
       ghost.nextPos = inside ? stepWithTeleport(ghost.pos, inside, layout.cols, layout.tunnelRows) : ghost.pos

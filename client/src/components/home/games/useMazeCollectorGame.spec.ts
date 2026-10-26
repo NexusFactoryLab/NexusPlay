@@ -59,8 +59,24 @@ describe('Camión Reciclador: purificador del tutorial', () => {
     ghostSpawns: [{ row: 1, col: 6 }],
     ghostPersonality: 'PATROLLER',
     objective: 'catch',
-    purifier: { area: NORTH },
+    area: NORTH,
+    purifier: true,
   }
+
+  it('el camión no puede salir de la zona del escenario', () => {
+    const state = engine.createInitialState(city, [], config, { playerStart: { row: 6, col: 0 }, pickups: [], ghostSpawns: [], objective: 'reach', goal: { row: 17, col: 0 }, area: NORTH })
+    state.phase = 'playing'
+    // Hacia abajo y hacia la derecha por la avenida: la zona termina en la fila 6 y la columna 10.
+    for (const direction of ['DOWN', 'RIGHT'] as const) {
+      state.player.desiredDirection = direction
+      for (let now = 16; now < 6000; now += 16) {
+        engine.tickEngine(state, city, [], now, FRAME)
+        const { row, col } = state.player.nextPos
+        expect(row >= NORTH.row && row < NORTH.row + NORTH.rows && col >= NORTH.col && col < NORTH.col + NORTH.cols).toBe(true)
+      }
+    }
+    expect(state.player.pos).toEqual({ row: 6, col: 10 })
+  })
 
   it('la nube espera quieta hasta que se toma la caneca', () => {
     const state = engine.createInitialState(city, [], config, scenario)
@@ -74,15 +90,17 @@ describe('Camión Reciclador: purificador del tutorial', () => {
     drive(state, (s) => (s.pickups.length > 0 ? s.pickups[0].pos : { row: 6, col: 10 }), (s) => s.pickups.length === 0)
     // Se espera bastante más que los 6 s normales del purificador antes de ir por la nube.
     for (let now = 0; now < 15000; now += 16) {
-      // El camión se queda estacionado lejos de la zona mientras pasa el tiempo.
-      state.player.pos = { row: 17, col: 12 }
-      state.player.nextPos = { row: 17, col: 12 }
+      // El camión se queda estacionado en una esquina de la zona mientras pasa el tiempo.
+      state.player.pos = { row: 6, col: 10 }
+      state.player.nextPos = { row: 6, col: 10 }
       state.player.desiredDirection = null
       engine.tickEngine(state, city, [], 100000 + now, FRAME)
       const { row, col } = state.ghosts[0].pos
       expect(row >= NORTH.row && row < NORTH.row + NORTH.rows && col >= NORTH.col && col < NORTH.col + NORTH.cols).toBe(true)
     }
-    expect(state.ghosts[0].mode).toBe('FRIGHTENED')
+    // Sigue asustada (o ya chocó sola con el camión estacionado): nunca volvió a ser peligrosa.
+    expect(['FRIGHTENED', 'EATEN']).toContain(state.ghosts[0].mode)
+    expect(state.caughtCount).toBe(0)
     drive(state, (s) => s.ghosts[0].pos, (s) => s.scenarioDone)
     expect(state.scenarioDone).toBe(true)
     expect(state.caughtCount).toBe(0)
