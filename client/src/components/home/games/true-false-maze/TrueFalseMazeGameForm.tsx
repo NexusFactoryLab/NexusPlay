@@ -5,6 +5,7 @@ import { TextField } from '../../../TextField'
 import { SaveVisibilityModal } from '../SaveVisibilityModal'
 import { ImageUploadField } from '../ImageUploadField'
 import { AiGameAssistantPanel } from '../AiGameAssistantPanel'
+import { AiIdentityBadges, useAiIdentity } from '../useAiIdentity'
 import { useReportCreateSummary } from '../aiDraftContext'
 import { useCreationDraftId } from '../useCreationDraftId'
 import {
@@ -180,6 +181,18 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
     setPhase(clampIndex(savedNumber(state, 'phase', 0), TOTAL_PHASES))
     setSelectedQuestion(clampIndex(savedNumber(state, 'selectedQuestion', 0), (restored ?? questions).length))
   }
+
+  // La IA también sugiere título, descripción y área: se aplican sin pisar lo que escribió el usuario.
+  const aiIdentity = useAiIdentity({
+    title,
+    description,
+    categoryId,
+    categoryIds: categories.map((category) => category.id),
+    setTitle,
+    setDescription,
+    setCategoryId,
+    goToIdentity: () => setPhase(0),
+  })
 
   function applyAiDraft(draft: GameDraft) {
     const items = Array.isArray(draft.content) ? draft.content : []
@@ -361,7 +374,7 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
       title="Laberinto Verdadero o Falso"
       description="Escribe afirmaciones: el robot entra a la sala VERDADERO o FALSO."
       descriptionDetail="Un robot recorre una nave espacial y responde cada afirmación entrando a la sala VERDADERO o FALSO, mientras esquiva medusas galácticas. Después de cada respuesta se muestra tu explicación."
-      aiPanel={<AiGameAssistantPanel gameType="TRUE_FALSE_MAZE" disabled={submitting} onDraftReady={applyAiDraft} />}
+      aiPanel={<AiGameAssistantPanel gameType="TRUE_FALSE_MAZE" disabled={submitting} onDraftReady={(draft, meta) => { applyAiDraft(draft); aiIdentity.onDraft(draft, meta) }} />}
     >
       <form className="flex flex-col gap-[16px]" onSubmit={handleSubmit} noValidate>
         <PhaseLabel phase={phase + 1} total={TOTAL_PHASES} label={PHASES[phase].label} />
@@ -390,6 +403,7 @@ export function TrueFalseMazeGameForm({ onClose, onCreated, onBack, onCategoryCr
         </div>
 
         <FormSection icon={Rocket} title="Cuéntanos de tu juego" subtitle="Nombre, portada y el lugar donde vivirá." tone={1}>
+<AiIdentityBadges ai={aiIdentity} />
 <TextField label="Título del juego" type="text" value={title} disabled={submitting} onChange={setTitle} onBlur={() => {}} />
         <TextField
           label="Descripción"

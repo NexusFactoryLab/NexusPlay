@@ -81,7 +81,7 @@ export function GameInstructionsGate({
   const isDomino = kind === 'DOMINO'
   const hasVisualDemo = isDomino
   return (
-    <Modal onClose={onContinue} fitContent maxWidthClassName={hasVisualDemo ? 'max-w-[1120px]' : 'max-w-[520px]'} maxHeightClassName="max-h-[calc(100dvh-40px)]" ariaLabel={isDomino ? 'Cómo jugar a Dominexo' : undefined}>
+    <Modal onClose={onContinue} fitContent minFitScale={isDomino ? 0.4 : undefined} maxWidthClassName={hasVisualDemo ? 'max-w-[1120px]' : 'max-w-[520px]'} maxHeightClassName="max-h-[calc(100dvh-40px)]" ariaLabel={isDomino ? 'Cómo jugar a Dominexo' : undefined}>
       <div className="space-y-4" data-game-instructions={kind}>
         <div className="flex items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-accent/12 via-accent/5 to-transparent px-4 py-3">
           <div>

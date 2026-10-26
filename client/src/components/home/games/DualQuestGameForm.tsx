@@ -5,6 +5,7 @@ import { TextField } from '../../TextField'
 import { SaveVisibilityModal } from './SaveVisibilityModal'
 import { ImageUploadField } from './ImageUploadField'
 import { AiGameAssistantPanel } from './AiGameAssistantPanel'
+import { AiIdentityBadges, useAiIdentity } from './useAiIdentity'
 import { useReportCreateSummary } from './aiDraftContext'
 import { useCreationDraftId } from './useCreationDraftId'
 import {
@@ -252,6 +253,18 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
     setCoverImageUrl(adapted.theme.coverImageUrl)
     setCategoryId(adapted.categoryId)
     applyAiDraft(adapted)
+  })
+
+  // La IA también sugiere título, descripción y área: se aplican sin pisar lo que escribió el usuario.
+  const aiIdentity = useAiIdentity({
+    title,
+    description,
+    categoryId,
+    categoryIds: categories.map((category) => category.id),
+    setTitle,
+    setDescription,
+    setCategoryId,
+    goToIdentity: () => setPhase(0),
   })
 
   function applyAiDraft(draft: GameDraft) {
@@ -569,13 +582,14 @@ export function DualQuestGameForm({ onClose, onCreated, onBack, onCategoryCreate
       title="Dúo Lógico"
       description="Fuego y Agua recorren el mismo mapa y se necesitan para avanzar."
       descriptionDetail="Cada rol queda bloqueado por casillas del otro. Al final arman juntos un concepto ensamblando lo que cada uno recolectó."
-      aiPanel={<AiGameAssistantPanel gameType="DUAL_QUEST" disabled={submitting} onDraftReady={applyAiDraft} />}
+      aiPanel={<AiGameAssistantPanel gameType="DUAL_QUEST" disabled={submitting} onDraftReady={(draft, meta) => { applyAiDraft(draft); aiIdentity.onDraft(draft, meta) }} />}
     >
       <form className="flex flex-col gap-[16px]" onSubmit={handleSubmit} noValidate>
         <PhaseLabel phase={phase + 1} total={TOTAL_PHASES} label={PHASES[phase].label} />
 
         {phase === 0 && (
           <FormSection icon={Rocket} title="Cuéntanos de tu juego" subtitle="Nombre, portada y el lugar donde vivirá." tone={1}>
+            <AiIdentityBadges ai={aiIdentity} />
             <TextField label="Título del juego" type="text" value={title} disabled={submitting} onChange={setTitle} onBlur={() => {}} />
             <TextField
               label="Descripción"

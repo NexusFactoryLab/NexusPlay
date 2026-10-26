@@ -211,6 +211,36 @@ describe('GenerateGameDraftUseCase — tipos sin imagen obligatoria', () => {
     expect(result.content).toHaveLength(6);
   });
 
+  it('DOMINO: reasigna íconos únicos y devuelve advertencias (conceptos sin definición/ejemplo/aplicación)', async () => {
+    const assistant = fakeAssistant(VALID_DOMINO_DRAFT);
+    const result = await buildUseCase(assistant).execute({
+      gameType: 'DOMINO',
+      files: [csvFile('concepto,descripcion\nEnergía solar,...')],
+    });
+
+    const icons = (result.content as Array<{ icon: string }>).map((c) => c.icon);
+    expect(new Set(icons).size).toBe(6);
+    expect(result.warnings?.some((w) => w.code === 'missing_definition' && w.conceptIndex === 0)).toBe(true);
+  });
+
+  it('devuelve título, descripción y un área existente; un área inexistente da null', async () => {
+    const categories = [{ id: 'cat-1', name: 'Energía' }];
+    const good = fakeAssistant({
+      ...VALID_DOMINO_DRAFT,
+      identity: { title: 'Energías renovables', description: 'Fuentes de energía limpias y sus usos.', categoryId: 'cat-1' },
+    });
+    const ok = await buildUseCase(good).execute({ gameType: 'DOMINO', files: [csvFile('a,b')], categories });
+    expect(ok).toMatchObject({ title: 'Energías renovables', description: 'Fuentes de energía limpias y sus usos.', categoryId: 'cat-1' });
+    // El prompt incluye la lista de áreas para que la IA elija solo entre ellas.
+    const sent = (good.generateGameDraft as ReturnType<typeof vi.fn>).mock.calls[0][0].instructions as string;
+    expect(sent).toContain('cat-1: Energía');
+
+    const bad = fakeAssistant({ ...VALID_DOMINO_DRAFT, identity: { title: 'Energías', categoryId: 'inventada' } });
+    const out = await buildUseCase(bad).execute({ gameType: 'DOMINO', files: [csvFile('a,b')], categories });
+    expect(out.categoryId).toBeNull();
+    expect(out).not.toHaveProperty('description');
+  });
+
   it('rechaza un borrador que la IA devolvió inválido, con el mismo validador que la creación manual', async () => {
     // Solo 2 conceptos: el dominó exige 6 y esto no se puede "arreglar" sin inventar contenido.
     const assistant = fakeAssistant({ config: { handSize: 7 }, content: (VALID_DOMINO_DRAFT.content as unknown[]).slice(0, 2) });

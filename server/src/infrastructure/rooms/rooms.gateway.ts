@@ -21,13 +21,16 @@ import {
   type TournamentMatch,
 } from '../../domain/ports/tournament-store.port.js';
 import type { GuessWhoCard } from '../../application/content-validators/guess-who.content-validator.js';
-import type { DominoConcept } from '../../application/content-validators/domino.content-validator.js';
+import { dominoQuestionBank } from '../../application/content-validators/domino-question-bank.js';
+import { dominoAvailableLevels, pickDominoQuestionForLevel } from '../../application/content-validators/domino-levels.js';
+import { DOMINO_LEVELS, type DominoConcept, type DominoLevel } from '../../application/content-validators/domino.content-validator.js';
 import {
   DOMINO_ROOM_STORE,
   type DominoRoomStore,
   type DominoRoomState,
   type DominoTile,
   type DominoPlacedTile,
+  type DominoPendingQuestion,
 } from '../../domain/ports/domino-room-store.port.js';
 import {
   SNAKES_LADDERS_ROOM_STORE,
@@ -266,15 +269,71 @@ function dominoHasValidMove(hand: DominoTile[], board: DominoPlacedTile[]): bool
   return hand.some((tile) => dominoTileMatchesEnd(tile, left) || dominoTileMatchesEnd(tile, right));
 }
 
+/** Segundos por turno que se sugieren al elegir cada nivel (el anfitrión puede ajustarlos después). */
+export const DOMINO_LEVEL_TURN_SECONDS: Record<DominoLevel, number> = { EASY: 30, MEDIUM: 25, ADVANCED: 30 };
+
 /**
  * Concepto tal como viaja al cliente: la pregunta se envía sin `correctIndex`
- * (la respuesta correcta solo vive en el servidor; la validación llega en el Issue 1).
+ * ni `explanation`. La corrección es del servidor y la explicación solo se
+ * entrega después de evaluar la respuesta (evento `domino:answer-result` o,
+ * en la pantalla de cierre, `missedConcepts`).
  */
 export function toDominoClientConcept(concept: DominoConcept) {
-  const { question, ...rest } = concept;
-  if (!question) return rest;
-  // Se arma campo por campo (lista blanca) para que un campo nuevo no se filtre por accidente.
-  return { ...rest, question: { text: question.text, options: question.options, explanation: question.explanation } };
+  // El cliente nunca conoce el banco: ni `question` ni `questions`. La pregunta elegida
+  // viaja aparte en `pendingQuestion` (solo texto y opciones).
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { question: _question, questions: _questions, ...rest } = concept;
+  return rest;
+}
+
+/**
+ * Concepto del extremo del tablero contra el que empata la ficha; `null` si
+ * el tablero está vacío (la apertura no empata con nada).
+ */
+function dominoMatchedConceptIndex(room: DominoRoomState, side: 'left' | 'right'): number | null {
+  if (room.board.length === 0) return null;
+  const { left, right } = dominoBoardEnds(room.board);
+  return (side === 'right' ? right : left) ?? null;
+}
+
+/**
+ * Arma la ficha colocada a partir de la mano y el lado elegido; lanza si no
+ * encaja. No muta la sala (la jugada se confirma después, tal vez tras una pregunta).
+ */
+function buildDominoPlacement(room: DominoRoomState, tile: DominoTile, side: 'left' | 'right', userId: string): DominoPlacedTile {
+  const isDouble = tile.a === tile.b;
+  if (room.board.length === 0) return { id: tile.id, left: tile.a, right: tile.b, isDouble, placedByUserId: userId };
+  const { left, right } = dominoBoardEnds(room.board);
+  if (side === 'right') {
+    if (!dominoTileMatchesEnd(tile, right)) throw new Error('Esa ficha no encaja en ese extremo.');
+    return tile.a === right
+      ? { id: tile.id, left: tile.a, right: tile.b, isDouble, placedByUserId: userId }
+      : { id: tile.id, left: tile.b, right: tile.a, isDouble, placedByUserId: userId };
+  }
+  if (!dominoTileMatchesEnd(tile, left)) throw new Error('Esa ficha no encaja en ese extremo.');
+  return tile.a === left
+    ? { id: tile.id, left: tile.b, right: tile.a, isDouble, placedByUserId: userId }
+    : { id: tile.id, left: tile.a, right: tile.b, isDouble, placedByUserId: userId };
+}
+
+/** Disponibilidad de niveles para el cliente: solo banderas y la frase corta del motivo. */
+function dominoLevelsView(room: DominoRoomState) {
+  const levels = dominoAvailableLevels(room.concepts);
+  return {
+    EASY: { available: true, reason: null as string | null },
+    MEDIUM: { available: levels.MEDIUM.available, reason: levels.MEDIUM.reason },
+    ADVANCED: { available: levels.ADVANCED.available, reason: levels.ADVANCED.reason },
+  };
+}
+
+/** Pregunta pendiente tal como la ve el cliente: quién responde y la pregunta elegida, sin correctIndex ni explanation. */
+function dominoPendingQuestionView(room: DominoRoomState, pending: DominoPendingQuestion) {
+  const question = dominoQuestionBank(room.concepts[pending.conceptIndex])[pending.questionIndex];
+  return {
+    userId: pending.userId,
+    conceptIndex: pending.conceptIndex,
+    question: question ? { text: question.text, options: question.options } : null,
+  };
 }
 
 /** Vista pública de la sala de dominó para un jugador dado: la mano ajena solo se ve como cantidad. */
@@ -285,6 +344,21 @@ export function toDominoClientView(room: DominoRoomState, forSocketId: string) {
     concepts: room.concepts.map(toDominoClientConcept),
     handSize: room.handSize,
     turnDurationSeconds: room.turnDurationSeconds,
+    level: room.level ?? 'EASY',
+    // Qué niveles puede ofrecer el contenido y, si no, el motivo corto (sin conceptos ni banco).
+    availableLevels: dominoLevelsView(room),
+    // Solo quién responde y de qué concepto: ficha, lado y respuesta correcta se quedan en el servidor.
+    pendingQuestion: room.pendingQuestion ? dominoPendingQuestionView(room, room.pendingQuestion) : null,
+    seenConceptIndexes: room.seenConceptIndexes ?? [],
+    missedConceptIndexes: room.missedConceptIndexes ?? [],
+    // La explicación de lo fallado solo llega al terminar la partida (ya se reveló al responder).
+    missedConcepts:
+      room.phase === 'FINISHED'
+        ? (room.missedQuestions ?? []).map(({ conceptIndex, questionIndex }) => {
+            const question = dominoQuestionBank(room.concepts[conceptIndex])[questionIndex];
+            return { conceptIndex, questionText: question?.text ?? null, explanation: question?.explanation ?? null };
+          })
+        : [],
     phase: room.phase,
     board: room.board,
     // Las salas creadas antes de este metadato siguen siendo válidas.
@@ -494,6 +568,8 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
 
   /** Timers de turno de salas de dominó, mismo criterio que `turnTimers` para "¿Quién Es?". */
   private readonly dominoTurnTimers = new Map<string, NodeJS.Timeout>();
+  /** Azar de la rotación de preguntas; las pruebas lo reemplazan por uno determinista. */
+  dominoQuestionRng: () => number = Math.random;
 
   /**
    * Timers de Escaleras y Serpientes — un solo timer por sala que cubre TANTO
@@ -672,6 +748,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
         dominoRoom.phase = dominoRoom.phase === 'FINISHED' ? dominoRoom.phase : 'WAITING';
         dominoRoom.activePlayerUserId = null;
         dominoRoom.turnDeadline = null;
+        dominoRoom.pendingQuestion = null;
         this.dominoRoomStore.set(dominoRoom);
         this.broadcastDominoState(dominoRoom);
         if (wasWaiting) this.tryStartDomino(dominoRoom);
@@ -1796,6 +1873,10 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       createdAt: Date.now(),
       rematchVotes: {},
       consecutivePasses: 0,
+      level: 'EASY',
+      pendingQuestion: null,
+      seenConceptIndexes: [],
+      missedConceptIndexes: [],
     };
 
     this.dominoRoomStore.create(room);
@@ -1895,6 +1976,34 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     this.broadcastDominoState(room);
   }
 
+  /** El anfitrión elige el nivel en el lobby; ambos jugadores juegan el mismo. */
+  @SubscribeMessage('domino:update-level')
+  handleDominoUpdateLevel(@ConnectedSocket() socket: AuthenticatedSocket, @MessageBody() body: { level: DominoLevel }) {
+    const room = this.dominoRoomStore.findBySocketId(socket.id);
+    if (!room) throw new Error('No estás en ninguna sala.');
+    if (room.phase !== 'WAITING') throw new Error('La partida ya está en curso o terminó.');
+    if (socket.data.userId !== room.hostUserId) {
+      throw new Error('Solo quien creó la sala puede cambiar el nivel.');
+    }
+
+    const level = body?.level;
+    if (!DOMINO_LEVELS.includes(level)) throw new Error('Nivel no válido.');
+    // Un nivel que el contenido no puede ofrecer (sin casos de aplicación o sin preguntas) no se puede elegir.
+    const availability = dominoAvailableLevels(room.concepts)[level];
+    if (!availability.available) {
+      throw new Error(`Ese nivel no está disponible: ${(availability.reason ?? 'falta contenido').toLowerCase()}.`);
+    }
+
+    if ((room.level ?? 'EASY') === level) return;
+    this.cancelDealCountdown('domino:' + room.code);
+    resetLobbyReady(room.players);
+    room.level = level;
+    // Cada nivel trae un tiempo de turno sugerido; el anfitrión puede ajustarlo después.
+    room.turnDurationSeconds = DOMINO_LEVEL_TURN_SECONDS[level];
+    this.dominoRoomStore.set(room);
+    this.broadcastDominoState(room);
+  }
+
   private startDominoDealCountdown(room: DominoRoomState) {
     const key = 'domino:' + room.code;
     if (this.dealTimers.has(key)) return;
@@ -1928,6 +2037,13 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     room.endedByBlock = false;
     room.rematchVotes = {};
     room.consecutivePasses = 0;
+    room.pendingQuestion = null;
+    room.seenConceptIndexes = [];
+    room.missedConceptIndexes = [];
+    room.missedQuestions = [];
+    // Revancha: el registro de preguntas hechas empieza de cero.
+    room.askedQuestions = {};
+    room.lastQuestion = {};
 
     const firstPlayer = room.players[Math.floor(Math.random() * room.players.length)];
     this.setActiveDominoTurn(room, firstPlayer.userId);
@@ -1949,31 +2065,121 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     const tile = player.hand.find((t) => t.id === body.tileId);
     if (!tile) throw new Error('Esa ficha no está en tu mano.');
 
-    const { left, right } = dominoBoardEnds(room.board);
-    let placed: DominoPlacedTile;
+    const side: 'left' | 'right' = body.side === 'right' ? 'right' : 'left';
+    // Si ya hay una pregunta pendiente no se arma otra: el jugador la contesta con `domino:answer`.
+    // Reintentar jugar solo reenvía el estado (handshake idempotente).
+    if (room.pendingQuestion) {
+      this.broadcastDominoState(room);
+      return;
+    }
 
+    const placed = buildDominoPlacement(room, tile, side, player.userId);
+
+    // Intermedio y Universitario: antes de colocar, se responde la pregunta del concepto del extremo que empata
+    // (en Universitario el cliente la acompaña con el caso de aplicación del concepto).
+    // Fácil, y un concepto sin preguntas (juegos viejos), se coloca directo.
+    const conceptIndex = dominoMatchedConceptIndex(room, side);
+    const bank = conceptIndex === null ? [] : dominoQuestionBank(room.concepts[conceptIndex]);
+    const level = room.level ?? 'EASY';
+    if ((level === 'MEDIUM' || level === 'ADVANCED') && conceptIndex !== null && bank.length > 0) {
+      // Rotación: una pregunta del banco que sirva para el nivel y aún no se haya hecho en la sala
+      // (robar y volver a jugar el mismo concepto no la repite). Sin ninguna marcada para el nivel, usa todo el banco.
+      const pick = pickDominoQuestionForLevel(bank, level, room.askedQuestions?.[conceptIndex] ?? [], room.lastQuestion?.[conceptIndex], this.dominoQuestionRng)!;
+      room.askedQuestions = { ...room.askedQuestions, [conceptIndex]: pick.asked };
+      room.lastQuestion = { ...room.lastQuestion, [conceptIndex]: pick.index };
+      room.pendingQuestion = { userId: player.userId, tileId: tile.id, side, conceptIndex, questionIndex: pick.index };
+      // El tiempo de responder cuenta como un turno completo: se reinicia el reloj.
+      room.turnDeadline = Date.now() + room.turnDurationSeconds * 1000;
+      this.startDominoTurnTimer(room, player.userId);
+      this.dominoRoomStore.set(room);
+      this.broadcastDominoState(room);
+      return;
+    }
+
+    this.commitDominoPlay(room, player, tile, placed, side);
+  }
+
+  /**
+   * Responde la pregunta pendiente de Intermedio. El servidor compara contra
+   * `correctIndex`, que nunca viajó al cliente; el índice enviado se valida.
+   */
+  @SubscribeMessage('domino:answer')
+  handleDominoAnswer(@ConnectedSocket() socket: AuthenticatedSocket, @MessageBody() body: { optionIndex: number }) {
+    const room = this.dominoRoomStore.findBySocketId(socket.id);
+    if (!room || room.phase !== 'PLAYING') throw new Error('La partida no está en curso.');
+
+    const player = room.players.find((p) => p.socketId === socket.id);
+    if (!player) throw new Error('No estás en esta sala.');
+    const pending = room.pendingQuestion;
+    if (!pending || pending.userId !== player.userId || player.userId !== room.activePlayerUserId) {
+      throw new Error('No tienes ninguna pregunta pendiente.');
+    }
+
+    // Se valida contra la pregunta elegida y guardada en el servidor, no contra otra del banco.
+    const question = dominoQuestionBank(room.concepts[pending.conceptIndex])[pending.questionIndex];
+    const optionIndex = body?.optionIndex;
+    if (!question || !Number.isInteger(optionIndex) || optionIndex < 0 || optionIndex >= question.options.length) {
+      throw new Error('Opción no válida.');
+    }
+
+    this.resolveDominoQuestion(room, optionIndex === question.correctIndex, false);
+  }
+
+  /**
+   * Cierra la pregunta pendiente. Acierto: se coloca la ficha. Error o tiempo
+   * agotado: se registra el concepto fallado y se pierde el turno. En ambos
+   * casos la explicación se envía solo ahora, al jugador que respondía.
+   */
+  private resolveDominoQuestion(room: DominoRoomState, correct: boolean, timedOut: boolean) {
+    const pending = room.pendingQuestion;
+    if (!pending) return;
+    room.pendingQuestion = null;
+    const player = room.players.find((p) => p.userId === pending.userId);
+    if (!player) return;
+
+    this.server.to(player.socketId).emit('domino:answer-result', {
+      correct,
+      timedOut,
+      conceptIndex: pending.conceptIndex,
+      explanation: dominoQuestionBank(room.concepts[pending.conceptIndex])[pending.questionIndex]?.explanation ?? null,
+    });
+
+    if (correct) {
+      const tile = player.hand.find((t) => t.id === pending.tileId);
+      if (!tile) {
+        this.advanceDominoTurn(room);
+        return;
+      }
+      this.commitDominoPlay(room, player, tile, buildDominoPlacement(room, tile, pending.side, player.userId), pending.side);
+      return;
+    }
+
+    const missed = room.missedConceptIndexes ?? [];
+    if (!missed.includes(pending.conceptIndex)) room.missedConceptIndexes = [...missed, pending.conceptIndex];
+    const missedQuestions = room.missedQuestions ?? [];
+    if (!missedQuestions.some((m) => m.conceptIndex === pending.conceptIndex && m.questionIndex === pending.questionIndex)) {
+      room.missedQuestions = [...missedQuestions, { conceptIndex: pending.conceptIndex, questionIndex: pending.questionIndex }];
+    }
+    this.advanceDominoTurn(room);
+  }
+
+  /** Aplica una jugada ya validada (y, en Intermedio, ya respondida): tablero, mano y siguiente turno. */
+  private commitDominoPlay(room: DominoRoomState, player: DominoRoomState['players'][number], tile: DominoTile, placed: DominoPlacedTile, side: 'left' | 'right') {
     if (room.board.length === 0) {
-      placed = { id: tile.id, left: tile.a, right: tile.b, isDouble: tile.a === tile.b, placedByUserId: player.userId };
       room.board = [placed];
       room.openingTileId = placed.id;
-    } else if (body.side === 'right') {
-      if (!dominoTileMatchesEnd(tile, right)) throw new Error('Esa ficha no encaja en ese extremo.');
-      placed =
-        tile.a === right
-          ? { id: tile.id, left: tile.a, right: tile.b, isDouble: tile.a === tile.b, placedByUserId: player.userId }
-          : { id: tile.id, left: tile.b, right: tile.a, isDouble: tile.a === tile.b, placedByUserId: player.userId };
+    } else if (side === 'right') {
       room.board = [...room.board, placed];
     } else {
-      if (!dominoTileMatchesEnd(tile, left)) throw new Error('Esa ficha no encaja en ese extremo.');
-      placed =
-        tile.a === left
-          ? { id: tile.id, left: tile.b, right: tile.a, isDouble: tile.a === tile.b, placedByUserId: player.userId }
-          : { id: tile.id, left: tile.a, right: tile.b, isDouble: tile.a === tile.b, placedByUserId: player.userId };
       room.board = [placed, ...room.board];
     }
 
     player.hand = player.hand.filter((t) => t.id !== tile.id);
     room.consecutivePasses = 0;
+    const seen = new Set(room.seenConceptIndexes ?? []);
+    seen.add(tile.a);
+    seen.add(tile.b);
+    room.seenConceptIndexes = [...seen];
 
     if (player.hand.length === 0) {
       this.finishDominoGame(room, player.userId, false);
@@ -1992,6 +2198,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     const player = room.players.find((p) => p.socketId === socket.id);
     if (!player) throw new Error('No estás en esta sala.');
     if (player.userId !== room.activePlayerUserId) throw new Error('No es tu turno.');
+    if (room.pendingQuestion) throw new Error('Primero responde la pregunta pendiente.');
     if (room.boneyard.length === 0) throw new Error('El pozo está vacío.');
     if (dominoHasValidMove(player.hand, room.board)) {
       throw new Error('Ya tienes una jugada posible, no puedes robar.');
@@ -2014,6 +2221,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     const player = room.players.find((p) => p.socketId === socket.id);
     if (!player) throw new Error('No estás en esta sala.');
     if (player.userId !== room.activePlayerUserId) throw new Error('No es tu turno.');
+    if (room.pendingQuestion) throw new Error('Primero responde la pregunta pendiente.');
     if (room.boneyard.length > 0) throw new Error('Todavía puedes robar del pozo.');
     if (dominoHasValidMove(player.hand, room.board)) {
       throw new Error('Tienes una jugada posible, no puedes pasar.');
@@ -2095,6 +2303,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     room.rematchVotes = {};
     room.activePlayerUserId = null;
     room.turnDeadline = null;
+    room.pendingQuestion = null;
 
     this.dominoRoomStore.set(room);
     this.broadcastDominoState(room);
@@ -2103,14 +2312,26 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   private setActiveDominoTurn(room: DominoRoomState, userId: string) {
     room.activePlayerUserId = userId;
     room.turnDeadline = Date.now() + room.turnDurationSeconds * 1000;
+    // Cualquier cambio de turno descarta una pregunta que hubiera quedado pendiente.
+    room.pendingQuestion = null;
 
     this.dominoRoomStore.set(room);
     this.broadcastDominoState(room);
 
+    this.startDominoTurnTimer(room, userId);
+  }
+
+  /** (Re)inicia el reloj del turno de `userId`; al vencer, el servidor decide por el jugador inactivo. */
+  private startDominoTurnTimer(room: DominoRoomState, userId: string) {
     this.clearDominoTurnTimer(room.code);
     const timer = setTimeout(() => {
       const current = this.dominoRoomStore.get(room.code);
       if (!current || current.phase !== 'PLAYING' || current.activePlayerUserId !== userId) return;
+      // Pregunta sin responder a tiempo = respuesta incorrecta: se pierde el turno.
+      if (current.pendingQuestion) {
+        this.resolveDominoQuestion(current, false, true);
+        return;
+      }
       // Si nadie actúa a tiempo, el servidor decide por el jugador inactivo:
       // pasa si no tiene jugada posible y no hay pozo, o roba/pasa según
       // corresponda, para que la partida nunca quede colgada esperando.

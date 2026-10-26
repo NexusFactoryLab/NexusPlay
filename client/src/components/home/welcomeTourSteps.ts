@@ -90,10 +90,10 @@ export function getWelcomeSteps(role: string, isKids: boolean, options: WelcomeO
   steps.push({
     title: 'Todo tiene su lugar',
     text: role === 'TEACHER'
-      ? 'Mis clases reúne tus grupos. Mis actividades guarda tus creaciones y Comunidad te permite descubrir juegos compartidos.'
+      ? 'El menú tiene tres partes: Explorar (Áreas y Comunidad), Mi espacio (Mis clases y Mis juegos) y, si tienes acceso, Administración.'
       : role === 'ADMIN'
-        ? 'Explora Áreas y Comunidad. En Usuarios y Organización administras la plataforma.'
-        : 'Explora Áreas y Comunidad para encontrar juegos. Tus juegos privados están en el menú.',
+        ? 'El menú tiene tres partes: Explorar (Áreas y Comunidad), Mi espacio (Mis juegos) y Administración (Usuarios, Edición, Proveedores de IA y Organización).'
+        : 'El menú tiene dos partes: Explorar (Áreas y Comunidad) para encontrar juegos y Mi espacio para lo tuyo, como Mis juegos.',
     target: 'navigation', icon: 'explore', kind: 'look',
   })
   steps.push(
@@ -114,27 +114,32 @@ export function getWelcomeSteps(role: string, isKids: boolean, options: WelcomeO
   })
   steps.push(
     {
-      title: 'Descubre la Comunidad', text: 'Comunidad reúne los juegos que otras personas comparten.',
+      title: 'Descubre la Comunidad', text: 'Explora los juegos que otras personas comparten en Comunidad y usa el filtro para ver solo un tipo de juego.',
       target: 'nav-community', icon: 'play', kind: 'tap', task: 'Toca «Comunidad».',
-      away: 'Estos son los juegos de la comunidad. Toca uno para jugarlo o ver de qué trata.',
+      away: 'Estos son los juegos de la comunidad. Toca uno para jugarlo o ver de qué trata, o filtra por tipo de juego.',
     },
     {
-      title: role === 'TEACHER' ? 'Encuentra tus actividades' : 'Tus juegos privados',
-      text: role === 'TEACHER' ? 'En Mis actividades están tus creaciones para consultarlas y seguir trabajando en ellas.' : 'En Mis juegos privados están tus juegos que no están publicados para la comunidad.',
+      title: 'Encuentra tus juegos',
+      text: role === 'TEACHER' ? 'En Mis juegos encuentras tus creaciones para consultarlas y seguir trabajando en ellas.' : 'En Mis juegos encuentras los juegos que creaste y que no están publicados para la comunidad.',
       target: 'nav-own-games', icon: 'create', kind: 'tap',
-      task: role === 'TEACHER' ? 'Toca «Mis actividades».' : 'Toca «Mis juegos privados».',
-      away: role === 'TEACHER' ? 'Aquí quedan tus actividades: ábrelas para editarlas, jugarlas o compartirlas.' : 'Aquí quedan tus juegos privados: solo tú los ves.',
+      task: 'Toca «Mis juegos».',
+      away: 'Aquí quedan tus juegos: ábrelos para editarlos, jugarlos o compartirlos.',
     },
   )
   if (role === 'ADMIN') steps.push(
     {
-      title: 'Gestiona los usuarios', text: 'En Usuarios consultas y administras las cuentas de NexusPlay.',
+      title: 'Gestiona los usuarios', text: 'En Usuarios puedes consultar y administrar las cuentas de NexusPlay.',
       target: 'nav-users', icon: 'profile', kind: 'tap', task: 'Toca «Usuarios».',
       away: 'Esta es la lista de cuentas. Puedes buscar, cambiar roles o desactivar cuentas.',
     },
     {
-      title: 'La IA, bajo control', text: 'En IA revisas las peticiones de creación con IA y el estado de cada una.',
-      target: 'nav-ai-providers', icon: 'create', kind: 'tap', task: 'Toca «IA».',
+      title: 'Edita lo que ven los demás', text: 'En Edición eliges los juegos destacados del Inicio y archivas o renombras los tipos de juego. Quien explora los ve en Comunidad, con el filtro por tipo.',
+      target: 'nav-edition', icon: 'create', kind: 'tap', task: 'Toca «Edición».',
+      away: 'Aquí eliges los juegos destacados del Inicio y administras los tipos de juego.',
+    },
+    {
+      title: 'La IA, bajo control', text: 'En Proveedores de IA revisas las peticiones de creación con IA y el estado de cada una.',
+      target: 'nav-ai-providers', icon: 'create', kind: 'tap', task: 'Toca «Proveedores de IA».',
       away: 'Aquí ves las peticiones a la IA y configuras sus proveedores.',
     },
   )

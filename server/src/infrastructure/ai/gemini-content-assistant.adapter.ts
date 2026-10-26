@@ -183,6 +183,7 @@ export class GeminiContentAssistant implements AiContentAssistant {
 
 Responde ÚNICAMENTE con un objeto JSON con esta forma exacta (sin texto adicional, sin markdown):
 { "config": { ... }, "content": [ ... ] }
+(si las instrucciones piden "title", "description" y "categoryId", agrégalos en la raíz de ese mismo objeto)
 
 Texto fuente (extraído de los archivos que subió el usuario para el tema "${gameType}"):
 """
@@ -217,8 +218,14 @@ ${sourceText.slice(0, 200_000)}
       throw new InvalidGameContentError('la IA devolvió una respuesta con forma inesperada.');
     }
 
-    const { config, content } = parsed as { config?: unknown; content?: unknown };
-    return { config: config ?? {}, content };
+    const { config, content, title, description, categoryId, categoryName } = parsed as Record<string, unknown>;
+    return {
+      config: config ?? {},
+      content,
+      ...([title, description, categoryId, categoryName].some((v) => v !== undefined)
+        ? { identity: { title, description, categoryId, categoryName } }
+        : {}),
+    };
   }
 
   /**

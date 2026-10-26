@@ -37,14 +37,15 @@ function room(): DominoRoomState {
 }
 
 describe('toDominoClientView', () => {
-  it('no envía correctIndex al cliente y conserva el resto de la pregunta', () => {
+  it('no envía correctIndex ni explanation al cliente y conserva texto y opciones', () => {
     const r = room();
     const view = toDominoClientView(r, 's1');
     expect(JSON.stringify(view)).not.toContain('correctIndex');
-    expect(view.concepts[0]).toMatchObject({
-      definition: 'Def',
-      question: { text: 'Q', options: ['A', 'B', 'C'], explanation: 'E' },
-    });
+    expect(JSON.stringify(view)).not.toContain('"E"');
+    // El cliente no conoce el banco: ni `question` ni `questions` viajan en los conceptos.
+    expect(view.concepts[0]).toMatchObject({ definition: 'Def' });
+    expect(view.concepts[0]).not.toHaveProperty('question');
+    expect(view.concepts[0]).not.toHaveProperty('questions');
     // El estado del servidor no se muta.
     expect(r.concepts[0].question?.correctIndex).toBe(2);
   });

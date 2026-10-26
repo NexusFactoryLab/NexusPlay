@@ -1,7 +1,8 @@
 import type { GuessWhoChatMessage } from './guessWhoTypes'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { io, type Socket } from 'socket.io-client'
-import type { DominoRoomStateView } from './dominoRoomTypes'
+import type { DominoAnswerResult, DominoRoomStateView } from './dominoRoomTypes'
+import type { DominoLevel } from './dominoTypes'
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:3000'
 
@@ -21,6 +22,9 @@ export function useDominoRoom(token: string | null) {
   const [dealCountdownMs, setDealCountdownMs] = useState<number | null>(null)
   /** Ficha jugada en el último room:state recibido (para animar "quién jugó" en el tablero). */
   const [lastPlacedTileId, setLastPlacedTileId] = useState<string | null>(null)
+
+  /** Corrección de la última pregunta de Intermedio (con la explicación); null hasta que llegue. */
+  const [answerResult, setAnswerResult] = useState<DominoAnswerResult | null>(null)
 
   useEffect(() => {
     if (!token) return
@@ -57,7 +61,9 @@ export function useDominoRoom(token: string | null) {
     socket.on('room:error', (payload: { message: string }) => setError(payload.message))
     socket.on('domino:dealing', (payload: { countdownMs: number }) => {
       setDealCountdownMs(payload.countdownMs)
+      setAnswerResult(null)
     })
+    socket.on('domino:answer-result', (payload: DominoAnswerResult) => setAnswerResult(payload))
     socket.on('domino:rematch-rejected', (payload: { message: string }) => {
       setRematchRejectedMessage(payload.message)
       roomCodeRef.current = null
@@ -96,6 +102,17 @@ export function useDominoRoom(token: string | null) {
     socketRef.current?.emit('domino:update-turn-duration', { turnDurationSeconds })
   }, [])
 
+  const updateLevel = useCallback((level: DominoLevel) => {
+    socketRef.current?.emit('domino:update-level', { level })
+  }, [])
+
+  /** Envía solo el índice elegido; el servidor corrige y responde con `domino:answer-result`. */
+  const answerQuestion = useCallback((optionIndex: number) => {
+    socketRef.current?.emit('domino:answer', { optionIndex })
+  }, [])
+
+  const dismissAnswerResult = useCallback(() => setAnswerResult(null), [])
+
   const playTile = useCallback((tileId: string, side: 'left' | 'right') => {
     socketRef.current?.emit('domino:play', { tileId, side })
   }, [])
@@ -128,10 +145,14 @@ export function useDominoRoom(token: string | null) {
     rematchRejectedMessage,
     dealCountdownMs,
     lastPlacedTileId,
+    answerResult,
+    dismissAnswerResult,
     createRoom,
     joinRoom,
     setReady,
     updateTurnDuration,
+    updateLevel,
+    answerQuestion,
     playTile,
     drawTile,
     passTurn,

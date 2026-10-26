@@ -1,4 +1,5 @@
 import type { GameTypeName } from '../../domain/value-objects/game-type.vo.js';
+import { DOMINO_ICON_CATALOG } from './domino-icon-catalog.js';
 
 /**
  * Instrucciones + forma de JSON esperada por cada `gameType` (y, para
@@ -79,13 +80,69 @@ const DOMINO_SPEC: GamePromptSpec = {
   instructions: `Genera el contenido de un juego de Dominó educativo a partir del texto fuente.
 Extrae entre 6 y 10 conceptos clave del texto (términos, personajes, fechas, eventos — lo que
 tenga más sentido para el tema). Cada concepto necesita una "label" corta (máximo 60 caracteres)
-y un color hexadecimal distinto y armonioso para cada uno. Para "icon" usa siempre el valor
-"star" (el cliente resuelve un ícono visual aparte; no inventes otras claves).`,
+y un color hexadecimal distinto y armonioso para cada uno. Para "icon" elige UNA clave de esta
+lista, la que mejor represente el SIGNIFICADO del concepto (no inventes claves):
+${DOMINO_ICON_CATALOG.join(', ')}.
+Reglas de íconos: cada concepto lleva un ícono distinto; evita "star" y "heart" (y "smile") salvo que el
+concepto trate justamente de eso; piensa qué objeto o escena lo evoca (bien: Evaporación -> "sun", Condensación -> "cloud",
+Precipitación -> "cloudRain", Bastilla -> "building", Fracción -> "pizza"; mal: usar "star" o "heart" porque no se te ocurre otro).
+
+Además, CADA concepto lleva material para los tres niveles del juego (todos son obligatorios):
+- "definition": una frase clara que defina el concepto (máximo 300 caracteres). Nivel Fácil.
+- "example": un ejemplo cotidiano y sencillo, pensado para niños (máximo 300 caracteres). Nivel Fácil.
+- "application": un CASO concreto donde se aplica, para nivel universitario (máximo 400 caracteres).
+  Nivel Universitario: sin este caso el nivel no queda disponible, así que NUNCA lo omitas.
+  Debe ser una SITUACIÓN de 1 a 3 frases con quién (una persona, comunidad o institución), qué problema o hecho
+  ocurre y cómo se conecta con el concepto. NO es una definición ni una generalidad.
+  Bien: "Una agricultora nota que su huerta se seca al mediodía y decide regar de noche para que el sol evapore menos agua."
+  Mal: "En la modelación climática, la evaporación de los océanos se cuantifica para estimar el balance hídrico." (suena a definición)
+- "questions": entre 2 y 3 preguntas distintas sobre ESE concepto (nunca más de 6; la primera es obligatoria).
+  Cada pregunta lleva "levels": lista con "MEDIUM" (Intermedio: comprensión directa del concepto),
+  "ADVANCED" (Universitario: aplicación o análisis del caso de "application") o ambos. Cada concepto debe
+  tener AL MENOS una pregunta que incluya "MEDIUM" y AL MENOS una que incluya "ADVANCED"; una misma pregunta
+  puede servir para ambos (["MEDIUM","ADVANCED"]). Las de "ADVANCED" deben apoyarse en el caso, sin inventar datos.
+  Varía el tipo: una conceptual (MEDIUM), una de identificación (ambos) y una de aplicación (ADVANCED). Cada pregunta tiene
+  "text" (máximo 300 caracteres), "options" (SIEMPRE 4 opciones distintas, máximo 120 caracteres cada una),
+  "correctIndex" (posición 0 a 3 de la opción correcta; el servidor mezcla las opciones después) y
+  "explanation" (por qué es correcta, máximo 400 caracteres).
+  Calidad de las preguntas:
+  - Los distractores deben ser plausibles y de la MISMA categoría que la respuesta (si la correcta es una fecha,
+    todas son fechas; si es un personaje, todos son personajes), con longitud parecida. Evita opciones absurdas
+    como "Luna / Marte / Satélite" para "¿Cuál orbita alrededor del Sol?".
+  - Las 4 opciones tienen una longitud SIMILAR (la más larga no debe pasar del doble de la más corta) y la
+    respuesta correcta NO debe ser la más larga ni la más detallada: si necesita más palabras, agrégaselas también
+    a los distractores o acorta la correcta.
+  - Las 4 opciones deben significar cosas DISTINTAS: ningún distractor es sinónimo o reformulación de la respuesta
+    ni de otro distractor. Mal: "Se congela" y "Se vuelve hielo" en la misma pregunta (dicen lo mismo).
+    Bien: "Se evapora", "Se congela", "Se condensa", "Se filtra" (cuatro procesos diferentes).
+  - La explicación debe confirmar la opción correcta y nunca contradecirla ni a la pregunta.
+  - Si el mensaje del usuario indica un nivel (primaria, colegio, universidad), ajusta la dificultad y el
+    vocabulario de las preguntas a ese nivel.
+  - No inventes fuentes, citas, cifras ni fechas. Si no estás seguro de un dato, prefiere una pregunta
+    conceptual en vez de una de datos exactos. Solo hechos verificables a partir del texto fuente o de
+    conocimiento bien establecido; nada dudoso.
+Recuerda: un ícono distinto y con significado para cada concepto (sin "star" ni "heart" de relleno).`,
   jsonShapeExample: `{
   "config": { "handSize": 7 },
   "content": [
-    { "label": "Fotosíntesis", "icon": "star", "color": "#22c55e" },
-    { "label": "Clorofila", "icon": "star", "color": "#16a34a" }
+    {
+      "label": "Fotosíntesis", "icon": "sprout", "color": "#22c55e",
+      "definition": "Proceso por el que las plantas convierten luz, agua y dióxido de carbono en azúcar y oxígeno.",
+      "example": "Una planta en la ventana que crece gracias a la luz del sol.",
+      "application": "Una productora de lechuga nota que sus plantas crecen lento en el invernadero y decide aumentar la luz y el CO2 para que hagan más fotosíntesis.",
+      "questions": [
+        { "text": "¿Qué gas liberan las plantas durante la fotosíntesis?", "options": ["Oxígeno", "Nitrógeno", "Metano", "Helio"], "correctIndex": 0, "levels": ["MEDIUM"], "explanation": "La fotosíntesis produce azúcar y libera oxígeno." },
+        { "text": "¿De dónde obtiene la planta la energía para la fotosíntesis?", "options": ["Del viento", "De la luz del sol", "De las rocas", "De la luna"], "correctIndex": 1, "levels": ["MEDIUM", "ADVANCED"], "explanation": "La luz aporta la energía que impulsa el proceso." },
+        { "text": "En el invernadero del caso, ¿qué ajuste aumenta la producción de lechuga?", "options": ["Subir la luz y el CO2", "Apagar todas las lámparas", "Cubrir el invernadero con tela negra", "Quitar el CO2 del aire"], "correctIndex": 0, "levels": ["ADVANCED"], "explanation": "Más luz y CO2 elevan la fotosíntesis, como describe el caso." }
+      ]
+    },
+    { "label": "Clorofila", "icon": "leaf", "color": "#16a34a",
+      "definition": "Pigmento verde de las plantas que absorbe la luz.",
+      "example": "Por la clorofila las hojas se ven verdes.",
+      "application": "Un agricultor ve que las hojas de su cafetal se ponen amarillas y concluye que les falta clorofila por falta de nutrientes.",
+      "questions": [
+      { "text": "¿Qué pigmento da el color verde a las hojas?", "options": ["Clorofila", "Hemoglobina", "Melanina", "Queratina"], "correctIndex": 0, "levels": ["MEDIUM", "ADVANCED"], "explanation": "La clorofila absorbe la luz y refleja el verde." }
+    ] }
   ]
 }`,
   imageRequirement: null,

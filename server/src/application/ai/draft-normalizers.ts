@@ -1,4 +1,6 @@
 import type { GameTypeName } from '../../domain/value-objects/game-type.vo.js';
+import { DOMINO_ICON_CATALOG } from './domino-icon-catalog.js';
+import { assignDominoIcons, ensureLevelCoverage, sanitizeQuestionLevels, shuffleQuestionOptions, type Rng } from './domino-quality.js';
 
 /**
  * Ajustes de FORMA y TAMAÑO sobre lo que devuelve la IA, antes de pasarlo
@@ -24,6 +26,8 @@ export interface NormalizeDraftOptions {
    * tarjeta corresponde a una imagen y no se puede descartar ninguna).
    */
   dedupe?: boolean;
+  /** Azar para barajar opciones (Dominó). Por defecto `Math.random`; las pruebas inyectan uno determinista. */
+  rng?: Rng;
 }
 
 export interface NormalizedDraft {
@@ -260,13 +264,90 @@ function keepUsefulTraits(cards: unknown, catalog: Map<string, Omit<GuessWhoTrai
 function normalizeDomino(config: Record<string, unknown>, content: unknown, options: NormalizeDraftOptions): NormalizedDraft {
   const next: Record<string, unknown> = { ...config };
   setClampedInt(next, 'handSize', 3, 12);
+  const rng = options.rng ?? Math.random;
 
   const items = mapObjects(content, (raw, index) => {
     const label = trimmedLabel(raw.label, 60);
     if (label === null) return null;
-    return { ...raw, label, icon: nonEmptyString(raw.icon) ?? 'star', color: validColor(raw.color, index) };
+    // Ícono: solo claves que el cliente sabe pintar; cualquier otra cosa vuelve a "star".
+    const icon = nonEmptyString(raw.icon);
+    const { question: legacyQuestion, questions: rawQuestions, definition, example, application, ...rest } = raw;
+    // Las opciones se barajan aquí (tras limpiar duplicados) para que la correcta no quede casi siempre en la misma posición.
+    const questions = ensureLevelCoverage(
+      normalizeDominoQuestions(rawQuestions, legacyQuestion).map((q) =>
+        shuffleQuestionOptions(q as { options: string[]; correctIndex: number; levels?: Array<'MEDIUM' | 'ADVANCED'> }, rng),
+      ),
+    );
+    const optionalTexts: Record<string, string> = {};
+    for (const [key, value, max] of [
+      ['definition', definition, 300],
+      ['example', example, 300],
+      ['application', application, 400],
+    ] as const) {
+      const text = nonEmptyString(value);
+      if (text) optionalTexts[key] = truncate(text, max);
+    }
+    return {
+      ...rest,
+      label,
+      icon: icon && DOMINO_ICON_CATALOG.includes(icon) ? icon : 'star',
+      color: validColor(raw.color, index),
+      ...optionalTexts,
+      ...(questions.length > 0 ? { questions } : {}),
+    };
   });
-  return { config: next, content: limit(options.dedupe === false ? items : dedupeBy(items, (item) => item.label), 10) };
+  const kept = limit(options.dedupe === false ? items : dedupeBy(items, (item) => item.label), 10);
+  if (!Array.isArray(kept)) return { config: next, content: kept };
+  // Íconos distintos por concepto: se evita el "star" de respaldo repetido y se infiere por el nombre.
+  const concepts = kept as Array<Record<string, unknown>>;
+  const icons = assignDominoIcons(concepts.map((item) => ({ label: String(item.label), icon: String(item.icon) })));
+  return { config: next, content: concepts.map((item, index) => ({ ...item, icon: icons[index] })) };
+}
+
+/**
+ * Banco de preguntas de un concepto a partir de lo que devuelva la IA (`questions`,
+ * o `question` suelta). Descarta las preguntas que el validador rechazaría (menos de
+ * 3 opciones, índice fuera de rango, sin explicación), acota textos, quita opciones
+ * y preguntas repetidas y deja máximo 6.
+ */
+function normalizeDominoQuestions(rawQuestions: unknown, legacyQuestion: unknown): Record<string, unknown>[] {
+  const candidates = Array.isArray(rawQuestions) ? rawQuestions : legacyQuestion !== undefined ? [legacyQuestion] : [];
+  const result: Record<string, unknown>[] = [];
+  const seenTexts = new Set<string>();
+  for (const item of candidates) {
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) continue;
+    const raw = item as Record<string, unknown>;
+    const text = nonEmptyString(raw.text);
+    const explanation = nonEmptyString(raw.explanation);
+    if (!text || !explanation || !Array.isArray(raw.options)) continue;
+    const correctIndex = toNumber(raw.correctIndex);
+    if (correctIndex === null || !Number.isInteger(correctIndex) || correctIndex < 0 || correctIndex >= raw.options.length) continue;
+    // Se quitan opciones repetidas sin perder la posición de la correcta.
+    const correctOption = nonEmptyString(raw.options[correctIndex]);
+    if (!correctOption) continue;
+    const options: string[] = [];
+    for (const option of raw.options) {
+      const clean = nonEmptyString(option);
+      if (clean && !options.some((o) => o.toLowerCase() === truncate(clean, 120).toLowerCase())) options.push(truncate(clean, 120));
+    }
+    const newCorrect = options.findIndex((o) => o.toLowerCase() === truncate(correctOption, 120).toLowerCase());
+    if (options.length < 3 || newCorrect < 0) continue;
+    const finalOptions = options.slice(0, 4);
+    if (newCorrect >= finalOptions.length) continue;
+    const key = text.toLowerCase().replace(/\s+/g, ' ');
+    if (seenTexts.has(key)) continue;
+    seenTexts.add(key);
+    const levels = sanitizeQuestionLevels(raw.levels);
+    result.push({
+      text: truncate(text, 300),
+      options: finalOptions,
+      correctIndex: newCorrect,
+      explanation: truncate(explanation, 400),
+      ...(levels ? { levels } : {}),
+    });
+    if (result.length === 6) break;
+  }
+  return result;
 }
 
 // --- Laberinto recolector ---------------------------------------------------

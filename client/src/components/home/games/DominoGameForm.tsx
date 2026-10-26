@@ -4,7 +4,6 @@ import type { FormEvent } from 'react'
 import { TextField } from '../../TextField'
 import { SaveVisibilityModal } from './SaveVisibilityModal'
 import { ImageUploadField } from './ImageUploadField'
-import { IconPickerField } from './IconPickerField'
 import { AiGameAssistantPanel } from './AiGameAssistantPanel'
 import { useReportCreateSummary } from './aiDraftContext'
 import { useCreationDraftId } from './useCreationDraftId'
@@ -37,28 +36,34 @@ import { listMyOrganizations, type OrganizationWithMyRole } from '../../../servi
 import { ApiError } from '../../../utils/http'
 import {
   DEFAULT_DOMINO_CONFIG,
-  DOMINO_ICON_KEYS,
-  DOMINO_ICON_LABELS,
   MAX_DOMINO_CONCEPTS,
   MIN_DOMINO_CONCEPTS,
   iconForConcept,
 } from './dominoTypes'
-import { DOMINO_TILE_SUGGESTED_COLORS } from './dominoTileVisualTokens'
+import {
+  emptyConcept,
+  isConceptComplete,
+  toConceptDraft,
+  toConceptInputs,
+  validateDominoConcepts,
+  type ConceptDraft,
+} from './dominoContentDraft'
+import { DominoConceptTabsPanel } from './DominoConceptTabsPanel'
+import { DominoContentBar } from './DominoContentBar'
+import { DominoLevelNotice } from './DominoLevelNotice'
+import { creationLevelNotice, firstGapIndex, serves } from './dominoLevelsDraft'
+import type { ConceptTab } from './dominoConceptTabs'
+import { AiIdentityBadges, useAiIdentity } from './useAiIdentity'
+import {
+  approveConcept,
+  discardConcept,
+  editConcept,
+  markAsAiGenerated,
+  nextPendingIndex,
+  reviewBlockIssue,
+  tileReviewState,
+} from './dominoReview'
 
-type ConceptDraft = {
-  label: string
-  icon: string
-  color: string
-}
-
-/** Paleta sugerida: colores bien diferenciables entre sí, para que las mitades de ficha no se confundan de un vistazo. */
-function emptyConcept(index: number): ConceptDraft {
-  return {
-    label: '',
-    icon: DOMINO_ICON_KEYS[index % DOMINO_ICON_KEYS.length],
-    color: DOMINO_TILE_SUGGESTED_COLORS[index % DOMINO_TILE_SUGGESTED_COLORS.length],
-  }
-}
 
 /**
  * Fases del formulario (issue #218): antes era un único scroll largo
@@ -116,6 +121,10 @@ export function DominoGameForm({
   const [createdGameId, setCreatedGameId] = useState<string | null>(null)
   const [phase, setPhase] = useState(0)
   const [selectedConcept, setSelectedConcept] = useState(0)
+  // Pestaña abierta del panel del concepto (se mantiene al cambiar de concepto).
+  const [conceptTab, setConceptTab] = useState<ConceptTab>('CONCEPT')
+  // Aviso previo a crear: visible cuando el profesor pulsó "Crear juego" y algún nivel quedaría sin contenido.
+  const [levelNoticeOpen, setLevelNoticeOpen] = useState(false)
   const { setSubPhase } = useCreateGameProgress()
 
   // Informa al header del wizard (CreateGameLayout) en qué fase va este
@@ -162,7 +171,9 @@ export function DominoGameForm({
     setTitle(savedString(state, 'title', ''))
     setDescription(savedString(state, 'description', ''))
     setCoverImageUrl(savedNullableString(state, 'coverImageUrl'))
-    const savedConcepts = savedList<ConceptDraft>(state, 'concepts')
+    // Los borradores guardados antes del banco de preguntas solo traen label/icon/color: se completan.
+    const savedRaw = savedList<unknown>(state, 'concepts')
+    const savedConcepts = savedRaw ? savedRaw.map((raw, index) => toConceptDraft(raw, index)) : null
     if (savedConcepts) setConcepts(savedConcepts)
     setHandSize(savedNumber(state, 'handSize', DEFAULT_DOMINO_CONFIG.handSize))
     setCategoryId(savedString(state, 'categoryId', ''))
@@ -179,30 +190,44 @@ export function DominoGameForm({
     applyAiDraft(adapted)
   })
 
-  function applyAiDraft(draft: GameDraft) {
+  // La IA también sugiere título, descripción y área: se aplican sin pisar lo que escribió el usuario.
+  const aiIdentity = useAiIdentity({
+    title,
+    description,
+    categoryId,
+    categoryIds: categories.map((category) => category.id),
+    setTitle,
+    setDescription,
+    setCategoryId,
+    goToIdentity: () => setPhase(0),
+  })
+
+  /**
+   * Carga un borrador en el formulario. Con `ai` (generado por la IA) los conceptos quedan
+   * pendientes de revisión (con sus advertencias) y se revisan en la propia cuadrícula.
+   * La adaptación desde otro juego no pasa por revisión.
+   */
+  function applyAiDraft(draft: GameDraft, options?: { ai?: boolean }) {
     const items = Array.isArray(draft.content) ? draft.content : []
     // El panel sigue al concepto más reciente mientras la IA llena la lista.
     setSelectedConcept(Math.max(items.length - 1, 0))
-    setConcepts(
-      items.map((item, index) => {
-        const raw = (item ?? {}) as Record<string, unknown>
-        return {
-          label: typeof raw.label === 'string' ? raw.label : '',
-          icon: typeof raw.icon === 'string' && DOMINO_ICON_KEYS.includes(raw.icon)
-            ? raw.icon
-            : DOMINO_ICON_KEYS[index % DOMINO_ICON_KEYS.length],
-          color: typeof raw.color === 'string' ? raw.color : DOMINO_TILE_SUGGESTED_COLORS[index % DOMINO_TILE_SUGGESTED_COLORS.length],
-        }
-      }),
-    )
+    // Carga también definition, example, application y el banco de preguntas que genera la IA.
+    const loaded = items.map((item, index) => toConceptDraft(item, index))
+    setConcepts(options?.ai ? markAsAiGenerated(loaded, draft.warnings) : loaded)
     const config = (draft.config ?? {}) as Record<string, unknown>
     if (typeof config.handSize === 'number') setHandSize(config.handSize)
   }
 
-  function updateConcept<K extends keyof ConceptDraft>(index: number, field: K, value: ConceptDraft[K]) {
-    setConcepts((current) =>
-      current.map((concept, i) => (i === index ? { ...concept, [field]: value } : concept)),
-    )
+  /** Salta al siguiente concepto de IA sin revisar (con vuelta al inicio). */
+  function goToNextPending() {
+    const next = nextPendingIndex(concepts, selectedConcept)
+    if (next !== null) setSelectedConcept(next)
+  }
+
+  /** Lleva a un concepto y abre la pestaña indicada (resumen, aviso previo y advertencias la usan). */
+  function jumpTo(conceptIndex: number, tab: ConceptTab) {
+    setSelectedConcept(conceptIndex)
+    setConceptTab(tab)
   }
 
   function addConcept() {
@@ -212,9 +237,8 @@ export function DominoGameForm({
   }
 
   function removeConcept(index: number) {
-    setConcepts((current) =>
-      current.length > MIN_DOMINO_CONCEPTS ? current.filter((_, i) => i !== index) : current,
-    )
+    // Descartar respeta el mínimo de conceptos (ver dominoReview.discardConcept).
+    setConcepts((current) => discardConcept(current, index).concepts)
     setSelectedConcept((current) => Math.max(0, Math.min(current, concepts.length - 2)))
   }
 
@@ -242,26 +266,22 @@ export function DominoGameForm({
 
   /** Valida solo los campos de la fase 3 (Contenido): el bloque repetible de conceptos. */
   function validateContentPhase(): string | null {
-    if (concepts.length < MIN_DOMINO_CONCEPTS) {
-      return `Necesitas al menos ${MIN_DOMINO_CONCEPTS} conceptos.`
+    // Antes que nada: los conceptos de IA deben estar revisados; lleva al primero pendiente.
+    const pendingReview = reviewBlockIssue(concepts)
+    if (pendingReview) {
+      if (pendingReview.conceptIndex !== undefined) setSelectedConcept(pendingReview.conceptIndex)
+      return pendingReview.message
     }
-    if (concepts.length > MAX_DOMINO_CONCEPTS) {
-      return `El dominó admite como máximo ${MAX_DOMINO_CONCEPTS} conceptos.`
+    // Exige 1 pregunta completa por concepto (ver validateDominoConcepts); lleva al concepto con el problema.
+    const issue = validateDominoConcepts(concepts)
+    if (!issue) return null
+    if (issue.conceptIndex !== undefined) {
+      setSelectedConcept(issue.conceptIndex)
+      // Si el problema es de una pregunta, abre la pestaña del nivel donde sale.
+      const bad = issue.questionIndex !== undefined ? concepts[issue.conceptIndex]?.questions[issue.questionIndex] : undefined
+      if (bad) setConceptTab(serves(bad, 'MEDIUM') ? 'MEDIUM' : 'ADVANCED')
     }
-    const emptyAt = concepts.findIndex((concept) => !concept.label.trim())
-    if (emptyAt !== -1) {
-      setSelectedConcept(emptyAt)
-      return 'Cada concepto necesita un nombre antes de crear el juego.'
-    }
-    const labels = concepts.map((concept) => concept.label.trim().toLowerCase())
-    const duplicateAt = labels.findIndex((label, index) => labels.indexOf(label) !== index)
-    if (duplicateAt !== -1) {
-      setSelectedConcept(duplicateAt)
-    }
-    if (new Set(labels).size !== labels.length) {
-      return 'No puede haber dos conceptos con el mismo nombre.'
-    }
-    return null
+    return issue.message
   }
 
   const VALIDATORS = [validateIdentityPhase, validateConfigPhase, validateContentPhase]
@@ -296,6 +316,20 @@ export function DominoGameForm({
       }
     }
 
+    // Aviso previo: si algún nivel no quedará disponible, no se crea todavía; el profesor decide
+    // completar ahora o crear de todos modos (el bloqueo de revisión de IA ya se aplicó arriba).
+    if (creationLevelNotice(concepts)) {
+      setError(null)
+      setLevelNoticeOpen(true)
+      return
+    }
+    await createNow()
+  }
+
+  /** Crea el juego (ya validado y, si hacía falta, confirmado el aviso de niveles). */
+  async function createNow() {
+    if (!token) return
+    setLevelNoticeOpen(false)
     setSubmitting(true)
     setError(null)
     try {
@@ -308,11 +342,7 @@ export function DominoGameForm({
         categoryId,
         organizationId: organizationId || undefined,
         theme: coverImageUrl ? { coverImageUrl } : undefined,
-        content: concepts.map((concept) => ({
-          label: concept.label.trim(),
-          icon: concept.icon,
-          color: concept.color,
-        })),
+        content: toConceptInputs(concepts),
         config: { handSize },
       })
       setCreatedGameId(game.id)
@@ -343,6 +373,7 @@ export function DominoGameForm({
   }
 
   const tileCount = (concepts.length * (concepts.length + 1)) / 2
+  const levelNotice = creationLevelNotice(concepts)
 
   return (
     <GameFormShell
@@ -357,17 +388,31 @@ export function DominoGameForm({
       description={
         <>
           Cada mitad de una ficha es un concepto tuyo en vez de un número. Con {concepts.length}{' '}
-          conceptos el set queda en {tileCount} fichas — se juega solo contra el tablero, empatando
+          conceptos el set queda en {tileCount} fichas — se juega 1 contra 1 en una sala, empatando
           los extremos abiertos.
         </>
       }
-      aiPanel={<AiGameAssistantPanel gameType="DOMINO" disabled={submitting} onDraftReady={applyAiDraft} />}
+      headerAside={
+        // Solo en la fase de Contenido: revisión de IA y niveles en la esquina superior derecha.
+        phase === 2 ? <DominoContentBar concepts={concepts} onJump={jumpTo} onNextPending={goToNextPending} /> : undefined
+      }
+      aiPanel={
+        <AiGameAssistantPanel
+          gameType="DOMINO"
+          disabled={submitting}
+          onDraftReady={(draft, meta) => {
+            applyAiDraft(draft, { ai: true })
+            aiIdentity.onDraft(draft, meta)
+          }}
+        />
+      }
     >
       <form className="flex flex-col gap-[16px]" onSubmit={handleSubmit} noValidate>
         <PhaseLabel phase={phase + 1} total={TOTAL_PHASES} label={PHASES[phase].label} />
 
         {phase === 0 && (
           <FormSection icon={Rocket} title="Cuéntanos de tu juego" subtitle="Nombre, portada y el lugar donde vivirá." tone={1}>
+            <AiIdentityBadges ai={aiIdentity} />
             <TextField
               label="Título del juego"
               type="text"
@@ -417,27 +462,39 @@ export function DominoGameForm({
 
         {phase === 1 && (
           <FormSection icon={SlidersHorizontal} title="Reglas del juego" subtitle="Ajusta cómo se juega; los valores por defecto funcionan bien." tone={2}>
-            <div>
-              <label className="nx-label mb-1.5 block text-[13px] font-medium text-text-h" htmlFor="domino-hand-size">
-                Fichas que recibe el jugador
-              </label>
+            <div className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-4">
+              <div className="flex items-center justify-between gap-3">
+                <label className="text-[16px] font-semibold text-text-h" htmlFor="domino-hand-size">
+                  Fichas que recibe el jugador
+                </label>
+                <span
+                  className="flex h-11 min-w-[44px] items-center justify-center rounded-full px-3 text-[18px] font-bold text-white"
+                  style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
+                  aria-live="polite"
+                >
+                  {handSize}
+                </span>
+              </div>
               <input
                 id="domino-hand-size"
-                type="number"
+                type="range"
                 min={3}
                 max={12}
-                className="w-full rounded-lg border border-border bg-bg px-[13px] py-[11px] text-[15px] text-text-h outline-none focus:border-accent"
-                value={handSize}
+                step={1}
+                className="h-11 w-full cursor-pointer accent-[var(--accent)]"
+                value={Number.isInteger(handSize) ? handSize : DEFAULT_DOMINO_CONFIG.handSize}
                 disabled={submitting}
                 onChange={(event) => setHandSize(Number(event.target.value))}
               />
-              <p className="nx-hint mt-1 text-[11.5px] text-text">Entre 3 y 12 fichas; el resto queda en el pozo.</p>
+              <p className="text-[16px] leading-snug text-text">
+                Entre 3 y 12 fichas; el resto queda en el pozo. Con {concepts.length} conceptos el set tiene {tileCount} fichas.
+              </p>
             </div>
           </FormSection>
         )}
 
         {phase === 2 && (
-        <FormSection icon={Puzzle} title="Conceptos" subtitle="Cada concepto se conecta con otro en la cadena del dominó." tone={3} bare>
+        <FormSection icon={Puzzle} title="Conceptos" subtitle="Una pestaña por nivel en cada concepto." tone={3} bare>
 <ItemGridEditor
           itemLabel="Concepto"
           addLabel="+ Agregar concepto"
@@ -449,7 +506,9 @@ export function DominoGameForm({
           onAdd={addConcept}
           onRemove={removeConcept}
           disabled={submitting}
-          isComplete={(index) => !!concepts[index]?.label.trim()}
+          layout="split"
+          tileReview={(index) => tileReviewState(concepts[index])}
+          isComplete={(index) => isConceptComplete(concepts[index]) && concepts[index]?.review !== 'pending'}
           tileText={(index) => concepts[index]?.label ?? ''}
           tileVisual={(index) => {
             const concept = concepts[index]
@@ -461,51 +520,37 @@ export function DominoGameForm({
               </span>
             )
           }}
-          renderEditor={(index) => (
-            <div className="flex flex-col gap-3">
-              <TextField
-                label="Nombre"
-                type="text"
-                value={concepts[index]?.label ?? ''}
+          renderEditor={(index) =>
+            concepts[index] ? (
+              <DominoConceptTabsPanel
+                concept={concepts[index]}
+                index={index}
                 disabled={submitting}
-                onChange={(value) => updateConcept(index, 'label', value)}
-                onBlur={() => {}}
+                tab={conceptTab}
+                onTabChange={setConceptTab}
+                // Editar un concepto de IA cuenta como revisarlo.
+                onChange={(next) => setConcepts((current) => editConcept(current, index, next))}
+                onApprove={() => setConcepts((current) => approveConcept(current, index))}
               />
-              <div>
-                <label
-                  className="nx-label mb-1.5 block text-[13px] font-medium text-text-h"
-                  htmlFor={`concept-icon-${index}`}
-                >
-                  Ícono
-                </label>
-                <IconPickerField
-                  id={`concept-icon-${index}`}
-                  value={concepts[index]?.icon ?? ''}
-                  labels={DOMINO_ICON_LABELS}
-                  disabled={submitting}
-                  onChange={(key) => updateConcept(index, 'icon', key)}
-                />
-              </div>
-              <div>
-                <label
-                  className="nx-label mb-1.5 block text-[13px] font-medium text-text-h"
-                  htmlFor={`concept-color-${index}`}
-                >
-                  Color
-                </label>
-                <input
-                  id={`concept-color-${index}`}
-                  type="color"
-                  className="h-[45px] w-full cursor-pointer rounded-lg border border-border bg-bg px-2 py-1.5 outline-none focus:border-accent"
-                  value={concepts[index]?.color ?? '#888888'}
-                  disabled={submitting}
-                  onChange={(event) => updateConcept(index, 'color', event.target.value)}
-                />
-              </div>
-            </div>
-          )}
+            ) : null
+          }
         />
 </FormSection>
+        )}
+
+        {levelNoticeOpen && levelNotice && (
+          <DominoLevelNotice
+            notice={levelNotice}
+            disabled={submitting}
+            onComplete={() => {
+              setLevelNoticeOpen(false)
+              setPhase(2)
+              // Abre la pestaña del primer nivel que faltaba (Intermedio o Universitario), nunca la misma para ambos.
+              const level = levelNotice.missing[0]
+              jumpTo(firstGapIndex(concepts, level) ?? levelNotice.firstConceptIndex, level)
+            }}
+            onCreateAnyway={createNow}
+          />
         )}
 
         {error && (

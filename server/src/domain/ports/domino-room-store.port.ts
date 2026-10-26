@@ -1,4 +1,4 @@
-import type { DominoConcept } from '../../application/content-validators/domino.content-validator.js';
+import type { DominoConcept, DominoLevel } from '../../application/content-validators/domino.content-validator.js';
 
 export const DOMINO_ROOM_STORE = Symbol('DOMINO_ROOM_STORE');
 
@@ -61,6 +61,34 @@ export interface DominoRoomState {
    * gana quien tenga menos puntos (suma de pips) en la mano.
    */
   consecutivePasses: number;
+  /** Nivel de la partida; lo fija el anfitrión en WAITING. Ausente en salas viejas = EASY. */
+  level?: DominoLevel;
+  /**
+   * Jugada de Intermedio a la espera de respuesta. Vive solo en el servidor:
+   * la ficha y el lado se guardan acá para no confiar en lo que el cliente
+   * reenvíe al responder.
+   */
+  pendingQuestion?: DominoPendingQuestion | null;
+  /** Índices de conceptos que aparecieron en fichas colocadas en la partida actual. */
+  seenConceptIndexes?: number[];
+  /** Conceptos cuya pregunta se falló (o se agotó el tiempo) en la partida actual. */
+  missedConceptIndexes?: number[];
+  /** Preguntas falladas (concepto + posición en su banco), para el repaso de la pantalla de cierre. */
+  missedQuestions?: Array<{ conceptIndex: number; questionIndex: number }>;
+  /** Por concepto, índices del banco ya preguntados en esta sala; base de la rotación sin repetir. */
+  askedQuestions?: Record<number, number[]>;
+  /** Por concepto, última pregunta hecha: evita repetirla justo al reiniciar el registro. */
+  lastQuestion?: Record<number, number>;
+}
+
+export interface DominoPendingQuestion {
+  userId: string;
+  tileId: string;
+  side: 'left' | 'right';
+  /** Concepto del extremo que empata; de él sale la pregunta. */
+  conceptIndex: number;
+  /** Posición, dentro del banco del concepto, de la pregunta elegida; la respuesta se valida contra ella. */
+  questionIndex: number;
 }
 
 /** Almacén efímero en memoria: la sala vive solo mientras el proceso corre (ver RoomsGateway). */

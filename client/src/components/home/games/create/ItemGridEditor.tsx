@@ -24,7 +24,13 @@ type ItemGridEditorProps = {
   /** Tope de elementos: al alcanzarlo se oculta "Agregar". */
   maxItems?: number
   /** `side`: panel a la derecha (campos pocos); `stacked`: panel ancho debajo de la cuadrícula (muchos campos). */
-  layout?: 'side' | 'stacked'
+  layout?: 'side' | 'stacked' | 'split'
+  /**
+   * Estado de revisión de cada tarjeta (contenido generado por IA): `pending` = sin revisar,
+   * `warning` = pendiente con advertencias del servidor, `reviewed` = revisada, `null` = no aplica.
+   * Se muestra como una etiqueta bajo el nombre y como borde de color.
+   */
+  tileReview?: (index: number) => 'pending' | 'warning' | 'reviewed' | null
   /** Campos del elemento seleccionado. */
   renderEditor: (index: number) => ReactNode
 }
@@ -52,6 +58,7 @@ export function ItemGridEditor({
   tileVisual,
   maxItems,
   layout = 'side',
+  tileReview,
   renderEditor,
 }: ItemGridEditorProps) {
   const [touched, setTouched] = useState(false)
@@ -103,6 +110,7 @@ export function ItemGridEditor({
             const complete = isComplete(index)
             const image = tileImage?.(index)
             const text = tileText(index).trim()
+            const review = tileReview?.(index) ?? null
             return (
               <button
                 key={index}
@@ -112,8 +120,11 @@ export function ItemGridEditor({
                 data-selected={index === current}
                 data-complete={complete}
                 data-pulse={!touched && index === 0}
+                data-review={review ?? undefined}
                 aria-current={index === current}
-                aria-label={`${itemLabel} ${index + 1}: ${text || 'sin nombre'}${complete ? ', completa' : ', incompleta'}`}
+                aria-label={`${itemLabel} ${index + 1}: ${text || 'sin nombre'}${complete ? ', completa' : ', incompleta'}${
+                  review === 'reviewed' ? ', revisada' : review ? ', pendiente de revisión' : ''
+                }`}
                 onClick={() => choose(index)}
                 style={{ animationDelay: `${Math.min(index, 12) * 35}ms` }}
               >
@@ -128,6 +139,11 @@ export function ItemGridEditor({
                   )}
                 </span>
                 <span className="nx-gi-name">{text || 'Sin nombre'}</span>
+                {review && (
+                  <span className="nx-gi-review" aria-hidden="true">
+                    {review === 'reviewed' ? 'Revisado' : review === 'warning' ? 'Revisar · aviso' : 'Por revisar'}
+                  </span>
+                )}
                 <span className="nx-gi-status" aria-hidden="true">
                   {complete ? <Check className="h-3 w-3" strokeWidth={3.4} /> : <i className="nx-gi-dot" />}
                 </span>

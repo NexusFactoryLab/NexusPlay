@@ -20,6 +20,11 @@ export interface DominoConcept {
   example?: string;
   /** Nivel Intermedio. `correctIndex` NUNCA debe viajar al cliente durante la partida. */
   question?: DominoConceptQuestion;
+  /**
+   * Banco de preguntas (1 a 6) que el servidor rota para no repetir. Si viene junto
+   * con `question`, `questions` manda (ver `dominoQuestionBank`). Nunca viaja al cliente.
+   */
+  questions?: DominoConceptQuestion[];
   /** Nivel Universitario: caso o situación donde aplica el concepto. */
   application?: string;
 }
@@ -30,7 +35,15 @@ export interface DominoConceptQuestion {
   options: string[];
   correctIndex: number;
   explanation: string;
+  /**
+   * Niveles en los que puede salir la pregunta (Fácil no pregunta). Subconjunto no vacío y sin
+   * duplicados. Ausente = sirve para ambos (juegos y borradores anteriores a esta marca).
+   */
+  levels?: DominoQuestionLevel[];
 }
+
+export const DOMINO_QUESTION_LEVELS = ['MEDIUM', 'ADVANCED'] as const;
+export type DominoQuestionLevel = (typeof DOMINO_QUESTION_LEVELS)[number];
 
 /**
  * Nivel de dificultad de una partida. Es ajuste de la sala, no del contenido:
@@ -56,6 +69,7 @@ const MAX_APPLICATION_LENGTH = 400;
 const MAX_QUESTION_LENGTH = 300;
 const MAX_OPTION_LENGTH = 120;
 const MAX_EXPLANATION_LENGTH = 400;
+const MAX_QUESTIONS = 6;
 const MIN_OPTIONS = 3;
 const MAX_OPTIONS = 4;
 /**
@@ -152,6 +166,19 @@ export class DominoContentValidator implements ContentValidator {
     if (concept.question !== undefined && concept.question !== null) {
       result.question = this.validateQuestion(concept.question, index);
     }
+    if (concept.questions !== undefined && concept.questions !== null) {
+      if (!Array.isArray(concept.questions) || concept.questions.length < 1 || concept.questions.length > MAX_QUESTIONS) {
+        throw new InvalidGameContentError(
+          `el concepto en la posición ${index} necesita de 1 a ${MAX_QUESTIONS} preguntas en questions.`,
+        );
+      }
+      const bank = concept.questions.map((q) => this.validateQuestion(q, index));
+      const texts = new Set(bank.map((q) => q.text.toLowerCase().replace(/\s+/g, ' ')));
+      if (texts.size !== bank.length) {
+        throw new InvalidGameContentError(`el concepto en la posición ${index} tiene preguntas repetidas en questions.`);
+      }
+      result.questions = bank;
+    }
 
     return result;
   }
@@ -169,7 +196,7 @@ export class DominoContentValidator implements ContentValidator {
 
   private validateQuestion(raw: unknown, index: number): DominoConceptQuestion {
     const where = `la pregunta del concepto en la posición ${index}`;
-    if (typeof raw !== 'object' || Array.isArray(raw)) {
+    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
       throw new InvalidGameContentError(`${where} no es un objeto válido.`);
     }
     const q = raw as Record<string, unknown>;
@@ -198,11 +225,22 @@ export class DominoContentValidator implements ContentValidator {
       throw new InvalidGameContentError(`${where} tiene un correctIndex fuera de rango.`);
     }
 
-    return {
+    const result: DominoConceptQuestion = {
       text: q.text.trim(),
       options,
       correctIndex: q.correctIndex as number,
       explanation: q.explanation.trim(),
     };
+    if (q.levels !== undefined && q.levels !== null) {
+      if (
+        !Array.isArray(q.levels) ||
+        q.levels.length === 0 ||
+        !q.levels.every((l) => (DOMINO_QUESTION_LEVELS as readonly unknown[]).includes(l))
+      ) {
+        throw new InvalidGameContentError(`${where} tiene levels inválido (usa MEDIUM y/o ADVANCED, al menos uno).`);
+      }
+      result.levels = DOMINO_QUESTION_LEVELS.filter((l) => (q.levels as unknown[]).includes(l));
+    }
+    return result;
   }
 }

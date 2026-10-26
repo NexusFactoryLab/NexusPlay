@@ -75,7 +75,13 @@ export class MongoGameRepository implements GameRepository, OnModuleInit {
   async save(game: Game, expectedVersion?: number): Promise<void> {
     const doc = GameMapper.toPersistence(game);
     const filter: Record<string, unknown> = { _id: doc._id };
-    if (expectedVersion !== undefined) filter.version = expectedVersion;
+    if (expectedVersion !== undefined) {
+      // Los juegos anteriores al control de versiones (y los sembrados) no
+      // tienen el campo `version`: el mapper los lee como 0, pero `{ version: 0 }`
+      // no encuentra un documento sin ese campo y toda edición fallaba con
+      // "modificado por otra operación". Ese `$set` ya escribe `version`.
+      filter.version = expectedVersion === 0 ? { $in: [0, null] } : expectedVersion;
+    }
 
     try {
       const result = await this.collection.updateOne(
@@ -143,11 +149,7 @@ export class MongoGameRepository implements GameRepository, OnModuleInit {
     const query: Record<string, unknown> = {};
     if (filter.status) query.status = filter.status;
     if (filter.creatorUserId) query.creatorUserId = filter.creatorUserId;
-    if (filter.slugs) {
-      query.slug = { $in: filter.slugs };
-    } else if (filter.excludeSlugs && filter.excludeSlugs.length > 0) {
-      query.slug = { $nin: filter.excludeSlugs };
-    }
+    if (filter.featured) query.featured = true;
     if (filter.categoryId) query.categoryId = filter.categoryId;
     if (filter.organizationId) query.organizationId = filter.organizationId;
     // El caller (list-games.use-case.ts) ya corta antes de llegar aquí si
@@ -212,5 +214,10 @@ export class MongoGameRepository implements GameRepository, OnModuleInit {
       { $set: { status: 'PUBLISHED', updatedAt: new Date() }, $inc: { version: 1 } },
     );
     return result.modifiedCount;
+  }
+
+  async setFeatured(id: string, featured: boolean): Promise<boolean> {
+    const result = await this.collection.updateOne({ _id: id }, { $set: { featured } });
+    return result.matchedCount > 0;
   }
 }

@@ -64,13 +64,13 @@ export type SavedDestinationCopy = {
 /**
  * Textos de éxito según rol y visibilidad (issues #245 y #2): "actividad" para
  * docentes y cuentas institucionales/administradoras, "juego" para
- * estudiantes; "Mis actividades" es el nombre que el menú da a `/mis-juegos`
- * para docentes.
+ * estudiantes; "Mis juegos" es el nombre que el menú da a `/mis-juegos`
+ * para todos los roles.
  */
 export function savedDestinationCopy(role: string | undefined, visibility: 'private' | 'community'): SavedDestinationCopy {
   const upper = role?.toUpperCase()
   const isStudent = upper === 'STUDENT'
-  const destination = visibility === 'community' ? 'Comunidad' : upper === 'TEACHER' ? 'Mis actividades' : 'Mis juegos privados'
+  const destination = visibility === 'community' ? 'Comunidad' : 'Mis juegos'
   return {
     destination,
     heading: isStudent ? `Juego guardado en ${destination}` : `Actividad guardada en ${destination}`,

@@ -23,6 +23,8 @@ type ModalProps = {
    * scroll interno de siempre.
    */
   fitContent?: boolean
+  /** Escala mínima de `fitContent`; más abajo de esto se vuelve al scroll. Por defecto `MIN_FIT_SCALE`. */
+  minFitScale?: number
 }
 
 /** Por debajo de esto el texto deja de leerse bien; ahí se prefiere un poco de scroll. */
@@ -41,6 +43,7 @@ export function Modal({
   ariaDescribedBy,
   ariaModal = true,
   fitContent = false,
+  minFitScale = MIN_FIT_SCALE,
 }: ModalProps) {
   useEffect(() => {
     function handleEscape(event: KeyboardEvent) {
@@ -52,7 +55,7 @@ export function Modal({
 
   const panelRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
-  const scale = useFitScale(fitContent, panelRef, contentRef)
+  const scale = useFitScale(fitContent, panelRef, contentRef, minFitScale)
 
   return (
     <div
@@ -63,7 +66,7 @@ export function Modal({
       <div
         ref={panelRef}
         className={`app-modal-panel w-full ${maxWidthClassName} ${maxHeightClassName} ${
-          fitContent && scale > MIN_FIT_SCALE ? 'overflow-hidden' : 'overflow-y-auto'
+          fitContent && scale > minFitScale ? 'overflow-hidden' : 'overflow-y-auto'
         } rounded-2xl bg-surface p-6 shadow-[var(--shadow)] animate-[modal-panel-in_0.25s_cubic-bezier(0.16,1,0.3,1)] sm:p-8 ${
           accentBorder ? 'border-[3px] border-transparent' : 'border border-border'
         }`}
@@ -105,6 +108,7 @@ function useFitScale(
   enabled: boolean,
   panelRef: React.RefObject<HTMLDivElement | null>,
   contentRef: React.RefObject<HTMLDivElement | null>,
+  minScale: number,
 ): number {
   const [scale, setScale] = useState(1)
 
@@ -132,7 +136,7 @@ function useFitScale(
           // la animación de entrada del panel (transform), a diferencia de getBoundingClientRect.
           const height = content.offsetHeight
           if (height <= 0 || height <= available) return current
-          const next = Math.max(MIN_FIT_SCALE, Math.floor(current * (available / height) * 1000) / 1000)
+          const next = Math.max(minScale, Math.floor(current * (available / height) * 1000) / 1000)
           // SOLO se achica: al reducir, el texto gana ancho y se parte en menos
           // líneas, el contenido mide menos y, si se dejara volver a crecer, se
           // volvería a partir y a desbordar — un vaivén infinito entre dos
@@ -157,7 +161,7 @@ function useFitScale(
       observer.disconnect()
       window.removeEventListener('resize', handleResize)
     }
-  }, [enabled, panelRef, contentRef])
+  }, [enabled, panelRef, contentRef, minScale])
 
   return scale
 }

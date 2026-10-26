@@ -34,17 +34,17 @@ import { JoinByCodeModal } from './games/JoinByCodeModal'
 import { resolveRoomCode, LIVE_ROOM_ROUTES, type ResolvedRoom } from './games/resolveRoomCode'
 import { GuessWhoRoom } from './games/GuessWhoRoom'
 import { GameFiltersPanel, type GameTypeFilterOption } from './games/GameFiltersPanel'
+import { GameFilterBar, type GameAreaFilterOption } from './games/GameFilterBar'
 import { modeFilterForGameType, type GameModeFilter } from './games/gameModeVisuals'
 import { resolveGameTypeDisplayName } from './games/gameTypePublicNames'
 
-export type GamesSectionMode = 'all' | 'categories' | 'community' | 'my-games' | 'game-type'
+export type GamesSectionMode = 'all' | 'categories' | 'community' | 'my-games'
 
 const BASE_PATH_BY_MODE: Record<GamesSectionMode, string> = {
   all: '/',
   categories: '/areas',
   community: '/comunidad',
   'my-games': '/mis-juegos',
-  'game-type': '/tipos-de-juego',
 }
 
 type GamesSectionProps = {
@@ -60,10 +60,6 @@ type GamesSectionProps = {
    * adulto por debajo.
    */
   browsingHidden?: boolean
-  /** Solo aplica con mode='game-type': filtra el catálogo por ese GameType (issue #156). */
-  gameTypeFilter?: string
-  /** Solo aplica con mode='game-type': nombre visible del tipo para el encabezado (ej. "Fuego y Agua"). */
-  gameTypeDisplayName?: string
 }
 
 function gamesLabel(count: number): string {
@@ -90,8 +86,6 @@ export function GamesSection({
   searchQuery,
   searchNonce,
   browsingHidden = false,
-  gameTypeFilter,
-  gameTypeDisplayName,
 }: GamesSectionProps) {
   const navigate = useNavigate()
   const { slug: slugFromUrl } = useParams<{ slug?: string }>()
@@ -117,13 +111,8 @@ export function GamesSection({
     }
   }
 
-  // En modo 'game-type' la lista vive en /tipos-de-juego/:gameType, así que
-  // el detalle debe anidarse ahí (/tipos-de-juego/:gameType/:slug) para no
-  // perder el filtro de tipo al navegar de vuelta o al recargar (issue #156).
-  const basePath =
-    mode === 'game-type' && gameTypeFilter
-      ? `${BASE_PATH_BY_MODE[mode]}/${gameTypeFilter}`
-      : BASE_PATH_BY_MODE[mode]
+  const basePath = BASE_PATH_BY_MODE[mode]
+  const tipoParam = searchParams.get('tipo')
   const { token, user } = useAuth()
   const { showToast } = useToast()
   const isTeacher = user?.role?.toUpperCase() === 'TEACHER'
@@ -145,6 +134,8 @@ export function GamesSection({
   // en cliente sobre `games` ya cargados, sin disparar peticiones nuevas.
   const [activeModes, setActiveModes] = useState<Set<GameModeFilter>>(new Set())
   const [activeTypes, setActiveTypes] = useState<Set<string>>(new Set())
+  // Filtro por área (issue #100): solo lo usa la barra de filtros visible.
+  const [activeAreaId, setActiveAreaId] = useState<string | null>(null)
 
   const [categories, setCategories] = useState<CategoryWithGameCount[]>([])
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null)
@@ -226,9 +217,8 @@ export function GamesSection({
       onlyMine: mode === 'my-games' || undefined,
       status: mode === 'my-games' ? 'DRAFT' : undefined,
       community: mode === 'community' || undefined,
-      // El Inicio solo muestra los demos; lo creado por usuarios va a Comunidad.
-      demos: mode === 'all' || undefined,
-      gameType: mode === 'game-type' ? gameTypeFilter ?? undefined : undefined,
+      // El Inicio solo muestra los destacados que fija un ADMIN; Comunidad lo muestra todo.
+      featured: mode === 'all' || undefined,
       pageSize: 40,
     })
       .then((result) => setGames(result.items))
@@ -245,7 +235,6 @@ export function GamesSection({
     searchNonce,
     shouldLoadGames,
     browsingHidden,
-    gameTypeFilter,
   ])
 
   useEffect(() => {
@@ -309,10 +298,19 @@ export function GamesSection({
 
   // Se reinicia el filtro al cambiar de sección/modo, para no dejar
   // aplicado sin que se vea (el panel no se muestra en 'categories').
+  // En Comunidad, `?tipo=` deja el filtro por tipo ya aplicado (enlaces que
+  // venían de /tipos-de-juego/:gameType y el acceso desde la gestión de tipos).
   useEffect(() => {
     setActiveModes(new Set())
+    setActiveAreaId(null)
+    setActiveTypes(new Set(mode === 'community' && tipoParam ? [tipoParam] : []))
+  }, [mode, tipoParam])
+
+  function clearFilters() {
+    setActiveModes(new Set())
     setActiveTypes(new Set())
-  }, [mode, gameTypeFilter])
+    setActiveAreaId(null)
+  }
 
   function toggleModeFilter(value: GameModeFilter) {
     setActiveModes((prev) => {
@@ -341,6 +339,7 @@ export function GamesSection({
   const filteredGames = games.filter((game) => {
     if (activeModes.size > 0 && !activeModes.has(modeFilterForGameType(game.gameType))) return false
     if (activeTypes.size > 0 && !activeTypes.has(game.gameType)) return false
+    if (activeAreaId && game.categoryId !== activeAreaId) return false
     return true
   })
 
@@ -353,6 +352,7 @@ export function GamesSection({
     if (justCreatedFiltered) {
       setActiveModes(new Set())
       setActiveTypes(new Set())
+      setActiveAreaId(null)
     }
   }, [justCreatedFiltered])
   useEffect(() => {
@@ -369,6 +369,15 @@ export function GamesSection({
       label: resolveGameTypeDisplayName(gameType, gameTypeDisplayNames.get(gameType)),
     }))
     .sort((a, b) => a.label.localeCompare(b.label))
+
+  const areaFilterOptions: GameAreaFilterOption[] = Array.from(
+    games.reduce((acc, game) => acc.set(game.categoryId, (acc.get(game.categoryId) ?? 0) + 1), new Map<string, number>()),
+  )
+    .flatMap(([id, count]) => {
+      const name = categories.find((c) => c.id === id)?.name
+      return name ? [{ id, name, count }] : []
+    })
+    .sort((a, b) => a.name.localeCompare(b.name))
 
   const soloFilterCount = games.filter((game) => modeFilterForGameType(game.gameType) === 'SOLO').length
   const multiFilterCount = games.length - soloFilterCount
@@ -952,10 +961,7 @@ export function GamesSection({
       typeOptions={typeFilterOptions}
       activeTypes={activeTypes}
       onToggleType={toggleTypeFilter}
-      onClear={() => {
-        setActiveModes(new Set())
-        setActiveTypes(new Set())
-      }}
+      onClear={clearFilters}
     />
   )
   const gamesCount = (
@@ -1071,33 +1077,25 @@ export function GamesSection({
             <h2 className="mb-1 text-[22px] tracking-tight text-text-h">
               {mode === 'community'
                 ? 'Juegos de la comunidad'
-                : mode === 'game-type'
-                  ? (gameTypeDisplayName ?? 'Juegos de este tipo')
-                  : isTeacher
-                    ? 'Mis actividades'
-                    : 'Mis juegos privados'}
+                : 'Mis juegos'}
             </h2>
             <p className="text-[14px] text-text">
               {mode === 'community'
-                ? 'Juegos que otros usuarios crearon y decidieron publicar.'
-                : mode === 'game-type'
-                  ? 'Juegos publicados con esta mecánica.'
-                  : isTeacher
-                    ? 'Crea, organiza y administra tus actividades.'
-                    : 'Solo tú los ves. Comparte el código de la sala para que otros se unan.'}
+                ? 'Juegos que otros usuarios crearon y decidieron publicar. Filtra por tipo, jugadores o área.'
+                : isTeacher
+                  ? 'Crea, organiza y administra tus juegos.'
+                  : 'Solo tú los ves. Comparte el código de la sala para que otros se unan.'}
             </p>
           </div>
-          {mode !== 'game-type' && (
-            <button
-              type="button"
-              className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl px-6 py-3 text-[15px] font-bold text-white shadow-[0_12px_30px_-10px_var(--accent)] transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg sm:w-auto"
-              style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
-              onClick={() => navigate('/juegos/crear')}
-            >
-              <PlusCircle className="h-5 w-5" strokeWidth={2.25} />
-              {isTeacher ? 'Crear actividad' : 'Crear juego'}
-            </button>
-          )}
+          <button
+            type="button"
+            className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl px-6 py-3 text-[15px] font-bold text-white shadow-[0_12px_30px_-10px_var(--accent)] transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg sm:w-auto"
+            style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
+            onClick={() => navigate('/juegos/crear')}
+          >
+            <PlusCircle className="h-5 w-5" strokeWidth={2.25} />
+            {isTeacher ? 'Crear actividad' : 'Crear juego'}
+          </button>
         </div>
       )}
 
@@ -1157,22 +1155,22 @@ export function GamesSection({
                 ? `Sin resultados para "${searchQuery}".`
                 : mode === 'community'
                   ? 'Aún nadie ha publicado juegos en la comunidad.'
-                  : mode === 'game-type'
-                    ? 'Aún no hay juegos publicados con esta mecánica.'
-                    : mode === 'my-games' && isTeacher
-                        ? 'Aún no has creado actividades'
-                        : mode === 'my-games'
-                          ? 'Aún no tienes juegos privados.'
-                      : 'Aún no hay juegos disponibles.'}
+                  : mode === 'my-games' && isTeacher
+                      ? 'Aún no has creado juegos'
+                      : mode === 'my-games'
+                        ? 'Aún no tienes juegos.'
+                        : mode === 'all'
+                          ? 'Aún no hay juegos destacados.'
+                          : 'Aún no hay juegos disponibles.'}
             </p>
             <p className="mt-1 max-w-[320px] text-[13px] text-text">
               {searchQuery
                 ? 'Prueba con otro término de búsqueda.'
-                  : mode === 'game-type'
-                    ? 'Vuelve más adelante o elige otra mecánica.'
-                    : mode === 'my-games' && isTeacher
-                      ? 'Crea tu primera actividad para comenzar a jugar con tus estudiantes.'
-                : 'Sé la primera persona en crear uno.'}
+                  : mode === 'my-games' && isTeacher
+                    ? 'Crea tu primera actividad para comenzar a jugar con tus estudiantes.'
+                    : mode === 'all'
+                      ? 'Mientras tanto, explora los juegos de la Comunidad desde el menú.'
+                      : 'Sé la primera persona en crear uno.'}
             </p>
               {!searchQuery && mode === 'my-games' && isTeacher && (
                 <button
@@ -1194,10 +1192,22 @@ export function GamesSection({
                 sin empujarlo (ver GameFiltersPanel). En el inicio va en la
                 fila del título "Juegos", que también queda justo encima. */}
             {mode !== 'all' && (
-              <div className="flex items-center justify-between gap-4">
-                {filtersPanel}
-                {gamesCount}
-              </div>
+              <GameFilterBar
+                total={games.length}
+                shown={filteredGames.length}
+                typeOptions={typeFilterOptions}
+                activeTypes={activeTypes}
+                onToggleType={toggleTypeFilter}
+                onClearTypes={() => setActiveTypes(new Set())}
+                soloCount={soloFilterCount}
+                multiCount={multiFilterCount}
+                activeMode={activeModes.size === 1 ? [...activeModes][0] : null}
+                onModeChange={(next) => setActiveModes(new Set(next ? [next] : []))}
+                areaOptions={areaFilterOptions}
+                activeAreaId={activeAreaId}
+                onAreaChange={setActiveAreaId}
+                onClearAll={clearFilters}
+              />
             )}
 
             {filteredGames.length === 0 ? (
@@ -1206,10 +1216,7 @@ export function GamesSection({
                 <button
                   type="button"
                   className="mt-3 text-[13px] font-medium text-accent hover:underline"
-                  onClick={() => {
-                    setActiveModes(new Set())
-                    setActiveTypes(new Set())
-                  }}
+                  onClick={clearFilters}
                 >
                   Limpiar filtros
                 </button>
