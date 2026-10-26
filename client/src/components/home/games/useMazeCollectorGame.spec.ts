@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ANSWER_FEEDBACK_MS, QUESTION_TIME_MS, __engineForTests as engine } from './useMazeCollectorGame'
+import { ANSWER_FEEDBACK_MS, EXTRA_CLOUD_EVERY_MS, QUESTION_TIME_MS, __engineForTests as engine } from './useMazeCollectorGame'
 import type { MazeScenario } from './useMazeCollectorGame'
 import { DEFAULT_MAZE_CONFIG, MAZE_LAYOUTS } from './mazeCollectorTypes'
 import type { CellPosition } from './mazeCollectorTypes'
@@ -218,6 +218,29 @@ describe('Camión Reciclador: preguntas de opción múltiple', () => {
     expect(state.lives).toBe(config.lives - 1)
     expect(state.answerFeedback?.kind).toBe('timeout')
     expect(state.question!.id).toBe(firstId + 1)
+  })
+
+  it('cada 8 s sin responder llega una nube más, y al responder bien se van', () => {
+    const state = engine.createInitialState(city, [], config, null, SUSTAINABLE_CITY_QUESTIONS)
+    state.ghosts = []
+    state.phase = 'playing'
+    let now = 0
+    while (now < EXTRA_CLOUD_EVERY_MS + 100) {
+      now += 16
+      state.player.nextPos = state.player.pos
+      state.player.desiredDirection = null
+      engine.tickEngine(state, city, [], now, FRAME)
+    }
+    expect(state.ghosts).toHaveLength(1)
+    // Nace lejos del camión, no encima.
+    const cloud = state.ghosts[0].pos
+    expect(Math.abs(cloud.row - state.player.pos.row) + Math.abs(cloud.col - state.player.pos.col)).toBeGreaterThan(8)
+
+    const correct = state.question!.answers.find((answer) => answer.correct)!
+    state.question!.answers.forEach((answer) => (answer.wrong = !answer.correct))
+    state.ghosts = state.ghosts.map((ghost) => ({ ...ghost, pos: { row: 17, col: 23 }, nextPos: { row: 17, col: 23 } }))
+    drive(state, () => correct.pos, (s) => s.answeredCorrect > 0)
+    expect(state.ghosts.filter((ghost) => ghost.id.startsWith('extra-'))).toHaveLength(0)
   })
 
   it('mientras sale el aviso de la respuesta, el juego y el reloj de la pregunta se detienen', () => {

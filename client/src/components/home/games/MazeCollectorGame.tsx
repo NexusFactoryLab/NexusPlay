@@ -4,7 +4,14 @@ import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, BookOpen, CircleHelp, LogOut
 import type { MazeCollectorConfig, MazeCollectorItem, MazeLayoutDef, CellPosition } from './mazeCollectorTypes'
 import { iconForConcept } from './mazeCollectorTypes'
 import { POWER_MODE_MS } from './mazeEngine'
-import { ANSWER_FEEDBACK_MS, DEFAULT_ROUNDS, QUESTION_TIME_MS, ROUND_OPTIONS, useMazeCollectorGame } from './useMazeCollectorGame'
+import {
+  ANSWER_FEEDBACK_MS,
+  DEFAULT_ROUNDS,
+  EXTRA_CLOUD_EVERY_MS,
+  QUESTION_TIME_MS,
+  ROUND_OPTIONS,
+  useMazeCollectorGame,
+} from './useMazeCollectorGame'
 import type { ActiveQuestion, AnswerFeedback, Direction, MazeAnswer, MazeScenario } from './useMazeCollectorGame'
 import type { MazeQuestion } from './mazeCollectorQuestions'
 import { EcoTruckSprite } from './EcoTruckSprite'
@@ -1053,7 +1060,8 @@ function QuestionIntro({ question, number, timed, onGo }: { question: ActiveQues
           {timed && (
             <>
               {' '}
-              Tienes <b className="text-amber-300">{QUESTION_TIME_MS / 1000} segundos</b>: si se acaban, también pierdes una vida.
+              Tienes <b className="text-amber-300">{QUESTION_TIME_MS / 1000} segundos</b>: si se acaban, también pierdes una vida. Y cada{' '}
+              {EXTRA_CLOUD_EVERY_MS / 1000} segundos sin responder <b className="text-rose-300">llega una nube más</b>.
             </>
           )}
         </p>

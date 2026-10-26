@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleHelp,
+  CloudFog,
   Footprints,
   Heart,
   Lightbulb,
@@ -16,14 +17,14 @@ import {
   Pause,
   Route,
   Snail,
-  Timer,
+
   X,
   Zap,
 } from 'lucide-react'
 import { FitScale } from './true-false-maze/FitScale'
 import { SpriteStrip, mazeSpriteUrl } from './mazeSpriteStrip'
 import { COMBO_POINTS, POINTS_BONUS, POINTS_PET, POWER_MODE_MS } from './mazeEngine'
-import { POINTS_ANSWER, QUESTION_TIME_MS } from './useMazeCollectorGame'
+import { EXTRA_CLOUD_EVERY_MS, POINTS_ANSWER, QUESTION_TIME_MS } from './useMazeCollectorGame'
 import { ArtTruckQuestion } from './tutorial/tutorialArt'
 import './true-false-maze/trueFalseMazeGuide.css'
 import './mazeCollectorGuide.css'
@@ -448,10 +449,10 @@ const STEPS: Step[] = [
           <b className="text-white">Maneja hasta la respuesta correcta:</b> +{POINTS_ANSWER} puntos y sale otra pregunta.
         </Item>
         <Item icon={<Heart className="h-4 w-4" />} tone="rose">
-          <b className="text-white">Si llegas a una equivocada, pierdes una vida</b> y esa respuesta desaparece. ¡Lee bien antes de ir!
+          <b className="text-white">Una equivocada o pasar de {QUESTION_TIME_MS / 1000} segundos</b> te quita una vida.
         </Item>
-        <Item icon={<Timer className="h-4 w-4" />} tone="amber">
-          <b className="text-white">Tienes {QUESTION_TIME_MS / 1000} segundos</b> para llegar. Si se acaban, pierdes una vida y sale otra pregunta.
+        <Item icon={<CloudFog className="h-4 w-4" />} tone="amber">
+          <b className="text-white">Cada {EXTRA_CLOUD_EVERY_MS / 1000} s sin responder llega una nube más.</b> ¡No solo recojas botellas!
         </Item>
       </ul>
     ),

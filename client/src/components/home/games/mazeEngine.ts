@@ -305,7 +305,8 @@ export function buildLevelBoard(layout: MazeLayoutDef): LevelBoard {
   const bagCells = pickSpreadCells(open, BAG_COUNT, reserved)
   bagCells.forEach((cell) => reserved.add(cellKey(cell)))
 
-  const petCells = open.filter((cell) => !reserved.has(cellKey(cell)))
+  // Una botella sí y otra no (en damero): con espacio entre ellas el mapa no se ve amontonado.
+  const petCells = open.filter((cell) => !reserved.has(cellKey(cell)) && (cell.row + cell.col) % 2 === 0)
 
   const center = { row: Math.floor(layout.rows / 2), col: Math.floor(layout.cols / 2) }
   const bonusSpawnPoint = closestCellTo(open, center)

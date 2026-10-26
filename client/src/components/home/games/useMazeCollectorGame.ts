@@ -70,7 +70,15 @@ export type ActiveQuestion = { id: number; question: string; answers: MazeAnswer
 /** Lo último que pasó con una respuesta, para el aviso en pantalla (`id` cambia con cada intento). */
 export type AnswerFeedback = { id: number; kind: 'correct' | 'wrong' | 'timeout'; letter: string }
 /** Tiempo para llegar a la respuesta correcta; solo corre mientras se juega (no en pausa ni con la pregunta en pantalla). */
-export const QUESTION_TIME_MS = 30000
+export const QUESTION_TIME_MS = 15000
+/**
+ * Mientras una pregunta sigue sin responder, cada tanto llega una nube más
+ * (hasta `MAX_EXTRA_CLOUDS`): así no conviene recoger botellas ignorando las
+ * preguntas. Al cambiar de pregunta las nubes extra se van.
+ */
+export const EXTRA_CLOUD_EVERY_MS = 8000
+export const MAX_EXTRA_CLOUDS = 3
+const EXTRA_CLOUD_PREFIX = 'extra-'
 /** Lo que dura el aviso de correcto / incorrecto / tiempo agotado: mientras tanto el juego (y su reloj) se congela. */
 export const ANSWER_FEEDBACK_MS = 1600
 
@@ -185,6 +193,8 @@ type InternalState = {
   questionDeadline: number | null
   /** Hasta cuándo dura el aviso de la última respuesta; mientras tanto nada se mueve. */
   feedbackUntil: number | null
+  /** Cuándo llega la próxima nube extra (reloj del juego); null = todavía no empezó a contar. */
+  nextExtraCloudAt: number | null
 }
 
 function ghostSpeed(level: number, enemySpeedConfig: number): number {
@@ -335,6 +345,32 @@ function nextQuestion(state: InternalState, layout: MazeLayoutDef) {
   const positions = placeAnswers(layout, state, Math.min(source.options.length, ANSWER_LETTERS.length))
   state.question = buildQuestion(source, positions, (state.question?.id ?? 0) + 1, true)
   state.questionDeadline = null
+  // Pregunta nueva: se van las nubes extra y su cuenta vuelve a empezar.
+  state.ghosts = state.ghosts.filter((ghost) => !ghost.id.startsWith(EXTRA_CLOUD_PREFIX))
+  state.nextExtraCloudAt = null
+}
+
+/** Llega una nube más, por la esquina más lejana al camión (nunca encima de él). */
+function spawnExtraCloud(state: InternalState, layout: MazeLayoutDef) {
+  const extras = state.ghosts.filter((ghost) => ghost.id.startsWith(EXTRA_CLOUD_PREFIX)).length
+  if (extras >= MAX_EXTRA_CLOUDS) return
+  const player = state.player.pos
+  const spawn = [...layout.enemySpawns].sort(
+    (a, b) => Math.abs(b.row - player.row) + Math.abs(b.col - player.col) - (Math.abs(a.row - player.row) + Math.abs(a.col - player.col)),
+  )[0]
+  const def = GHOST_PERSONALITIES[extras % GHOST_PERSONALITIES.length]
+  state.ghosts.push({
+    id: `${EXTRA_CLOUD_PREFIX}${state.question?.id ?? 0}-${extras}`,
+    name: def.name,
+    personality: def.personality,
+    pos: { ...spawn },
+    nextPos: { ...spawn },
+    progress: 0,
+    facing: 'UP',
+    pivot: { ...spawn },
+    spawn: { ...spawn },
+    mode: 'NORMAL',
+  })
 }
 
 /** Misma pregunta, respuestas en otro lugar (al cambiar de nivel el tablero es otro). */
@@ -448,6 +484,7 @@ function createInitialState(
     answerFeedback: null,
     questionDeadline: null,
     feedbackUntil: null,
+    nextExtraCloudAt: null,
   }
   if (!scenario) nextQuestion(state, layout)
   return state
@@ -728,6 +765,7 @@ function tickEngine(state: InternalState, layout: MazeLayoutDef, items: MazeColl
       if (state.questionDeadline !== null) state.questionDeadline += frozenMs
       if (state.energizedUntil !== null) state.energizedUntil += frozenMs
       if (state.activeBonus) state.activeBonus.expiresAt += frozenMs
+      if (state.nextExtraCloudAt !== null) state.nextExtraCloudAt += frozenMs
       state.player.slowUntil += frozenMs
       return
     }
@@ -748,6 +786,11 @@ function tickEngine(state: InternalState, layout: MazeLayoutDef, items: MazeColl
     else if (now >= state.questionDeadline) {
       questionTimedOut(state, layout, now)
       return
+    }
+    if (state.nextExtraCloudAt === null) state.nextExtraCloudAt = now + EXTRA_CLOUD_EVERY_MS
+    else if (now >= state.nextExtraCloudAt) {
+      spawnExtraCloud(state, layout)
+      state.nextExtraCloudAt = now + EXTRA_CLOUD_EVERY_MS
     }
   }
 
