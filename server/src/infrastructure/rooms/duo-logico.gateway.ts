@@ -13,6 +13,7 @@ import { DUO_ROOM_STORE, type DuoRoomStore } from '../../domain/ports/duo-room-s
 import {
   answerDuoQuestion,
   applyClientState,
+  chooseDuoLevel,
   chooseRole,
   createDuoRoom,
   disconnectDuoPlayer,
@@ -123,6 +124,13 @@ export class DuoLogicoGateway implements OnGatewayDisconnect, OnModuleInit, OnMo
     this.broadcastRoom(room);
   }
 
+  @SubscribeMessage(DUO_EVENTS.level)
+  handleLevel(@ConnectedSocket() socket: AuthenticatedSocket, @MessageBody() body: { levelId: string }) {
+    const room = this.roomOf(socket);
+    chooseDuoLevel(room, socket.data.userId, body?.levelId);
+    this.broadcastRoom(room);
+  }
+
   @SubscribeMessage(DUO_EVENTS.ready)
   handleReady(@ConnectedSocket() socket: AuthenticatedSocket, @MessageBody() body: { ready: boolean }) {
     const room = this.roomOf(socket);
@@ -192,6 +200,7 @@ export class DuoLogicoGateway implements OnGatewayDisconnect, OnModuleInit, OnMo
     const q = room.question;
     return [
       room.phase,
+      room.levelId,
       room.runId,
       room.hearts,
       q ? `${q.gate.id}:${q.attempt}:${Object.keys(q.answers).length}` : '-',

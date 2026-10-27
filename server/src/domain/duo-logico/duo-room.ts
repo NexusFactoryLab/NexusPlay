@@ -1,10 +1,11 @@
-import { BOSQUE } from './shared/levels/bosque.js';
-import { parseLevel, type DuoGateDef, type DuoLevel } from './shared/duoLevel.js';
+import { DUO_LEVEL_DEFS, duoLevel, isDuoLevelId, nextDuoLevelId } from './shared/levels/index.js';
+import type { DuoGateDef, DuoLevel } from './shared/duoLevel.js';
 import {
   coinsForGate,
   collectCoins,
   createWorldState,
   gateWithBothOnPedestals,
+  touchMirrors,
   updateSwitches,
 } from './shared/duoWorld.js';
 import {
@@ -40,12 +41,8 @@ export const DUO_RECONNECT_GRACE_MS = 90_000;
 /** Una caja deja de ser de alguien si no la mueve en este tiempo. */
 export const DUO_CRATE_LEASE_MS = 400;
 
-const LEVELS: Record<string, DuoLevel> = { bosque: parseLevel(BOSQUE) };
-
 export function levelById(id: string): DuoLevel {
-  const level = LEVELS[id];
-  if (!level) throw new Error(`No existe el escenario ${id}.`);
-  return level;
+  return duoLevel(id);
 }
 
 export interface DuoRoomPlayer {
@@ -92,6 +89,8 @@ export interface DuoRoomState {
   revealEndsAt: number | null;
   waitingPartnerUntil: number | null;
   crateLeases: Record<string, number>;
+  /** Quién tocaba cada espejo en el tick anterior (para girarlo solo al empezar a tocarlo). */
+  mirrorContacts: Record<string, DuoRole[]>;
   usedQuestionIds: string[];
   retryVotes: DuoRole[];
   startedAt: number | null;
@@ -113,7 +112,7 @@ export function createDuoRoom(input: {
   role: DuoRole;
   now: number;
 }): DuoRoomState {
-  const level = levelById('bosque');
+  const level = levelById(DUO_LEVEL_DEFS[0].id);
   return {
     code: input.code,
     gameId: input.gameId,
@@ -131,6 +130,7 @@ export function createDuoRoom(input: {
     revealEndsAt: null,
     waitingPartnerUntil: null,
     crateLeases: {},
+    mirrorContacts: {},
     usedQuestionIds: [],
     retryVotes: [],
     startedAt: null,
@@ -210,6 +210,16 @@ export function leaveDuoRoom(room: DuoRoomState, userId: string, now: number): b
   return false;
 }
 
+/** El anfitrión elige en la sala de espera desde qué escenario empiezan. */
+export function chooseDuoLevel(room: DuoRoomState, userId: string, levelId: unknown): void {
+  if (room.phase !== 'WAITING') throw new Error('Ya no se puede cambiar de escenario.');
+  if (room.hostUserId !== userId) throw new Error('Solo quien creó la sala elige el escenario.');
+  if (!isDuoLevelId(levelId)) throw new Error('Ese escenario no existe.');
+  room.levelId = levelId;
+  room.world = createWorldState(levelById(levelId));
+  for (const p of room.players) p.ready = false;
+}
+
 export function setDuoReady(room: DuoRoomState, userId: string, ready: boolean, now: number): void {
   if (room.phase !== 'WAITING') return;
   if (typeof ready !== 'boolean') throw new Error('Indica si estás listo.');
@@ -228,6 +238,7 @@ function startRun(room: DuoRoomState, now: number): void {
   room.reveal = null;
   room.revealEndsAt = null;
   room.crateLeases = {};
+  room.mirrorContacts = {};
   room.usedQuestionIds = [];
   room.retryVotes = [];
   room.startedAt = null;
@@ -281,7 +292,7 @@ function shuffled(n: number, rng: () => number): number[] {
 }
 
 function pickQuestion(room: DuoRoomState, gate: DuoGateDef, rng: () => number): DuoQuestion {
-  const pool = questionsOf(gate.format);
+  const pool = questionsOf(gate.format, room.levelId);
   const fresh = pool.filter((q) => !room.usedQuestionIds.includes(q.id));
   const from = fresh.length > 0 ? fresh : pool;
   return from[Math.floor(rng() * from.length)];
@@ -366,6 +377,7 @@ export function tickDuoRoom(room: DuoRoomState, now: number, rng: () => number =
     }
     const bodies: Partial<Record<DuoRole, DuoPlayerNet>> = {};
     for (const p of room.players) if (p.state) bodies[p.role] = p.state;
+    touchMirrors(level, room.world, bodies, room.mirrorContacts);
     updateSwitches(level, room.world, bodies);
     for (const coin of collectCoins(level, room.world, bodies)) {
       const def = level.def.coins.find((c) => c.id === coin.id);
@@ -407,7 +419,10 @@ export function voteDuoRetry(room: DuoRoomState, userId: string, now: number): v
   if (room.phase !== 'VICTORY' && room.phase !== 'DEFEAT') throw new Error('La partida no ha terminado.');
   const role = playerOf(room, userId).role;
   if (!room.retryVotes.includes(role)) room.retryVotes.push(role);
-  if (room.players.length === 2 && room.players.every((p) => room.retryVotes.includes(p.role) && p.socketId)) startRun(room, now);
+  if (room.players.length !== 2 || !room.players.every((p) => room.retryVotes.includes(p.role) && p.socketId)) return;
+  // Tras ganar se pasa al siguiente escenario (o, al final de la campaña, de vuelta al primero).
+  if (room.phase === 'VICTORY') room.levelId = nextDuoLevelId(room.levelId) ?? DUO_LEVEL_DEFS[0].id;
+  startRun(room, now);
 }
 
 export function validEmote(emote: unknown): emote is DuoEmote {
@@ -461,6 +476,13 @@ export function toDuoRoomView(room: DuoRoomState, userId: string, now: number): 
     gameId: room.gameId,
     gameTitle: room.gameTitle,
     levelId: room.levelId,
+    levelTitle: level.def.title,
+    levels: DUO_LEVEL_DEFS.map((def) => ({ id: def.id, title: def.title, tagline: def.tagline })),
+    nextLevelTitle: (() => {
+      const next = nextDuoLevelId(room.levelId);
+      return next ? levelById(next).def.title : null;
+    })(),
+    hostUserId: room.hostUserId,
     phase: room.phase,
     runId: room.runId,
     you: me?.role ?? null,

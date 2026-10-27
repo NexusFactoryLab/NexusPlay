@@ -324,3 +324,82 @@ mirrored.paste(bgimg.transpose(Image.FLIP_LEFT_RIGHT), (bgimg.width, 0))
 bgimg = mirrored
 bgimg.save(os.path.join(OUT, 'bosque.webp'), 'WEBP', quality=86, method=6)
 print('bosque', bgimg.size)
+
+
+# ---------- Escenarios nuevos (fase 2 en adelante) ----------
+# Cada escenario trae su tileset, su fondo y su hoja de objetos (Drive:
+# tiles-<id>, fondo-<id>, objetos-<id>, ya limpios como PNG). Salida:
+#   <id>-fill.webp  relleno del suelo (repetible)
+#   <id>-top.webp   franja de la superficie (repetible en x)
+#   <id>-terrain.json/webp  tapas, plataforma flotante, plataforma delgada (thin-*) y decoración
+#   <id>-objects.json/webp  objetos propios del escenario
+#   <id>-bg.webp    fondo junto a su reflejo
+THEMES = {
+    'solar': {
+        'tiles': 'tiles-solar', 'bg': 'fondo-solar.jpg', 'sheet': 'objetos-solar',
+        'fill': (420, 240, 770, 365),
+        'top': (410, 35, 780, 112),
+        'terrain': {
+            'cap-left': ((35, 190, 33, 130), (0, 0)),
+            'cap-right': ((35, 190, 1060, 1175), (1, 0)),
+            'float-left': ((418, 559, 32, 150), (0, 0)),
+            'float-mid': ((418, 539, 380, 750), (0, 0)),
+            'float-right': ((418, 558, 900, 1009), (1, 0)),
+            'float-small': ((436, 539, 1047, 1175), (0.5, 0)),
+            'thin-left': ((593, 673, 27, 140), (0, 0)),
+            'thin-mid': ((593, 651, 400, 790), (0, 0)),
+            'thin-right': ((593, 673, 1060, 1172), (1, 0)),
+            'panel': ((753, 851, 467, 580), (0.5, 1)),
+            'sign': ((763, 832, 630, 689), (0.5, 1)),
+            'battery': ((751, 845, 740, 842), (0.5, 1)),
+            'valve': ((756, 853, 884, 1010), (0.5, 1)),
+            'beacon': ((762, 839, 1054, 1133), (0.5, 1)),
+        },
+        'objects': {
+            'mirror-0': ((38, 272, 83, 251), False, (0.5, 1)),
+            'mirror-1': ((35, 272, 357, 528), False, (0.5, 1)),
+            'mirror-2': ((43, 272, 635, 849), False, (0.5, 1)),
+            'mirror-3': ((36, 272, 956, 1117), False, (0.5, 1)),
+            'receiver-off': ((309, 464, 209, 545), False, (0.5, 1)),
+            'receiver-on': ((293, 464, 640, 971), True, (0.5, 1)),
+            'mover': ((514, 657, 80, 587), False, (0, 0)),
+            'gear': ((488, 680, 749, 972), False, (0.5, 0.5)),
+            'switch-off': ((693, 862, 88, 257), False, (0.5, 1)),
+            'switch-on': ((693, 863, 314, 482), False, (0.5, 1)),
+            'battery-0': ((691, 863, 644, 755), False, (0.5, 1)),
+            'battery-1': ((691, 863, 812, 924), False, (0.5, 1)),
+            'battery-2': ((691, 863, 986, 1097), False, (0.5, 1)),
+        },
+    },
+}
+
+
+def build_theme(key, spec):
+    tiles_im = load(spec['tiles'])
+    x0, y0, x1, y1 = spec['fill']
+    fill = tiles_im.crop((x0, y0, x1, y1))
+    fill = Image.fromarray(np.concatenate([np.asarray(fill), np.asarray(fill.transpose(Image.FLIP_TOP_BOTTOM))], axis=0))
+    save_tex(f'{key}-fill', seamless_y(seamless_x(fill)), (128, 128))
+    x0, y0, x1, y1 = spec['top']
+    save_tex(f'{key}-top', seamless_x(tiles_im.crop((x0, y0, x1, y1)), 50), (160, 64), pad=True)
+    terrain_atlas = Atlas(width=1400)
+    for name, ((ty0, ty1, tx0, tx1), anchor) in spec['terrain'].items():
+        terrain_atlas.add(name, trim(tiles_im.crop((tx0, ty0, tx1, ty1)), 0), anchor)
+    terrain_atlas.save(f'{key}-terrain', scale=0.5)
+    obj_im = load(spec['sheet'])
+    objects_atlas = Atlas(width=1400)
+    for name, ((oy0, oy1, ox0, ox1), glow, anchor) in spec['objects'].items():
+        im = obj_im.crop((ox0 - 4, oy0 - 4, ox1 + 4, oy1 + 4))
+        objects_atlas.add(name, trim(deglow(im) if glow else keep_main(im, min_sat=0)), anchor)
+    objects_atlas.save(f'{key}-objects', scale=0.5)
+    bg = Image.open(os.path.join(SRC, spec['bg'])).convert('RGB')
+    both = Image.new('RGB', (bg.width * 2, bg.height))
+    both.paste(bg, (0, 0))
+    both.paste(bg.transpose(Image.FLIP_LEFT_RIGHT), (bg.width, 0))
+    both.save(os.path.join(OUT, f'{key}-bg.webp'), 'WEBP', quality=86, method=6)
+    print(f'{key}-bg', both.size)
+
+
+for theme_key, theme_spec in THEMES.items():
+    if os.path.exists(os.path.join(SRC, theme_spec['tiles'] + '.png')):
+        build_theme(theme_key, theme_spec)

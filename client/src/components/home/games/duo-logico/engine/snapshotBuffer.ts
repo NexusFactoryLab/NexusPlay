@@ -33,6 +33,11 @@ export class SnapshotBuffer {
     this.samples = []
   }
 
+  /** Diferencia estimada (ms) entre el reloj del servidor y el local, o null si aún no hay datos. */
+  clockOffset(): number | null {
+    return this.offset
+  }
+
   /** Estado a dibujar ahora (hora local), o null si todavía no llegó nada. */
   sample(now: number): DuoPlayerNet | null {
     if (this.samples.length === 0 || this.offset === null) return null

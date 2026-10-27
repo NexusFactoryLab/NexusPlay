@@ -49,9 +49,43 @@ export interface DuoGateDef {
   portal?: Cell;
 }
 
+/** Escenarios con su propio arte (tileset, fondo y objetos). */
+export type DuoTheme = 'bosque' | 'solar';
+
+/** Cuántas posiciones tiene un espejo: se gira una al tocarlo. */
+export const MIRROR_ANGLES = 4;
+
+/** Espejo que se gira al tocarlo; refleja la luz cuando queda en `target`. */
+export interface DuoMirrorDef extends Cell {
+  id: string;
+  start: number;
+  target: number;
+}
+
+/** Receptor de luz: se enciende (es un interruptor con su id) cuando todos sus espejos apuntan bien. */
+export interface DuoReceiverDef extends Cell {
+  id: string;
+  /** En el orden en que la luz los recorre, desde la fuente. */
+  mirrors: string[];
+}
+
+/**
+ * Plataforma que va y vuelve suave entre su celda y `path` celdas más allá,
+ * según el reloj del servidor: los dos jugadores la ven en el mismo lugar.
+ */
+export interface DuoMoverDef extends Cell {
+  id: string;
+  width: number;
+  path: { dx: number; dy: number };
+  period: number;
+}
+
 export interface DuoLevelDef {
   id: string;
   title: string;
+  theme: DuoTheme;
+  /** Una frase para la tarjeta del escenario en la sala de espera. */
+  tagline: string;
   map: string[];
   spawns: Record<DuoRole, Cell>;
   buttons: Array<Cell & { id: string }>;
@@ -60,7 +94,13 @@ export interface DuoLevelDef {
   crates: Array<Cell & { id: string }>;
   coins: Array<Cell & { id: string; gate: string }>;
   gates: DuoGateDef[];
-  decor: Array<Cell & { kind: 'flowers' | 'bush' | 'fern' | 'mushroom' | 'rock' }>;
+  mirrors?: DuoMirrorDef[];
+  receivers?: DuoReceiverDef[];
+  /** De dónde sale la luz que reflejan los espejos (solo se dibuja). */
+  lightSource?: Cell;
+  movers?: DuoMoverDef[];
+  /** `kind` es el nombre de la pieza de decoración en el atlas del escenario. */
+  decor: Array<Cell & { kind: string }>;
 }
 
 export interface DuoLevel {
@@ -142,6 +182,25 @@ export function bridgeRect(bridge: Cell & { width: number }): Rect {
 
 export function gateWallRect(wall: Cell & { height: number }): Rect {
   return { x: wall.col * TILE + (TILE - GATE_W) / 2, y: wall.row * TILE, w: GATE_W, h: wall.height * TILE };
+}
+
+export const MIRROR_W = 40;
+export const RECEIVER_W = 56;
+
+export function mirrorRect(cell: Cell): Rect {
+  return { x: cell.col * TILE + (TILE - MIRROR_W) / 2, y: cell.row * TILE + 8, w: MIRROR_W, h: TILE - 8 };
+}
+
+/** Desplazamiento de una plataforma móvil a la hora `t` (segundos del servidor). */
+export function moverOffset(mover: DuoMoverDef, t: number): { dx: number; dy: number } {
+  const phase = (((t % mover.period) + mover.period) % mover.period) / mover.period;
+  const k = (1 - Math.cos(phase * Math.PI * 2)) / 2;
+  return { dx: k * mover.path.dx * TILE, dy: k * mover.path.dy * TILE };
+}
+
+export function moverRect(mover: DuoMoverDef, t: number): Rect {
+  const { dx, dy } = moverOffset(mover, t);
+  return { x: mover.col * TILE + dx, y: mover.row * TILE + dy, w: mover.width * TILE, h: BRIDGE_H };
 }
 
 export function crateSpawn(cell: Cell): { x: number; y: number } {

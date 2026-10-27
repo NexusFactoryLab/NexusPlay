@@ -15,6 +15,8 @@ import type { DuoLevelDef } from '../duoLevel.js';
 export const BOSQUE: DuoLevelDef = {
   id: 'bosque',
   title: 'El Bosque',
+  theme: 'bosque',
+  tagline: 'Puentes, palancas y una caja para trepar.',
   map: [
     '........................................................................',
     '........................................................................',

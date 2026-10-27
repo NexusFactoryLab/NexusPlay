@@ -68,6 +68,8 @@ export interface DuoWorldState {
   coins: Record<string, DuoRole>;
   /** Puertas del Saber ya abiertas (pregunta respondida bien por los dos). */
   gates: Record<string, boolean>;
+  /** Ángulo actual de cada espejo (0 a MIRROR_ANGLES - 1). */
+  mirrors: Record<string, number>;
 }
 
 export interface DuoSnapshot {

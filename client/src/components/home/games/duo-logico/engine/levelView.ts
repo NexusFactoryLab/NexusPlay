@@ -7,14 +7,15 @@ import {
   bridgeRect,
   gateWallRect,
   isSolidTile,
+  moverRect,
   standPoint,
   tileAt,
   type DuoLevel,
   type TileKind,
 } from '../shared/duoLevel'
-import { isConditionMet } from '../shared/duoWorld'
+import { isConditionMet, litMirrorCount } from '../shared/duoWorld'
 import type { DuoRole, DuoWorldState } from '../shared/duoTypes'
-import type { DuoAssets } from './duoAssets'
+import type { DuoAssets, DuoThemeAssets } from './duoAssets'
 
 interface Run {
   row: number
@@ -75,15 +76,23 @@ export class LevelView {
   private readonly crates = new Map<string, Sprite>()
   private portal: AnimatedSprite | null = null
   private readonly portalGlow = new Graphics()
+  private readonly mirrors = new Map<string, Sprite>()
+  private readonly receivers = new Map<string, Sprite>()
+  private readonly beam = new Graphics()
+  private readonly movers = new Map<string, Sprite>()
+  private readonly sparks = new Graphics()
+  private readonly sparkRuns: Run[] = []
 
   private readonly assets: DuoAssets
+  private readonly theme: DuoThemeAssets
   private readonly level: DuoLevel
 
-  constructor(assets: DuoAssets, level: DuoLevel) {
+  constructor(assets: DuoAssets, theme: DuoThemeAssets, level: DuoLevel) {
     this.assets = assets
+    this.theme = theme
     this.level = level
     const def = level.def
-    const t = assets.terrain.textures
+    const t = theme.terrain.textures
     const o = assets.objects.textures
 
     // --- Líquidos (detrás) ---
@@ -119,7 +128,7 @@ export class LevelView {
       const x = run.c0 * TILE
       const y = run.row * TILE
       const w = (run.c1 - run.c0 + 1) * TILE
-      const dirt = new TilingSprite({ texture: assets.dirt, width: w, height: TILE })
+      const dirt = new TilingSprite({ texture: theme.fill, width: w, height: TILE })
       dirt.position.set(x, y)
       dirt.tilePosition.set(-x, -y)
       ground.addChild(dirt)
@@ -129,9 +138,9 @@ export class LevelView {
     for (const run of grassRuns) {
       const x = run.c0 * TILE
       const w = (run.c1 - run.c0 + 1) * TILE
-      const grass = new TilingSprite({ texture: assets.grass, width: w + 8, height: 46 })
+      const grass = new TilingSprite({ texture: theme.top, width: w + 8, height: 46 })
       grass.position.set(x - 4, run.row * TILE - 14)
-      grass.tileScale.set(46 / assets.grass.frame.height)
+      grass.tileScale.set(46 / theme.top.frame.height)
       grass.tilePosition.x = -x
       grassLayer.addChild(grass)
       // Pasto que cae por los bordes expuestos.
@@ -164,21 +173,28 @@ export class LevelView {
 
     // --- Plataformas flotantes y ramas ---
     for (const run of runs(level, (k) => k === 'float')) this.back.addChild(this.threeSlice(run, 'float', 76, -10))
-    for (const run of runs(level, (k) => k === 'branch')) this.back.addChild(this.threeSlice(run, 'branch', 40, -12))
+    for (const run of runs(level, (k) => k === 'branch')) this.back.addChild(this.threeSlice(run, theme.thinPrefix, 40, -12))
 
-    // --- Espinas ---
+    // --- Espinas o chispas (celdas ^) ---
     for (const run of runs(level, (k) => k === 'thorns')) {
+      if (theme.hazard === 'electric') {
+        this.sparkRuns.push(run)
+        continue
+      }
       const w = (run.c1 - run.c0 + 1) * TILE
       const thorns = new TilingSprite({ texture: assets.thorns, width: w, height: 46 })
       thorns.position.set(run.c0 * TILE, (run.row + 1) * TILE - 44)
       thorns.tileScale.set(46 / assets.thorns.frame.height)
       this.back.addChild(thorns)
     }
+    this.back.addChild(this.sparks)
 
     // --- Decoración ---
-    const decorHeight = { flowers: 40, bush: 44, fern: 48, mushroom: 34, rock: 26 }
+    const decorHeight: Record<string, number> = { flowers: 40, bush: 44, fern: 48, mushroom: 34, rock: 26, panel: 44, sign: 30, battery: 36, valve: 34, beacon: 28 }
     for (const d of def.decor) {
-      const s = sized(t[d.kind], decorHeight[d.kind])
+      const texture = t[d.kind]
+      if (!texture) continue
+      const s = sized(texture, decorHeight[d.kind] ?? 40)
       s.anchor.set(0.5, 1)
       const p = standPoint(d)
       s.position.set(p.x, p.y + 4)
@@ -267,6 +283,34 @@ export class LevelView {
       this.coins.set(c.id, { sprite: coin, baseY: coin.y })
       this.back.addChild(coin)
     }
+    // --- Espejos, receptores y el rayo de luz ---
+    const so = theme.objects?.textures ?? {}
+    this.back.addChild(this.beam)
+    for (const m of def.mirrors ?? []) {
+      const s = sized(so['mirror-0'] ?? o['crate'], 60)
+      s.anchor.set(0.5, 1)
+      const p = standPoint(m)
+      s.position.set(p.x, p.y + 2)
+      this.mirrors.set(m.id, s)
+      this.back.addChild(s)
+    }
+    for (const r of def.receivers ?? []) {
+      const s = sized(so['receiver-off'] ?? o['crate'], 34)
+      s.anchor.set(0.5, 1)
+      const p = standPoint(r)
+      s.position.set(p.x, p.y + 2)
+      this.receivers.set(r.id, s)
+      this.back.addChild(s)
+    }
+    // --- Plataformas móviles ---
+    for (const m of def.movers ?? []) {
+      const s = new Sprite(so['mover'] ?? o['crate'])
+      s.width = m.width * TILE
+      s.height = 30
+      this.movers.set(m.id, s)
+      this.back.addChild(s)
+    }
+
     for (const c of def.crates) {
       const s = new Sprite(o.crate)
       s.anchor.set(0)
@@ -292,8 +336,37 @@ export class LevelView {
   }
 
   /** Plataforma de 3 piezas (punta, centro estirado, punta). */
-  private threeSlice(run: Run, prefix: 'float' | 'branch', height: number, dy: number): Container {
-    const t = this.assets.terrain.textures
+  /**
+   * La luz baja de la fuente al primer espejo y sigue por cada espejo bien
+   * orientado; si llega al receptor, todo el camino brilla.
+   */
+  private drawBeam(world: DuoWorldState, now: number): void {
+    const g = this.beam.clear()
+    const def = this.level.def
+    if (!def.lightSource) return
+    const center = (cell: { col: number; row: number }, dy: number) => ({ x: cell.col * TILE + TILE / 2, y: cell.row * TILE + dy })
+    for (const receiver of def.receivers ?? []) {
+      const lit = litMirrorCount(this.level, world, receiver.id)
+      const points = [center(def.lightSource, TILE / 2)]
+      for (let i = 0; i < receiver.mirrors.length && i <= lit; i++) {
+        const mirror = (def.mirrors ?? []).find((m) => m.id === receiver.mirrors[i])
+        if (mirror) points.push(center(mirror, 30))
+      }
+      const reached = lit === receiver.mirrors.length
+      if (reached) points.push(center(receiver, 44))
+      const pulse = 0.75 + Math.sin(now / 120) * 0.25
+      for (const [width, color, alpha] of [[16, 0xfde68a, 0.25], [6, 0xfef08a, 0.85], [2, 0xffffff, 1]] as const) {
+        g.moveTo(points[0].x, points[0].y)
+        for (const p of points.slice(1)) g.lineTo(p.x, p.y)
+        g.stroke({ color, width, alpha: alpha * (reached ? 1 : 0.7) * pulse })
+      }
+    }
+    const sun = center(def.lightSource, TILE / 2)
+    g.circle(sun.x, sun.y, 34).fill({ color: 0xfef9c3, alpha: 0.35 }).circle(sun.x, sun.y, 22).fill({ color: 0xfde047, alpha: 0.95 })
+  }
+
+  private threeSlice(run: Run, prefix: string, height: number, dy: number): Container {
+    const t = this.theme.terrain.textures
     const c = new Container()
     const x = run.c0 * TILE
     const w = (run.c1 - run.c0 + 1) * TILE
@@ -313,8 +386,38 @@ export class LevelView {
     return c
   }
 
-  update(world: DuoWorldState, crates: Array<{ id: string; x: number; y: number }>, onPedestal: Partial<Record<string, Record<DuoRole, boolean>>>, now: number): void {
+  /** `time`: segundos del reloj del servidor (plataformas móviles). */
+  update(world: DuoWorldState, crates: Array<{ id: string; x: number; y: number }>, onPedestal: Partial<Record<string, Record<DuoRole, boolean>>>, now: number, time: number): void {
     const o = this.assets.objects.textures
+    const so = this.theme.objects?.textures ?? {}
+    for (const m of this.level.def.movers ?? []) {
+      const r = moverRect(m, time)
+      this.movers.get(m.id)?.position.set(r.x, r.y - 6)
+    }
+    for (const m of this.level.def.mirrors ?? []) {
+      const texture = so['mirror-' + (world.mirrors[m.id] ?? 0)]
+      const sprite = this.mirrors.get(m.id)
+      if (sprite && texture) sprite.texture = texture
+    }
+    this.drawBeam(world, now)
+    for (const r of this.level.def.receivers ?? []) {
+      const texture = so[world.switches[r.id] ? 'receiver-on' : 'receiver-off']
+      const sprite = this.receivers.get(r.id)
+      if (sprite && texture) sprite.texture = texture
+    }
+    // Chispas que saltan por el piso electrificado.
+    const sg = this.sparks.clear()
+    for (const run of this.sparkRuns) {
+      const x0 = run.c0 * TILE
+      const x1 = (run.c1 + 1) * TILE
+      const base = (run.row + 1) * TILE - 18
+      for (const [color, width, phase] of [[0xfde047, 4, 0], [0xffffff, 1.5, 1.7]] as const) {
+        sg.moveTo(x0, base)
+        for (let x = x0; x <= x1; x += 14) sg.lineTo(x, base + Math.sin(x * 0.9 + now / 60 + phase) * 9 * Math.sin(now / 140 + x))
+        sg.stroke({ color, width, alpha: 0.9 })
+      }
+      sg.rect(x0, base + 8, x1 - x0, 12).fill({ color: 0xfacc15, alpha: 0.18 + Math.sin(now / 90) * 0.08 })
+    }
     const frame = Math.floor(now / SURFACE_FRAME_MS)
     for (const s of this.surfaces) s.sprite.texture = s.frames[frame % s.frames.length]
 

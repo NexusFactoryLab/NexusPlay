@@ -7,14 +7,11 @@ import { DuoQuestionPanel } from './DuoQuestionPanel'
 import { DuoTouchControls } from './DuoTouchControls'
 import { DuoEndScreen } from './DuoEndScreen'
 import { CHARACTERS } from './duoCharacters'
-import { BOSQUE } from './shared/levels/bosque'
-import { parseLevel } from './shared/duoLevel'
+import { duoLevel } from './shared/levels/index'
 import { DUO_EMOTES, otherRole, type DuoRole } from './shared/duoTypes'
 import type { DuoRoomView } from './shared/duoProtocol'
 import type { DeathCause } from './shared/duoPhysics'
 import type { useDuoRoom } from './useDuoRoom'
-
-const LEVELS = { bosque: parseLevel(BOSQUE) }
 
 const CAUSE_TEXT: Record<DeathCause, string> = {
   lava: 'en la lava',
@@ -55,7 +52,7 @@ export function DuoPlayScreen({
   const me = room.you ?? 'FIRE'
   const partnerRole = otherRole(me)
   const partner = room.players.find((p) => p.role === partnerRole)
-  const level = LEVELS[room.levelId as keyof typeof LEVELS] ?? LEVELS.bosque
+  const level = duoLevel(room.levelId)
   const touch = usePrefersTouch()
   const [toasts, setToasts] = useState<Toast[]>([])
   const toastId = useRef(0)
@@ -110,7 +107,14 @@ export function DuoPlayScreen({
 
   useEffect(() => {
     gameRef.current?.setPhase(room.phase, room.runId)
-  }, [room.phase, room.runId])
+  }, [room.phase, room.runId, level])
+
+  const skew = room.serverNow - Date.now()
+  useEffect(() => {
+    gameRef.current?.setClockSkew(skew)
+    // Basta con la primera vista: después manda el reloj de las posiciones.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [level])
 
   // Avisos del servidor (fichas, puertas) como mensajes cortos.
   const seenNotices = useRef(new Set<number>())
@@ -163,6 +167,7 @@ export function DuoPlayScreen({
         <div className="pointer-events-auto flex items-center gap-2 rounded-2xl bg-slate-900/80 px-3 py-2 shadow-lg backdrop-blur">
           <img src={CHARACTERS[me].portrait} alt="" className="h-8 w-8 object-contain" />
           <div className="leading-tight">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-300" data-testid="duo-level-title">{room.levelTitle}</p>
             <p className="text-[13px] font-bold">{CHARACTERS[me].name} · Tú</p>
             <p className="text-[11px] text-slate-300">con {partner?.displayName ?? '…'} {partner && !partner.connected && '(desconectado)'}</p>
           </div>

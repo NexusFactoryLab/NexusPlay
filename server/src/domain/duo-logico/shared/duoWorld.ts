@@ -6,6 +6,9 @@ import {
   crateSpawn,
   gateWallRect,
   leverRect,
+  MIRROR_ANGLES,
+  mirrorRect,
+  moverRect,
   overlaps,
   pedestalRect,
   type DuoCondition,
@@ -35,6 +38,7 @@ export function createWorldState(level: DuoLevel): DuoWorldState {
     crates: level.def.crates.map((c) => ({ id: c.id, ...crateSpawn(c), owner: null })),
     coins: {},
     gates: {},
+    mirrors: Object.fromEntries((level.def.mirrors ?? []).map((m) => [m.id, m.start % MIRROR_ANGLES])),
   };
 }
 
@@ -53,17 +57,19 @@ export function isBridgeOn(level: DuoLevel, world: DuoWorldState, bridgeId: stri
 export interface DynamicSolids {
   /** Bloquean por todos lados. */
   solid: Rect[];
-  /** Solo se pisan desde arriba (puentes de luz). */
+  /** Solo se pisan desde arriba (puentes de luz y plataformas móviles). */
   oneWay: Rect[];
 }
 
-export function dynamicSolids(level: DuoLevel, world: DuoWorldState): DynamicSolids {
+/** `time`: segundos del reloj del servidor, para ubicar las plataformas móviles. */
+export function dynamicSolids(level: DuoLevel, world: DuoWorldState, time = 0): DynamicSolids {
   const solid: Rect[] = [];
   for (const gate of level.def.gates) {
     solid.push(pedestalRect(gate.pedestals.FIRE), pedestalRect(gate.pedestals.WATER));
     if (gate.wall && !world.gates[gate.id]) solid.push(gateWallRect(gate.wall));
   }
   const oneWay = level.def.bridges.filter((b) => isConditionMet(b.when, world.switches)).map(bridgeRect);
+  for (const mover of level.def.movers ?? []) oneWay.push(moverRect(mover, time));
   return { solid, oneWay };
 }
 
@@ -111,6 +117,14 @@ export function updateSwitches(level: DuoLevel, world: DuoWorldState, players: B
       changed = true;
     }
   }
+  // Receptores de luz: encendidos mientras todos sus espejos apuntan bien.
+  for (const receiver of level.def.receivers ?? []) {
+    const lit = isReceiverLit(level, world, receiver.id);
+    if (world.switches[receiver.id] !== lit) {
+      world.switches[receiver.id] = lit;
+      changed = true;
+    }
+  }
   for (const lever of level.def.levers) {
     if (world.switches[lever.id]) continue;
     const rect = leverRect(lever);
@@ -118,6 +132,45 @@ export function updateSwitches(level: DuoLevel, world: DuoWorldState, players: B
       world.switches[lever.id] = true;
       changed = true;
     }
+  }
+  return changed;
+}
+
+/** Cuántos espejos seguidos (desde la fuente) ya dejan pasar la luz hacia este receptor. */
+export function litMirrorCount(level: DuoLevel, world: DuoWorldState, receiverId: string): number {
+  const receiver = (level.def.receivers ?? []).find((r) => r.id === receiverId);
+  if (!receiver) return 0;
+  let count = 0;
+  for (const id of receiver.mirrors) {
+    const mirror = (level.def.mirrors ?? []).find((m) => m.id === id);
+    if (!mirror || world.mirrors[id] !== mirror.target) break;
+    count += 1;
+  }
+  return count;
+}
+
+export function isReceiverLit(level: DuoLevel, world: DuoWorldState, receiverId: string): boolean {
+  const receiver = (level.def.receivers ?? []).find((r) => r.id === receiverId);
+  return !!receiver && litMirrorCount(level, world, receiverId) === receiver.mirrors.length;
+}
+
+/**
+ * Gira un espejo cada vez que alguien empieza a tocarlo (no mientras sigue
+ * encima). `contacts` guarda quién tocaba cada espejo en el instante anterior.
+ * Devuelve true si algún espejo giró.
+ */
+export function touchMirrors(level: DuoLevel, world: DuoWorldState, players: Bodies, contacts: Record<string, DuoRole[]>): boolean {
+  let changed = false;
+  const bodies = livingRects(players);
+  for (const mirror of level.def.mirrors ?? []) {
+    const rect = mirrorRect(mirror);
+    const now = bodies.filter((b) => overlaps(b.rect, rect)).map((b) => b.role);
+    const before = contacts[mirror.id] ?? [];
+    if (now.some((role) => !before.includes(role))) {
+      world.mirrors[mirror.id] = ((world.mirrors[mirror.id] ?? 0) + 1) % MIRROR_ANGLES;
+      changed = true;
+    }
+    contacts[mirror.id] = now;
   }
   return changed;
 }

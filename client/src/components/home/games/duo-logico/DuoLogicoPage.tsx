@@ -94,6 +94,31 @@ function DuoLogicoSession({ slug, code }: { slug?: string; code?: string }) {
       >
         <div className="mb-3 rounded-[24px] border border-border/80 bg-surface p-3.5">
           <p className="mb-2 text-[13px] font-semibold text-text-h">
+            Escenario {room.hostUserId === user?.id ? '· elige por dónde empiezan' : '· lo elige quien creó la sala'}
+          </p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5" role="radiogroup" aria-label="Escenario">
+            {room.levels.map((level, i) => {
+              const selected = level.id === room.levelId
+              return (
+                <button
+                  key={level.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  disabled={room.hostUserId !== user?.id}
+                  onClick={() => duo.chooseLevel(level.id)}
+                  className={`rounded-xl border-2 px-2.5 py-2 text-left transition ${selected ? 'border-accent bg-accent/10' : 'border-border'} ${room.hostUserId === user?.id ? 'hover:border-accent/60' : 'cursor-default'}`}
+                >
+                  <span className="block text-[11px] font-bold uppercase text-accent">Escenario {i + 1}</span>
+                  <span className="block text-[14px] font-bold text-text-h">{level.title}</span>
+                  <span className="block text-[12px] leading-snug text-text">{level.tagline}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+        <div className="mb-3 rounded-[24px] border border-border/80 bg-surface p-3.5">
+          <p className="mb-2 text-[13px] font-semibold text-text-h">
             Personajes {room.players.length < 2 ? '· elige el tuyo; tu compañero recibe el otro' : '· pueden intercambiarlos antes de estar listos'}
           </p>
           <div className="grid grid-cols-2 gap-3">
