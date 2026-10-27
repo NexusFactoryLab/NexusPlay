@@ -1,5 +1,6 @@
 import type { GameTypeName } from '../../domain/value-objects/game-type.vo.js';
 import { DOMINO_ICON_CATALOG } from './domino-icon-catalog.js';
+import { DUO_LEVEL_DEFS } from '../../domain/duo-logico/shared/levels/index.js';
 
 /**
  * Instrucciones + forma de JSON esperada por cada `gameType` (y, para
@@ -396,40 +397,32 @@ que represente ese concepto, ej. "lemon acid"), "posEmoji"/"negEmoji" (UN emoji 
   fillsMissingImages: true,
 };
 
-const DUAL_QUEST_SPEC: GamePromptSpec = {
-  instructions: `Genera el contenido de un juego "Dúo Lógico" a partir del texto fuente. Es el tipo de
-juego más exigente en geometría — sigue las reglas al pie de la letra:
-1. Elige "gridCols" y "gridRows" PEQUEÑOS y manejables: entre 8 y 12 columnas, entre 6 y 9 filas.
-2. "grid" es una matriz de gridRows filas × gridCols columnas, valores: 0=libre, 1=muro,
-   2=solo pasable por FIRE, 3=solo pasable por WATER. Deja la MAYORÍA de casillas en 0 (libre),
-   usa 1/2/3 con moderación y SIEMPRE deja un camino de casillas libres (0) conectando ambos lados.
-3. "fireStart" debe caer en una casilla pasable para FIRE (valor 0 o 2). "waterStart" debe caer en
-   una casilla pasable para WATER (valor 0 o 3). "corePosition" debe caer en una casilla libre (0).
-4. Declara 1 o 2 "gates" (compuertas), cada una en una casilla libre (0) distinta de fireStart/
-   waterStart/corePosition, con un "gateId" único (ej. "gate-1").
-5. Por cada gate declara EXACTAMENTE un "trigger" en "triggers" con ese mismo "gateId": "kind"
-   "QUESTION" (con "prompt" del texto fuente, 2-4 "options" y "correctOptionIndex"),
-   "activatedByRole" (FIRE o WATER) y "switchPosition" en una casilla pasable para ese rol.
-6. En "content", genera "fragmentGems": al menos 2 gemas con "role":"FIRE" y al menos 2 con
-   "role":"WATER", cada una en una casilla pasable para su rol, con "label" corto extraído del
-   texto fuente y "order" del 1 al N SIN huecos ni repetidos combinando ambos roles (ej. con 4
-   gemas: order 1,2,3,4 en cualquier orden entre ellas, cada valor usado una sola vez).
-7. "coreQuestion" es la hipótesis/pregunta final que arman las gemas juntas, extraída del texto.`,
+/** Escenarios de Dúo Lógico, en el orden de la campaña (para el prompt). */
+const DUO_LEVEL_LIST = DUO_LEVEL_DEFS.map((def) => `"${def.id}" (${def.title})`).join(', ');
+
+const DUAL_QUEST_PIXI_SPEC: GamePromptSpec = {
+  instructions: `Genera las preguntas de un juego "Dúo Lógico" a partir del texto fuente. Dos estudiantes
+(Lumen y Gota) recorren escenarios y en cada "Puerta del Saber" responden una pregunta: solo avanzan
+si los DOS aciertan. Los escenarios ya existen: ${DUO_LEVEL_LIST}.
+1. En "config.levels" pon los ids de TODOS los escenarios, en ese orden.
+2. En "content" escribe EXACTAMENTE 3 preguntas por escenario, una de cada formato:
+   - "MIRROR": la misma pregunta para los dos ("prompt" y 4 "options").
+   - "SPLIT": cada uno ve solo un dato ("clues": {"FIRE": ..., "WATER": ...}) y necesitan juntar los dos
+     para responder "prompt" (4 "options"). Ninguno de los dos datos por sí solo da la respuesta.
+   - "TWO_PART": un problema común en "prompt" y una parte para cada uno en "parts" (cada parte con su
+     propio "prompt" y 4 "options").
+3. En TODAS las listas de "options", la PRIMERA opción es la correcta (el juego las baraja). Las
+   incorrectas deben ser plausibles y distintas entre sí.
+4. Cada pregunta lleva "level" (el id del escenario), 2 "hints" cortas que ayudan sin dar la respuesta
+   y una "explanation" breve de lo que se aprende.
+5. Todo sale del texto fuente, en español, claro para estudiantes de colegio. Enunciados de máximo 200
+   caracteres y opciones de máximo 100.`,
   jsonShapeExample: `{
-  "config": {
-    "coreQuestion": "¿Qué proceso combina fuego y agua para...?",
-    "gridCols": 10, "gridRows": 7,
-    "grid": [[0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0], [0,0,0,0,1,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0]],
-    "fireStart": { "row": 0, "col": 0 }, "waterStart": { "row": 0, "col": 9 },
-    "corePosition": { "row": 3, "col": 4 },
-    "gates": [{ "gateId": "gate-1", "position": { "row": 3, "col": 5 } }],
-    "triggers": [{ "triggerId": "trigger-1", "kind": "QUESTION", "activatedByRole": "FIRE", "switchPosition": { "row": 1, "col": 1 }, "gateId": "gate-1", "prompt": "¿...?", "options": ["A", "B"], "correctOptionIndex": 0 }]
-  },
+  "config": { "levels": [${DUO_LEVEL_DEFS.map((def) => `"${def.id}"`).join(', ')}] },
   "content": [
-    { "gemId": "gem-1", "role": "FIRE", "position": { "row": 2, "col": 1 }, "label": "...", "order": 1 },
-    { "gemId": "gem-2", "role": "WATER", "position": { "row": 2, "col": 8 }, "label": "...", "order": 2 },
-    { "gemId": "gem-3", "role": "FIRE", "position": { "row": 4, "col": 1 }, "label": "...", "order": 3 },
-    { "gemId": "gem-4", "role": "WATER", "position": { "row": 4, "col": 8 }, "label": "...", "order": 4 }
+    { "level": "bosque", "format": "MIRROR", "prompt": "¿...?", "options": ["Correcta", "Incorrecta 1", "Incorrecta 2", "Incorrecta 3"], "hints": ["...", "..."], "explanation": "..." },
+    { "level": "bosque", "format": "SPLIT", "prompt": "¿...?", "clues": { "FIRE": "Dato 1", "WATER": "Dato 2" }, "options": ["Correcta", "Incorrecta 1", "Incorrecta 2", "Incorrecta 3"], "hints": ["...", "..."], "explanation": "..." },
+    { "level": "bosque", "format": "TWO_PART", "prompt": "Problema común", "parts": { "FIRE": { "prompt": "¿Parte de Lumen?", "options": ["Correcta", "Incorrecta 1", "Incorrecta 2", "Incorrecta 3"] }, "WATER": { "prompt": "¿Parte de Gota?", "options": ["Correcta", "Incorrecta 1", "Incorrecta 2", "Incorrecta 3"] } }, "hints": ["...", "..."], "explanation": "..." }
   ]
 }`,
   imageRequirement: null,
@@ -442,7 +435,7 @@ const CATALOG: Record<string, GamePromptSpec> = {
   [catalogKey('GUESS_WHO')]: GUESS_WHO_SPEC,
   [catalogKey('MEMORY_MATCH', 'PAIRS')]: MEMORY_MATCH_PAIRS_SPEC,
   [catalogKey('MEMORY_MATCH', 'OPPOSITES')]: MEMORY_MATCH_OPPOSITES_SPEC,
-  [catalogKey('DUAL_QUEST')]: DUAL_QUEST_SPEC,
+  [catalogKey('DUAL_QUEST_PIXI')]: DUAL_QUEST_PIXI_SPEC,
   [catalogKey('TRUE_FALSE_MAZE')]: TRUE_FALSE_MAZE_SPEC,
 };
 

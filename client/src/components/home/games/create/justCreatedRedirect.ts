@@ -1,7 +1,7 @@
 import type { CreatedGameKind } from '../createdGameSummary'
 
 const KINDS: readonly CreatedGameKind[] = [
-  'PAIRS', 'OPPOSITES', 'GUESS_WHO', 'DOMINO', 'MAZE_COLLECTOR', 'SNAKES_LADDERS', 'DUAL_QUEST',
+  'PAIRS', 'OPPOSITES', 'GUESS_WHO', 'DOMINO', 'MAZE_COLLECTOR', 'SNAKES_LADDERS', 'DUAL_QUEST_PIXI',
 ]
 
 /**

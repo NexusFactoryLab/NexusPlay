@@ -11,7 +11,7 @@ export function invitationDestination(value: string | null): string | null {
     const url = new URL(value, 'https://nexusplay.invalid')
     if (url.origin !== 'https://nexusplay.invalid') return null
     const room = url.pathname.match(
-      /^\/(quien-es\/(?:sala|torneo)|domino\/sala|escaleras-serpientes\/sala|dual-quest\/sala)\/([a-z0-9]{6})\/?$/i,
+      /^\/(quien-es\/(?:sala|torneo)|domino\/sala|escaleras-serpientes\/sala|dual-quest-pixi\/sala)\/([a-z0-9]{6})\/?$/i,
     )
     if (room) return `/${room[1].toLowerCase()}/${room[2].toUpperCase()}`
     // Enlaces antiguos y entrada mediante código genérico, resueltos por GamesSection.

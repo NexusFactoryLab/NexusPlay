@@ -13,6 +13,8 @@ import type { DuoQuestionFormat, DuoRole } from './shared/duoTypes.js';
  */
 interface QuestionBase {
   id: string;
+  /** Escenario al que pertenece (sus puertas solo sacan preguntas de su tema). */
+  level: string;
   /** Pistas que se destapan con las fichas recogidas en el tramo. */
   hints: string[];
   /** Se muestra al acertar los dos: lo que se aprende. */
@@ -44,6 +46,7 @@ export const DUO_QUESTION_BANK: readonly DuoQuestion[] = [
   // ---- Espejo ----
   {
     id: 'paramo-agua',
+    level: 'bosque',
     format: 'MIRROR',
     prompt: '¿Qué ecosistema de alta montaña funciona como una "fábrica de agua" para ciudades como Bogotá?',
     options: ['El páramo', 'El desierto de la Tatacoa', 'El manglar', 'La sabana de los Llanos'],
@@ -52,6 +55,7 @@ export const DUO_QUESTION_BANK: readonly DuoQuestion[] = [
   },
   {
     id: 'frailejon',
+    level: 'bosque',
     format: 'MIRROR',
     prompt: '¿Qué planta del páramo atrapa el agua de la niebla con sus hojas peludas y la entrega poco a poco al suelo?',
     options: ['El frailejón', 'El cactus', 'La palma de cera', 'El girasol'],
@@ -60,6 +64,7 @@ export const DUO_QUESTION_BANK: readonly DuoQuestion[] = [
   },
   {
     id: 'corredor-biologico',
+    level: 'bosque',
     format: 'MIRROR',
     prompt: 'En una ciudad sostenible, ¿para qué sirve un corredor biológico?',
     options: [
@@ -73,6 +78,7 @@ export const DUO_QUESTION_BANK: readonly DuoQuestion[] = [
   },
   {
     id: 'humedales',
+    level: 'bosque',
     format: 'MIRROR',
     prompt: 'Bogotá protege humedales como La Conejera y Juan Amarillo. ¿Por qué son importantes para la ciudad?',
     options: [
@@ -87,6 +93,7 @@ export const DUO_QUESTION_BANK: readonly DuoQuestion[] = [
   // ---- Información dividida ----
   {
     id: 'ahorro-agua',
+    level: 'bosque',
     format: 'SPLIT',
     prompt: 'Una familia cambió dos hábitos. ¿Cuántos litros de agua ahorra en total cada día?',
     clues: {
@@ -99,6 +106,7 @@ export const DUO_QUESTION_BANK: readonly DuoQuestion[] = [
   },
   {
     id: 'arboles-faltan',
+    level: 'bosque',
     format: 'SPLIT',
     prompt: 'El colegio está reforestando la quebrada con árboles nativos. ¿Cuántos árboles faltan por sembrar?',
     clues: {
@@ -111,6 +119,7 @@ export const DUO_QUESTION_BANK: readonly DuoQuestion[] = [
   },
   {
     id: 'manglar',
+    level: 'bosque',
     format: 'SPLIT',
     prompt: '¿De qué ecosistema colombiano hablan las dos pistas?',
     clues: {
@@ -123,6 +132,7 @@ export const DUO_QUESTION_BANK: readonly DuoQuestion[] = [
   },
   {
     id: 'condor',
+    level: 'bosque',
     format: 'SPLIT',
     prompt: '¿De qué animal hablan las dos pistas?',
     clues: {
@@ -136,6 +146,7 @@ export const DUO_QUESTION_BANK: readonly DuoQuestion[] = [
   // ---- Dos partes ----
   {
     id: 'movilidad',
+    level: 'bosque',
     format: 'TWO_PART',
     prompt: 'La ciudad quiere que la gente se mueva sin llenar el aire de humo.',
     parts: {
@@ -153,6 +164,7 @@ export const DUO_QUESTION_BANK: readonly DuoQuestion[] = [
   },
   {
     id: 'rio-limpio',
+    level: 'bosque',
     format: 'TWO_PART',
     prompt: 'El río que atraviesa la ciudad está contaminado. Cada uno propone una solución.',
     parts: {
@@ -170,6 +182,7 @@ export const DUO_QUESTION_BANK: readonly DuoQuestion[] = [
   },
   {
     id: 'energia-limpia',
+    level: 'bosque',
     format: 'TWO_PART',
     prompt: 'El colegio quiere funcionar con energía limpia.',
     parts: {
@@ -185,10 +198,123 @@ export const DUO_QUESTION_BANK: readonly DuoQuestion[] = [
     hints: ['Una fuente viene del cielo de día; la otra sopla.', 'Ninguna se quema.'],
     explanation: 'Colombia tiene mucho sol y, en La Guajira, vientos fuertes y constantes: dos fuentes renovables que no contaminan el aire.',
   },
+  // ---- Planta solar ----
+  {
+    id: 'solar-bateria',
+    level: 'solar',
+    format: 'MIRROR',
+    prompt: 'Una casa con paneles solares quiere tener luz también de noche. ¿Qué parte del sistema guarda la energía del día?',
+    options: ['La batería', 'El panel solar', 'El cable', 'El bombillo'],
+    hints: ['Es como un tanque, pero de electricidad.', 'Los celulares también tienen una.'],
+    explanation: 'Los paneles producen electricidad solo mientras hay sol; la batería guarda la que sobra para usarla de noche o en días nublados.',
+  },
+  {
+    id: 'solar-renovable',
+    level: 'solar',
+    format: 'MIRROR',
+    prompt: '¿Por qué se dice que la energía del sol y del viento es renovable?',
+    options: [
+      'Porque viene de fuentes que no se agotan al usarlas',
+      'Porque se saca de debajo de la tierra',
+      'Porque se quema para producir calor',
+      'Porque solo funciona en las ciudades',
+    ],
+    hints: ['Mañana el sol volverá a salir.', 'Lo contrario serían el carbón o el petróleo.'],
+    explanation: 'El sol y el viento se renuevan solos. El carbón y el petróleo tardan millones de años en formarse y, al quemarlos, contaminan el aire.',
+  },
+  {
+    id: 'solar-caribe',
+    level: 'solar',
+    format: 'MIRROR',
+    prompt: 'En el Cesar y en La Guajira se construyen parques solares. ¿Por qué esa región es buena para los paneles?',
+    options: [
+      'Recibe mucho sol durante casi todo el año',
+      'Allí llueve casi todos los días',
+      'Está cubierta de nieve',
+      'Tiene muy poca luz de día',
+    ],
+    hints: ['Piensa en el clima de la región Caribe.', 'Los paneles necesitan luz.'],
+    explanation: 'El norte de Colombia tiene mucha radiación solar, por eso allí funcionan parques solares como El Paso, en el Cesar.',
+  },
+  {
+    id: 'solar-paneles-techo',
+    level: 'solar',
+    format: 'SPLIT',
+    prompt: 'El colegio puso paneles en el techo. ¿Cuánta energía producen en total en un día soleado?',
+    clues: {
+      FIRE: 'Cada panel produce 2 kWh en un día soleado.',
+      WATER: 'En el techo hay 6 paneles.',
+    },
+    options: ['12 kWh', '8 kWh', '6 kWh', '3 kWh'],
+    hints: ['Uno sabe cuánto da cada panel; el otro, cuántos hay.', 'Es una multiplicación.'],
+    explanation: '6 paneles × 2 kWh = 12 kWh al día: suficiente para mantener encendidos muchos bombillos LED del colegio.',
+  },
+  {
+    id: 'solar-nevera',
+    level: 'solar',
+    format: 'SPLIT',
+    prompt: '¿Cuántas horas puede funcionar la nevera de la tienda solo con la batería?',
+    clues: {
+      FIRE: 'La batería guarda 3 kWh de energía.',
+      WATER: 'La nevera gasta medio kWh (0,5 kWh) cada hora.',
+    },
+    options: ['6 horas', '3 horas', '1 hora y media', '12 horas'],
+    hints: ['Uno tiene lo que hay guardado; el otro, lo que se gasta por hora.', 'Es una división.'],
+    explanation: '3 kWh ÷ 0,5 kWh por hora = 6 horas. Saber cuánto gasta cada aparato ayuda a no desperdiciar energía.',
+  },
+  {
+    id: 'solar-eolica',
+    level: 'solar',
+    format: 'SPLIT',
+    prompt: '¿De qué fuente de energía hablan las dos pistas?',
+    clues: {
+      FIRE: 'No echa humo y nunca se acaba.',
+      WATER: 'Mueve las aspas de unos molinos gigantes en La Guajira.',
+    },
+    options: ['El viento (energía eólica)', 'El carbón', 'El petróleo', 'La leña'],
+    hints: ['Sopla.', 'Los molinos modernos se llaman aerogeneradores.'],
+    explanation: 'La Guajira tiene vientos fuertes y constantes; por eso allí se instalan aerogeneradores que convierten el viento en electricidad.',
+  },
+  {
+    id: 'solar-escuela-rural',
+    level: 'solar',
+    format: 'TWO_PART',
+    prompt: 'Una escuela rural no tiene conexión a la red eléctrica y quiere luz todo el día.',
+    parts: {
+      FIRE: {
+        prompt: '¿Qué instalan para producir electricidad con la luz del día?',
+        options: ['Paneles solares', 'Un generador de gasolina', 'Una fogata', 'Más ventanas'],
+      },
+      WATER: {
+        prompt: '¿Qué necesitan para tener luz también por la noche?',
+        options: ['Baterías que guarden la energía', 'Velas de cera', 'Un espejo grande', 'Cortinas oscuras'],
+      },
+    },
+    hints: ['Una parte produce y la otra guarda.', 'Ninguna de las dos echa humo.'],
+    explanation: 'Paneles más baterías: así muchas escuelas rurales de Colombia tienen luz y pueden cargar sus computadores sin contaminar.',
+  },
+  {
+    id: 'solar-ahorro-casa',
+    level: 'solar',
+    format: 'TWO_PART',
+    prompt: 'En casa quieren gastar menos energía.',
+    parts: {
+      FIRE: {
+        prompt: '¿Qué bombillo gasta menos electricidad dando la misma luz?',
+        options: ['El bombillo LED', 'El bombillo incandescente', 'El halógeno', 'Todos gastan igual'],
+      },
+      WATER: {
+        prompt: '¿Qué hacer con los aparatos que nadie está usando?',
+        options: ['Desconectarlos', 'Dejarlos en espera toda la noche', 'Subirles el volumen', 'Taparlos con una cobija'],
+      },
+    },
+    hints: ['Una parte es cambiar algo; la otra, un hábito.', 'Un aparato en espera sigue gastando.'],
+    explanation: 'Un LED gasta mucho menos que un bombillo incandescente, y desconectar lo que no se usa evita el consumo "fantasma" de los aparatos en espera.',
+  },
 ];
 
-export function questionsOf(format: DuoQuestionFormat): DuoQuestion[] {
-  return DUO_QUESTION_BANK.filter((q) => q.format === format);
+export function questionsOf(format: DuoQuestionFormat, level: string): DuoQuestion[] {
+  return DUO_QUESTION_BANK.filter((q) => q.format === format && q.level === level);
 }
 
 /** Opciones que le tocan a un rol (en TWO_PART cada uno tiene las suyas). */

@@ -11,7 +11,6 @@ import { InMemoryRoomStore } from './in-memory-room.store.js';
 import { InMemoryTournamentStore } from './in-memory-tournament.store.js';
 import { InMemoryDominoRoomStore } from './in-memory-domino-room.store.js';
 import { InMemorySnakesLaddersRoomStore } from './in-memory-snakes-ladders-room.store.js';
-import { InMemoryDualQuestRoomStore } from './in-memory-dual-quest-room.store.js';
 
 type Client = Parameters<RoomsGateway['handleQuestion']>[0];
 const client = (id: string) => ({ id, data: { userId: id, displayName: id }, join: vi.fn(), leave: vi.fn(), emit: vi.fn(), disconnect: vi.fn() }) as unknown as Client;
@@ -20,7 +19,7 @@ afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); });
 function setup() {
   const rooms = new InMemoryRoomStore(), tournaments = new InMemoryTournamentStore();
   const game = { id: 'test', title: 'Test', gameType: { getName: () => 'GUESS_WHO' }, config: { turnDurationSeconds: 30 }, content: Array.from({ length: 6 }, (_, i) => ({ cardId: String(i), label: `Tarjeta ${i}`, imageUrl: '', audioUrl: null, info: null, traits: i < 3 ? [{ id: 't0', question: '¿Rasgo?' }] : [] })) };
-  const gateway = new RoomsGateway(new JwtService(), { findById: async () => game } as unknown as GameRepository, {} as UserRepository, rooms, tournaments, new InMemoryDominoRoomStore(), new InMemorySnakesLaddersRoomStore(), new InMemoryDualQuestRoomStore(), { track: async () => {} } as unknown as AnalyticsTrackerService);
+  const gateway = new RoomsGateway(new JwtService(), { findById: async () => game } as unknown as GameRepository, {} as UserRepository, rooms, tournaments, new InMemoryDominoRoomStore(), new InMemorySnakesLaddersRoomStore(), { track: async () => {} } as unknown as AnalyticsTrackerService);
   const events: { target: string; payload: unknown }[] = [];
   gateway.server = { to: (target: string) => ({ emit: (_event: string, payload: unknown) => events.push({ target, payload: structuredClone(payload) }) }) } as unknown as Server;
   return { gateway, rooms, tournaments, events };

@@ -11,6 +11,10 @@ export const DUO_EVENTS = {
   leave: 'duo:leave',
   /** En la sala de espera: elegir (o intercambiar) personaje. */
   role: 'duo:role',
+  /** En la sala de espera: el anfitrión elige el escenario inicial. */
+  level: 'duo:level',
+  /** Girar un espejo desde su panel: { mirrorId, dir: 1 | -1 }. */
+  mirror: 'duo:mirror',
   ready: 'duo:ready',
   /** Cliente → servidor: posición propia y cajas que mueve, ~20 veces por segundo. */
   state: 'duo:state',
@@ -80,6 +84,12 @@ export interface DuoRoomView {
   gameId: string;
   gameTitle: string;
   levelId: string;
+  levelTitle: string;
+  /** Escenarios de la campaña, en orden. */
+  levels: Array<{ id: string; title: string; tagline: string }>;
+  /** Título del escenario que sigue al ganar este, o null si es el último. */
+  nextLevelTitle: string | null;
+  hostUserId: string;
   phase: DuoPhase;
   /** Cambia cada vez que la partida vuelve a empezar: el cliente reinicia su simulación. */
   runId: number;
@@ -110,6 +120,8 @@ export type DuoClientMessages = {
   'duo:create': { gameId: string; role: DuoRole };
   'duo:join': { code: string };
   'duo:role': { role: DuoRole };
+  'duo:level': { levelId: string };
+  'duo:mirror': { mirrorId: string; dir: 1 | -1 };
   'duo:ready': { ready: boolean };
   'duo:state': DuoClientState;
   'duo:answer': { optionIndex: number };

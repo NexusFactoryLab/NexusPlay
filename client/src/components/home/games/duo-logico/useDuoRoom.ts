@@ -87,6 +87,8 @@ export function useDuoRoom(token: string | null) {
   }, [emit])
 
   const chooseRole = useCallback((role: DuoRole) => emit(DUO_EVENTS.role, { role }), [emit])
+  const chooseLevel = useCallback((levelId: string) => emit(DUO_EVENTS.level, { levelId }), [emit])
+  const rotateMirror = useCallback((mirrorId: string, dir: 1 | -1) => emit(DUO_EVENTS.mirror, { mirrorId, dir }), [emit])
   const setReady = useCallback((ready: boolean) => emit(DUO_EVENTS.ready, { ready }), [emit])
   const answer = useCallback((optionIndex: number) => emit(DUO_EVENTS.answer, { optionIndex }), [emit])
   const retry = useCallback(() => emit(DUO_EVENTS.retry, {}), [emit])
@@ -113,6 +115,8 @@ export function useDuoRoom(token: string | null) {
     joinRoom,
     leaveRoom,
     chooseRole,
+    chooseLevel,
+    rotateMirror,
     setReady,
     answer,
     retry,

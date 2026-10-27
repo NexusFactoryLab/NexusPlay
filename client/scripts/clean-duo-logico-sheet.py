@@ -18,6 +18,9 @@ gray = img.mean(axis=2)
 corner = gray[0:60, 0:200].astype(int).ravel()
 hist = np.bincount(corner, minlength=256)
 dark = int(np.argmax(hist[140:240]) + 140)
+# Fondo blanco liso (sin cuadriculado): solo se quita lo casi blanco.
+if hist[140:240].sum() < 0.1 * corner.size:
+    dark = 250
 print('checker dark gray', dark)
 bg = ((mx - mn) <= 14) & (mn >= dark - 16)
 labels, n = ndimage.label(bg)

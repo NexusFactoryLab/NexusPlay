@@ -3,7 +3,7 @@ import { MongoClient } from 'mongodb';
 
 /**
  * Siembra el nivel de ejemplo de Dúo Lógico (motor PixiJS): mismo criterio
- * que seed-dual-quest-demo.ts (el juego de grid) pero para DUAL_QUEST_PIXI
+ * que los demás seeds, para Dúo Lógico (DUAL_QUEST_PIXI)
  * — física real, gravedad, nadar en el propio elemento. Los datos son el
  * mismo `level1EnergiaRenovable` del cliente
  * (client/src/components/home/games/dual-quest-pixi/levels/level1EnergiaRenovable.ts),
@@ -21,95 +21,10 @@ const GAME_ID = 'seed-dual-quest-pixi-ciudad-sostenible-1';
 const CATEGORY_NAME = 'Ciencias Naturales';
 const CATEGORY_SLUG = 'ciencias-naturales';
 
-const CONFIG = {
-  widthPx: 1700,
-  heightPx: 1000,
-  fireStart: { x: 80, y: 800 },
-  waterStart: { x: 170, y: 800 },
-  dog: { x: 230, y: 800 },
-  platforms: [
-    { x: 0, y: 860, width: 300, height: 140, material: 'concrete' },
-    { x: 460, y: 860, width: 260, height: 140, material: 'concrete' },
-    { x: 560, y: 760, width: 110, height: 40, material: 'metal' },
-    { x: 650, y: 660, width: 110, height: 40, material: 'metal' },
-    { x: 460, y: 560, width: 400, height: 40, material: 'concrete' },
-    { x: 1020, y: 560, width: 260, height: 40, material: 'concrete' },
-    { x: 700, y: 420, width: 140, height: 30, material: 'metal' },
-    { x: 760, y: 460, width: 90, height: 30, material: 'dirt' },
-    { x: 840, y: 360, width: 90, height: 30, material: 'dirt' },
-    { x: 1080, y: 420, width: 90, height: 30, material: 'metal' },
-    { x: 1160, y: 320, width: 90, height: 30, material: 'metal' },
-    { x: 900, y: 260, width: 700, height: 40, material: 'concrete' },
-  ],
-  liquids: [{ x: 860, y: 560, width: 160, height: 120, kind: 'LAVA' }],
-  crates: [{ x: 560, y: 500, size: 48 }],
-  buttons: [
-    { id: 'dogButton', x: 220, y: 860, momentary: true },
-    { id: 'leverFinal', x: 560, y: 860, momentary: false },
-  ],
-  bridges: [{ id: 'bridge1', x: 380, y: 860, width: 160, height: 30, requires: ['dogButton'], logic: 'AND' }],
-  doors: [{ id: 'doorFinal', x: 700, y: 790, width: 30, height: 140, requires: ['leverFinal'], logic: 'AND' }],
-  portal: { x: 1500, y: 220, width: 100, height: 120 },
-  finalReveal: {
-    title: 'Ciudad Sostenible I: Energía que se comparte',
-    // TODO: reemplazar por imágenes reales — de momento son rutas que no existen.
-    positiveUrl: '/assets/dual-quest/reveal-energia-positivo.svg',
-    negativeUrl: '/assets/dual-quest/reveal-energia-negativo.svg',
-    summary:
-      'A la izquierda, una ciudad con energía renovable repartida y rutas seguras para todos. A la derecha, una ciudad que depende de una sola fuente contaminante y dejó sin alternativa a quienes más la necesitaban.',
-  },
-};
-
-const CONTENT = [
-  {
-    id: 'piece-1',
-    x: 150,
-    y: 800,
-    role: null,
-    color: '#FFD166',
-    glow: '#FACC15',
-    concept: {
-      title: 'Energía Compartida',
-      body: 'Una ciudad sostenible reparte su energía entre todos sus barrios en vez de concentrarla en unos pocos — por eso aquí nadie cruza solo.',
-    },
-  },
-  {
-    id: 'piece-2',
-    x: 770,
-    y: 390,
-    role: null,
-    color: '#38BDF8',
-    glow: '#38BDF8',
-    concept: {
-      title: 'Infraestructura Compartida',
-      body: 'Mover un solo bloque pesado entre dos personas construye más rápido que hacerlo solos — así se construyen las ciudades reales.',
-    },
-  },
-  {
-    id: 'piece-3',
-    x: 940,
-    y: 620,
-    role: 'FIRE',
-    color: '#FDBA74',
-    glow: '#F97316',
-    concept: {
-      title: 'Resiliencia Energética',
-      body: 'Una fuente de energía renovable (como Lumen en la lava) sigue funcionando donde otras fuentes fallarían.',
-    },
-  },
-  {
-    id: 'piece-4',
-    x: 885,
-    y: 330,
-    role: 'WATER',
-    color: '#7DD3FC',
-    glow: '#38BDF8',
-    concept: {
-      title: 'Gestión del Agua',
-      body: 'Cuando una ruta está contaminada o es peligrosa, una ciudad sostenible siempre planea una alternativa segura — la ruta alta de Gota.',
-    },
-  },
-];
+// Dúo Lógico nuevo (#105/#108): los escenarios vienen hechos en el código; el
+// juego elige cuáles incluye. Sin preguntas propias: usa el banco por defecto.
+const CONFIG = { levels: ['bosque', 'solar'] };
+const CONTENT: unknown[] = [];
 
 async function ensureCategory(
   categories: import('mongodb').Collection,
@@ -161,7 +76,7 @@ async function main(): Promise<void> {
       theme: { primaryColor: '#1f8a5f', coverImageUrl: null },
       categoryId,
       // Sin creador humano: es contenido del equipo, no de un usuario (mismo
-      // criterio que seed-dual-quest-demo.ts y seed-maze-collector-demos.ts).
+      // criterio que seed-maze-collector-demos.ts).
       creatorUserId: 'system',
       status: 'PUBLISHED',
       config: CONFIG,

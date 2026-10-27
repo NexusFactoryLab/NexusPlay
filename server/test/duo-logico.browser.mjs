@@ -23,15 +23,15 @@ import { ROOM_STORE } from '../dist/domain/ports/room-store.port.js';
 import { TOURNAMENT_STORE } from '../dist/domain/ports/tournament-store.port.js';
 import { DOMINO_ROOM_STORE } from '../dist/domain/ports/domino-room-store.port.js';
 import { SNAKES_LADDERS_ROOM_STORE } from '../dist/domain/ports/snakes-ladders-room-store.port.js';
-import { DUAL_QUEST_ROOM_STORE } from '../dist/domain/ports/dual-quest-room-store.port.js';
 import { DUO_ROOM_STORE } from '../dist/domain/ports/duo-room-store.port.js';
 import { InMemoryRoomStore } from '../dist/infrastructure/rooms/in-memory-room.store.js';
 import { InMemoryTournamentStore } from '../dist/infrastructure/rooms/in-memory-tournament.store.js';
 import { InMemoryDominoRoomStore } from '../dist/infrastructure/rooms/in-memory-domino-room.store.js';
 import { InMemorySnakesLaddersRoomStore } from '../dist/infrastructure/rooms/in-memory-snakes-ladders-room.store.js';
-import { InMemoryDualQuestRoomStore } from '../dist/infrastructure/rooms/in-memory-dual-quest-room.store.js';
 import { InMemoryDuoRoomStore } from '../dist/infrastructure/rooms/in-memory-duo-room.store.js';
 import { optionsFor } from '../dist/domain/duo-logico/duo-questions.js';
+import { moverRect } from '../dist/domain/duo-logico/shared/duoLevel.js';
+import { SOLAR } from '../dist/domain/duo-logico/shared/levels/solar.js';
 import { AnalyticsTrackerService } from '../dist/application/services/analytics-tracker.service.js';
 
 const require = createRequire(import.meta.url);
@@ -54,7 +54,6 @@ Module({
     { provide: TOURNAMENT_STORE, useClass: InMemoryTournamentStore },
     { provide: DOMINO_ROOM_STORE, useClass: InMemoryDominoRoomStore },
     { provide: SNAKES_LADDERS_ROOM_STORE, useClass: InMemorySnakesLaddersRoomStore },
-    { provide: DUAL_QUEST_ROOM_STORE, useClass: InMemoryDualQuestRoomStore },
     { provide: DUO_ROOM_STORE, useClass: InMemoryDuoRoomStore },
   ],
 })(TestModule);
@@ -113,11 +112,31 @@ try {
   }
 
   const continueGuide = (page) => page.getByRole('button', { name: /continuar|Saltar guía/ }).first().click();
+  /** Ningún elemento del panel de la pregunta necesita scroll (todo cabe en pantalla). */
+  async function assertNoScroll(page, label) {
+    const overflow = await page.getByRole('dialog', { name: 'Puerta del Saber' }).evaluate((root) =>
+      [root, ...root.querySelectorAll('*')].filter((el) => {
+        const style = getComputedStyle(el);
+        const scrolls = /(auto|scroll)/.test(style.overflowY) && el.scrollHeight > el.clientHeight + 1;
+        return scrolls && !el.closest('[aria-label="Chat de la sala"]');
+      }).length,
+    );
+    assert.equal(overflow, 0, `sin scroll en la pregunta (${label})`);
+    const fits = await page.getByRole('dialog', { name: 'Puerta del Saber' }).evaluate((root) => root.getBoundingClientRect().bottom <= window.innerHeight + 1);
+    assert.ok(fits, `la pregunta cabe en la pantalla (${label})`);
+  }
 
   // --- Ana crea la sala eligiendo a Lumen ---
   const ana = await openPage('Ana', false);
   await ana.goto(`${base}/dual-quest-pixi/${GAME.slug}`);
-  await continueGuide(ana);
+  // La guía visual de 6 pasos aparece al entrar.
+  const guide = ana.locator('[data-game-guide="DUAL_QUEST_PIXI"]');
+  await guide.waitFor();
+  await ana.screenshot({ path: '.scratch/duo-guia-desktop.png' });
+  for (let i = 0; i < 5; i++) await guide.getByRole('button', { name: 'Siguiente' }).click();
+  await guide.getByText('Corazones y fichas de pista').waitFor();
+  await ana.screenshot({ path: '.scratch/duo-guia-final-desktop.png' });
+  await guide.getByRole('button', { name: '¡A jugar!' }).click();
   await ana.getByRole('button', { name: /Lumen/ }).first().click();
   await ana.getByRole('button', { name: 'Crear sala e invitar a mi compañero' }).click();
   await ana.waitForURL(/\/dual-quest-pixi\/sala\/[A-Z0-9]{6}$/);
@@ -128,6 +147,8 @@ try {
   // --- Luis entra por el enlace desde el celular ---
   const luis = await openPage('Luis', true);
   await luis.goto(`${base}/dual-quest-pixi/sala/${code}`);
+  await luis.locator('[data-game-guide="DUAL_QUEST_PIXI"]').waitFor();
+  await luis.screenshot({ path: '.scratch/duo-guia-mobile.png' });
   await continueGuide(luis);
   await until(() => room().players.length === 2, 'Luis en la sala');
   assert.equal(room().players[1].role, 'WATER');
@@ -214,6 +235,13 @@ try {
   await panel(luis).getByText('Pregunta espejo').waitFor();
   await ana.screenshot({ path: '.scratch/duo-pregunta-desktop.png' });
   await luis.screenshot({ path: '.scratch/duo-pregunta-mobile.png' });
+  await assertNoScroll(ana, 'computador');
+  await assertNoScroll(luis, 'celular horizontal');
+  await luis.setViewportSize({ width: 390, height: 844 });
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  await assertNoScroll(luis, 'celular vertical');
+  await luis.screenshot({ path: '.scratch/duo-pregunta-vertical.png' });
+  await luis.setViewportSize({ width: 844, height: 390 });
   const right = (role) => optionsFor(room().question.question, role)[0];
 
   // Primer intento: Luis se equivoca; pierden un corazón.
@@ -245,26 +273,73 @@ try {
   await new Promise((resolve) => setTimeout(resolve, 600));
   assert.ok(Math.abs(pos('Luis').x - before.x) < 40, `Luis retoma su posición (${before.x} → ${pos('Luis').x})`);
 
+  // El botón «?» vuelve a abrir la guía en plena partida.
+  await ana.getByRole('button', { name: 'Cómo jugar' }).click();
+  await ana.locator('[data-game-guide="DUAL_QUEST_PIXI"]').waitFor();
+  await ana.getByRole('button', { name: /Saltar guía/ }).click();
+  await ana.locator('[data-game-guide="DUAL_QUEST_PIXI"]').waitFor({ state: 'hidden' });
+
   // Pasan por la puerta abierta.
   await walkTo('Ana', 28 * TILE + TILE / 2);
   assert.ok(pos('Ana').x > 27 * TILE, 'Ana cruzó la Puerta del Saber');
   await ana.screenshot({ path: '.scratch/duo-tramo-b-desktop.png' });
 
-  // --- Fin de la partida y revancha ---
+  // --- Ganan el Bosque y pasan a la Planta solar ---
   const r = room();
   r.phase = 'VICTORY';
   r.finishedAt = Date.now();
   gateway.broadcastRoom(r);
-  await ana.getByRole('heading', { name: '¡Salvaron el bosque!' }).waitFor();
+  await ana.getByRole('heading', { name: '¡Superaron El Bosque!' }).waitFor();
   await luis.screenshot({ path: '.scratch/duo-victoria-mobile.png' });
-  await ana.getByRole('button', { name: 'Jugar otra vez' }).click();
-  await luis.getByRole('button', { name: /quiere jugar otra vez/ }).click();
-  await until(() => room().phase === 'COUNTDOWN' && room().runId === 2, 'revancha');
-  await until(() => room().phase === 'PLAYING', 'revancha en juego');
-  await until(() => pos('Ana') && pos('Ana').x < 4 * TILE, 'Ana vuelve al inicio');
+  await ana.getByRole('button', { name: 'Siguiente: La Planta solar' }).click();
+  await luis.getByRole('button', { name: /ya votó: Siguiente: La Planta solar/ }).click();
+  await until(() => room().phase === 'COUNTDOWN' && room().runId === 2 && room().levelId === 'solar', 'planta solar');
+  await ana.getByTestId('duo-level-title').filter({ hasText: 'La Planta solar' }).waitFor();
+  await until(() => room().phase === 'PLAYING', 'planta solar en juego');
+  await until(() => pos('Ana') && pos('Ana').x < 4 * TILE && pos('Luis'), 'los dos al inicio de la planta');
+  assert.equal(room().hearts, 3);
+
+  // La plataforma móvil (reloj del servidor) cruza el foso electrificado con Ana encima.
+  const mover = SOLAR.movers[0];
+  await walkTo('Ana', 9 * TILE + TILE / 2);
+  const at = () => moverRect(mover, Date.now() / 1000);
+  // Se espera a que llegue al borde y empiece a irse hacia la derecha.
+  await until(() => at().x < mover.col * TILE + 6 && moverRect(mover, Date.now() / 1000 + 0.2).x > at().x, 'plataforma en el borde', 15000);
+  await walkTo('Ana', mover.col * TILE + TILE, 10);
+  await ana.screenshot({ path: '.scratch/duo-solar-plataforma-desktop.png' });
+  await until(() => at().x > (mover.col + mover.path.dx) * TILE - 8, 'plataforma al otro lado', 8000);
+  await walkTo('Ana', 18 * TILE + TILE / 2);
+  assert.ok(!pos('Ana').dead && pos('Ana').x > 17 * TILE, 'Ana cruzó el foso en la plataforma');
+
+  // Con la Puerta 1 abierta, Ana sube a la repisa y gira el primer espejo.
+  r.world.gates['puerta-1'] = true;
+  await walkTo('Ana', 26 * TILE + TILE / 2);
+  const angle = room().world.mirrors['espejo-1'];
+  await press('Ana', 'right', true);
+  await press('Ana', 'jump', true);
+  await until(() => pos('Ana').x >= 27 * TILE + 20, 'Ana sobre la repisa');
+  await press('Ana', 'right', false);
+  await press('Ana', 'jump', false);
+  // Tocar el espejo ya no lo gira: aparece el botón para abrir su panel.
+  await ana.getByTestId('duo-mirror-open').click();
+  const mirrorPanel = ana.getByTestId('duo-mirror-panel');
+  await mirrorPanel.waitFor();
+  assert.equal(room().world.mirrors['espejo-1'], angle, 'acercarse no gira el espejo');
+  await mirrorPanel.getByRole('button', { name: 'Girar a la derecha' }).click();
+  await until(() => room().world.mirrors['espejo-1'] === (angle + 1) % 4, 'el espejo gira con la flecha');
+  await ana.keyboard.press('ArrowLeft');
+  await until(() => room().world.mirrors['espejo-1'] === angle, 'la flecha del teclado lo gira de vuelta');
+  await ana.keyboard.press('ArrowRight');
+  await until(() => room().world.mirrors['espejo-1'] === (angle + 1) % 4, 'y otra vez');
+  assert.ok(Math.abs(pos('Ana').vx) < 5, 'con el panel abierto el personaje no se mueve');
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  await ana.screenshot({ path: '.scratch/duo-solar-espejo-desktop.png' });
+  await ana.keyboard.press('Escape');
+  await mirrorPanel.waitFor({ state: 'hidden' });
+  await luis.screenshot({ path: '.scratch/duo-solar-mobile.png' });
 
   assert.deepEqual(errors, []);
-  console.log('PASS duo-logico: sala, cooperación, pedestales, pregunta (fallo y acierto), reconexión y revancha');
+  console.log('PASS duo-logico: sala, cooperación, pedestales, pregunta (fallo y acierto), reconexión, campaña y planta solar');
 } catch (error) {
   for (const [id, page] of openPages) await page.screenshot({ path: `.scratch/duo-fallo-${id}.png` }).catch(() => {});
   console.error('Errores de página:', errors);

@@ -1,5 +1,5 @@
-import { BOSQUE } from './shared/levels/bosque.js';
-import { parseLevel, type DuoGateDef, type DuoLevel } from './shared/duoLevel.js';
+import { DUO_LEVEL_DEFS, duoLevel } from './shared/levels/index.js';
+import { MIRROR_ANGLES, mirrorRect, type DuoGateDef, type DuoLevel } from './shared/duoLevel.js';
 import {
   coinsForGate,
   collectCoins,
@@ -40,12 +40,8 @@ export const DUO_RECONNECT_GRACE_MS = 90_000;
 /** Una caja deja de ser de alguien si no la mueve en este tiempo. */
 export const DUO_CRATE_LEASE_MS = 400;
 
-const LEVELS: Record<string, DuoLevel> = { bosque: parseLevel(BOSQUE) };
-
 export function levelById(id: string): DuoLevel {
-  const level = LEVELS[id];
-  if (!level) throw new Error(`No existe el escenario ${id}.`);
-  return level;
+  return duoLevel(id);
 }
 
 export interface DuoRoomPlayer {
@@ -80,6 +76,10 @@ export interface DuoRoomState {
   gameId: string;
   gameTitle: string;
   levelId: string;
+  /** Escenarios que eligió el profesor, en el orden en que se juegan. */
+  campaign: string[];
+  /** Preguntas que escribió el profesor; si un escenario no tiene de un formato, se usa el banco. */
+  customQuestions: DuoQuestion[];
   hostUserId: string;
   phase: DuoPhase;
   runId: number;
@@ -112,13 +112,19 @@ export function createDuoRoom(input: {
   user: { userId: string; displayName: string; socketId: string };
   role: DuoRole;
   now: number;
+  /** Escenarios del juego; por defecto, todos. */
+  campaign?: string[];
+  customQuestions?: DuoQuestion[];
 }): DuoRoomState {
-  const level = levelById('bosque');
+  const campaign = input.campaign && input.campaign.length > 0 ? input.campaign : DUO_LEVEL_DEFS.map((def) => def.id);
+  const level = levelById(campaign[0]);
   return {
     code: input.code,
     gameId: input.gameId,
     gameTitle: input.gameTitle,
     levelId: level.def.id,
+    campaign,
+    customQuestions: input.customQuestions ?? [],
     hostUserId: input.user.userId,
     phase: 'WAITING',
     runId: 0,
@@ -210,6 +216,16 @@ export function leaveDuoRoom(room: DuoRoomState, userId: string, now: number): b
   return false;
 }
 
+/** El anfitrión elige en la sala de espera desde qué escenario empiezan. */
+export function chooseDuoLevel(room: DuoRoomState, userId: string, levelId: unknown): void {
+  if (room.phase !== 'WAITING') throw new Error('Ya no se puede cambiar de escenario.');
+  if (room.hostUserId !== userId) throw new Error('Solo quien creó la sala elige el escenario.');
+  if (typeof levelId !== 'string' || !room.campaign.includes(levelId)) throw new Error('Ese escenario no está en este juego.');
+  room.levelId = levelId;
+  room.world = createWorldState(levelById(levelId));
+  for (const p of room.players) p.ready = false;
+}
+
 export function setDuoReady(room: DuoRoomState, userId: string, ready: boolean, now: number): void {
   if (room.phase !== 'WAITING') return;
   if (typeof ready !== 'boolean') throw new Error('Indica si estás listo.');
@@ -281,7 +297,8 @@ function shuffled(n: number, rng: () => number): number[] {
 }
 
 function pickQuestion(room: DuoRoomState, gate: DuoGateDef, rng: () => number): DuoQuestion {
-  const pool = questionsOf(gate.format);
+  const custom = room.customQuestions.filter((q) => q.level === room.levelId && q.format === gate.format);
+  const pool = custom.length > 0 ? custom : questionsOf(gate.format, room.levelId);
   const fresh = pool.filter((q) => !room.usedQuestionIds.includes(q.id));
   const from = fresh.length > 0 ? fresh : pool;
   return from[Math.floor(rng() * from.length)];
@@ -407,7 +424,38 @@ export function voteDuoRetry(room: DuoRoomState, userId: string, now: number): v
   if (room.phase !== 'VICTORY' && room.phase !== 'DEFEAT') throw new Error('La partida no ha terminado.');
   const role = playerOf(room, userId).role;
   if (!room.retryVotes.includes(role)) room.retryVotes.push(role);
-  if (room.players.length === 2 && room.players.every((p) => room.retryVotes.includes(p.role) && p.socketId)) startRun(room, now);
+  if (room.players.length !== 2 || !room.players.every((p) => room.retryVotes.includes(p.role) && p.socketId)) return;
+  // Tras ganar se pasa al siguiente escenario (o, al final de la campaña, de vuelta al primero).
+  if (room.phase === 'VICTORY') room.levelId = nextInCampaign(room) ?? room.campaign[0];
+  startRun(room, now);
+}
+
+/** El escenario que sigue en la campaña de este juego, o null si es el último. */
+function nextInCampaign(room: DuoRoomState): string | null {
+  return room.campaign[room.campaign.indexOf(room.levelId) + 1] ?? null;
+}
+
+/** Distancia máxima (px) entre el personaje y el espejo para poder girarlo. */
+export const MIRROR_REACH = 80;
+
+/**
+ * Gira un espejo desde su panel (flechas). Solo quien está junto a él, en
+ * plena partida y sin estar apagado; `dir` es 1 (derecha) o -1 (izquierda).
+ */
+export function rotateDuoMirror(room: DuoRoomState, userId: string, mirrorId: unknown, dir: unknown): void {
+  if (room.phase !== 'PLAYING' || room.waitingPartnerUntil) throw new Error('Ahora no se pueden girar los espejos.');
+  const level = levelById(room.levelId);
+  const mirror = (level.def.mirrors ?? []).find((m) => m.id === mirrorId);
+  if (!mirror) throw new Error('Ese espejo no existe.');
+  if (dir !== 1 && dir !== -1) throw new Error('Gira el espejo a la izquierda o a la derecha.');
+  const player = playerOf(room, userId);
+  const state = player.state;
+  if (!state || state.dead) throw new Error('Acércate al espejo para girarlo.');
+  const rect = mirrorRect(mirror);
+  const dx = Math.max(rect.x - state.x, 0, state.x - (rect.x + rect.w));
+  const dy = Math.max(rect.y - state.y, 0, state.y - (rect.y + rect.h));
+  if (dx > MIRROR_REACH || dy > MIRROR_REACH) throw new Error('Acércate al espejo para girarlo.');
+  room.world.mirrors[mirror.id] = ((room.world.mirrors[mirror.id] ?? 0) + dir + MIRROR_ANGLES) % MIRROR_ANGLES;
 }
 
 export function validEmote(emote: unknown): emote is DuoEmote {
@@ -461,6 +509,13 @@ export function toDuoRoomView(room: DuoRoomState, userId: string, now: number): 
     gameId: room.gameId,
     gameTitle: room.gameTitle,
     levelId: room.levelId,
+    levelTitle: level.def.title,
+    levels: room.campaign.map((id) => levelById(id).def).map((def) => ({ id: def.id, title: def.title, tagline: def.tagline })),
+    nextLevelTitle: (() => {
+      const next = nextInCampaign(room);
+      return next ? levelById(next).def.title : null;
+    })(),
+    hostUserId: room.hostUserId,
     phase: room.phase,
     runId: room.runId,
     you: me?.role ?? null,

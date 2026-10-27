@@ -1,11 +1,11 @@
 import { Application, Container, Graphics, TilingSprite } from 'pixi.js'
-import { crateSpawn, standPoint, type DuoLevel } from '../shared/duoLevel'
+import { crateSpawn, mirrorRect, standPoint, type DuoLevel } from '../shared/duoLevel'
 import { STEP, createPlayer, stepCrate, stepPlayer, toNet, type CrateSim, type DeathCause, type PlayerSim } from '../shared/duoPhysics'
-import { checkpointFor, collectCoins, isOnPedestal, updateSwitches } from '../shared/duoWorld'
+import { checkpointFor, collectCoins, isOnPedestal, litMirrorCount, updateSwitches } from '../shared/duoWorld'
 import { otherRole, type DuoEmote, type DuoPlayerNet, type DuoRole, type DuoSnapshot, type DuoWorldState } from '../shared/duoTypes'
 import type { DuoPhase } from '../shared/duoProtocol'
 import { CharacterView } from './characterView'
-import { loadDuoAssets, type DuoAssets } from './duoAssets'
+import { loadDuoAssets, loadThemeAssets, type DuoAssets, type DuoThemeAssets } from './duoAssets'
 import { DuoInputState } from './duoInput'
 import { LevelView } from './levelView'
 import { SnapshotBuffer } from './snapshotBuffer'
@@ -14,6 +14,19 @@ import { SnapshotBuffer } from './snapshotBuffer'
 const SEND_EVERY_MS = 50
 /** Una caja empujada sigue siendo "mía" este tiempo después del último empujón. */
 const CRATE_HOLD_MS = 350
+/** Distancia (px) a la que aparece el panel de un espejo; la misma que acepta el servidor. */
+const MIRROR_REACH = 80
+
+/** Espejo junto al que está el personaje, para el panel de React. */
+export interface NearMirror {
+  id: string
+  angle: number
+  /** El espejo ya apunta bien. */
+  aligned: boolean
+  /** La luz llega hasta este espejo (los anteriores están bien). */
+  lit: boolean
+}
+
 /** Celdas de alto que se quieren ver (la cámara acerca o aleja según la pantalla). */
 const VIEW_ROWS = 10.5
 
@@ -23,6 +36,8 @@ export interface DuoGameOptions {
   names: Record<DuoRole, string>
   sendState: (state: { player: DuoPlayerNet; crates: Array<{ id: string; x: number; y: number }> }) => void
   onFainted?: (role: DuoRole, cause: DeathCause | null) => void
+  /** Cambió el espejo cercano (o su ángulo); null al alejarse. */
+  onNearMirror?: (mirror: NearMirror | null) => void
 }
 
 /**
@@ -35,6 +50,9 @@ export class DuoGame {
   readonly input = new DuoInputState()
   private app: Application | null = null
   private assets!: DuoAssets
+  private theme!: DuoThemeAssets
+  /** Diferencia del reloj del servidor que trae la vista de la sala (antes de la primera posición). */
+  private clockSkew = 0
   private readonly worldLayer = new Container()
   private readonly hud = new Container()
   private background!: TilingSprite
@@ -58,6 +76,9 @@ export class DuoGame {
   private sinceSend = 0
   private cam = { x: 0, y: 0, ready: false }
   private destroyed = false
+  /** Mientras el panel del espejo está abierto, el personaje no se mueve. */
+  private frozen = false
+  private nearMirrorKey = ''
 
   private readonly options: DuoGameOptions
 
@@ -81,7 +102,8 @@ export class DuoGame {
     const switches: Record<string, boolean> = {}
     for (const b of this.level.def.buttons) switches[b.id] = false
     for (const l of this.level.def.levers) switches[l.id] = false
-    return { switches, crates: this.crates.map((c) => ({ id: c.id, x: c.x, y: c.y, owner: null })), coins: {}, gates: {} }
+    const mirrors = Object.fromEntries((this.level.def.mirrors ?? []).map((m) => [m.id, m.start]))
+    return { switches, crates: this.crates.map((c) => ({ id: c.id, x: c.x, y: c.y, owner: null })), coins: {}, gates: {}, mirrors }
   }
 
   private freshCrates(): CrateSim[] {
@@ -89,7 +111,7 @@ export class DuoGame {
   }
 
   async mount(host: HTMLElement): Promise<void> {
-    this.assets = await loadDuoAssets()
+    ;[this.assets, this.theme] = await Promise.all([loadDuoAssets(), loadThemeAssets(this.level.def.theme)])
     if (this.destroyed) return
     const app = new Application()
     await app.init({
@@ -107,8 +129,8 @@ export class DuoGame {
     app.canvas.setAttribute('aria-label', 'Escenario del juego')
     host.appendChild(app.canvas)
 
-    this.background = new TilingSprite({ texture: this.assets.background, width: app.screen.width, height: app.screen.height })
-    this.levelView = new LevelView(this.assets, this.level)
+    this.background = new TilingSprite({ texture: this.theme.background, width: app.screen.width, height: app.screen.height })
+    this.levelView = new LevelView(this.assets, this.theme, this.level)
     const other = otherRole(this.role)
     this.views[this.role] = new CharacterView(this.assets, this.role, this.options.names[this.role], true)
     this.views[other] = new CharacterView(this.assets, other, this.options.names[other], false)
@@ -173,6 +195,21 @@ export class DuoGame {
     }
   }
 
+  /** Diferencia del reloj del servidor según la vista de la sala (ms). */
+  setClockSkew(ms: number): void {
+    this.clockSkew = ms
+  }
+
+  /** Segundos del reloj del servidor, para que los dos vean las plataformas móviles en el mismo lugar. */
+  private serverSeconds(): number {
+    return (Date.now() + (this.partner.clockOffset() ?? this.clockSkew)) / 1000
+  }
+
+  setFrozen(frozen: boolean): void {
+    this.frozen = frozen
+    if (frozen) this.me.vx = 0
+  }
+
   showEmote(role: DuoRole, emote: DuoEmote): void {
     this.views[role]?.showEmote(emote, performance.now())
   }
@@ -182,11 +219,16 @@ export class DuoGame {
     if (!app) return
     const now = performance.now()
     const playing = this.phase === 'PLAYING'
+    // Con el panel del espejo abierto no se simula, pero se sigue contando la posición (quieto).
+    const simulating = playing && !this.frozen
 
     this.accumulator = Math.min(this.accumulator + deltaMs, 250)
-    while (this.accumulator >= STEP * 1000) {
+    const time = this.serverSeconds()
+    let pending = Math.floor(this.accumulator / (STEP * 1000))
+    while (pending > 0) {
       this.accumulator -= STEP * 1000
-      if (playing) this.simulate(now)
+      pending -= 1
+      if (simulating) this.simulate(now, time - pending * STEP)
     }
 
     // Cajas que mueve el otro (o nadie): se acercan suave a la posición del servidor.
@@ -210,10 +252,36 @@ export class DuoGame {
       }
     }
 
-    this.render(now, deltaMs)
+    this.render(now, deltaMs, time)
+    this.reportNearMirror()
   }
 
-  private simulate(now: number): void {
+  /** Avisa a React cuando el personaje queda junto a un espejo (o se aleja). */
+  private reportNearMirror(): void {
+    let near: NearMirror | null = null
+    if (this.phase === 'PLAYING' && !this.me.dead) {
+      for (const receiver of this.level.def.receivers ?? []) {
+        const lit = litMirrorCount(this.level, this.serverWorld, receiver.id)
+        receiver.mirrors.forEach((id, index) => {
+          const mirror = (this.level.def.mirrors ?? []).find((m) => m.id === id)
+          if (!mirror || near) return
+          const r = mirrorRect(mirror)
+          const dx = Math.max(r.x - this.me.x, 0, this.me.x - (r.x + r.w))
+          const dy = Math.max(r.y - this.me.y, 0, this.me.y - (r.y + r.h))
+          if (dx > MIRROR_REACH - 10 || dy > MIRROR_REACH - 10) return
+          const angle = this.serverWorld.mirrors[id] ?? mirror.start
+          near = { id, angle, aligned: angle === mirror.target, lit: index <= lit }
+        })
+      }
+    }
+    const current = near as NearMirror | null
+    const key = current ? `${current.id}:${current.angle}:${current.lit}` : ''
+    if (key === this.nearMirrorKey) return
+    this.nearMirrorKey = key
+    this.options.onNearMirror?.(current)
+  }
+
+  private simulate(now: number, time: number): void {
     const ctx = {
       level: this.level,
       world: this.localWorld,
@@ -221,12 +289,13 @@ export class DuoGame {
       canPush: (id: string) => this.serverWorld.crates.find((c) => c.id === id)?.owner !== otherRole(this.role),
       onPush: (id: string) => this.ownedUntil.set(id, now + CRATE_HOLD_MS),
       respawnAt: standPoint(checkpointFor(this.level, this.serverWorld, this.role)),
+      time,
     }
     const event = stepPlayer(this.me, this.input.read(), ctx, STEP)
     if (event?.kind === 'died') this.options.onFainted?.(this.role, event.cause)
     for (const crate of this.crates) {
       if ((this.ownedUntil.get(crate.id) ?? 0) <= now) continue
-      if (!stepCrate(this.level, this.localWorld, this.crates, crate, STEP)) {
+      if (!stepCrate(this.level, this.localWorld, this.crates, crate, STEP, time)) {
         const def = this.level.def.crates.find((c) => c.id === crate.id)
         if (def) Object.assign(crate, crateSpawn(def), { vy: 0 })
       }
@@ -242,6 +311,7 @@ export class DuoGame {
       crates: this.crates.map((c) => ({ id: c.id, x: c.x, y: c.y, owner: null })),
       coins: { ...this.serverWorld.coins },
       gates: { ...this.serverWorld.gates },
+      mirrors: { ...this.serverWorld.mirrors },
     }
     const bodies = { [this.role]: toNet(this.me), [otherRole(this.role)]: this.partnerNow() ?? undefined }
     updateSwitches(this.level, world, bodies)
@@ -257,7 +327,7 @@ export class DuoGame {
     return this.partner.sample(performance.now())
   }
 
-  private render(now: number, deltaMs: number): void {
+  private render(now: number, deltaMs: number, time: number): void {
     const app = this.app!
     const other = otherRole(this.role)
     const mine = toNet(this.me)
@@ -275,7 +345,7 @@ export class DuoGame {
 
     const gate = this.level.def.gates.find((g) => !this.serverWorld.gates[g.id])
     const onPedestal = gate ? { [gate.id]: { [this.role]: isOnPedestal(gate, this.role, mine), [other]: isOnPedestal(gate, other, partner) } as Record<DuoRole, boolean> } : {}
-    this.levelView.update(this.localWorld, this.crates, onPedestal, now)
+    this.levelView.update(this.localWorld, this.crates, onPedestal, now, time)
 
     // --- Cámara ---
     const sw = app.screen.width
@@ -301,7 +371,7 @@ export class DuoGame {
     // Fondo con paralaje: se mueve más lento que el mundo.
     this.background.width = sw
     this.background.height = sh
-    const bgScale = sh / this.assets.background.frame.height
+    const bgScale = sh / this.theme.background.frame.height
     this.background.tileScale.set(bgScale)
     this.background.tilePosition.x = -camX * zoom * 0.3
 

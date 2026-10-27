@@ -6,7 +6,6 @@ import { ROOM_STORE } from '../domain/ports/room-store.port.js';
 import { TOURNAMENT_STORE } from '../domain/ports/tournament-store.port.js';
 import { DOMINO_ROOM_STORE } from '../domain/ports/domino-room-store.port.js';
 import { SNAKES_LADDERS_ROOM_STORE } from '../domain/ports/snakes-ladders-room-store.port.js';
-import { DUAL_QUEST_ROOM_STORE } from '../domain/ports/dual-quest-room-store.port.js';
 import { DUO_ROOM_STORE } from '../domain/ports/duo-room-store.port.js';
 import { MongoService } from './persistence/mongo/mongo.service.js';
 import { MongoGameRepository } from './persistence/mongo/mongo-game.repository.js';
@@ -14,7 +13,6 @@ import { InMemoryRoomStore } from './rooms/in-memory-room.store.js';
 import { InMemoryTournamentStore } from './rooms/in-memory-tournament.store.js';
 import { InMemoryDominoRoomStore } from './rooms/in-memory-domino-room.store.js';
 import { InMemorySnakesLaddersRoomStore } from './rooms/in-memory-snakes-ladders-room.store.js';
-import { InMemoryDualQuestRoomStore } from './rooms/in-memory-dual-quest-room.store.js';
 import { InMemoryDuoRoomStore } from './rooms/in-memory-duo-room.store.js';
 import { RoomsGateway } from './rooms/rooms.gateway.js';
 import { DuoLogicoGateway } from './rooms/duo-logico.gateway.js';
@@ -33,7 +31,6 @@ import { AiCoreModule } from './ai-core.module.js';
     { provide: TOURNAMENT_STORE, useClass: InMemoryTournamentStore },
     { provide: DOMINO_ROOM_STORE, useClass: InMemoryDominoRoomStore },
     { provide: SNAKES_LADDERS_ROOM_STORE, useClass: InMemorySnakesLaddersRoomStore },
-    { provide: DUAL_QUEST_ROOM_STORE, useClass: InMemoryDualQuestRoomStore },
     { provide: DUO_ROOM_STORE, useClass: InMemoryDuoRoomStore },
     // Bot de las partidas en solitario de Identidad Oculta (issue #60): el
     // Difícil usa el modelo entrenado en ml/ si hay pesos válidos (issue #62).

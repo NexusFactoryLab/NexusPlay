@@ -9,7 +9,6 @@ describe('playTargetFor', () => {
     ['MAZE_COLLECTOR', '/jugar/laberinto/mi-juego'],
     ['TRUE_FALSE_MAZE', '/jugar/laberinto-vf/mi-juego'],
     ['SNAKES_LADDERS', '/escaleras-serpientes/sala?gameId=abc123'],
-    ['DUAL_QUEST', '/dual-quest/sala?gameId=abc123'],
     ['DUAL_QUEST_PIXI', '/dual-quest-pixi/mi-juego'],
     ['MEMORY_MATCH', '/jugar/memoria/mi-juego'],
   ])('%s se abre en %s', (gameType, path) => {

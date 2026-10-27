@@ -23,11 +23,13 @@ export function DuoEndScreen({ room, onRetry, onExit }: { room: DuoRoomView; onR
           <img src={CHARACTERS.WATER.portrait} alt="" className={`h-20 w-20 object-contain [@media(max-height:520px)]:h-14 [@media(max-height:520px)]:w-14 ${won ? 'animate-bounce [animation-delay:150ms]' : 'opacity-70 grayscale-[40%]'}`} />
         </div>
         <h2 className="m-0 text-[26px] font-black tracking-tight text-slate-900">
-          {won ? '¡Salvaron el bosque!' : abandoned ? 'Tu compañero salió' : 'Se acabaron los corazones'}
+          {won ? `¡Superaron ${room.levelTitle}!` : abandoned ? 'Tu compañero salió' : 'Se acabaron los corazones'}
         </h2>
         <p className="mt-1 text-[15px] text-slate-600">
           {won
-            ? 'Cruzaron juntos las tres Puertas del Saber. Así se trabaja en equipo.'
+            ? room.nextLevelTitle
+              ? `Cruzaron juntos las tres Puertas del Saber. Los espera ${room.nextLevelTitle}.`
+              : '¡Completaron toda la campaña! Así se trabaja en equipo.'
             : abandoned
               ? 'La partida terminó porque tu compañero se fue o no volvió a tiempo.'
               : 'Repasen las pistas y vuelvan a intentarlo: cada puerta les enseña algo nuevo.'}
@@ -51,7 +53,9 @@ export function DuoEndScreen({ room, onRetry, onExit }: { room: DuoRoomView; onR
               className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-violet-600 px-4 py-3 text-[15px] font-bold text-white hover:bg-violet-700 disabled:opacity-60"
             >
               <RotateCcw className="h-4 w-4" />
-              {voted ? 'Esperando a tu compañero…' : partnerVoted ? 'Tu compañero quiere jugar otra vez' : 'Jugar otra vez'}
+              {voted
+                ? 'Esperando a tu compañero…'
+                : `${partnerVoted ? 'Tu compañero ya votó: ' : ''}${won ? (room.nextLevelTitle ? `Siguiente: ${room.nextLevelTitle}` : 'Empezar la campaña de nuevo') : 'Intentar de nuevo'}`}
             </button>
           )}
           <button

@@ -1,4 +1,4 @@
-import { TILE, isLiquidTile, isSolidTile, tileAt, type DuoLevel, type TileKind } from './duoLevel.js';
+import { TILE, isLiquidTile, isSolidTile, moverRect, tileAt, type DuoLevel, type TileKind } from './duoLevel.js';
 import { PLAYER_H, PLAYER_W, crateRect, dynamicSolids, playerRect, type DynamicSolids } from './duoWorld.js';
 import type { DuoAnim, DuoInput, DuoPlayerNet, DuoRole, DuoWorldState, Rect } from './duoTypes.js';
 
@@ -70,6 +70,8 @@ export interface StepContext {
   onPush?: (crateId: string) => void;
   /** Dónde reaparece el personaje si se apaga. */
   respawnAt: { x: number; y: number };
+  /** Segundos del reloj del servidor (ubica las plataformas móviles). */
+  time?: number;
 }
 
 export type StepEvent = { kind: 'died'; cause: DeathCause } | { kind: 'respawned' } | null;
@@ -173,8 +175,8 @@ function crateResting(level: DuoLevel, dyn: DynamicSolids, crates: CrateSim[], c
 }
 
 /** Gravedad de una caja que mueve este cliente. Devuelve false si cayó a un líquido (hay que reponerla). */
-export function stepCrate(level: DuoLevel, world: DuoWorldState, crates: CrateSim[], crate: CrateSim, dt: number): boolean {
-  const dyn = dynamicSolids(level, world);
+export function stepCrate(level: DuoLevel, world: DuoWorldState, crates: CrateSim[], crate: CrateSim, dt: number, time = 0): boolean {
+  const dyn = dynamicSolids(level, world, time);
   crate.vy = Math.min(crate.vy + PHYS.gravity * dt, PHYS.maxFall);
   const dy = crate.vy * dt;
   const rect = crateRect(crate);
@@ -238,7 +240,21 @@ export function stepPlayer(p: PlayerSim, input: DuoInput, ctx: StepContext, dt: 
     p.grounded = false;
     return { kind: 'respawned' };
   }
-  const dyn = dynamicSolids(level, ctx.world);
+  const time = ctx.time ?? 0;
+  const dyn = dynamicSolids(level, ctx.world, time);
+
+  // --- Plataformas móviles: quien está parado encima viaja con ellas ---
+  if (p.grounded) {
+    for (const mover of level.def.movers ?? []) {
+      const before = moverRect(mover, time - dt);
+      const onTop = Math.abs(p.y - before.y) < 3 && p.x + PLAYER_W / 2 > before.x && p.x - PLAYER_W / 2 < before.x + before.w;
+      if (!onTop) continue;
+      const after = moverRect(mover, time);
+      p.x += after.x - before.x;
+      p.y = after.y;
+      break;
+    }
+  }
 
   // --- Horizontal ---
   const dir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
