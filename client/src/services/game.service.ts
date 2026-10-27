@@ -300,6 +300,8 @@ export function updateGame(
   token: string,
   gameId: string,
   input: {
+    title?: string
+    description?: string
     config?: Record<string, unknown>
     theme?: { primaryColor?: string; coverImageUrl?: string | null }
   },
