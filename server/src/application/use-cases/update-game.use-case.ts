@@ -9,6 +9,7 @@ import { toGameDetailDto, type GameDetailDto } from '../dtos/game-response.dto.j
 import type { UseCase } from '../ports/use-case.port.js';
 import { ContentValidatorRegistry } from '../content-validators/content-validator.registry.js';
 import { GameAuthorizationService } from '../services/game-authorization.service.js';
+import { RequesterAdminResolver } from '../services/requester-admin-resolver.service.js';
 
 /** El slug es inmutable tras crear el juego: cambiar de URL rompería enlaces ya compartidos. */
 export interface UpdateGameInput {
@@ -28,6 +29,7 @@ export class UpdateGameUseCase implements UseCase<UpdateGameInput, GameDetailDto
     @Inject(GAME_REPOSITORY) private readonly gameRepository: GameRepository,
     private readonly contentValidators: ContentValidatorRegistry,
     private readonly gameAuthorization: GameAuthorizationService,
+    private readonly requesterAdminResolver: RequesterAdminResolver,
   ) {}
 
   async execute(input: UpdateGameInput): Promise<GameDetailDto> {
@@ -40,6 +42,15 @@ export class UpdateGameUseCase implements UseCase<UpdateGameInput, GameDetailDto
     const canManage = await this.gameAuthorization.canManage(game, input.requestingUserId);
     if (!canManage) {
       throw new ForbiddenActionError('editar este juego');
+    }
+
+    // Título y descripción son editoriales: solo un ADMIN de la plataforma los
+    // cambia, ni siquiera el creador del juego. El rol se resuelve contra la BD.
+    if (input.title !== undefined || input.description !== undefined) {
+      const isAdmin = await this.requesterAdminResolver.resolve(input.requestingUserId);
+      if (!isAdmin) {
+        throw new ForbiddenActionError('editar el título o la descripción del juego');
+      }
     }
 
     const validator = this.contentValidators.resolve(game.gameType.getName());
