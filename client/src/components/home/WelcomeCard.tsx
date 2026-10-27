@@ -1,27 +1,33 @@
 import { useEffect, useRef, useState } from 'react'
-import { X, Zap } from 'lucide-react'
-import studyArt from '../../assets/welcome/study.webp'
-import competeArt from '../../assets/welcome/compete.webp'
-import createArt from '../../assets/welcome/create.webp'
-import exploreArt from '../../assets/welcome/explore.webp'
+import { Compass, Play, X, Zap } from 'lucide-react'
 import studyIcon from '../../assets/welcome/emoji-study.webp'
 import competeIcon from '../../assets/welcome/emoji-compete.webp'
 import createIcon from '../../assets/welcome/emoji-create.webp'
-import exploreIcon from '../../assets/welcome/emoji-explore.webp'
+import truckArt from './games/assets/maze-collector/truck-drive.webp'
+import cloudArt from './games/assets/maze-collector/cloud-chaser.webp'
+import robotArt from './games/true-false-maze/assets/spaceship/robot/robot-down-0.png'
+import jellyArt from './games/true-false-maze/assets/spaceship/jellyfish/jelly-down-0.png'
+import './welcomeCard.css'
+
+/** Las tres formas de empezar, en una palabra cada una (el icono es imagen: igual en todos los sistemas). */
+const HIGHLIGHTS = [
+  { icon: studyIcon, title: 'Estudia' },
+  { icon: competeIcon, title: 'Compite' },
+  { icon: createIcon, title: 'Crea' },
+] as const
 
 /**
- * Las cuatro formas de empezar que presenta la bienvenida. `width`/`height`
- * son el tamaño nativo de cada dibujo en px CSS (no todos tienen la misma
- * proporción), centrados en una franja de altura fija para que los títulos
- * de las cuatro columnas queden alineados. El icono del título (📚 🏆 🛠️ 🌐)
- * es una imagen y no el carácter emoji: así se ve igual en cualquier sistema
- * en vez de cambiar con la fuente de emojis de cada uno.
+ * Los personajes de los juegos destacados flotando en el escenario de arriba.
+ * `x`/`y` en % del escenario, `size` en px y `delay` desfasa la flotación; `strip` es una tira
+ * de fotogramas cuadrados (solo se muestra el primero).
  */
-const HIGHLIGHTS = [
-  { icon: studyIcon, iconSize: [16, 17], title: 'Estudia Solo', text: 'Supera retos y áreas a tu propio ritmo.', art: studyArt, width: 110, height: 105 },
-  { icon: competeIcon, iconSize: [19, 19], title: 'Reta y Compite', text: 'Desafía a tus amigos o a la comunidad entera.', art: competeArt, width: 110, height: 103 },
-  { icon: createIcon, iconSize: [18, 18], title: 'Crea tus Mundos', text: 'Transforma tus temas en juegos interactivos.', art: createArt, width: 104, height: 99 },
-  { icon: exploreIcon, iconSize: [18, 17], title: 'Explora la Comunidad', text: 'Juega miles de retos creados por otros.', art: exploreArt, width: 109, height: 107 },
+const CAST = [
+  { src: '/assets/duo-logico/lumen-portrait.webp', label: 'Lumen, de Dúo Lógico', x: 8, y: 18, size: 74, delay: 0, strip: false },
+  { src: truckArt, label: 'Camión Reciclador', x: 30, y: 40, size: 96, delay: 0.6, strip: true },
+  { src: robotArt, label: 'Robot de Misión Galáctica', x: 56, y: 22, size: 70, delay: 1.2, strip: false },
+  { src: '/assets/duo-logico/gota-portrait.webp', label: 'Gota, de Dúo Lógico', x: 78, y: 40, size: 72, delay: 0.3, strip: false },
+  { src: jellyArt, label: '', x: 72, y: 4, size: 40, delay: 0.9, strip: false },
+  { src: cloudArt, label: '', x: 2, y: 58, size: 50, delay: 1.5, strip: true },
 ] as const
 
 // Relleno lavanda de la tarjeta (`light-dark` sigue el `color-scheme` de cada
@@ -45,7 +51,7 @@ type WelcomeCardProps = {
 
 /**
  * Tarjeta de bienvenida que sale en cada carga o login (ver `WelcomeTour`):
- * logo, título, las cuatro formas de empezar con sus dibujos y dos salidas —
+ * logo, los personajes de los juegos, título corto y dos salidas —
  * "¡Empezar a jugar!" (cierra) y "Ver guía rápida" (abre el recorrido). El
  * resto de la pantalla queda desenfocada y oscurecida detrás.
  *
@@ -107,7 +113,7 @@ export function WelcomeCard({ onClose, onQuickGuide }: WelcomeCardProps) {
           Sin `my-auto` ni scroll en el overlay: el centrado (items-center) es simétrico aunque el alto natural sea mayor que la ventana. */}
       <div
         ref={fitBoxRef}
-        className="w-full max-w-[612px]"
+        className="w-full max-w-[560px]"
         style={fit < 1 ? { transform: `scale(${fit})` } : undefined}
       >
         <section
@@ -116,7 +122,7 @@ export function WelcomeCard({ onClose, onQuickGuide }: WelcomeCardProps) {
           role="dialog"
           aria-modal="true"
           aria-labelledby="welcome-card-title"
-          className="welcome-card-panel relative outline-none rounded-[22px] border-[4px] border-transparent px-5 pt-[36px] pb-[8px] text-center shadow-[0_24px_70px_-18px_rgba(0,0,0,0.55),inset_0_0_0_1px_rgba(255,255,255,0.5)] animate-[modal-panel-in_0.25s_cubic-bezier(0.16,1,0.3,1)]"
+          className="welcome-card-panel relative outline-none rounded-[22px] border-[4px] border-transparent px-5 pt-[30px] pb-[14px] text-center shadow-[0_24px_70px_-18px_rgba(0,0,0,0.55),inset_0_0_0_1px_rgba(255,255,255,0.5)] animate-[modal-panel-in_0.25s_cubic-bezier(0.16,1,0.3,1)]"
           style={{
             // Dos fondos: el relleno lavanda recortado al padding y, debajo, el
             // degradado rosa → violeta (al 65 %, como en el diseño) que asoma
@@ -145,59 +151,57 @@ export function WelcomeCard({ onClose, onQuickGuide }: WelcomeCardProps) {
             <span className="text-[28px] font-medium tracking-tight text-text-h">NexusPlay</span>
           </div>
 
+          {/* Escenario: los personajes de los juegos flotando sobre un cielo nocturno con estrellas. */}
+          <div className="welcome-stage relative mx-auto mt-4 h-[150px] overflow-hidden rounded-[18px]" aria-hidden="true">
+            {CAST.map((item) => (
+              <img
+                key={item.src}
+                src={item.src}
+                alt=""
+                draggable={false}
+                className={`welcome-float absolute ${item.strip ? 'object-cover object-left' : 'object-contain'} drop-shadow-[0_10px_14px_rgba(0,0,0,0.45)]`}
+                style={{ left: `${item.x}%`, top: `${item.y}%`, width: item.size, height: item.size, animationDelay: `${item.delay}s` }}
+              />
+            ))}
+          </div>
+
           {/* `font-sans`: la app pone Space Grotesk a los h2/h3; el diseño usa Manrope. */}
           <h2
             id="welcome-card-title"
-            className="mt-[17.5px] font-sans text-[30.5px] leading-tight font-bold tracking-tight"
+            className="mt-5 font-sans text-[30.5px] leading-tight font-bold tracking-tight"
             style={{ color: TITLE_COLOR }}
           >
             ¡Bienvenido a NexusPlay!
           </h2>
-          <p className="mx-auto mt-[7px] max-w-[440px] text-[14.5px] leading-[21px] text-text-h">
-            Tu espacio para aprender jugando y crear tu propio camino de <strong>conocimiento</strong>. ¡Elige cómo quieres
-            empezar hoy!
-          </p>
+          <p className="mt-1.5 text-[15px] font-medium text-text-h">Aprende jugando, solo o con amigos.</p>
 
-          <ul className="mt-[21px] grid grid-cols-2 gap-y-6 min-[650px]:grid-cols-4">
+          <ul className="mt-4 flex flex-wrap justify-center gap-2">
             {HIGHLIGHTS.map((item) => (
-              <li key={item.title} className="flex flex-col items-center">
-                <span className="flex h-[107px] items-center justify-center">
-                  <img src={item.art} alt="" width={item.width} height={item.height} loading="eager" draggable={false} />
-                </span>
-                <h3 className="mt-[11.3px] font-sans text-[14px] leading-[18px] font-bold tracking-tight text-text-h">
-                  <img
-                    src={item.icon}
-                    alt=""
-                    width={item.iconSize[0]}
-                    height={item.iconSize[1]}
-                    className="mr-1 inline-block align-[-4px]"
-                    draggable={false}
-                  />
-                  {item.title}
-                </h3>
-                <p className="mx-auto mt-[5px] max-w-[122px] text-[12px] leading-[16.2px] font-medium text-text-h">{item.text}</p>
+              <li
+                key={item.title}
+                className="flex items-center gap-1.5 rounded-full bg-surface/80 px-3.5 py-1.5 text-[13.5px] font-bold text-text-h shadow-sm ring-1 ring-accent/20"
+              >
+                <img src={item.icon} alt="" width={18} height={18} draggable={false} />
+                {item.title}
               </li>
             ))}
           </ul>
 
-          <p className="mt-[21.3px] text-[15px] leading-tight font-bold text-text-h">¿Listo para subir de nivel?</p>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="mt-[15px] rounded-[14px] px-6 py-3 text-[13.7px] leading-[18px] font-semibold text-white shadow-[-6px_10px_20px_-8px_color-mix(in_srgb,var(--accent-2)_70%,transparent),6px_10px_20px_-8px_color-mix(in_srgb,var(--accent)_70%,transparent)] transition-transform hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-            style={{ background: 'linear-gradient(90deg, var(--accent-2), var(--accent))' }}
-          >
-            ¡Empezar a jugar!
-          </button>
-
-          <div className="mt-[6px]">
+          <div className="mt-6 mb-3 flex flex-col-reverse items-stretch justify-center gap-3 min-[480px]:flex-row">
             <button
               type="button"
               onClick={onQuickGuide}
-              className="rounded-lg px-3 py-1 text-[14.3px] font-medium text-text-h/75 transition-colors hover:text-text-h focus-visible:outline-2 focus-visible:outline-accent"
+              className="flex items-center justify-center gap-2 rounded-[14px] border-2 border-accent bg-surface px-6 py-3 text-[14.5px] font-bold text-accent shadow-sm transition-transform hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
-              Ver guía rápida
+              <Compass className="h-5 w-5" aria-hidden="true" /> Ver guía rápida
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex items-center justify-center gap-2 rounded-[14px] px-6 py-3 text-[14.5px] font-bold text-white shadow-[-6px_10px_20px_-8px_color-mix(in_srgb,var(--accent-2)_70%,transparent),6px_10px_20px_-8px_color-mix(in_srgb,var(--accent)_70%,transparent)] transition-transform hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              style={{ background: 'linear-gradient(90deg, var(--accent-2), var(--accent))' }}
+            >
+              <Play className="h-4 w-4" fill="currentColor" aria-hidden="true" /> ¡Empezar a jugar!
             </button>
           </div>
         </section>

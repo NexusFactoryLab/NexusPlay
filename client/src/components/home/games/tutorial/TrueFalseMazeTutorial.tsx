@@ -125,6 +125,7 @@ function TaskPart({
   setup,
   context,
   initialStatus,
+  caughtFails,
 }: {
   title: string
   map: ShipMap
@@ -133,6 +134,8 @@ function TaskPart({
   setup?: (state: TfState) => void
   context: TutorialPartContext
   initialStatus?: ReactNode
+  /** Si la medusa atrapa al robot, la parte vuelve a empezar (por ejemplo, el núcleo ya gastado no reaparece). */
+  caughtFails?: string
 }) {
   // Marcas que duran toda la parte (no cada render): preparar una vez y avisar el logro una sola vez.
   const ready = useRef(false)
@@ -162,7 +165,8 @@ function TaskPart({
           }
         },
         onFinished: () => context.onFailed('Te quedaste sin baterías. ¡Inténtalo otra vez!'),
-        onCaught: () => context.onMistake('¡Una medusa te atrapó! En el juego pierdes una batería.'),
+        onCaught: () =>
+          caughtFails ? context.onFailed(caughtFails) : context.onMistake('¡Una medusa te atrapó! En el juego pierdes una batería.'),
       }}
     />
   )
@@ -176,8 +180,11 @@ export function TrueFalseMazeTutorial({ title, onFinish }: { title: string; onFi
       check: (state: TfState, events: TfEvent[], memo: Memo, context: TutorialPartContext) => boolean,
       setup?: (state: TfState) => void,
       initialStatus?: ReactNode,
+      caughtFails?: string,
     ): TutorialPart['render'] =>
-    (context) => <TaskPart title={title} map={map} config={config} check={check} setup={setup} context={context} initialStatus={initialStatus} />
+    (context) => (
+      <TaskPart title={title} map={map} config={config} check={check} setup={setup} context={context} initialStatus={initialStatus} caughtFails={caughtFails} />
+    )
 
   const parts: TutorialPart[] = [
     {
@@ -221,7 +228,15 @@ export function TrueFalseMazeTutorial({ title, onFinish }: { title: string; onFi
         { icon: <Zap className="h-4 w-4" />, tone: 'cyan', text: <>El <b className="text-white">núcleo de energía</b> lanza un pulso que aturde a las medusas.</> },
         { icon: <Shield className="h-4 w-4" />, tone: 'amber', text: <>Aturdidas, <b className="text-white">tócalas</b>: vuelven a su nido y sumas puntos.</> },
       ],
-      render: task(CORE, { ...CALM, enemyCount: 1 }, (_state, events) => events.some((event) => event.type === 'zap')),
+      render: task(
+        CORE,
+        { ...CALM, enemyCount: 1 },
+        (_state, events) => events.some((event) => event.type === 'zap'),
+        undefined,
+        undefined,
+        // El núcleo se gasta al tomarlo: si la medusa te atrapa, la parte empieza de nuevo con el núcleo en su lugar.
+        '¡La medusa te atrapó! Vuelve a intentarlo: toma el núcleo y tócala mientras está aturdida.',
+      ),
     },
     {
       title: 'Usa la rejilla',

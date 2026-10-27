@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { Check, GraduationCap, Play, RotateCcw, Target, TriangleAlert, X } from 'lucide-react'
 import { FitScale } from '../true-false-maze/FitScale'
 import { Item, strong } from '../true-false-maze/TrueFalseMazeGuide'
+import './gameGuides.css'
 import { GUIDE_ACCENTS } from './GameGuide'
 import type { GuideAccent } from './GameGuide'
 
@@ -45,8 +46,12 @@ export type TutorialPart = {
 /** Lo que dura el telón que oscurece la parte que termina (después se cambia de parte, ya sin que se note). */
 const CURTAIN_MS = 450
 
+/** Lo que dura el fondo desenfocado con la tarea en grande antes de que el juego arranque. */
+const FOCUS_MS = 3000
+
 type Stage =
   | { kind: 'brief'; previous: { result: 'done' | 'failed'; message: string } | null }
+  | { kind: 'focus' }
   | { kind: 'play' }
   | { kind: 'leaving'; result: 'done' | 'failed'; message: string }
   | { kind: 'finished'; message: string }
@@ -139,6 +144,19 @@ export function TutorialRunner({
     return () => window.clearTimeout(timer)
   }, [leaving, index, parts.length])
 
+  // Tras «Entendido», la tarea se lee en grande sobre el juego desenfocado; luego baja a la barra y el juego arranca.
+  const focusing = stage.kind === 'focus'
+  useEffect(() => {
+    if (!focusing) return
+    const start = () => setStage((current) => (current.kind === 'focus' ? { kind: 'play' } : current))
+    const timer = window.setTimeout(start, FOCUS_MS)
+    window.addEventListener('keydown', start)
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener('keydown', start)
+    }
+  }, [focusing])
+
   const context: TutorialPartContext = {
     active: stage.kind === 'play',
     onDone: () => finishPart('done', part.success),
@@ -165,24 +183,45 @@ export function TutorialRunner({
       {stage.kind === 'leaving' && <div className="gg-curtain gg-curtain-in" aria-hidden="true" />}
       {(stage.kind === 'brief' || stage.kind === 'finished') && <div key={`${index}-${attempt}-${stage.kind}`} className="gg-curtain gg-curtain-out" aria-hidden="true" />}
 
+      {focusing && (
+        <button
+          type="button"
+          onClick={() => setStage({ kind: 'play' })}
+          aria-label="Empezar ya"
+          className="fixed inset-0 z-[70] flex cursor-pointer flex-col items-center justify-center gap-5 bg-[#03040c]/55 px-5 text-center backdrop-blur-md"
+          style={{ animation: 'gg-fade-in 0.3s ease-out' }}
+        >
+          <span className="tut-focus-badge flex items-center gap-2 rounded-full bg-cyan-400 px-4 py-1.5 text-[13px] font-black tracking-wide text-slate-950 uppercase">
+            <Target className="h-4 w-4" aria-hidden="true" /> Tu misión · {index + 1}/{parts.length}
+          </span>
+          <span role="status" className="tour-step-in max-w-[760px] font-heading text-[clamp(1.3rem,4.2dvh+1vw,2.6rem)] leading-tight font-bold text-white drop-shadow-[0_4px_18px_rgba(0,0,0,0.8)]">
+            {task}
+          </span>
+          <span className="h-1.5 w-[min(320px,70vw)] overflow-hidden rounded-full bg-white/15" aria-hidden="true">
+            <span className="tut-focus-bar block h-full rounded-full bg-cyan-300" style={{ animationDuration: `${FOCUS_MS}ms` }} />
+          </span>
+          <span className="text-[12.5px] font-medium text-slate-300">Toca o pulsa una tecla para empezar ya</span>
+        </button>
+      )}
+
       {(stage.kind === 'play' || stage.kind === 'leaving') && (
-        // La tarea queda arriba, visible pero sin tapar: los toques sobre el texto pasan al juego.
+        // La tarea queda abajo, visible pero sin tapar: los toques sobre el texto pasan al juego.
         <div
           className={`pointer-events-none fixed inset-x-0 z-[65] flex justify-center px-3 ${
-            // En pantallas táctiles, debajo de la fila de botones del juego (Pausa, salir…) para no taparla.
-            touch ? 'top-[calc(env(safe-area-inset-top)+64px)]' : 'top-[calc(env(safe-area-inset-top)+8px)]'
+            // En pantallas táctiles, encima de la cruceta y los botones del juego para no taparlos.
+            touch ? 'bottom-[calc(env(safe-area-inset-bottom)+150px)]' : 'bottom-[calc(env(safe-area-inset-bottom)+14px)]'
           }`}
         >
           <div
             role="status"
-            className="tour-step-in flex max-w-[680px] items-center gap-2.5 rounded-2xl border-2 border-amber-300 bg-slate-950/92 py-1.5 pr-1.5 pl-2.5 text-slate-100 shadow-[0_14px_34px_-12px_rgba(0,0,0,0.75)] backdrop-blur"
+            className="tut-task-bar tour-step-in flex max-w-[720px] items-center gap-2.5 rounded-2xl border-2 border-cyan-300 bg-slate-950/94 py-2 pr-1.5 pl-2.5 text-white backdrop-blur"
           >
-            <span className="flex shrink-0 items-center gap-1 rounded-lg bg-amber-300 px-2 py-0.5 text-[11px] font-black text-slate-900 uppercase">
+            <span className="flex shrink-0 items-center gap-1 rounded-lg bg-cyan-400 px-2 py-0.5 text-[11px] font-black text-slate-950 uppercase">
               <Target className="h-3.5 w-3.5" aria-hidden="true" /> {index + 1}/{parts.length}
             </span>
-            <span className="min-w-0 text-[13px] leading-snug font-semibold sm:text-[14px]">
+            <span className="min-w-0 text-[13.5px] leading-snug font-bold sm:text-[15px]">
               {mistake ? (
-                <span className="flex items-center gap-1.5 text-amber-200">
+                <span className="flex items-center gap-1.5 text-rose-200">
                   <TriangleAlert className="h-4 w-4 shrink-0" aria-hidden="true" /> {mistake}
                 </span>
               ) : (
@@ -203,7 +242,7 @@ export function TutorialRunner({
         </div>
       )}
 
-      {stage.kind !== 'play' && stage.kind !== 'leaving' && (
+      {(stage.kind === 'brief' || stage.kind === 'finished') && (
         <div
           className="fixed inset-0 z-[70] flex items-center justify-center bg-[#03040c]/80 p-2 text-slate-100 backdrop-blur-sm sm:p-5"
           style={{ animation: 'gg-fade-in 0.45s ease-out' }}
@@ -280,10 +319,10 @@ export function TutorialRunner({
                         ))}
                       </ul>
                     )}
-                    <p className="flex items-start gap-2.5 rounded-2xl border-2 border-dashed border-amber-300/70 bg-amber-300/10 px-3 py-2 font-bold text-white">
-                      <Target className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" aria-hidden="true" />
+                    <p className="flex items-start gap-2.5 rounded-2xl border-2 border-dashed border-cyan-300/80 bg-cyan-400/10 px-3 py-2 font-bold text-white">
+                      <Target className="mt-0.5 h-5 w-5 shrink-0 text-cyan-300" aria-hidden="true" />
                       <span>
-                        <span className={strong('text-amber-300')}>Tu misión: </span>
+                        <span className={strong('text-cyan-300')}>Tu misión: </span>
                         {task}
                       </span>
                     </p>
@@ -301,7 +340,7 @@ export function TutorialRunner({
                     autoFocus
                     onClick={() => {
                       enterPageFullscreen()
-                      setStage({ kind: 'play' })
+                      setStage({ kind: 'focus' })
                     }}
                     className={buttonClass}
                     style={buttonShadow}
