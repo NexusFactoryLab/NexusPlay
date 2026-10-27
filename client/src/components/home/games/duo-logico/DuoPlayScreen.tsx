@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { DoorOpen, Heart, LogOut, MessageCircle, Smile, Sparkles } from 'lucide-react'
+import { CircleHelp, DoorOpen, Heart, LogOut, MessageCircle, Smile, Sparkles } from 'lucide-react'
+import { GameGuide } from '../tutorial/GameGuide'
+import { duoGuideSteps } from './duoGuideSteps'
 import { ChatPanel } from '../ChatPanel'
 import { DuoGame, type NearMirror } from './engine/DuoGame'
 import { DuoMirrorPanel } from './DuoMirrorPanel'
@@ -63,6 +65,7 @@ export function DuoPlayScreen({
   const [now, setNow] = useState(() => Date.now())
   const [nearMirror, setNearMirror] = useState<NearMirror | null>(null)
   const [mirrorOpen, setMirrorOpen] = useState(false)
+  const [guideOpen, setGuideOpen] = useState(false)
   const { setRealtimeListener, sendState, sendEmote } = duo
 
   const names = useMemo(() => {
@@ -182,7 +185,7 @@ export function DuoPlayScreen({
           <div className="leading-tight">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-300" data-testid="duo-level-title">{room.levelTitle}</p>
             <p className="text-[13px] font-bold">{CHARACTERS[me].name} · Tú</p>
-            <p className="text-[11px] text-slate-300">con {partner?.displayName ?? '…'} {partner && !partner.connected && '(desconectado)'}</p>
+            <p className="text-[11px] text-slate-300 [@media(max-height:520px)]:hidden">con {partner?.displayName ?? '…'} {partner && !partner.connected && '(desconectado)'}</p>
           </div>
         </div>
 
@@ -203,8 +206,16 @@ export function DuoPlayScreen({
         <div className="pointer-events-auto flex items-center gap-1.5">
           <button
             type="button"
+            onClick={() => setGuideOpen(true)}
+            className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900/80 shadow-lg backdrop-blur hover:bg-slate-800 [@media(max-height:520px)]:h-9 [@media(max-height:520px)]:w-9"
+            aria-label="Cómo jugar"
+          >
+            <CircleHelp className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
             onClick={() => setEmotesOpen((v) => !v)}
-            className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900/80 shadow-lg backdrop-blur hover:bg-slate-800"
+            className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900/80 shadow-lg backdrop-blur hover:bg-slate-800 [@media(max-height:520px)]:h-9 [@media(max-height:520px)]:w-9"
             aria-label="Mensajes rápidos"
             aria-expanded={emotesOpen}
           >
@@ -216,7 +227,7 @@ export function DuoPlayScreen({
               setChatOpen((v) => !v)
               setReadCount(duo.messages.length)
             }}
-            className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900/80 shadow-lg backdrop-blur hover:bg-slate-800"
+            className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900/80 shadow-lg backdrop-blur hover:bg-slate-800 [@media(max-height:520px)]:h-9 [@media(max-height:520px)]:w-9"
             aria-label="Chat"
           >
             <MessageCircle className="h-5 w-5" />
@@ -225,7 +236,7 @@ export function DuoPlayScreen({
           <button
             type="button"
             onClick={onExit}
-            className="flex h-10 items-center gap-1.5 rounded-xl bg-slate-900/80 px-3 text-[13px] font-semibold shadow-lg backdrop-blur hover:bg-slate-800"
+            className="flex h-10 items-center gap-1.5 rounded-xl bg-slate-900/80 px-3 text-[13px] font-semibold shadow-lg backdrop-blur hover:bg-slate-800 [@media(max-height:520px)]:h-9"
           >
             <LogOut className="h-4 w-4" /> <span className="hidden sm:inline">Salir</span>
           </button>
@@ -315,6 +326,15 @@ export function DuoPlayScreen({
           onRotate={(dir) => duo.rotateMirror(nearMirror.id, dir)}
         />
       )}
+
+      {/* En celular vertical se ve muy poco del escenario: se sugiere acostarlo. */}
+      {touch && (
+        <p className="pointer-events-none absolute inset-x-3 bottom-28 z-10 hidden rounded-2xl bg-slate-900/90 px-4 py-2 text-center text-[13px] font-semibold text-amber-200 shadow-lg portrait:block">
+          📱↻ Gira el celular para ver más del escenario
+        </p>
+      )}
+
+      {guideOpen && <GameGuide steps={duoGuideSteps()} label="Guía rápida" ariaLabel="Guía de Dúo Lógico" dataAttr="DUAL_QUEST_PIXI" accent="amber" onClose={() => setGuideOpen(false)} />}
 
       {touch && room.phase === 'PLAYING' && !panelOpen && <DuoTouchControls onChange={(key, down) => gameRef.current?.input.setTouch(key, down)} />}
     </div>

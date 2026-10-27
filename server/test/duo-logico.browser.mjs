@@ -112,11 +112,31 @@ try {
   }
 
   const continueGuide = (page) => page.getByRole('button', { name: /continuar|Saltar guía/ }).first().click();
+  /** Ningún elemento del panel de la pregunta necesita scroll (todo cabe en pantalla). */
+  async function assertNoScroll(page, label) {
+    const overflow = await page.getByRole('dialog', { name: 'Puerta del Saber' }).evaluate((root) =>
+      [root, ...root.querySelectorAll('*')].filter((el) => {
+        const style = getComputedStyle(el);
+        const scrolls = /(auto|scroll)/.test(style.overflowY) && el.scrollHeight > el.clientHeight + 1;
+        return scrolls && !el.closest('[aria-label="Chat de la sala"]');
+      }).length,
+    );
+    assert.equal(overflow, 0, `sin scroll en la pregunta (${label})`);
+    const fits = await page.getByRole('dialog', { name: 'Puerta del Saber' }).evaluate((root) => root.getBoundingClientRect().bottom <= window.innerHeight + 1);
+    assert.ok(fits, `la pregunta cabe en la pantalla (${label})`);
+  }
 
   // --- Ana crea la sala eligiendo a Lumen ---
   const ana = await openPage('Ana', false);
   await ana.goto(`${base}/dual-quest-pixi/${GAME.slug}`);
-  await continueGuide(ana);
+  // La guía visual de 6 pasos aparece al entrar.
+  const guide = ana.locator('[data-game-guide="DUAL_QUEST_PIXI"]');
+  await guide.waitFor();
+  await ana.screenshot({ path: '.scratch/duo-guia-desktop.png' });
+  for (let i = 0; i < 5; i++) await guide.getByRole('button', { name: 'Siguiente' }).click();
+  await guide.getByText('Corazones y fichas de pista').waitFor();
+  await ana.screenshot({ path: '.scratch/duo-guia-final-desktop.png' });
+  await guide.getByRole('button', { name: '¡A jugar!' }).click();
   await ana.getByRole('button', { name: /Lumen/ }).first().click();
   await ana.getByRole('button', { name: 'Crear sala e invitar a mi compañero' }).click();
   await ana.waitForURL(/\/dual-quest-pixi\/sala\/[A-Z0-9]{6}$/);
@@ -127,6 +147,8 @@ try {
   // --- Luis entra por el enlace desde el celular ---
   const luis = await openPage('Luis', true);
   await luis.goto(`${base}/dual-quest-pixi/sala/${code}`);
+  await luis.locator('[data-game-guide="DUAL_QUEST_PIXI"]').waitFor();
+  await luis.screenshot({ path: '.scratch/duo-guia-mobile.png' });
   await continueGuide(luis);
   await until(() => room().players.length === 2, 'Luis en la sala');
   assert.equal(room().players[1].role, 'WATER');
@@ -213,6 +235,13 @@ try {
   await panel(luis).getByText('Pregunta espejo').waitFor();
   await ana.screenshot({ path: '.scratch/duo-pregunta-desktop.png' });
   await luis.screenshot({ path: '.scratch/duo-pregunta-mobile.png' });
+  await assertNoScroll(ana, 'computador');
+  await assertNoScroll(luis, 'celular horizontal');
+  await luis.setViewportSize({ width: 390, height: 844 });
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  await assertNoScroll(luis, 'celular vertical');
+  await luis.screenshot({ path: '.scratch/duo-pregunta-vertical.png' });
+  await luis.setViewportSize({ width: 844, height: 390 });
   const right = (role) => optionsFor(room().question.question, role)[0];
 
   // Primer intento: Luis se equivoca; pierden un corazón.
@@ -243,6 +272,12 @@ try {
   await luis.locator('canvas').waitFor();
   await new Promise((resolve) => setTimeout(resolve, 600));
   assert.ok(Math.abs(pos('Luis').x - before.x) < 40, `Luis retoma su posición (${before.x} → ${pos('Luis').x})`);
+
+  // El botón «?» vuelve a abrir la guía en plena partida.
+  await ana.getByRole('button', { name: 'Cómo jugar' }).click();
+  await ana.locator('[data-game-guide="DUAL_QUEST_PIXI"]').waitFor();
+  await ana.getByRole('button', { name: /Saltar guía/ }).click();
+  await ana.locator('[data-game-guide="DUAL_QUEST_PIXI"]').waitFor({ state: 'hidden' });
 
   // Pasan por la puerta abierta.
   await walkTo('Ana', 28 * TILE + TILE / 2);

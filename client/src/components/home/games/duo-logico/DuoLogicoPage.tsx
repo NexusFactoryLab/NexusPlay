@@ -111,7 +111,7 @@ function DuoLogicoSession({ slug, code }: { slug?: string; code?: string }) {
                 >
                   <span className="block text-[11px] font-bold uppercase text-accent">Escenario {i + 1}</span>
                   <span className="block text-[14px] font-bold text-text-h">{level.title}</span>
-                  <span className="block text-[12px] leading-snug text-text">{level.tagline}</span>
+                  <span className="block text-[12px] leading-snug text-text [@media(max-height:520px)]:hidden">{level.tagline}</span>
                 </button>
               )
             })}

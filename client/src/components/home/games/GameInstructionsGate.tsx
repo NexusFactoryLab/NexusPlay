@@ -8,6 +8,7 @@ import { DominoVisualDemo } from './DominoVisualDemo'
 import { TutorialQuestion } from './tutorial/TutorialQuestion'
 import { GameGuide } from './tutorial/GameGuide'
 import { guessWhoGuideSteps, memoryGuideSteps, tournamentGuideSteps } from './tutorial/guideSteps'
+import { duoGuideSteps } from './duo-logico/duoGuideSteps'
 
 const SEEN_KEY_PREFIX = 'nexusplay:guia-vista:'
 
@@ -77,6 +78,9 @@ export function GameInstructionsGate({
         onTutorial={onTutorial}
       />
     )
+  }
+  if (kind === 'DUAL_QUEST_PIXI') {
+    return <GameGuide steps={duoGuideSteps()} label="Guía rápida" ariaLabel="Guía de Dúo Lógico" dataAttr={kind} accent="amber" onClose={onContinue} />
   }
   const isDomino = kind === 'DOMINO'
   const hasVisualDemo = isDomino

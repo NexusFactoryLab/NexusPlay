@@ -1,22 +1,27 @@
 import { useState } from 'react'
-import { Check, Eye, Lock, MessageCircle, Sparkles, X } from 'lucide-react'
+import { Check, DoorOpen, Eye, Heart, Lock, MessageCircle, Sparkles, X } from 'lucide-react'
 import { ChatPanel } from '../ChatPanel'
+import { FitScale } from '../true-false-maze/FitScale'
 import { CHARACTERS } from './duoCharacters'
-import { otherRole, type DuoQuestionFormat } from './shared/duoTypes'
+import { otherRole, type DuoQuestionFormat, type DuoRole } from './shared/duoTypes'
 import type { DuoRoomView } from './shared/duoProtocol'
 import type { DuoChatMessage } from './useDuoRoom'
 
 const LETTERS = ['A', 'B', 'C', 'D']
+/** Cada letra con su color, como en los botones de un concurso. */
+const LETTER_TONE = ['bg-amber-400 text-amber-950', 'bg-sky-400 text-sky-950', 'bg-emerald-400 text-emerald-950', 'bg-rose-400 text-rose-950']
 
 const FORMAT_INFO: Record<DuoQuestionFormat, { name: string; howTo: string }> = {
-  MIRROR: { name: 'Pregunta espejo', howTo: 'Los dos ven la misma pregunta. Cada uno responde en secreto: solo pasan si aciertan los dos.' },
-  SPLIT: { name: 'Información dividida', howTo: 'Cada uno tiene solo una parte de los datos. Cuéntense lo que ven para poder responder.' },
-  TWO_PART: { name: 'Pregunta en dos partes', howTo: 'Cada uno resuelve su parte del mismo problema. La respuesta queda bien solo si las dos partes lo están.' },
+  MIRROR: { name: 'Pregunta espejo', howTo: 'Los dos ven la misma pregunta y responden en secreto.' },
+  SPLIT: { name: 'Información dividida', howTo: 'Cada uno tiene un dato distinto: cuéntenselo por el chat.' },
+  TWO_PART: { name: 'Dos partes', howTo: 'Cada uno resuelve su parte del mismo problema.' },
 }
 
 /**
- * La Puerta del Saber: la pregunta (con la parte de cada uno), las pistas
- * de las fichas, las opciones y, al responder los dos, qué eligió cada uno.
+ * La Puerta del Saber: un panel de juego que siempre cabe en la pantalla
+ * (FitScale lo reduce en vez de hacer scroll). Muestra a los dos personajes
+ * con su estado, la pregunta con la parte de cada uno, las pistas de las
+ * fichas, las opciones y, al responder los dos, qué eligió cada uno.
  */
 export function DuoQuestionPanel({
   room,
@@ -34,63 +39,123 @@ export function DuoQuestionPanel({
   const q = room.question
   const reveal = room.phase === 'REVEAL' ? room.reveal : null
   const [chatOpen, setChatOpen] = useState(q?.format === 'SPLIT')
+  const [readCount, setReadCount] = useState(messages.length)
   if (!q || !room.you) return null
-  const me = CHARACTERS[room.you]
-  const partner = CHARACTERS[otherRole(room.you)]
+  const meRole = room.you
+  const partnerRole = otherRole(meRole)
+  const me = CHARACTERS[meRole]
+  const partner = CHARACTERS[partnerRole]
   const info = FORMAT_INFO[q.format]
   const answered = q.myAnswer !== null
   const lockedHints = q.hintsTotal - q.hints.length
+  const unread = Math.max(0, messages.length - readCount)
+  const fitKey = `${q.gateId}-${q.attempt}-${answered}-${q.partnerAnswered}-${reveal ? 'r' : 'q'}-${q.hints.length}`
 
   return (
-    <div className="absolute inset-0 z-30 flex overflow-y-auto bg-slate-950/70 p-2 sm:p-4" role="dialog" aria-label="Puerta del Saber">
-      {/* m-auto centra cuando cabe y deja ver desde arriba cuando no (celular acostado). */}
-      <div className="m-auto flex w-full max-w-[980px] flex-col gap-3 lg:flex-row lg:items-start">
-        <section className="flex-1 rounded-3xl bg-white p-4 text-slate-900 shadow-2xl sm:p-6 [@media(max-height:520px)]:p-3">
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-violet-600 px-3 py-1 text-[12px] font-bold uppercase tracking-wide text-white">Puerta del Saber</span>
-            <span className="rounded-full bg-violet-100 px-3 py-1 text-[12px] font-bold text-violet-800">{info.name}</span>
-            {q.attempt > 1 && <span className="rounded-full bg-amber-100 px-3 py-1 text-[12px] font-bold text-amber-800">Intento {q.attempt}</span>}
+    <div className="absolute inset-0 z-30 flex bg-slate-950/75 p-2 backdrop-blur-[2px] sm:p-4" role="dialog" aria-label="Puerta del Saber">
+      <div className="relative mx-auto flex h-full min-h-0 w-full max-w-[980px] flex-col overflow-hidden rounded-[28px] border-2 border-violet-400/50 bg-gradient-to-b from-slate-900/95 to-[#140b2e]/95 text-white shadow-[0_30px_90px_-20px_rgba(139,92,246,0.7)]">
+        {/* Cabecera: la puerta, el formato, los corazones y el chat */}
+        <header className="flex shrink-0 items-center gap-2 border-b border-white/10 px-3 py-2 sm:px-5">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-500/25 text-violet-200">
+            <DoorOpen className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1 leading-tight">
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-violet-300">Puerta del Saber{q.attempt > 1 ? ` · intento ${q.attempt}` : ''}</p>
+            <p className="truncate text-[14px] font-bold text-white">
+              {info.name} <span className="font-normal text-slate-300">· {info.howTo}</span>
+            </p>
           </div>
-          <p className="mb-3 text-[13px] text-slate-600 [@media(max-height:520px)]:mb-1.5">{info.howTo}</p>
+          <span className="flex shrink-0 items-center gap-0.5" aria-label={`${room.hearts} corazones`}>
+            {Array.from({ length: room.maxHearts }, (_, i) => (
+              <Heart key={i} className={`h-4 w-4 ${i < room.hearts ? 'fill-rose-500 text-rose-500' : 'text-slate-600'}`} />
+            ))}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setChatOpen((v) => !v)
+              setReadCount(messages.length)
+            }}
+            className="relative flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-white/10 px-3 text-[13px] font-semibold hover:bg-white/20"
+            aria-expanded={chatOpen}
+          >
+            <MessageCircle className="h-4 w-4" /> <span className="max-sm:hidden">Chat</span>
+            {!chatOpen && unread > 0 && <span className="absolute -right-1 -top-1 rounded-full bg-rose-500 px-1.5 text-[10px] font-bold">{unread}</span>}
+          </button>
+        </header>
 
-          <h2 className="m-0 text-[19px] font-bold leading-snug text-slate-900 sm:text-[21px] [@media(max-height:520px)]:text-[17px]" data-testid="duo-prompt">{q.prompt}</h2>
+        <FitScale className="min-h-0 flex-1" fitKey={fitKey} minScale={0.5} contentClassName="px-3 py-3 sm:px-5 sm:py-4">
+          {/* Los dos personajes y si ya respondieron */}
+          <div className="mb-3 flex items-center justify-center gap-3">
+            {([meRole, partnerRole] as DuoRole[]).map((role) => {
+              const isMe = role === meRole
+              const done = isMe ? answered : q.partnerAnswered
+              const pick = reveal ? (isMe ? reveal.mine : reveal.partner) : null
+              return (
+                <div
+                  key={role}
+                  className={`flex items-center gap-2 rounded-2xl border px-2.5 py-1.5 transition ${
+                    pick ? (pick.correct ? 'border-emerald-400 bg-emerald-500/20' : 'border-rose-400 bg-rose-500/20') : done ? 'border-violet-300/60 bg-violet-500/15' : 'border-white/15 bg-white/5'
+                  }`}
+                >
+                  <img src={CHARACTERS[role].portrait} alt="" className={`h-10 w-10 object-contain ${pick && !pick.correct ? 'grayscale-[50%]' : ''} ${pick?.correct ? 'animate-bounce' : ''}`} />
+                  <div className="leading-tight">
+                    <p className="text-[13px] font-bold">
+                      {CHARACTERS[role].name}
+                      {isMe ? ' (tú)' : ''}
+                    </p>
+                    <p className="text-[12px] text-slate-300">{pick ? (pick.correct ? '¡Acertó!' : 'Falló') : done ? 'Ya respondió ✓' : 'Pensando…'}</p>
+                  </div>
+                  {pick && (pick.correct ? <Check className="h-5 w-5 text-emerald-300" /> : <X className="h-5 w-5 text-rose-300" />)}
+                </div>
+              )
+            })}
+          </div>
+
+          <h2 className="m-0 text-center text-[24px] font-black leading-snug text-white" data-testid="duo-prompt">
+            {q.prompt}
+          </h2>
 
           {q.myClue && (
-            <div className="mt-3 rounded-2xl border-2 border-dashed border-amber-400 bg-amber-50 p-3">
-              <p className="mb-1 flex items-center gap-1.5 text-[12px] font-bold uppercase text-amber-800">
-                <Eye className="h-4 w-4" /> Solo tú ves este dato ({me.name})
+            <div className="mx-auto mt-3 max-w-[640px] rounded-2xl border-2 border-dashed border-amber-300/80 bg-amber-400/10 px-4 py-2.5 text-center">
+              <p className="flex items-center justify-center gap-1.5 text-[12px] font-black uppercase tracking-wide text-amber-300">
+                <Eye className="h-4 w-4" /> Solo tú ves este dato
               </p>
-              <p className="text-[16px] font-semibold" data-testid="duo-clue">{q.myClue}</p>
-              <p className="mt-1 text-[12px] text-amber-900">{partner.name} tiene el otro dato: pídeselo por el chat.</p>
+              <p className="text-[18px] font-bold" data-testid="duo-clue">
+                {q.myClue}
+              </p>
+              <p className="text-[12px] text-amber-200/80">{partner.name} tiene el otro: pídeselo por el chat.</p>
             </div>
           )}
 
           {q.myPrompt && (
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              <div className="rounded-2xl border-2 border-violet-400 bg-violet-50 p-3">
-                <p className="mb-1 text-[12px] font-bold uppercase text-violet-800">Tu parte ({me.name})</p>
-                <p className="text-[15px] font-semibold" data-testid="duo-my-part">{q.myPrompt}</p>
+              <div className="rounded-2xl border-2 border-violet-300/70 bg-violet-500/15 px-3 py-2">
+                <p className="text-[12px] font-black uppercase tracking-wide text-violet-300">Tu parte · {me.name}</p>
+                <p className="text-[16px] font-bold" data-testid="duo-my-part">
+                  {q.myPrompt}
+                </p>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-slate-600">
-                <p className="mb-1 text-[12px] font-bold uppercase">La parte de {partner.name}</p>
-                <p className="text-[14px]">{q.partnerPrompt}</p>
+              <div className="rounded-2xl border border-white/15 bg-white/5 px-3 py-2 text-slate-300">
+                <p className="text-[12px] font-black uppercase tracking-wide">La parte de {partner.name}</p>
+                <p className="text-[15px]">{q.partnerPrompt}</p>
               </div>
             </div>
           )}
 
           {(q.hints.length > 0 || lockedHints > 0) && (
-            <ul className="mt-3 flex flex-col gap-1.5">
+            <div className="mt-3 flex flex-wrap justify-center gap-1.5">
               {q.hints.map((hint) => (
-                <li key={hint} className="flex items-start gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-[14px] text-emerald-900">
-                  <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /> {hint}
-                </li>
+                <span key={hint} className="flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-3 py-1 text-[13px] text-emerald-100">
+                  <Sparkles className="h-3.5 w-3.5 text-emerald-300" /> {hint}
+                </span>
               ))}
               {lockedHints > 0 && (
-                <li className="flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-2 text-[13px] text-slate-500">
-                  <Lock className="h-4 w-4" /> {lockedHints === 1 ? 'Una pista más' : `${lockedHints} pistas más`} con las fichas del camino
-                </li>
+                <span className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[12px] text-slate-400">
+                  <Lock className="h-3.5 w-3.5" /> {lockedHints === 1 ? '1 pista más' : `${lockedHints} pistas más`} con las fichas
+                </span>
               )}
-            </ul>
+            </div>
           )}
 
           {!reveal && (
@@ -104,13 +169,15 @@ export function DuoQuestionPanel({
                     disabled={answered}
                     onClick={() => onAnswer(i)}
                     data-testid="duo-option"
-                    className={`flex min-h-[52px] items-center gap-3 rounded-2xl border-2 px-3 py-2.5 text-left text-[15px] font-semibold transition [@media(max-height:520px)]:min-h-[44px] [@media(max-height:520px)]:py-1.5 ${
-                      mine ? 'border-violet-600 bg-violet-600 text-white' : answered ? 'border-slate-200 text-slate-400' : 'border-slate-200 hover:border-violet-500 hover:bg-violet-50'
+                    className={`flex min-h-[54px] items-center gap-3 rounded-2xl border-2 px-3 py-2 text-left text-[16px] font-bold transition ${
+                      mine
+                        ? 'scale-[1.02] border-white bg-violet-600 shadow-[0_0_24px_rgba(167,139,250,0.7)]'
+                        : answered
+                          ? 'border-white/10 bg-white/5 text-slate-500'
+                          : 'border-white/15 bg-white/10 hover:-translate-y-0.5 hover:border-white/60 hover:bg-white/15'
                     }`}
                   >
-                    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[14px] font-black ${mine ? 'bg-white text-violet-700' : 'bg-slate-100 text-slate-700'}`}>
-                      {LETTERS[i]}
-                    </span>
+                    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[16px] font-black ${answered && !mine ? 'bg-slate-700 text-slate-400' : LETTER_TONE[i]}`}>{LETTERS[i]}</span>
                     {option}
                   </button>
                 )
@@ -119,14 +186,14 @@ export function DuoQuestionPanel({
           )}
 
           {!reveal && (
-            <p className="mt-3 text-center text-[14px] font-semibold text-slate-600" role="status" data-testid="duo-answer-status">
+            <p className="mt-3 text-center text-[14px] font-semibold text-slate-300" role="status" data-testid="duo-answer-status">
               {answered
                 ? q.partnerAnswered
                   ? 'Revelando…'
                   : `Respuesta guardada. Esperando a ${partner.name}…`
                 : q.partnerAnswered
                   ? `${partner.name} ya respondió. ¡Te toca!`
-                  : 'Elige tu respuesta. Tu compañero no verá cuál hasta que respondan los dos.'}
+                  : `Elige tu respuesta: ${partner.name} no verá cuál hasta que respondan los dos.`}
             </p>
           )}
 
@@ -137,41 +204,44 @@ export function DuoQuestionPanel({
                   { who: `${me.name} (tú)`, pick: reveal.mine },
                   { who: partner.name, pick: reveal.partner },
                 ].map(({ who, pick }) => (
-                  <div key={who} className={`rounded-2xl border-2 p-3 ${pick.correct ? 'border-emerald-500 bg-emerald-50' : 'border-rose-500 bg-rose-50'}`}>
-                    <p className="flex items-center gap-1.5 text-[12px] font-bold uppercase">
-                      {pick.correct ? <Check className="h-4 w-4 text-emerald-600" /> : <X className="h-4 w-4 text-rose-600" />} {who}
+                  <div key={who} className={`rounded-2xl border-2 px-3 py-2 ${pick.correct ? 'border-emerald-400 bg-emerald-500/15' : 'border-rose-400 bg-rose-500/15'}`}>
+                    <p className="flex items-center gap-1.5 text-[12px] font-black uppercase tracking-wide">
+                      {pick.correct ? <Check className="h-4 w-4 text-emerald-300" /> : <X className="h-4 w-4 text-rose-300" />} {who}
                     </p>
-                    <p className="text-[15px] font-semibold">{pick.option}</p>
+                    <p className="text-[16px] font-bold">{pick.option}</p>
                   </div>
                 ))}
               </div>
               {reveal.success ? (
-                <div className="mt-3 rounded-2xl bg-emerald-600 p-3 text-white">
-                  <p className="text-[17px] font-black">{reveal.final ? '¡Lo lograron! El portal se abre…' : '¡Los dos acertaron! La puerta se abre.'}</p>
-                  {reveal.explanation && <p className="mt-1 text-[14px]">{reveal.explanation}</p>}
+                <div className="mt-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-3">
+                  <p className="text-[20px] font-black">{reveal.final ? '¡Lo lograron! El portal se abre…' : '¡Los dos acertaron! La puerta se abre.'}</p>
+                  {reveal.explanation && <p className="mt-1 text-[15px] text-emerald-50">{reveal.explanation}</p>}
                 </div>
               ) : (
-                <div className="mt-3 rounded-2xl bg-rose-600 p-3 text-white">
-                  <p className="text-[17px] font-black">
-                    {room.hearts > 0 ? `Pierden un corazón. Les quedan ${room.hearts}.` : 'Se acabaron los corazones.'}
-                  </p>
-                  {room.hearts > 0 && <p className="mt-1 text-[14px]">Hablen entre ustedes y vuelvan a intentarlo: las opciones cambian de lugar.</p>}
+                <div className="mt-3 rounded-2xl bg-gradient-to-r from-rose-600 to-orange-600 px-4 py-3">
+                  <p className="text-[20px] font-black">{room.hearts > 0 ? `Pierden un corazón. Les quedan ${room.hearts}.` : 'Se acabaron los corazones.'}</p>
+                  {room.hearts > 0 && <p className="mt-1 text-[15px]">Hablen y vuelvan a intentarlo: las opciones cambian de lugar.</p>}
                 </div>
               )}
             </div>
           )}
-        </section>
+        </FitScale>
 
-        <aside className={`flex flex-col overflow-hidden rounded-3xl bg-surface text-text shadow-2xl lg:w-[320px] ${chatOpen ? 'h-[300px] lg:h-[460px]' : ''}`}>
-          {chatOpen ? (
-            <ChatPanel inline messages={messages} selfUserId={selfUserId} onSend={onSendChat} onClose={() => setChatOpen(false)} />
-          ) : (
-            <button type="button" onClick={() => setChatOpen(true)} className="flex items-center justify-center gap-2 px-4 py-3 text-[14px] font-semibold text-text-h">
-              <MessageCircle className="h-4 w-4" /> Hablar con {partner.name}
-              {messages.length > 0 && <span className="rounded-full bg-accent/15 px-2 text-[12px] text-accent">{messages.length}</span>}
-            </button>
-          )}
-        </aside>
+        {/* El chat se abre por encima del panel, sin empujar la pregunta. */}
+        {chatOpen && (
+          <div className="absolute bottom-2 right-2 top-14 z-10 flex w-[min(340px,calc(100%-16px))] flex-col overflow-hidden rounded-2xl bg-surface text-text shadow-2xl">
+            <ChatPanel
+              inline
+              messages={messages}
+              selfUserId={selfUserId}
+              onSend={onSendChat}
+              onClose={() => {
+                setChatOpen(false)
+                setReadCount(messages.length)
+              }}
+            />
+          </div>
+        )}
       </div>
     </div>
   )
