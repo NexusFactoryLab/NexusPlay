@@ -17,12 +17,10 @@ import { ROOM_STORE } from '../dist/domain/ports/room-store.port.js';
 import { TOURNAMENT_STORE } from '../dist/domain/ports/tournament-store.port.js';
 import { DOMINO_ROOM_STORE } from '../dist/domain/ports/domino-room-store.port.js';
 import { SNAKES_LADDERS_ROOM_STORE } from '../dist/domain/ports/snakes-ladders-room-store.port.js';
-import { DUAL_QUEST_ROOM_STORE } from '../dist/domain/ports/dual-quest-room-store.port.js';
 import { InMemoryRoomStore } from '../dist/infrastructure/rooms/in-memory-room.store.js';
 import { InMemoryTournamentStore } from '../dist/infrastructure/rooms/in-memory-tournament.store.js';
 import { InMemoryDominoRoomStore } from '../dist/infrastructure/rooms/in-memory-domino-room.store.js';
 import { InMemorySnakesLaddersRoomStore } from '../dist/infrastructure/rooms/in-memory-snakes-ladders-room.store.js';
-import { InMemoryDualQuestRoomStore } from '../dist/infrastructure/rooms/in-memory-dual-quest-room.store.js';
 import { AnalyticsTrackerService } from '../dist/application/services/analytics-tracker.service.js';
 
 const require = createRequire(import.meta.url);
@@ -39,12 +37,6 @@ const modes = [
     'SNAKES_LADDERS',
     SNAKES_LADDERS_ROOM_STORE,
     (code) => `/escaleras-serpientes/sala/${code}`,
-  ],
-  [
-    'dual-quest',
-    'DUAL_QUEST',
-    DUAL_QUEST_ROOM_STORE,
-    (code) => `/dual-quest/sala/${code}`,
   ],
 ];
 function game(type) {
@@ -113,7 +105,6 @@ Module({
       provide: SNAKES_LADDERS_ROOM_STORE,
       useClass: InMemorySnakesLaddersRoomStore,
     },
-    { provide: DUAL_QUEST_ROOM_STORE, useClass: InMemoryDualQuestRoomStore },
   ],
 })(TestModule);
 async function until(predicate, label) {
@@ -303,7 +294,7 @@ try {
       .getByRole('dialog', { name: 'Chat de la sala' })
       .waitFor({ state: 'hidden' });
     await lobby(host).waitFor(); // Escape del chat no abandona la sala.
-    if (prefix !== 'dual-quest') {
+    {
       await readyPanel(guest)
         .getByRole('button', { name: 'Listo para jugar' })
         .click();
@@ -321,13 +312,6 @@ try {
       );
       await lobby(guest).getByText('45', { exact: true }).waitFor();
       assert.equal(await lobby(guest).getByRole('spinbutton').count(), 0);
-    } else {
-      await lobby(host)
-        .getByText('Juego simultáneo', { exact: true })
-        .waitFor();
-      assert.equal(await lobby(host).getByRole('spinbutton').count(), 0);
-      assert.match(await lobby(host).innerText(), /🔥.*Ana/);
-      assert.match(await lobby(host).innerText(), /💧.*Luis/);
     }
     await host.setViewportSize({ width: 390, height: 844 });
     await host.screenshot({

@@ -13,6 +13,8 @@ export const DUO_EVENTS = {
   role: 'duo:role',
   /** En la sala de espera: el anfitrión elige el escenario inicial. */
   level: 'duo:level',
+  /** Girar un espejo desde su panel: { mirrorId, dir: 1 | -1 }. */
+  mirror: 'duo:mirror',
   ready: 'duo:ready',
   /** Cliente → servidor: posición propia y cajas que mueve, ~20 veces por segundo. */
   state: 'duo:state',
@@ -119,6 +121,7 @@ export type DuoClientMessages = {
   'duo:join': { code: string };
   'duo:role': { role: DuoRole };
   'duo:level': { levelId: string };
+  'duo:mirror': { mirrorId: string; dir: 1 | -1 };
   'duo:ready': { ready: boolean };
   'duo:state': DuoClientState;
   'duo:answer': { optionIndex: number };

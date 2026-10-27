@@ -60,7 +60,7 @@ export function normalizeDraft(options: NormalizeDraftOptions, config: unknown, 
     case 'MAZE_COLLECTOR':
       return normalizeMazeCollector(rawConfig, rawContent, options);
     default:
-      // SNAKES_LADDERS y DUAL_QUEST dependen de la geometría del tablero: no
+      // SNAKES_LADDERS depende de la geometría del tablero y DUAL_QUEST_PIXI la valida su validador: no
       // hay un arreglo seguro que no cambie el sentido, así que se validan tal cual.
       return { config: rawConfig, content: rawContent };
   }

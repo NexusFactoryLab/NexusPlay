@@ -7,7 +7,6 @@ import {
   gateWallRect,
   leverRect,
   MIRROR_ANGLES,
-  mirrorRect,
   moverRect,
   overlaps,
   pedestalRect,
@@ -152,27 +151,6 @@ export function litMirrorCount(level: DuoLevel, world: DuoWorldState, receiverId
 export function isReceiverLit(level: DuoLevel, world: DuoWorldState, receiverId: string): boolean {
   const receiver = (level.def.receivers ?? []).find((r) => r.id === receiverId);
   return !!receiver && litMirrorCount(level, world, receiverId) === receiver.mirrors.length;
-}
-
-/**
- * Gira un espejo cada vez que alguien empieza a tocarlo (no mientras sigue
- * encima). `contacts` guarda quién tocaba cada espejo en el instante anterior.
- * Devuelve true si algún espejo giró.
- */
-export function touchMirrors(level: DuoLevel, world: DuoWorldState, players: Bodies, contacts: Record<string, DuoRole[]>): boolean {
-  let changed = false;
-  const bodies = livingRects(players);
-  for (const mirror of level.def.mirrors ?? []) {
-    const rect = mirrorRect(mirror);
-    const now = bodies.filter((b) => overlaps(b.rect, rect)).map((b) => b.role);
-    const before = contacts[mirror.id] ?? [];
-    if (now.some((role) => !before.includes(role))) {
-      world.mirrors[mirror.id] = ((world.mirrors[mirror.id] ?? 0) + 1) % MIRROR_ANGLES;
-      changed = true;
-    }
-    contacts[mirror.id] = now;
-  }
-  return changed;
 }
 
 /** Recoge las fichas que toca cada personaje. Devuelve las recién tomadas. */

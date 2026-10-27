@@ -43,18 +43,6 @@ import type {
   SnakesLaddersQuestion,
   SnakesLaddersTriggerType,
 } from '../../application/content-validators/snakes-ladders.content-validator.js';
-import {
-  DUAL_QUEST_ROOM_STORE,
-  type DualQuestRoomStore,
-  type DualQuestRoomState,
-  type DualQuestDirection,
-} from '../../domain/ports/dual-quest-room-store.port.js';
-import type {
-  DualQuestCellPosition,
-  DualQuestFragmentGem,
-  DualQuestRole,
-  DualQuestTrigger,
-} from '../../application/content-validators/dual-quest.content-validator.js';
 import { AnalyticsTrackerService } from '../../application/services/analytics-tracker.service.js';
 import { WsExceptionFilter } from './ws-exception.filter.js';
 import { allLobbyReady, recordLobbyReady, resetLobbyReady } from './lobby-ready.js';
@@ -85,7 +73,7 @@ interface AuthenticatedSocket extends Socket {
 }
 
 /** El `kind` que le dice al cliente a qué pantalla enrutar tras resolver un código. */
-export type RoomKind = 'room' | 'tournament' | 'domino' | 'snakes-ladders' | 'dual-quest' | 'duo-logico';
+export type RoomKind = 'room' | 'tournament' | 'domino' | 'snakes-ladders' | 'duo-logico';
 
 /**
  * Las 5 salas (1v1 de "¿Quién Es?", torneo, dominó, escaleras y serpientes,
@@ -125,14 +113,6 @@ function shuffle<T>(items: T[]): T[] {
 
 /** Cuenta regresiva antes de repartir cartas (3-2-1), igual para el inicio y cada revancha. */
 const DEAL_COUNTDOWN_MS = 3_000;
-
-/** Deltas de movimiento para el tick de Dúo Lógico. */
-const DUAL_QUEST_DIRECTION_DELTAS: Record<DualQuestDirection, DualQuestCellPosition> = {
-  UP: { row: -1, col: 0 },
-  DOWN: { row: 1, col: 0 },
-  LEFT: { row: 0, col: -1 },
-  RIGHT: { row: 0, col: 1 },
-};
 
 /** Largo máximo de un mensaje de chat de sala; se recorta, no se rechaza. */
 const MAX_CHAT_MESSAGE_LENGTH = 500;
@@ -429,70 +409,6 @@ function toSnakesLaddersClientView(room: SnakesLaddersRoomState, forSocketId: st
   };
 }
 
-/**
- * Vista pública de una sala de Dúo Lógico: nunca incluye
- * `correctOptionIndex` de los triggers QUESTION (solo vive en
- * `room.triggers`, del lado del servidor) — si hay una pregunta pendiente,
- * se manda su prompt/opciones pero jamás la respuesta correcta.
- */
-function toDualQuestClientView(room: DualQuestRoomState, forSocketId: string) {
-  const pendingTrigger = room.pendingQuestion
-    ? room.triggers.find((t) => t.triggerId === room.pendingQuestion!.triggerId)
-    : undefined;
-
-  return {
-    code: room.code,
-    gameTitle: room.gameTitle,
-    coreQuestion: room.coreQuestion,
-    gridCols: room.gridCols,
-    gridRows: room.gridRows,
-    grid: room.grid,
-    corePosition: room.corePosition,
-    gates: room.gates,
-    // Metadata segura de cada interruptor: dónde está y quién lo activa —
-    // nunca `prompt`/`options`/`correctOptionIndex` (eso solo se revela vía
-    // `pendingQuestion`, una vez que alguien lo activa de verdad).
-    triggers: room.triggers.map((trigger) => ({
-      triggerId: trigger.triggerId,
-      kind: trigger.kind,
-      activatedByRole: trigger.activatedByRole,
-      switchPosition: trigger.switchPosition,
-      gateId: trigger.gateId,
-    })),
-    phase: room.phase,
-    bothAtCore: room.bothAtCore,
-    collectedGemIds: room.collectedGemIds,
-    // Nunca se manda `order` (la secuencia correcta) — solo lo necesario
-    // para que el cliente sepa qué buscar y qué ya se recolectó.
-    gems: room.fragmentGems.map((gem) => ({
-      gemId: gem.gemId,
-      role: gem.role,
-      label: gem.label,
-      position: gem.position,
-      collected: room.collectedGemIds.includes(gem.gemId),
-    })),
-    canAssemble: room.bothAtCore && room.collectedGemIds.length === room.fragmentGems.length,
-    pendingQuestion:
-      room.pendingQuestion && pendingTrigger
-        ? {
-            triggerId: room.pendingQuestion.triggerId,
-            forRole: room.pendingQuestion.forRole,
-            prompt: pendingTrigger.prompt,
-            options: pendingTrigger.options,
-          }
-        : null,
-    players: room.players.map((player) => ({
-      userId: player.userId,
-      displayName: player.displayName,
-      ready: player.ready === true,
-      role: player.role,
-      position: player.position,
-      isSelf: player.socketId === forSocketId,
-      isHost: player.userId === room.hostUserId,
-    })),
-  };
-}
-
 /** Vista pública de la sala que se envía a un jugador dado: oculta la carta secreta ajena. */
 export function toClientView(room: RoomState, forSocketId: string) {
   return {
@@ -580,14 +496,6 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
    */
   private readonly snakesLaddersTurnTimers = new Map<string, NodeJS.Timeout>();
 
-  /**
-   * Dúo Lógico no tiene turnos: los dos jugadores se mueven a la vez, en
-   * tiempo real. Este mapa guarda el `setInterval` de "tick de movimiento"
-   * de cada sala activa (uno cada ~150ms mientras `phase === 'PLAYING'`),
-   * no un timeout de espera como los demás juegos.
-   */
-  private readonly dualQuestMovementTicks = new Map<string, NodeJS.Timeout>();
-
   private readonly dealTimers = new Map<string, NodeJS.Timeout>();
 
   /** Construido una vez en el constructor a partir de los stores inyectados — ver RoomRegistryEntry. */
@@ -609,7 +517,6 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     @Inject(TOURNAMENT_STORE) private readonly tournamentStore: TournamentStore,
     @Inject(DOMINO_ROOM_STORE) private readonly dominoRoomStore: DominoRoomStore,
     @Inject(SNAKES_LADDERS_ROOM_STORE) private readonly snakesLaddersRoomStore: SnakesLaddersRoomStore,
-    @Inject(DUAL_QUEST_ROOM_STORE) private readonly dualQuestRoomStore: DualQuestRoomStore,
     private readonly analyticsTracker: AnalyticsTrackerService,
     @Optional() @Inject(GUESS_WHO_BOT_POLICY) botPolicy: GuessWhoBotPolicy = new HeuristicGuessWhoBotPolicy(),
     @Optional() @Inject(GUESS_WHO_FREE_ANSWERER) freeAnswerer?: GuessWhoFreeAnswerer,
@@ -638,7 +545,6 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       { kind: 'tournament', store: this.tournamentStore },
       { kind: 'domino', store: this.dominoRoomStore },
       { kind: 'snakes-ladders', store: this.snakesLaddersRoomStore },
-      { kind: 'dual-quest', store: this.dualQuestRoomStore },
     ];
   }
 
@@ -785,25 +691,6 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       }
     }
 
-    const dualQuestRoom = this.dualQuestRoomStore.findBySocketId(socket.id);
-    if (dualQuestRoom) {
-      const wasWaiting = dualQuestRoom.phase === 'WAITING';
-      this.cancelDealCountdown('dual-quest:' + dualQuestRoom.code);
-      this.clearDualQuestMovementTick(dualQuestRoom.code);
-      dualQuestRoom.players = dualQuestRoom.players.filter((player) => player.socketId !== socket.id);
-
-      if (dualQuestRoom.players.length === 0) {
-        this.dualQuestRoomStore.delete(dualQuestRoom.code);
-      } else {
-        if (!wasWaiting) resetLobbyReady(dualQuestRoom.players);
-        if (!dualQuestRoom.players.some((p) => p.userId === dualQuestRoom.hostUserId)) dualQuestRoom.hostUserId = dualQuestRoom.players[0].userId;
-        dualQuestRoom.phase = dualQuestRoom.phase === 'FINISHED' ? dualQuestRoom.phase : 'WAITING';
-        dualQuestRoom.pendingQuestion = null;
-        this.dualQuestRoomStore.set(dualQuestRoom);
-        this.broadcastDualQuestState(dualQuestRoom);
-        if (wasWaiting) this.tryStartDualQuest(dualQuestRoom);
-      }
-    }
   }
 
   @SubscribeMessage('room:create')
@@ -1137,13 +1024,6 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     const room = this.snakesLaddersRoomStore.findBySocketId(socket.id);
     if (!room) throw new Error('No estás en ninguna sala.');
     this.relayLobbyChat(socket, body, room.players, 'snakes-ladders:chat-message');
-  }
-
-  @SubscribeMessage('dual-quest:chat')
-  handleDualQuestChat(@ConnectedSocket() socket: AuthenticatedSocket, @MessageBody() body: { text: string }) {
-    const room = this.dualQuestRoomStore.findBySocketId(socket.id);
-    if (!room) throw new Error('No estás en ninguna sala.');
-    this.relayLobbyChat(socket, body, room.players, 'dual-quest:chat-message');
   }
 
   @SubscribeMessage('tournament:chat')
@@ -2760,394 +2640,6 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       this.server
         .to(player.socketId)
         .emit('snakes-ladders:state', toSnakesLaddersClientView(room, player.socketId));
-    }
-  }
-
-  // ---------------------------------------------------------------------
-  // Dúo Lógico: sala cooperativa de exactamente 2 jugadores (FIRE y WATER)
-  // moviéndose en tiempo real sobre una cuadrícula compartida — a
-  // diferencia de todos los juegos anteriores (por turnos), acá el
-  // servidor corre un tick continuo por sala que mueve a ambos jugadores
-  // a la vez. La Fase 3 agrega la recolección de gemas y el ensamblaje
-  // final sobre esta misma sala.
-  // ---------------------------------------------------------------------
-
-  private static readonly DUAL_QUEST_TICK_MS = 150;
-
-  @SubscribeMessage('dual-quest:create')
-  async handleDualQuestCreate(
-    @ConnectedSocket() socket: AuthenticatedSocket,
-    @MessageBody() body: { gameId: string; role?: DualQuestRole },
-  ) {
-    const game = await this.gameRepository.findById(body.gameId);
-    if (!game || game.gameType.getName() !== 'DUAL_QUEST') {
-      throw new Error('Juego no encontrado o no es de tipo Dúo Lógico.');
-    }
-
-    const code = this.generateUniqueRoomCode();
-
-    const role: DualQuestRole = body.role === 'WATER' ? 'WATER' : 'FIRE';
-    const startPosition = role === 'FIRE' ? (game.config.fireStart as DualQuestCellPosition) : (game.config.waterStart as DualQuestCellPosition);
-
-    const room: DualQuestRoomState = {
-      code,
-      gameId: game.id,
-      gameTitle: game.title,
-      coreQuestion: game.config.coreQuestion as string,
-      gridCols: game.config.gridCols as number,
-      gridRows: game.config.gridRows as number,
-      grid: game.config.grid as number[][],
-      fireStart: game.config.fireStart as DualQuestCellPosition,
-      waterStart: game.config.waterStart as DualQuestCellPosition,
-      corePosition: game.config.corePosition as DualQuestCellPosition,
-      gates: (game.config.gates as Array<{ gateId: string; position: DualQuestCellPosition }>).map((gate) => ({
-        ...gate,
-        open: false,
-      })),
-      triggers: game.config.triggers as DualQuestTrigger[],
-      fragmentGems: game.content as DualQuestFragmentGem[],
-      collectedGemIds: [],
-      hostUserId: socket.data.userId,
-      phase: 'WAITING',
-      players: [
-        {
-          socketId: socket.id,
-          userId: socket.data.userId,
-          displayName: socket.data.displayName,
-          ready: false,
-          role,
-          position: startPosition,
-          desiredDirection: null,
-        },
-      ],
-      pendingQuestion: null,
-      bothAtCore: false,
-      createdAt: Date.now(),
-    };
-
-    this.dualQuestRoomStore.create(room);
-    socket.join(`dual-quest:${code}`);
-    socket.emit('dual-quest:state', toDualQuestClientView(room, socket.id));
-
-    void this.analyticsTracker.track({
-      type: 'room_created',
-      userId: socket.data.userId,
-      gameId: game.id,
-      metadata: { mode: 'dual-quest', role },
-    });
-  }
-
-  @SubscribeMessage('dual-quest:join')
-  handleDualQuestJoin(@ConnectedSocket() socket: AuthenticatedSocket, @MessageBody() body: { code: string }) {
-    const code = body.code?.trim().toUpperCase();
-    const room = this.dualQuestRoomStore.get(code);
-
-    if (!room) throw new Error('No existe una sala de Dúo Lógico con ese código.');
-
-    const existing = room.players.find((player) => player.userId === socket.data.userId);
-    if (existing) {
-      if (room.phase === 'WAITING' && existing.socketId !== socket.id) {
-        existing.ready = false;
-        this.cancelDealCountdown('dual-quest:' + room.code);
-      }
-      existing.socketId = socket.id;
-    } else {
-      if (room.phase !== 'WAITING') throw new Error('La partida ya inició.');
-      if (room.players.length >= 2) throw new Error('La sala ya está llena.');
-      // El segundo jugador siempre recibe el rol que falta — Dúo Lógico
-      // necesita exactamente un FIRE y un WATER, nunca dos del mismo.
-      const takenRole = room.players[0]?.role;
-      const role: DualQuestRole = takenRole === 'FIRE' ? 'WATER' : 'FIRE';
-      const startPosition = role === 'FIRE' ? room.fireStart : room.waterStart;
-      room.players.push({
-        socketId: socket.id,
-        userId: socket.data.userId,
-        displayName: socket.data.displayName,
-        ready: false,
-        role,
-        position: startPosition,
-        desiredDirection: null,
-      });
-    }
-
-    this.dualQuestRoomStore.set(room);
-    socket.join(`dual-quest:${code}`);
-    this.broadcastDualQuestState(room);
-  }
-
-  /** Compatibilidad: Iniciar solo confirma al emisor, nunca a toda la sala. */
-  @SubscribeMessage('dual-quest:start')
-  handleDualQuestStart(@ConnectedSocket() socket: AuthenticatedSocket) {
-    this.handleDualQuestReady(socket, { ready: true });
-  }
-
-  @SubscribeMessage('dual-quest:ready')
-  handleDualQuestReady(@ConnectedSocket() socket: AuthenticatedSocket, @MessageBody() body: { ready: boolean }) {
-    const room = this.dualQuestRoomStore.findBySocketId(socket.id);
-    if (!room) throw new Error('No estás en ninguna sala.');
-    // Una retransmisión del último Listo no inicia otra partida ni produce un error tardío.
-    if (room.phase !== 'WAITING' && body?.ready === true && room.players.some(
-      (p) => p.socketId === socket.id && p.userId === socket.data.userId && p.ready === true,
-    )) return;
-    if (room.phase !== 'WAITING') throw new Error('La sala ya no está esperando jugadores.');
-    if (!recordLobbyReady(room.players, socket, body?.ready)) return;
-    this.cancelDealCountdown('dual-quest:' + room.code);
-    this.dualQuestRoomStore.set(room);
-    this.broadcastDualQuestState(room);
-    this.tryStartDualQuest(room);
-  }
-
-  private tryStartDualQuest(room: DualQuestRoomState) {
-    if (room.phase !== 'WAITING' || !allLobbyReady(room.players)) return;
-    room.phase = 'PLAYING';
-    room.bothAtCore = false;
-    room.pendingQuestion = null;
-    this.dualQuestRoomStore.set(room);
-    this.broadcastDualQuestState(room);
-    this.startDualQuestMovementTick(room.code);
-  }
-
-  /** El jugador solo manda su dirección deseada — el tick del servidor decide si de verdad se mueve. */
-  @SubscribeMessage('dual-quest:move')
-  handleDualQuestMove(
-    @ConnectedSocket() socket: AuthenticatedSocket,
-    @MessageBody() body: { direction: DualQuestDirection | null },
-  ) {
-    const room = this.dualQuestRoomStore.findBySocketId(socket.id);
-    if (!room || room.phase !== 'PLAYING') return;
-
-    const player = room.players.find((p) => p.socketId === socket.id);
-    if (!player) return;
-
-    player.desiredDirection = body.direction ?? null;
-    this.dualQuestRoomStore.set(room);
-  }
-
-  @SubscribeMessage('dual-quest:activate-trigger')
-  handleDualQuestActivateTrigger(
-    @ConnectedSocket() socket: AuthenticatedSocket,
-    @MessageBody() body: { triggerId: string },
-  ) {
-    const room = this.dualQuestRoomStore.findBySocketId(socket.id);
-    if (!room || room.phase !== 'PLAYING') throw new Error('La partida no está en curso.');
-
-    const player = room.players.find((p) => p.socketId === socket.id);
-    if (!player) throw new Error('No estás en esta sala.');
-
-    const trigger = room.triggers.find((t) => t.triggerId === body.triggerId);
-    if (!trigger) throw new Error('Ese trigger no existe.');
-    if (trigger.activatedByRole !== player.role) {
-      throw new Error(`Ese trigger solo lo puede activar el rol ${trigger.activatedByRole}.`);
-    }
-    if (player.position.row !== trigger.switchPosition.row || player.position.col !== trigger.switchPosition.col) {
-      throw new Error('Tienes que estar parado sobre el interruptor para activarlo.');
-    }
-
-    if (trigger.kind === 'SWITCH') {
-      this.openDualQuestGate(room, trigger.gateId);
-      return;
-    }
-
-    // QUESTION: se guarda como pendiente y se emite sin la respuesta correcta.
-    room.pendingQuestion = { triggerId: trigger.triggerId, forRole: player.role };
-    this.dualQuestRoomStore.set(room);
-    this.broadcastDualQuestState(room);
-  }
-
-  @SubscribeMessage('dual-quest:answer-trigger')
-  handleDualQuestAnswerTrigger(
-    @ConnectedSocket() socket: AuthenticatedSocket,
-    @MessageBody() body: { triggerId: string; optionIndex: number },
-  ) {
-    const room = this.dualQuestRoomStore.findBySocketId(socket.id);
-    if (!room || room.phase !== 'PLAYING' || !room.pendingQuestion) {
-      throw new Error('No hay ninguna pregunta pendiente.');
-    }
-    if (room.pendingQuestion.triggerId !== body.triggerId) {
-      throw new Error('Esa pregunta ya no está activa.');
-    }
-
-    const player = room.players.find((p) => p.socketId === socket.id);
-    if (!player || player.role !== room.pendingQuestion.forRole) {
-      throw new Error('Esta pregunta no es tuya.');
-    }
-
-    const trigger = room.triggers.find((t) => t.triggerId === body.triggerId);
-    const correct = trigger !== undefined && body.optionIndex === trigger.correctOptionIndex;
-
-    room.pendingQuestion = null;
-
-    this.server.to(`dual-quest:${room.code}`).emit('dual-quest:trigger-result', {
-      triggerId: body.triggerId,
-      role: player.role,
-      correct,
-    });
-
-    if (correct && trigger) {
-      this.openDualQuestGate(room, trigger.gateId);
-      return;
-    }
-
-    // Incorrecto: no hay castigo duro, solo no se abre — el jugador puede
-    // volver a pararse en el interruptor e intentar de nuevo.
-    this.dualQuestRoomStore.set(room);
-    this.broadcastDualQuestState(room);
-  }
-
-  private openDualQuestGate(room: DualQuestRoomState, gateId: string) {
-    const gate = room.gates.find((g) => g.gateId === gateId);
-    if (gate) gate.open = true;
-    this.dualQuestRoomStore.set(room);
-    this.broadcastDualQuestState(room);
-  }
-
-  /**
-   * Arma la Gema Núcleo: el cliente manda TODAS las gemas recolectadas en
-   * el orden que cree correcto. El servidor la corrige contra el `order`
-   * real de `room.fragmentGems` (nunca contra algo que mande el cliente) —
-   * coincide exacto y en secuencia, o no cuenta. Reintentos ilimitados: una
-   * respuesta incorrecta no penaliza, solo no termina la partida.
-   */
-  @SubscribeMessage('dual-quest:submit-assembly')
-  handleDualQuestSubmitAssembly(
-    @ConnectedSocket() socket: AuthenticatedSocket,
-    @MessageBody() body: { orderedGemIds: string[] },
-  ) {
-    const room = this.dualQuestRoomStore.findBySocketId(socket.id);
-    if (!room || room.phase !== 'PLAYING') throw new Error('La partida no está en curso.');
-    if (!room.bothAtCore) throw new Error('Ambos jugadores deben estar en la Gema Núcleo para ensamblar.');
-    if (room.collectedGemIds.length !== room.fragmentGems.length) {
-      throw new Error('Todavía faltan gemas por recolectar.');
-    }
-
-    const submitted = Array.isArray(body.orderedGemIds) ? body.orderedGemIds : [];
-    const sameSet =
-      submitted.length === room.collectedGemIds.length &&
-      room.collectedGemIds.every((id) => submitted.includes(id));
-    if (!sameSet) {
-      throw new Error('El arreglo enviado no contiene exactamente las gemas recolectadas.');
-    }
-
-    const correctSequence = [...room.fragmentGems].sort((a, b) => a.order - b.order).map((g) => g.gemId);
-    const correct = submitted.every((gemId, index) => gemId === correctSequence[index]);
-
-    this.server.to(`dual-quest:${room.code}`).emit('dual-quest:assembly-result', { correct });
-
-    if (correct) {
-      this.clearDualQuestMovementTick(room.code);
-      room.phase = 'FINISHED';
-      this.dualQuestRoomStore.set(room);
-      this.broadcastDualQuestState(room);
-    }
-  }
-
-  /** Solo el anfitrión, y solo con la partida terminada — reinicia posiciones, compuertas y gemas para volver a jugar sin recrear la sala. */
-  @SubscribeMessage('dual-quest:restart')
-  handleDualQuestRestart(@ConnectedSocket() socket: AuthenticatedSocket) {
-    const room = this.dualQuestRoomStore.findBySocketId(socket.id);
-    if (!room) throw new Error('No estás en ninguna sala.');
-    if (room.phase !== 'FINISHED') throw new Error('La partida no ha terminado.');
-    if (socket.data.userId !== room.hostUserId) throw new Error('Solo quien creó la sala puede reiniciar.');
-
-    for (const player of room.players) {
-      player.position = player.role === 'FIRE' ? room.fireStart : room.waterStart;
-      player.desiredDirection = null;
-    }
-    for (const gate of room.gates) gate.open = false;
-    room.collectedGemIds = [];
-    room.pendingQuestion = null;
-    room.bothAtCore = false;
-    room.phase = 'WAITING';
-    resetLobbyReady(room.players);
-
-    this.dualQuestRoomStore.set(room);
-    this.broadcastDualQuestState(room);
-  }
-
-  @SubscribeMessage('dual-quest:leave')
-  handleDualQuestLeave(@ConnectedSocket() socket: AuthenticatedSocket) {
-    this.handleDisconnect(socket);
-    socket.disconnect();
-  }
-
-  private startDualQuestMovementTick(code: string) {
-    this.clearDualQuestMovementTick(code);
-    const timer = setInterval(() => {
-      const room = this.dualQuestRoomStore.get(code);
-      if (!room || room.phase !== 'PLAYING') {
-        this.clearDualQuestMovementTick(code);
-        return;
-      }
-      this.tickDualQuestMovement(room);
-    }, RoomsGateway.DUAL_QUEST_TICK_MS);
-    this.dualQuestMovementTicks.set(code, timer);
-  }
-
-  private clearDualQuestMovementTick(code: string) {
-    const timer = this.dualQuestMovementTicks.get(code);
-    if (timer) {
-      clearInterval(timer);
-      this.dualQuestMovementTicks.delete(code);
-    }
-  }
-
-  private isDualQuestPassable(room: DualQuestRoomState, position: DualQuestCellPosition, role: DualQuestRole): boolean {
-    const cell = room.grid[position.row]?.[position.col];
-    if (cell === undefined) return false;
-    const gate = room.gates.find((g) => g.position.row === position.row && g.position.col === position.col);
-    if (gate && !gate.open) return false;
-    if (cell === 1) return false;
-    if (cell === 2) return role === 'FIRE';
-    if (cell === 3) return role === 'WATER';
-    return true;
-  }
-
-  private tickDualQuestMovement(room: DualQuestRoomState) {
-    let moved = false;
-    let collected = false;
-
-    for (const player of room.players) {
-      if (!player.desiredDirection) continue;
-      const delta = DUAL_QUEST_DIRECTION_DELTAS[player.desiredDirection];
-      const next: DualQuestCellPosition = { row: player.position.row + delta.row, col: player.position.col + delta.col };
-      if (this.isDualQuestPassable(room, next, player.role)) {
-        player.position = next;
-        moved = true;
-      }
-    }
-
-    // Auto-recolección: cada jugador solo puede recoger gemas de SU rol,
-    // mismo criterio que Maze Collector (caer en la celda ya las agrega).
-    if (moved) {
-      for (const player of room.players) {
-        const gem = room.fragmentGems.find(
-          (g) =>
-            g.role === player.role &&
-            g.position.row === player.position.row &&
-            g.position.col === player.position.col &&
-            !room.collectedGemIds.includes(g.gemId),
-        );
-        if (gem) {
-          room.collectedGemIds = [...room.collectedGemIds, gem.gemId];
-          collected = true;
-        }
-      }
-    }
-
-    const wasBothAtCore = room.bothAtCore;
-    room.bothAtCore =
-      room.players.length === 2 &&
-      room.players.every((p) => p.position.row === room.corePosition.row && p.position.col === room.corePosition.col);
-
-    if (moved || collected || room.bothAtCore !== wasBothAtCore) {
-      this.dualQuestRoomStore.set(room);
-      this.broadcastDualQuestState(room);
-    }
-  }
-
-  private broadcastDualQuestState(room: DualQuestRoomState) {
-    for (const player of room.players) {
-      this.server.to(player.socketId).emit('dual-quest:state', toDualQuestClientView(room, player.socketId));
     }
   }
 }

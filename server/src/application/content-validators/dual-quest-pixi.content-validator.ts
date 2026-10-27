@@ -1,242 +1,95 @@
 import { Injectable } from '@nestjs/common';
 import { InvalidGameContentError } from '../../domain/errors/game.errors.js';
+import { DUO_LEVEL_DEFS, isDuoLevelId } from '../../domain/duo-logico/shared/levels/index.js';
+import type { DuoQuestion } from '../../domain/duo-logico/duo-questions.js';
 import type { ContentValidator } from './content-validator.port.js';
 
 /**
- * DUAL_QUEST_PIXI es la variante del motor PixiJS (física real, gravedad,
- * salto, nadar en el propio elemento) — mismo espíritu pedagógico que
- * DUAL_QUEST (fuego/agua, dependencia obligatoria), pero la geometría es
- * un mundo de píxeles con plataformas/líquidos/interruptores, no una
- * cuadrícula. `config` guarda todo lo que NO es un array de fichas
- * (plataformas, líquidos, cajas, botones, puertas, puentes, perro,
- * portal, imagen final); `content` es el array de fichas de
- * rompecabezas — es lo único de la forma del nivel que el esquema de
- * Mongo exige como array (ver `games.collection-schema.ts`).
+ * DUAL_QUEST_PIXI es Dúo Lógico con sprites y sala en línea (issues #105 y
+ * #108). Los escenarios ya vienen hechos en el código
+ * (domain/duo-logico/shared/levels); el profesor elige cuáles incluye y, si
+ * quiere, escribe sus propias preguntas para las Puertas del Saber.
+ *
+ *  - `config.levels`: ids de los escenarios, en el orden de la campaña.
+ *  - `content`: preguntas propias (puede ir vacío: se usa el banco por
+ *    defecto). Misma forma que el banco del servidor: la primera opción de
+ *    cada lista es la correcta (se barajan al mostrarlas).
  */
-export type DualQuestPixiRole = 'FIRE' | 'WATER';
-type Vec2 = { x: number; y: number };
+const FORMATS = new Set(['MIRROR', 'SPLIT', 'TWO_PART']);
+export const DUO_MAX_CUSTOM_QUESTIONS = 45;
+const MAX_PROMPT = 220;
+const MAX_OPTION = 120;
+const MAX_HINT = 160;
+const MAX_EXPLANATION = 400;
+const OPTIONS_PER_QUESTION = 4;
 
-const VALID_ROLES: readonly DualQuestPixiRole[] = ['FIRE', 'WATER'];
-const VALID_MATERIALS = new Set(['concrete', 'dirt', 'metal']);
-const VALID_LIQUID_KINDS = new Set(['WATER', 'LAVA', 'WASTE']);
-const MAX_TITLE_LENGTH = 120;
-const MAX_BODY_LENGTH = 600;
-const MAX_URL_LENGTH = 500;
-const MIN_DIMENSION_PX = 200;
-const MAX_DIMENSION_PX = 20000;
-
-function isNonEmptyString(value: unknown, maxLength: number): value is string {
-  return typeof value === 'string' && value.trim().length > 0 && value.length <= maxLength;
+function text(value: unknown, max: number, where: string): string {
+  if (typeof value !== 'string' || !value.trim()) throw new InvalidGameContentError(`${where} no puede quedar vacío.`);
+  if (value.trim().length > max) throw new InvalidGameContentError(`${where} supera los ${max} caracteres.`);
+  return value.trim();
 }
 
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
-}
-
-function isVec2(value: unknown): value is Vec2 {
-  return typeof value === 'object' && value !== null && isFiniteNumber((value as Vec2).x) && isFiniteNumber((value as Vec2).y);
-}
-
-function isRect(value: unknown): value is { x: number; y: number; width: number; height: number } {
-  if (typeof value !== 'object' || value === null) return false;
-  const rect = value as Record<string, unknown>;
-  return isFiniteNumber(rect.x) && isFiniteNumber(rect.y) && isFiniteNumber(rect.width) && isFiniteNumber(rect.height) && (rect.width as number) > 0 && (rect.height as number) > 0;
+function options(value: unknown, where: string): string[] {
+  if (!Array.isArray(value) || value.length !== OPTIONS_PER_QUESTION) {
+    throw new InvalidGameContentError(`${where} necesita exactamente ${OPTIONS_PER_QUESTION} opciones.`);
+  }
+  const list = value.map((o, i) => text(o, MAX_OPTION, `${where}, opción ${i + 1}`));
+  if (new Set(list.map((o) => o.toLowerCase())).size !== list.length) throw new InvalidGameContentError(`${where} tiene opciones repetidas.`);
+  return list;
 }
 
 @Injectable()
 export class DualQuestPixiContentValidator implements ContentValidator {
   validateConfig(config: unknown): Record<string, unknown> {
     const raw = (config ?? {}) as Record<string, unknown>;
-
-    if (!isFiniteNumber(raw.widthPx) || raw.widthPx < MIN_DIMENSION_PX || raw.widthPx > MAX_DIMENSION_PX) {
-      throw new InvalidGameContentError(`widthPx debe ser un número entre ${MIN_DIMENSION_PX} y ${MAX_DIMENSION_PX}.`);
+    const levels = raw.levels ?? DUO_LEVEL_DEFS.map((def) => def.id);
+    if (!Array.isArray(levels) || levels.length === 0) throw new InvalidGameContentError('Elige al menos un escenario.');
+    for (const id of levels) {
+      if (!isDuoLevelId(id)) throw new InvalidGameContentError(`El escenario "${String(id)}" no existe.`);
     }
-    if (!isFiniteNumber(raw.heightPx) || raw.heightPx < MIN_DIMENSION_PX || raw.heightPx > MAX_DIMENSION_PX) {
-      throw new InvalidGameContentError(`heightPx debe ser un número entre ${MIN_DIMENSION_PX} y ${MAX_DIMENSION_PX}.`);
-    }
-    if (!isVec2(raw.fireStart)) throw new InvalidGameContentError('fireStart necesita "x" y "y" numéricos.');
-    if (!isVec2(raw.waterStart)) throw new InvalidGameContentError('waterStart necesita "x" y "y" numéricos.');
-    if (!isRect(raw.portal)) throw new InvalidGameContentError('portal necesita x/y/width/height numéricos.');
-
-    const platforms = this.validatePlatforms(raw.platforms);
-    const liquids = this.validateLiquids(raw.liquids ?? []);
-    const crates = this.validateCrates(raw.crates ?? []);
-    const buttons = this.validateButtons(raw.buttons ?? []);
-    const buttonIds = new Set(buttons.map((b) => b.id));
-    const doors = this.validateDoorsOrBridges(raw.doors ?? [], buttonIds, 'doors');
-    const bridges = this.validateDoorsOrBridges(raw.bridges ?? [], buttonIds, 'bridges');
-    const dog = raw.dog === null || raw.dog === undefined ? null : this.validateDog(raw.dog);
-    const finalReveal = this.validateFinalReveal(raw.finalReveal);
-
-    return {
-      widthPx: raw.widthPx,
-      heightPx: raw.heightPx,
-      fireStart: raw.fireStart,
-      waterStart: raw.waterStart,
-      portal: raw.portal,
-      platforms,
-      liquids,
-      crates,
-      buttons,
-      doors,
-      bridges,
-      dog,
-      finalReveal,
-    };
+    if (new Set(levels).size !== levels.length) throw new InvalidGameContentError('Hay escenarios repetidos.');
+    // Siempre en el orden de la campaña, sin importar cómo llegaron.
+    const ordered = DUO_LEVEL_DEFS.map((def) => def.id).filter((id) => levels.includes(id));
+    return { levels: ordered };
   }
 
-  private validatePlatforms(value: unknown): unknown[] {
-    if (!Array.isArray(value) || value.length === 0) {
-      throw new InvalidGameContentError('platforms necesita al menos una plataforma.');
-    }
-    return value.map((item, index) => {
-      if (!isRect(item)) {
-        throw new InvalidGameContentError(`platforms[${index}] necesita x/y/width/height numéricos.`);
-      }
-      const raw = item as Record<string, unknown>;
-      if (!VALID_MATERIALS.has(raw.material as string)) {
-        throw new InvalidGameContentError(`platforms[${index}].material debe ser concrete, dirt o metal.`);
-      }
-      return { x: raw.x, y: raw.y, width: raw.width, height: raw.height, material: raw.material };
-    });
-  }
-
-  private validateLiquids(value: unknown): unknown[] {
-    if (!Array.isArray(value)) throw new InvalidGameContentError('liquids debe ser un array.');
-    return value.map((item, index) => {
-      if (!isRect(item)) throw new InvalidGameContentError(`liquids[${index}] necesita x/y/width/height numéricos.`);
-      const raw = item as Record<string, unknown>;
-      if (!VALID_LIQUID_KINDS.has(raw.kind as string)) {
-        throw new InvalidGameContentError(`liquids[${index}].kind debe ser WATER, LAVA o WASTE.`);
-      }
-      return { x: raw.x, y: raw.y, width: raw.width, height: raw.height, kind: raw.kind };
-    });
-  }
-
-  private validateCrates(value: unknown): unknown[] {
-    if (!Array.isArray(value)) throw new InvalidGameContentError('crates debe ser un array.');
-    return value.map((item, index) => {
-      if (!isVec2(item)) throw new InvalidGameContentError(`crates[${index}] necesita "x" y "y" numéricos.`);
-      const raw = item as Record<string, unknown>;
-      if (!isFiniteNumber(raw.size) || (raw.size as number) <= 0) {
-        throw new InvalidGameContentError(`crates[${index}].size debe ser un número positivo.`);
-      }
-      return { x: raw.x, y: raw.y, size: raw.size };
-    });
-  }
-
-  private validateButtons(value: unknown): Array<{ id: string; x: number; y: number; momentary: boolean }> {
-    if (!Array.isArray(value)) throw new InvalidGameContentError('buttons debe ser un array.');
+  validateContent(content: unknown, config?: Record<string, unknown>): unknown[] {
+    if (content === undefined || content === null) return [];
+    if (!Array.isArray(content)) throw new InvalidGameContentError('Las preguntas deben ser una lista.');
+    if (content.length > DUO_MAX_CUSTOM_QUESTIONS) throw new InvalidGameContentError(`Máximo ${DUO_MAX_CUSTOM_QUESTIONS} preguntas propias.`);
+    const levels = (config?.levels as string[] | undefined) ?? DUO_LEVEL_DEFS.map((def) => def.id);
     const ids = new Set<string>();
-    return value.map((item, index) => {
-      if (typeof item !== 'object' || item === null) {
-        throw new InvalidGameContentError(`buttons[${index}] no es un objeto válido.`);
-      }
+    return content.map((item, index): DuoQuestion => {
+      const where = `La pregunta ${index + 1}`;
+      if (typeof item !== 'object' || item === null) throw new InvalidGameContentError(`${where} no es válida.`);
       const raw = item as Record<string, unknown>;
-      if (!isNonEmptyString(raw.id, 60)) throw new InvalidGameContentError(`buttons[${index}] necesita un id.`);
-      if (ids.has(raw.id)) throw new InvalidGameContentError(`el id de botón "${raw.id}" está repetido.`);
-      ids.add(raw.id);
-      if (!isFiniteNumber(raw.x) || !isFiniteNumber(raw.y)) {
-        throw new InvalidGameContentError(`buttons[${index}] necesita "x" y "y" numéricos.`);
+      const id = typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim().slice(0, 60) : `propia-${index + 1}`;
+      if (ids.has(id)) throw new InvalidGameContentError(`${where} repite su id.`);
+      ids.add(id);
+      if (typeof raw.level !== 'string' || !levels.includes(raw.level)) throw new InvalidGameContentError(`${where} es de un escenario que el juego no incluye.`);
+      if (!FORMATS.has(raw.format as string)) throw new InvalidGameContentError(`${where} tiene un formato desconocido.`);
+      const hintsRaw = Array.isArray(raw.hints) ? raw.hints : [];
+      const hints = hintsRaw.filter((h) => typeof h === 'string' && h.trim()).slice(0, 3).map((h, i) => text(h, MAX_HINT, `${where}, pista ${i + 1}`));
+      const explanation = typeof raw.explanation === 'string' && raw.explanation.trim() ? text(raw.explanation, MAX_EXPLANATION, `${where}, explicación`) : '¡Muy bien! Los dos acertaron.';
+      const base = { id, level: raw.level, hints, explanation };
+      const prompt = text(raw.prompt, MAX_PROMPT, `${where}, enunciado`);
+      if (raw.format === 'MIRROR') return { ...base, format: 'MIRROR', prompt, options: options(raw.options, where) };
+      if (raw.format === 'SPLIT') {
+        const clues = (raw.clues ?? {}) as Record<string, unknown>;
+        return {
+          ...base,
+          format: 'SPLIT',
+          prompt,
+          clues: { FIRE: text(clues.FIRE, MAX_PROMPT, `${where}, dato de Lumen`), WATER: text(clues.WATER, MAX_PROMPT, `${where}, dato de Gota`) },
+          options: options(raw.options, where),
+        };
       }
-      if (typeof raw.momentary !== 'boolean') {
-        throw new InvalidGameContentError(`buttons[${index}].momentary debe ser booleano.`);
-      }
-      return { id: raw.id, x: raw.x as number, y: raw.y as number, momentary: raw.momentary };
-    });
-  }
-
-  private validateDoorsOrBridges(value: unknown, buttonIds: Set<string>, fieldName: string): unknown[] {
-    if (!Array.isArray(value)) throw new InvalidGameContentError(`${fieldName} debe ser un array.`);
-    const ids = new Set<string>();
-    return value.map((item, index) => {
-      if (!isRect(item)) throw new InvalidGameContentError(`${fieldName}[${index}] necesita x/y/width/height numéricos.`);
-      const raw = item as Record<string, unknown>;
-      if (!isNonEmptyString(raw.id, 60)) throw new InvalidGameContentError(`${fieldName}[${index}] necesita un id.`);
-      if (ids.has(raw.id)) throw new InvalidGameContentError(`el id "${raw.id}" está repetido en ${fieldName}.`);
-      ids.add(raw.id);
-      if (!Array.isArray(raw.requires) || raw.requires.length === 0) {
-        throw new InvalidGameContentError(`${fieldName}[${index}] necesita al menos un id en "requires".`);
-      }
-      for (const requiredId of raw.requires) {
-        if (!buttonIds.has(requiredId as string)) {
-          throw new InvalidGameContentError(`${fieldName}[${index}]: "${String(requiredId)}" no existe en buttons.`);
-        }
-      }
-      if (raw.logic !== 'AND' && raw.logic !== 'OR') {
-        throw new InvalidGameContentError(`${fieldName}[${index}].logic debe ser AND u OR.`);
-      }
-      return { id: raw.id, x: raw.x, y: raw.y, width: raw.width, height: raw.height, requires: raw.requires, logic: raw.logic };
-    });
-  }
-
-  private validateDog(value: unknown): Vec2 {
-    if (!isVec2(value)) throw new InvalidGameContentError('dog necesita "x" y "y" numéricos (o null si el nivel no lo usa).');
-    return value;
-  }
-
-  private validateFinalReveal(value: unknown): Record<string, unknown> {
-    if (typeof value !== 'object' || value === null) {
-      throw new InvalidGameContentError('finalReveal es obligatorio.');
-    }
-    const raw = value as Record<string, unknown>;
-    if (!isNonEmptyString(raw.title, MAX_TITLE_LENGTH)) throw new InvalidGameContentError('finalReveal.title es obligatorio.');
-    if (!isNonEmptyString(raw.positiveUrl, MAX_URL_LENGTH)) throw new InvalidGameContentError('finalReveal.positiveUrl es obligatorio.');
-    if (!isNonEmptyString(raw.negativeUrl, MAX_URL_LENGTH)) throw new InvalidGameContentError('finalReveal.negativeUrl es obligatorio.');
-    if (!isNonEmptyString(raw.summary, MAX_BODY_LENGTH)) throw new InvalidGameContentError('finalReveal.summary es obligatorio.');
-    return {
-      title: (raw.title as string).trim(),
-      positiveUrl: (raw.positiveUrl as string).trim(),
-      negativeUrl: (raw.negativeUrl as string).trim(),
-      summary: (raw.summary as string).trim(),
-    };
-  }
-
-  validateContent(content: unknown): unknown[] {
-    if (!Array.isArray(content) || content.length === 0) {
-      throw new InvalidGameContentError('las fichas de rompecabezas (content) necesitan al menos un elemento.');
-    }
-    const ids = new Set<string>();
-    return content.map((item, index) => {
-      if (typeof item !== 'object' || item === null) {
-        throw new InvalidGameContentError(`content[${index}] no es un objeto válido.`);
-      }
-      const raw = item as Record<string, unknown>;
-
-      if (!isNonEmptyString(raw.id, 60)) throw new InvalidGameContentError(`content[${index}] necesita un id.`);
-      if (ids.has(raw.id)) throw new InvalidGameContentError(`el id de ficha "${raw.id}" está repetido.`);
-      ids.add(raw.id);
-
-      if (!isFiniteNumber(raw.x) || !isFiniteNumber(raw.y)) {
-        throw new InvalidGameContentError(`content[${index}] necesita "x" y "y" numéricos.`);
-      }
-      if (raw.role !== null && !VALID_ROLES.includes(raw.role as DualQuestPixiRole)) {
-        throw new InvalidGameContentError(`content[${index}].role debe ser FIRE, WATER o null.`);
-      }
-      if (!isNonEmptyString(raw.color, 20) || !isNonEmptyString(raw.glow, 20)) {
-        throw new InvalidGameContentError(`content[${index}] necesita "color" y "glow" (hex CSS).`);
-      }
-
-      const concept = raw.concept as Record<string, unknown> | undefined;
-      if (typeof concept !== 'object' || concept === null) {
-        throw new InvalidGameContentError(`content[${index}].concept es obligatorio.`);
-      }
-      if (!isNonEmptyString(concept.title, MAX_TITLE_LENGTH)) {
-        throw new InvalidGameContentError(`content[${index}].concept.title es obligatorio.`);
-      }
-      if (!isNonEmptyString(concept.body, MAX_BODY_LENGTH)) {
-        throw new InvalidGameContentError(`content[${index}].concept.body es obligatorio.`);
-      }
-
-      return {
-        id: raw.id,
-        x: raw.x,
-        y: raw.y,
-        role: raw.role,
-        color: (raw.color as string).trim(),
-        glow: (raw.glow as string).trim(),
-        concept: { title: (concept.title as string).trim(), body: (concept.body as string).trim() },
-      };
+      const parts = (raw.parts ?? {}) as Record<string, Record<string, unknown> | undefined>;
+      const part = (role: 'FIRE' | 'WATER', name: string) => ({
+        prompt: text(parts[role]?.prompt, MAX_PROMPT, `${where}, parte de ${name}`),
+        options: options(parts[role]?.options, `${where}, parte de ${name}`),
+      });
+      return { ...base, format: 'TWO_PART', prompt, parts: { FIRE: part('FIRE', 'Lumen'), WATER: part('WATER', 'Gota') } };
     });
   }
 }

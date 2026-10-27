@@ -11,7 +11,6 @@ import { InMemoryRoomStore } from './in-memory-room.store.js';
 import { InMemoryTournamentStore } from './in-memory-tournament.store.js';
 import { InMemoryDominoRoomStore } from './in-memory-domino-room.store.js';
 import { InMemorySnakesLaddersRoomStore } from './in-memory-snakes-ladders-room.store.js';
-import { InMemoryDualQuestRoomStore } from './in-memory-dual-quest-room.store.js';
 
 type Client = Parameters<RoomsGateway['handleDominoPlay']>[0];
 
@@ -62,7 +61,6 @@ function setup(phase: DominoRoomState['phase'] = 'WAITING') {
     new InMemoryTournamentStore(),
     domino,
     new InMemorySnakesLaddersRoomStore(),
-    new InMemoryDualQuestRoomStore(),
     { track: vi.fn().mockResolvedValue(undefined) } as unknown as AnalyticsTrackerService,
   );
   const events: Array<{ target: string; event: string; payload: unknown }> = [];

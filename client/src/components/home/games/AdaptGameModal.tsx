@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
   Dices,
-  Flame,
   Ghost,
   Info,
   Layers,
@@ -107,14 +106,6 @@ const TARGETS: AdaptTarget[] = [
     group: 'MEMORY',
     groupTitle: 'Memoria',
     variantLabel: 'Opuestos',
-  },
-  {
-    key: 'DUAL_QUEST',
-    title: 'Dúo Lógico',
-    description: 'Dos personajes resuelven retos del tema en cooperación.',
-    targetType: 'DUAL_QUEST',
-    route: '/juegos/crear/dual-quest',
-    icon: Flame,
   },
 ]
 

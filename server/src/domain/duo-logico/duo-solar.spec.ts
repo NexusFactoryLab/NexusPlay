@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { TILE, moverRect, standPoint } from './shared/duoLevel.js';
 import { STEP, createPlayer, stepPlayer, type PlayerSim, type StepEvent } from './shared/duoPhysics.js';
-import { createWorldState, isReceiverLit, litMirrorCount, touchMirrors, updateSwitches } from './shared/duoWorld.js';
+import { createWorldState, isReceiverLit, litMirrorCount, updateSwitches } from './shared/duoWorld.js';
 import { DUO_LEVEL_DEFS, duoLevel, nextDuoLevelId } from './shared/levels/index.js';
 import { SOLAR } from './shared/levels/solar.js';
 import { NO_INPUT, type DuoInput, type DuoPlayerNet } from './shared/duoTypes.js';
@@ -13,6 +13,7 @@ import {
   applyClientState,
   chooseDuoLevel,
   createDuoRoom,
+  rotateDuoMirror,
   joinDuoRoom,
   setDuoReady,
   tickDuoRoom,
@@ -72,28 +73,13 @@ describe('Planta solar', () => {
     expect(p.x).toBeGreaterThan(49 * TILE);
   });
 
-  it('cada espejo gira una vez al tocarlo; con los dos bien se enciende el receptor y el puente', () => {
+  it('con los dos espejos bien orientados se enciende el receptor y el puente', () => {
     const world = createWorldState(solar);
-    const contacts = {};
     const [m1, m2] = SOLAR.mirrors!;
-    const on1 = net(standPoint(m1));
-    // Tocar y quedarse encima gira una sola vez.
-    touchMirrors(solar, world, { FIRE: on1 }, contacts);
-    touchMirrors(solar, world, { FIRE: on1 }, contacts);
-    expect(world.mirrors[m1.id]).toBe((m1.start + 1) % 4);
-    // Soltar y volver a tocar lo gira otra vez, hasta su posición correcta.
-    touchMirrors(solar, world, {}, contacts);
-    touchMirrors(solar, world, { FIRE: on1 }, contacts);
-    expect(world.mirrors[m1.id]).toBe(m1.target);
+    world.mirrors[m1.id] = m1.target;
     expect(litMirrorCount(solar, world, 'receptor')).toBe(1);
     expect(isReceiverLit(solar, world, 'receptor')).toBe(false);
-    // Gota orienta el segundo.
-    const on2 = net(standPoint(m2));
-    for (let i = 0; i < 4 && world.mirrors[m2.id] !== m2.target; i++) {
-      touchMirrors(solar, world, {}, contacts);
-      touchMirrors(solar, world, { WATER: on2 }, contacts);
-    }
-    expect(world.mirrors[m2.id]).toBe(m2.target);
+    world.mirrors[m2.id] = m2.target;
     updateSwitches(solar, world, {});
     expect(world.switches['receptor']).toBe(true);
   });
@@ -120,6 +106,43 @@ describe('campaña de escenarios', () => {
     return r;
   }
 
+  it('el espejo se gira con las flechas del panel, solo estando junto a él', () => {
+    const r = room('solar');
+    const m1 = SOLAR.mirrors![0];
+    const near = standPoint(m1);
+    expect(() => rotateDuoMirror(r, 'ana', m1.id, 1)).toThrow('Acércate');
+    applyClientState(r, 'ana', { player: net({ x: near.x + 30, y: near.y }), crates: [] }, DUO_COUNTDOWN_MS);
+    rotateDuoMirror(r, 'ana', m1.id, 1);
+    expect(r.world.mirrors[m1.id]).toBe((m1.start + 1) % 4);
+    rotateDuoMirror(r, 'ana', m1.id, -1);
+    rotateDuoMirror(r, 'ana', m1.id, -1);
+    expect(r.world.mirrors[m1.id]).toBe((m1.start + 3) % 4);
+    expect(() => rotateDuoMirror(r, 'ana', m1.id, 2)).toThrow();
+    expect(() => rotateDuoMirror(r, 'ana', 'otro', 1)).toThrow('no existe');
+    applyClientState(r, 'ana', { player: net({ x: near.x + 400, y: near.y }), crates: [] }, DUO_COUNTDOWN_MS);
+    expect(() => rotateDuoMirror(r, 'ana', m1.id, 1)).toThrow('Acércate');
+  });
+
+  it('la campaña usa solo los escenarios que eligió el profesor y sus preguntas propias', () => {
+    const own = { id: 'p1', level: 'solar', format: 'MIRROR' as const, prompt: '¿Pregunta del profe?', options: ['Sí', 'No', 'Tal vez', 'Nunca'], hints: [], explanation: 'Bien.' };
+    const r = createDuoRoom({ code: 'C', gameId: 'g', gameTitle: 't', user: ANA, role: 'FIRE', now: 0, campaign: ['solar'], customQuestions: [own] });
+    expect(r.levelId).toBe('solar');
+    expect(toDuoRoomView(r, 'ana', 0).levels.map((l) => l.id)).toEqual(['solar']);
+    expect(() => chooseDuoLevel(r, 'ana', 'bosque')).toThrow('no está en este juego');
+    joinDuoRoom(r, LUIS);
+    setDuoReady(r, 'ana', true, 0);
+    setDuoReady(r, 'luis', true, 0);
+    tickDuoRoom(r, DUO_COUNTDOWN_MS, () => 0.3);
+    for (const [id, role] of [['ana', 'FIRE'], ['luis', 'WATER']] as const) {
+      const top = pedestalRect(SOLAR.gates[0].pedestals[role]);
+      applyClientState(r, id, { player: net({ x: top.x + top.w / 2, y: top.y }), crates: [] }, DUO_COUNTDOWN_MS);
+    }
+    tickDuoRoom(r, DUO_COUNTDOWN_MS, () => 0.3);
+    expect(r.question?.question.id).toBe('p1');
+    r.phase = 'VICTORY';
+    expect(toDuoRoomView(r, 'ana', 0).nextLevelTitle).toBeNull();
+  });
+
   it('los escenarios van en orden: bosque y luego planta solar', () => {
     expect(DUO_LEVEL_DEFS.map((d) => d.id).slice(0, 2)).toEqual(['bosque', 'solar']);
     expect(nextDuoLevelId('bosque')).toBe('solar');
@@ -129,7 +152,7 @@ describe('campaña de escenarios', () => {
     const r = createDuoRoom({ code: 'C', gameId: 'g', gameTitle: 't', user: ANA, role: 'FIRE', now: 0 });
     joinDuoRoom(r, LUIS);
     expect(() => chooseDuoLevel(r, 'luis', 'solar')).toThrow('Solo quien creó');
-    expect(() => chooseDuoLevel(r, 'ana', 'marte')).toThrow('no existe');
+    expect(() => chooseDuoLevel(r, 'ana', 'marte')).toThrow('no está en este juego');
     chooseDuoLevel(r, 'ana', 'solar');
     expect(toDuoRoomView(r, 'luis', 0)).toMatchObject({ levelId: 'solar', levelTitle: 'La Planta solar' });
   });

@@ -1,8 +1,8 @@
 import { MIN_DISCARDS_TO_ACCUSE } from './guessWhoTypes'
-import { ArrowUp, ArrowUpDown, Brain, Check, CircleHelp, Compass, Copy, Dice5, DoorOpen, Ear, Eye, Flag, Footprints, Gem, Hand, Handshake, Layers, Leaf, Link2, MessageCircleQuestion, MoveRight, Puzzle, Search, Shield, SquareMousePointer, Sun, ToggleRight, Trophy, X } from 'lucide-react'
+import { ArrowUp, ArrowUpDown, Brain, Check, CircleHelp, Copy, Dice5, DoorOpen, Ear, Eye, Flag, Footprints, Hand, Handshake, Layers, Leaf, Link2, MessageCircleQuestion, MoveRight, Search, Shield, SquareMousePointer, Sun, Trophy, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
-export type InstructionKind = 'PAIRS' | 'OPPOSITES' | 'GUESS_WHO' | 'GUESS_WHO_GROUP' | 'DOMINO' | 'MAZE_COLLECTOR' | 'SNAKES_LADDERS' | 'DUAL_QUEST' | 'DUAL_QUEST_PIXI' | 'TRUE_FALSE_MAZE'
+export type InstructionKind = 'PAIRS' | 'OPPOSITES' | 'GUESS_WHO' | 'GUESS_WHO_GROUP' | 'DOMINO' | 'MAZE_COLLECTOR' | 'SNAKES_LADDERS' | 'DUAL_QUEST_PIXI' | 'TRUE_FALSE_MAZE'
 type Instruction = { text: string; exampleTitle: string; labels: [string, string, string, string]; icons: [LucideIcon, LucideIcon, LucideIcon, LucideIcon]; caption: string }
 
 /** Solo contenido: la presentación y la forma de continuar son comunes. */
@@ -49,12 +49,6 @@ export const gameInstructions: Record<InstructionKind, Instruction> = {
     icons: [Dice5, MoveRight, MessageCircleQuestion, Flag],
     caption: 'Tira el dado, resuelve los retos del camino y llega a la última casilla.',
   },
-  DUAL_QUEST: {
-    text: 'Fuego y Agua juegan en equipo. Muévete con las flechas, WASD o los controles de pantalla; activa mecanismos, responde preguntas y recoge las gemas. Reúnanse en el núcleo y ordenen las piezas para completar el reto.',
-    exampleTitle: 'Ejemplo de cooperación', labels: ['Explora', 'Activa', 'Recoge', 'Ordena'],
-    icons: [Compass, ToggleRight, Gem, Puzzle],
-    caption: 'Activen los mecanismos, recojan las gemas y ordenen las piezas en el núcleo.',
-  },
   TRUE_FALSE_MAZE: {
     text: 'Lee la afirmación y lleva al robot a la sala VERDADERO o FALSO con las flechas, WASD o deslizando. Esquiva a las medusas galácticas: los núcleos de energía las aturden y las rejillas te llevan al otro lado de la nave. Si respondes mal o te atrapan, pierdes una batería.',
     exampleTitle: 'Ejemplo de una ronda', labels: ['Lee', 'Corre', 'Esquiva', 'Responde'],
@@ -69,8 +63,8 @@ export const gameInstructions: Record<InstructionKind, Instruction> = {
   },
 }
 
-/** Claves de instrucciones que corresponden a un formulario de creación (sin variantes de partida como el torneo o el motor PixiJS). */
-export type CreationInstructionKind = Exclude<InstructionKind, 'GUESS_WHO_GROUP' | 'DUAL_QUEST_PIXI'>
+/** Claves de instrucciones que corresponden a un formulario de creación (sin variantes de partida como el torneo). */
+export type CreationInstructionKind = Exclude<InstructionKind, 'GUESS_WHO_GROUP'>
 
 /**
  * Versión corta de las instrucciones para la pantalla de éxito tras crear un
@@ -96,9 +90,9 @@ export const gameInstructionSummaries: Record<CreationInstructionKind, { purpose
     purpose: 'Entrena la memoria uniendo imágenes con su nombre.',
     howTo: 'Destapa dos cartas y une cada imagen con su nombre antes de que termine el tiempo.',
   },
-  DUAL_QUEST: {
-    purpose: 'Dos jugadores resuelven el reto en equipo.',
-    howTo: 'Fuego y Agua se mueven, activan mecanismos, responden preguntas y se reúnen en el núcleo.',
+  DUAL_QUEST_PIXI: {
+    purpose: 'Dos estudiantes superan escenarios en equipo y responden juntos.',
+    howTo: 'Lumen y Gota se ayudan con botones, palancas y espejos; en cada Puerta del Saber pasan solo si los dos aciertan.',
   },
   MAZE_COLLECTOR: {
     purpose: 'Recoge todos los elementos y esquiva a los enemigos.',

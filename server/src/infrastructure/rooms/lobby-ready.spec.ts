@@ -10,7 +10,6 @@ import { InMemoryRoomStore } from './in-memory-room.store.js';
 import { InMemoryTournamentStore } from './in-memory-tournament.store.js';
 import { InMemoryDominoRoomStore } from './in-memory-domino-room.store.js';
 import { InMemorySnakesLaddersRoomStore } from './in-memory-snakes-ladders-room.store.js';
-import { InMemoryDualQuestRoomStore } from './in-memory-dual-quest-room.store.js';
 
 type Client = Parameters<RoomsGateway['handleStart']>[0];
 function client(id: string): Client {
@@ -56,16 +55,6 @@ const modes = [
     delay: false,
   },
   {
-    name: 'dual-quest',
-    type: 'DUAL_QUEST',
-    create: 'handleDualQuestCreate',
-    join: 'handleDualQuestJoin',
-    ready: 'handleDualQuestReady',
-    start: 'handleDualQuestStart',
-    store: 'dual',
-    delay: false,
-  },
-  {
     name: 'tournament',
     type: 'GUESS_WHO',
     create: 'handleTournamentCreate',
@@ -83,7 +72,6 @@ async function setup(mode: Mode, count = 2) {
     room: new InMemoryRoomStore(),
     domino: new InMemoryDominoRoomStore(),
     snakes: new InMemorySnakesLaddersRoomStore(),
-    dual: new InMemoryDualQuestRoomStore(),
     tournament: new InMemoryTournamentStore(),
   };
   const game = {
@@ -124,7 +112,6 @@ async function setup(mode: Mode, count = 2) {
     stores.tournament,
     stores.domino,
     stores.snakes,
-    stores.dual,
     {
       track: vi.fn().mockResolvedValue(undefined),
     } as unknown as AnalyticsTrackerService,
@@ -290,7 +277,7 @@ describe('salas de varios participantes', () => {
     expect(h.room.phase).toBe('PLAYING');
   });
   it('el torneo exige cantidad par además de unanimidad y reevalúa al salir', async () => {
-    const h = await setup(modes[4], 3);
+    const h = await setup(modes[3], 3);
     h.ready(0);
     h.ready(1);
     h.ready(2);
@@ -299,7 +286,7 @@ describe('salas de varios participantes', () => {
     expect(h.room.phase).toBe('RUNNING');
   });
   it('el torneo de 4 no inicia hasta la cuarta confirmación', async () => {
-    const h = await setup(modes[4], 4);
+    const h = await setup(modes[3], 4);
     h.ready(1);
     h.ready(2);
     h.ready(3);
@@ -309,7 +296,7 @@ describe('salas de varios participantes', () => {
   });
 });
 
-describe.each([modes[0], modes[1], modes[2], modes[4]])(
+describe.each([modes[0], modes[1], modes[2], modes[3]])(
   '$name: configuración',
   (mode) => {
     it('cambiar el turno exige que todos vuelvan a confirmar', async () => {
@@ -331,17 +318,6 @@ describe.each([modes[0], modes[1], modes[2], modes[4]])(
     });
   },
 );
-
-it('Dúo reinicia en lobby y requiere confirmación de ambos', async () => {
-  const h = await setup(modes[3]);
-  h.room.phase = 'FINISHED';
-  h.gateway.handleDualQuestRestart(h.sockets[0]);
-  expect(h.room.phase).toBe('WAITING');
-  h.ready(0);
-  expect(h.room.phase).toBe('WAITING');
-  h.ready(1);
-  expect(h.room.phase).toBe('PLAYING');
-});
 
 describe.each(modes.slice(0, 3))(
   '$name: conserva la revancha por unanimidad',
@@ -370,7 +346,6 @@ const chatHandlers = {
   domino: 'handleDominoChat',
   tournament: 'handleTournamentChat',
   'snakes-ladders': 'handleSnakesLaddersChat',
-  'dual-quest': 'handleDualQuestChat',
 } as const;
 describe.each(modes)('$name: chat compartido', (mode) => {
   it('entrega texto solo a los participantes actuales con identidad del servidor', async () => {

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DoorOpen, Heart, LogOut, MessageCircle, Smile, Sparkles } from 'lucide-react'
 import { ChatPanel } from '../ChatPanel'
-import { DuoGame } from './engine/DuoGame'
+import { DuoGame, type NearMirror } from './engine/DuoGame'
+import { DuoMirrorPanel } from './DuoMirrorPanel'
 import { EMOTE_TEXT } from './engine/characterView'
 import { DuoQuestionPanel } from './DuoQuestionPanel'
 import { DuoTouchControls } from './DuoTouchControls'
@@ -60,6 +61,8 @@ export function DuoPlayScreen({
   const [chatOpen, setChatOpen] = useState(false)
   const [readCount, setReadCount] = useState(0)
   const [now, setNow] = useState(() => Date.now())
+  const [nearMirror, setNearMirror] = useState<NearMirror | null>(null)
+  const [mirrorOpen, setMirrorOpen] = useState(false)
   const { setRealtimeListener, sendState, sendEmote } = duo
 
   const names = useMemo(() => {
@@ -91,6 +94,10 @@ export function DuoPlayScreen({
         const who = role === me ? 'Te apagaste' : `${CHARACTERS[role].name} se apagó`
         toast(`${who}${cause ? ' ' + CAUSE_TEXT[cause] : ''}. Vuelve al último punto seguro.`, 'bad')
       },
+      onNearMirror: (mirror) => {
+        setNearMirror(mirror)
+        if (!mirror) setMirrorOpen(false)
+      },
     })
     gameRef.current = game
     void game.mount(host)
@@ -108,6 +115,12 @@ export function DuoPlayScreen({
   useEffect(() => {
     gameRef.current?.setPhase(room.phase, room.runId)
   }, [room.phase, room.runId, level])
+
+  // Con el panel del espejo abierto el personaje se queda quieto (las flechas giran el espejo).
+  const panelOpen = mirrorOpen && !!nearMirror && room.phase === 'PLAYING'
+  useEffect(() => {
+    gameRef.current?.setFrozen(panelOpen)
+  }, [panelOpen])
 
   const skew = room.serverNow - Date.now()
   useEffect(() => {
@@ -292,7 +305,18 @@ export function DuoPlayScreen({
 
       {ended && <DuoEndScreen room={room} onRetry={duo.retry} onExit={onExit} />}
 
-      {touch && room.phase === 'PLAYING' && <DuoTouchControls onChange={(key, down) => gameRef.current?.input.setTouch(key, down)} />}
+      {nearMirror && room.phase === 'PLAYING' && (
+        <DuoMirrorPanel
+          mirror={nearMirror}
+          open={panelOpen}
+          touch={touch}
+          onOpen={() => setMirrorOpen(true)}
+          onClose={() => setMirrorOpen(false)}
+          onRotate={(dir) => duo.rotateMirror(nearMirror.id, dir)}
+        />
+      )}
+
+      {touch && room.phase === 'PLAYING' && !panelOpen && <DuoTouchControls onChange={(key, down) => gameRef.current?.input.setTouch(key, down)} />}
     </div>
   )
 }

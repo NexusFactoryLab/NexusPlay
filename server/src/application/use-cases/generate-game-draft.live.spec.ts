@@ -8,7 +8,6 @@ import { GuessWhoContentValidator } from '../content-validators/guess-who.conten
 import { DominoContentValidator } from '../content-validators/domino.content-validator.js';
 import { MazeCollectorContentValidator } from '../content-validators/maze-collector.content-validator.js';
 import { SnakesLaddersContentValidator } from '../content-validators/snakes-ladders.content-validator.js';
-import { DualQuestContentValidator } from '../content-validators/dual-quest.content-validator.js';
 import { DualQuestPixiContentValidator } from '../content-validators/dual-quest-pixi.content-validator.js';
 import { TrueFalseMazeContentValidator } from '../content-validators/true-false-maze.content-validator.js';
 import { ContentImageResolver } from '../services/content-image-resolver.service.js';
@@ -40,7 +39,6 @@ function buildRegistry(): ContentValidatorRegistry {
     new DominoContentValidator(),
     new MazeCollectorContentValidator(),
     new SnakesLaddersContentValidator(),
-    new DualQuestContentValidator(),
     new DualQuestPixiContentValidator(),
     new TrueFalseMazeContentValidator(),
   );

@@ -23,13 +23,11 @@ import { ROOM_STORE } from '../dist/domain/ports/room-store.port.js';
 import { TOURNAMENT_STORE } from '../dist/domain/ports/tournament-store.port.js';
 import { DOMINO_ROOM_STORE } from '../dist/domain/ports/domino-room-store.port.js';
 import { SNAKES_LADDERS_ROOM_STORE } from '../dist/domain/ports/snakes-ladders-room-store.port.js';
-import { DUAL_QUEST_ROOM_STORE } from '../dist/domain/ports/dual-quest-room-store.port.js';
 import { DUO_ROOM_STORE } from '../dist/domain/ports/duo-room-store.port.js';
 import { InMemoryRoomStore } from '../dist/infrastructure/rooms/in-memory-room.store.js';
 import { InMemoryTournamentStore } from '../dist/infrastructure/rooms/in-memory-tournament.store.js';
 import { InMemoryDominoRoomStore } from '../dist/infrastructure/rooms/in-memory-domino-room.store.js';
 import { InMemorySnakesLaddersRoomStore } from '../dist/infrastructure/rooms/in-memory-snakes-ladders-room.store.js';
-import { InMemoryDualQuestRoomStore } from '../dist/infrastructure/rooms/in-memory-dual-quest-room.store.js';
 import { InMemoryDuoRoomStore } from '../dist/infrastructure/rooms/in-memory-duo-room.store.js';
 import { optionsFor } from '../dist/domain/duo-logico/duo-questions.js';
 import { moverRect } from '../dist/domain/duo-logico/shared/duoLevel.js';
@@ -56,7 +54,6 @@ Module({
     { provide: TOURNAMENT_STORE, useClass: InMemoryTournamentStore },
     { provide: DOMINO_ROOM_STORE, useClass: InMemoryDominoRoomStore },
     { provide: SNAKES_LADDERS_ROOM_STORE, useClass: InMemorySnakesLaddersRoomStore },
-    { provide: DUAL_QUEST_ROOM_STORE, useClass: InMemoryDualQuestRoomStore },
     { provide: DUO_ROOM_STORE, useClass: InMemoryDuoRoomStore },
   ],
 })(TestModule);
@@ -288,9 +285,22 @@ try {
   await until(() => pos('Ana').x >= 27 * TILE + 20, 'Ana sobre la repisa');
   await press('Ana', 'right', false);
   await press('Ana', 'jump', false);
-  await until(() => room().world.mirrors['espejo-1'] === (angle + 1) % 4, 'el espejo gira');
+  // Tocar el espejo ya no lo gira: aparece el botón para abrir su panel.
+  await ana.getByTestId('duo-mirror-open').click();
+  const mirrorPanel = ana.getByTestId('duo-mirror-panel');
+  await mirrorPanel.waitFor();
+  assert.equal(room().world.mirrors['espejo-1'], angle, 'acercarse no gira el espejo');
+  await mirrorPanel.getByRole('button', { name: 'Girar a la derecha' }).click();
+  await until(() => room().world.mirrors['espejo-1'] === (angle + 1) % 4, 'el espejo gira con la flecha');
+  await ana.keyboard.press('ArrowLeft');
+  await until(() => room().world.mirrors['espejo-1'] === angle, 'la flecha del teclado lo gira de vuelta');
+  await ana.keyboard.press('ArrowRight');
+  await until(() => room().world.mirrors['espejo-1'] === (angle + 1) % 4, 'y otra vez');
+  assert.ok(Math.abs(pos('Ana').vx) < 5, 'con el panel abierto el personaje no se mueve');
   await new Promise((resolve) => setTimeout(resolve, 400));
   await ana.screenshot({ path: '.scratch/duo-solar-espejo-desktop.png' });
+  await ana.keyboard.press('Escape');
+  await mirrorPanel.waitFor({ state: 'hidden' });
   await luis.screenshot({ path: '.scratch/duo-solar-mobile.png' });
 
   assert.deepEqual(errors, []);

@@ -18,7 +18,6 @@ import { GuessWhoContentValidator } from '../application/content-validators/gues
 import { DominoContentValidator } from '../application/content-validators/domino.content-validator.js';
 import { MazeCollectorContentValidator } from '../application/content-validators/maze-collector.content-validator.js';
 import { SnakesLaddersContentValidator } from '../application/content-validators/snakes-ladders.content-validator.js';
-import { DualQuestContentValidator } from '../application/content-validators/dual-quest.content-validator.js';
 import { DualQuestPixiContentValidator } from '../application/content-validators/dual-quest-pixi.content-validator.js';
 import { TrueFalseMazeContentValidator } from '../application/content-validators/true-false-maze.content-validator.js';
 import { ContentValidatorRegistry } from '../application/content-validators/content-validator.registry.js';
@@ -118,7 +117,6 @@ import { AiProviderAttemptsController } from './http/controllers/ai-provider-att
     DominoContentValidator,
     MazeCollectorContentValidator,
     SnakesLaddersContentValidator,
-    DualQuestContentValidator,
     DualQuestPixiContentValidator,
     TrueFalseMazeContentValidator,
     ContentValidatorRegistry,

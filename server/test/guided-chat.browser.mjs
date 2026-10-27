@@ -17,12 +17,10 @@ import { ROOM_STORE } from '../dist/domain/ports/room-store.port.js';
 import { TOURNAMENT_STORE } from '../dist/domain/ports/tournament-store.port.js';
 import { DOMINO_ROOM_STORE } from '../dist/domain/ports/domino-room-store.port.js';
 import { SNAKES_LADDERS_ROOM_STORE } from '../dist/domain/ports/snakes-ladders-room-store.port.js';
-import { DUAL_QUEST_ROOM_STORE } from '../dist/domain/ports/dual-quest-room-store.port.js';
 import { InMemoryRoomStore } from '../dist/infrastructure/rooms/in-memory-room.store.js';
 import { InMemoryTournamentStore } from '../dist/infrastructure/rooms/in-memory-tournament.store.js';
 import { InMemoryDominoRoomStore } from '../dist/infrastructure/rooms/in-memory-domino-room.store.js';
 import { InMemorySnakesLaddersRoomStore } from '../dist/infrastructure/rooms/in-memory-snakes-ladders-room.store.js';
-import { InMemoryDualQuestRoomStore } from '../dist/infrastructure/rooms/in-memory-dual-quest-room.store.js';
 import { AnalyticsTrackerService } from '../dist/application/services/analytics-tracker.service.js';
 
 const require = createRequire(import.meta.url);
@@ -95,7 +93,6 @@ Module({
       provide: SNAKES_LADDERS_ROOM_STORE,
       useClass: InMemorySnakesLaddersRoomStore,
     },
-    { provide: DUAL_QUEST_ROOM_STORE, useClass: InMemoryDualQuestRoomStore },
   ],
 })(TestModule);
 

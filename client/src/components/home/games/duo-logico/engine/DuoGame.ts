@@ -1,7 +1,7 @@
 import { Application, Container, Graphics, TilingSprite } from 'pixi.js'
-import { crateSpawn, standPoint, type DuoLevel } from '../shared/duoLevel'
+import { crateSpawn, mirrorRect, standPoint, type DuoLevel } from '../shared/duoLevel'
 import { STEP, createPlayer, stepCrate, stepPlayer, toNet, type CrateSim, type DeathCause, type PlayerSim } from '../shared/duoPhysics'
-import { checkpointFor, collectCoins, isOnPedestal, updateSwitches } from '../shared/duoWorld'
+import { checkpointFor, collectCoins, isOnPedestal, litMirrorCount, updateSwitches } from '../shared/duoWorld'
 import { otherRole, type DuoEmote, type DuoPlayerNet, type DuoRole, type DuoSnapshot, type DuoWorldState } from '../shared/duoTypes'
 import type { DuoPhase } from '../shared/duoProtocol'
 import { CharacterView } from './characterView'
@@ -14,6 +14,19 @@ import { SnapshotBuffer } from './snapshotBuffer'
 const SEND_EVERY_MS = 50
 /** Una caja empujada sigue siendo "mía" este tiempo después del último empujón. */
 const CRATE_HOLD_MS = 350
+/** Distancia (px) a la que aparece el panel de un espejo; la misma que acepta el servidor. */
+const MIRROR_REACH = 80
+
+/** Espejo junto al que está el personaje, para el panel de React. */
+export interface NearMirror {
+  id: string
+  angle: number
+  /** El espejo ya apunta bien. */
+  aligned: boolean
+  /** La luz llega hasta este espejo (los anteriores están bien). */
+  lit: boolean
+}
+
 /** Celdas de alto que se quieren ver (la cámara acerca o aleja según la pantalla). */
 const VIEW_ROWS = 10.5
 
@@ -23,6 +36,8 @@ export interface DuoGameOptions {
   names: Record<DuoRole, string>
   sendState: (state: { player: DuoPlayerNet; crates: Array<{ id: string; x: number; y: number }> }) => void
   onFainted?: (role: DuoRole, cause: DeathCause | null) => void
+  /** Cambió el espejo cercano (o su ángulo); null al alejarse. */
+  onNearMirror?: (mirror: NearMirror | null) => void
 }
 
 /**
@@ -61,6 +76,9 @@ export class DuoGame {
   private sinceSend = 0
   private cam = { x: 0, y: 0, ready: false }
   private destroyed = false
+  /** Mientras el panel del espejo está abierto, el personaje no se mueve. */
+  private frozen = false
+  private nearMirrorKey = ''
 
   private readonly options: DuoGameOptions
 
@@ -187,6 +205,11 @@ export class DuoGame {
     return (Date.now() + (this.partner.clockOffset() ?? this.clockSkew)) / 1000
   }
 
+  setFrozen(frozen: boolean): void {
+    this.frozen = frozen
+    if (frozen) this.me.vx = 0
+  }
+
   showEmote(role: DuoRole, emote: DuoEmote): void {
     this.views[role]?.showEmote(emote, performance.now())
   }
@@ -196,6 +219,8 @@ export class DuoGame {
     if (!app) return
     const now = performance.now()
     const playing = this.phase === 'PLAYING'
+    // Con el panel del espejo abierto no se simula, pero se sigue contando la posición (quieto).
+    const simulating = playing && !this.frozen
 
     this.accumulator = Math.min(this.accumulator + deltaMs, 250)
     const time = this.serverSeconds()
@@ -203,7 +228,7 @@ export class DuoGame {
     while (pending > 0) {
       this.accumulator -= STEP * 1000
       pending -= 1
-      if (playing) this.simulate(now, time - pending * STEP)
+      if (simulating) this.simulate(now, time - pending * STEP)
     }
 
     // Cajas que mueve el otro (o nadie): se acercan suave a la posición del servidor.
@@ -228,6 +253,32 @@ export class DuoGame {
     }
 
     this.render(now, deltaMs, time)
+    this.reportNearMirror()
+  }
+
+  /** Avisa a React cuando el personaje queda junto a un espejo (o se aleja). */
+  private reportNearMirror(): void {
+    let near: NearMirror | null = null
+    if (this.phase === 'PLAYING' && !this.me.dead) {
+      for (const receiver of this.level.def.receivers ?? []) {
+        const lit = litMirrorCount(this.level, this.serverWorld, receiver.id)
+        receiver.mirrors.forEach((id, index) => {
+          const mirror = (this.level.def.mirrors ?? []).find((m) => m.id === id)
+          if (!mirror || near) return
+          const r = mirrorRect(mirror)
+          const dx = Math.max(r.x - this.me.x, 0, this.me.x - (r.x + r.w))
+          const dy = Math.max(r.y - this.me.y, 0, this.me.y - (r.y + r.h))
+          if (dx > MIRROR_REACH - 10 || dy > MIRROR_REACH - 10) return
+          const angle = this.serverWorld.mirrors[id] ?? mirror.start
+          near = { id, angle, aligned: angle === mirror.target, lit: index <= lit }
+        })
+      }
+    }
+    const current = near as NearMirror | null
+    const key = current ? `${current.id}:${current.angle}:${current.lit}` : ''
+    if (key === this.nearMirrorKey) return
+    this.nearMirrorKey = key
+    this.options.onNearMirror?.(current)
   }
 
   private simulate(now: number, time: number): void {

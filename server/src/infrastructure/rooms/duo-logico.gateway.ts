@@ -20,6 +20,7 @@ import {
   isInGame,
   joinDuoRoom,
   leaveDuoRoom,
+  rotateDuoMirror,
   setDuoReady,
   tickDuoRoom,
   toDuoRoomView,
@@ -29,6 +30,8 @@ import {
   type DuoRoomState,
 } from '../../domain/duo-logico/duo-room.js';
 import { DUO_EVENTS } from '../../domain/duo-logico/shared/duoProtocol.js';
+import { isDuoLevelId } from '../../domain/duo-logico/shared/levels/index.js';
+import type { DuoQuestion } from '../../domain/duo-logico/duo-questions.js';
 import type { DuoClientState, DuoRole } from '../../domain/duo-logico/shared/duoTypes.js';
 import { AnalyticsTrackerService } from '../../application/services/analytics-tracker.service.js';
 import { WsExceptionFilter } from './ws-exception.filter.js';
@@ -93,6 +96,9 @@ export class DuoLogicoGateway implements OnGatewayDisconnect, OnModuleInit, OnMo
       user: { userId: socket.data.userId, displayName: socket.data.displayName, socketId: socket.id },
       role: body?.role === 'WATER' ? 'WATER' : 'FIRE',
       now: Date.now(),
+      // Juegos creados antes del formulario nuevo no traen `levels` ni preguntas propias: van todos los escenarios con el banco.
+      campaign: Array.isArray(game.config.levels) ? (game.config.levels as string[]).filter(isDuoLevelId) : undefined,
+      customQuestions: (game.content as Array<Partial<DuoQuestion>>).filter((q): q is DuoQuestion => !!q && typeof q.format === 'string' && typeof q.level === 'string'),
     });
     this.store.create(room);
     await socket.join(this.channel(room));
@@ -129,6 +135,13 @@ export class DuoLogicoGateway implements OnGatewayDisconnect, OnModuleInit, OnMo
     const room = this.roomOf(socket);
     chooseDuoLevel(room, socket.data.userId, body?.levelId);
     this.broadcastRoom(room);
+  }
+
+  @SubscribeMessage(DUO_EVENTS.mirror)
+  handleMirror(@ConnectedSocket() socket: AuthenticatedSocket, @MessageBody() body: { mirrorId: string; dir: number }) {
+    const room = this.roomOf(socket);
+    rotateDuoMirror(room, socket.data.userId, body?.mirrorId, body?.dir);
+    // El ángulo nuevo llega a los dos en la próxima posición (cada 50 ms).
   }
 
   @SubscribeMessage(DUO_EVENTS.ready)
