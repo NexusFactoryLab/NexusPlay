@@ -7,6 +7,8 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Crown, LogOut, Skull, Trophy, Users } from 'lucide-react'
 import { useAuth } from '../../../hooks/useAuth'
 import { useGuessWhoTournament } from './useGuessWhoTournament'
+import { PlayerWaitOverlay } from './PlayerWaitOverlay'
+import { usePlayerWait } from './playerWait'
 import { Modal } from './Modal'
 import { MatchBoard } from './MatchBoard'
 import { MIN_DISCARDS_TO_ACCUSE } from './guessWhoTypes'
@@ -58,6 +60,8 @@ function TournamentSession() {
     passMatchTurn,
   } = useGuessWhoTournament(token)
 
+  // Se cortó la conexión del rival de la partida propia: la partida espera (issue #120).
+  const playerWait = usePlayerWait(tournament?.myMatch?.awaiting, user?.id)
   const startedRef = useRef(false)
   const [joinCodeInput, setJoinCodeInput] = useState('')
   const [maxParticipantsText, setMaxParticipantsText] = useState('4')
@@ -243,6 +247,7 @@ function TournamentSession() {
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-bg">
+      {playerWait && tournament.myMatch?.phase === 'PLAYING' && <PlayerWaitOverlay wait={playerWait} onLeave={handleExit} />}
       {showPairingOverlay && pairingAnnouncement && (
         <PairingAnnouncementOverlay announcement={pairingAnnouncement} selfUserId={user?.id ?? null} />
       )}

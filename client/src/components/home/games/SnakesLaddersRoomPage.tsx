@@ -5,6 +5,8 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Dices, LogOut, RotateCcw, Trophy } from 'lucide-react'
 import { useAuth } from '../../../hooks/useAuth'
 import { useSnakesLaddersRoom } from './useSnakesLaddersRoom'
+import { PlayerWaitOverlay } from './PlayerWaitOverlay'
+import { usePlayerWait } from './playerWait'
 import { SnakesLaddersBoard } from './SnakesLaddersBoard'
 import { ChallengeModal } from './ChallengeModal'
 import { useCountdown } from './MatchBoard'
@@ -78,6 +80,8 @@ function SnakesLaddersRoomPageSession() {
     joinRoom(code)
   }
 
+  // Se cortó la conexión de alguien: la partida espera (issue #120).
+  const playerWait = usePlayerWait(room?.awaiting, user?.id)
   const self = room?.players.find((p) => p.isSelf)
   const isMyTurn = room?.phase === 'PLAYING' && room.activePlayerUserId === user?.id
   const activePlayer = room?.players.find((p) => p.userId === room.activePlayerUserId)
@@ -92,6 +96,7 @@ function SnakesLaddersRoomPageSession() {
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-bg">
+      {playerWait && room?.phase === 'PLAYING' && <PlayerWaitOverlay wait={playerWait} onLeave={handleExit} />}
       <div className="mx-auto flex min-h-full w-full max-w-[1600px] flex-col p-5 sm:p-8">
         <header className="mb-5 flex items-center justify-between gap-3">
           <div>

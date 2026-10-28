@@ -2,13 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { io, type Socket } from 'socket.io-client'
 import type { GuessWhoChatMessage } from '../guessWhoTypes'
 import { DUO_EVENTS, type DuoNotice, type DuoRoomView, type DuoServerMessages } from './shared/duoProtocol'
-import type { DuoClientState, DuoEmote, DuoRole, DuoSnapshot } from './shared/duoTypes'
+import type { DuoClientState, DuoEmote, DuoPeerState, DuoRole, DuoSnapshot } from './shared/duoTypes'
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:3000'
 
 /** Recibe lo que llega muchas veces por segundo sin pasar por el estado de React. */
 export interface DuoRealtimeListener {
   onSnapshot(snapshot: DuoSnapshot, receivedAt: number): void
+  /** La posición del compañero, reenviada por el servidor apenas llega. */
+  onPeer(peer: DuoPeerState, receivedAt: number): void
   onEmote(role: DuoRole, emote: DuoEmote): void
 }
 
@@ -48,6 +50,9 @@ export function useDuoRoom(token: string | null) {
     })
     socket.on(DUO_EVENTS.snapshot, (snapshot: DuoServerMessages['duo:snapshot']) => {
       listenerRef.current?.onSnapshot(snapshot, Date.now())
+    })
+    socket.on(DUO_EVENTS.peer, (peer: DuoServerMessages['duo:peer']) => {
+      listenerRef.current?.onPeer(peer, Date.now())
     })
     socket.on(DUO_EVENTS.emoteShown, ({ role, emote }: DuoServerMessages['duo:emote-shown']) => {
       listenerRef.current?.onEmote(role, emote)

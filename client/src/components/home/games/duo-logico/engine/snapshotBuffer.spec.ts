@@ -1,35 +1,84 @@
 import { describe, expect, it } from 'vitest'
-import { INTERPOLATION_DELAY_MS, MAX_INTERPOLATION_DELAY_MS, NetClock, SnapshotBuffer } from './snapshotBuffer'
+import { MAX_DELAY_MS, MAX_EXTRAPOLATION_MS, MAX_WARP, MIN_DELAY_MS, NetClock, SnapshotBuffer, START_DELAY_MS } from './snapshotBuffer'
 import type { DuoPlayerNet } from '../shared/duoTypes'
 
 const at = (x: number, extra: Partial<DuoPlayerNet> = {}): DuoPlayerNet => ({ x, y: 640, vx: 0, vy: 0, facing: 1, anim: 'walk', dead: false, ...extra })
 
+/**
+ * Posiciones cada 33 ms (x sube 10 por muestra). El reloj del servidor va
+ * 1000 ms adelante del local; `late` es la demora extra de cada llegada.
+ */
+function feed(buffer: SnapshotBuffer, from: number, count: number, late: (i: number) => number = () => 0) {
+  for (let i = from; i < from + count; i++) {
+    const serverAt = 1000 + i * 33
+    buffer.push(serverAt, at(i * 10), i * 33 + late(i), serverAt)
+  }
+}
+
 describe('SnapshotBuffer (compañero interpolado)', () => {
-  it('dibuja un poco en el pasado, entre las dos posiciones que rodean ese instante', () => {
+  it('con la red pareja dibuja con el retraso mínimo, entre las dos posiciones que rodean ese instante', () => {
     const buffer = new SnapshotBuffer()
-    // Reloj del servidor 1000 ms adelante del local; llegan sin demora.
-    buffer.push(1000, at(0), 0)
-    buffer.push(1050, at(10), 50)
-    buffer.push(1100, at(20), 100)
-    // A la hora local 200 se dibuja el instante del servidor 1200 - retraso (entre 1050 y 1100).
-    const target = 1200 - INTERPOLATION_DELAY_MS
-    const shown = buffer.sample(200)!
-    expect(shown.x).toBeCloseTo(10 + ((target - 1050) / 50) * 10, 5)
+    feed(buffer, 0, 30)
+    expect(buffer.clock.delay()).toBe(MIN_DELAY_MS)
+    const now = 29 * 33
+    const target = now + 1000 - MIN_DELAY_MS
+    const a = Math.floor((target - 1000) / 33)
+    const k = (target - (1000 + a * 33)) / 33
+    expect(buffer.sample(now)!.x).toBeCloseTo(a * 10 + k * 10, 5)
   })
 
-  it('sin muestras nuevas extrapola con la velocidad, pero poco', () => {
+  it('una posición repetida (misma hora de llegada) no cuenta como nueva', () => {
+    const buffer = new SnapshotBuffer()
+    buffer.push(1000, at(0), 0, 1000)
+    // El servidor reenvía la misma posición: se ignora.
+    buffer.push(1033, at(0), 33, 1000)
+    buffer.push(1066, at(20), 66, 1066)
+    // Instante 1033: a medio camino entre x=0 y x=20, no quieto en 0.
+    const now = 1033 - 1000 + buffer.clock.delay()
+    expect(buffer.sample(now)!.x).toBeCloseTo(10, 5)
+  })
+
+  it('un paquete suelto muy tarde no sube el retraso; si llegan desparejos seguido, sí (con tope)', () => {
+    const buffer = new SnapshotBuffer()
+    feed(buffer, 0, 40)
+    feed(buffer, 40, 1, () => 150)
+    expect(buffer.clock.delay()).toBe(MIN_DELAY_MS)
+    feed(buffer, 41, 20, () => 120)
+    expect(buffer.clock.delay()).toBeGreaterThanOrEqual(120 + 33)
+    feed(buffer, 61, 90, () => 5000)
+    expect(buffer.clock.delay()).toBe(MAX_DELAY_MS)
+  })
+
+  it('el reloj de dibujo nunca salta ni retrocede: frena o acelera como mucho un 10 %', () => {
+    const buffer = new SnapshotBuffer()
+    feed(buffer, 0, 40)
+    let now = 40 * 33
+    let previous = buffer.clock.advance(now)!
+    feed(buffer, 40, 30, () => 150)
+    expect(buffer.clock.delay()).toBeGreaterThan(150)
+    for (let i = 0; i < 200; i++) {
+      now += 16
+      const t = buffer.clock.advance(now)!
+      expect(t - previous).toBeGreaterThanOrEqual(16 * (1 - MAX_WARP) - 1e-9)
+      expect(t - previous).toBeLessThanOrEqual(16 * (1 + MAX_WARP) + 1e-9)
+      previous = t
+    }
+    // Al final ya alcanzó el retraso nuevo.
+    expect(now + buffer.clockOffset()! - buffer.clock.delay() - previous).toBeCloseTo(0, 0)
+  })
+
+  it('sin muestras nuevas adivina con la velocidad, pero poco', () => {
     const buffer = new SnapshotBuffer()
     buffer.push(1000, at(100, { vx: 300 }), 0)
-    const shown = buffer.sample(1000 + INTERPOLATION_DELAY_MS)!
-    expect(shown.x).toBeCloseTo(100 + 300 * 0.12, 5)
+    expect(buffer.sample(2000)!.x).toBeCloseTo(100 + 300 * (MAX_EXTRAPOLATION_MS / 1000), 5)
   })
 
   it('un salto grande (reaparecer) no se interpola: cambia de golpe', () => {
     const buffer = new SnapshotBuffer()
     buffer.push(1000, at(2000), 0)
-    buffer.push(1050, at(100), 50)
-    const x = buffer.sample(50 + INTERPOLATION_DELAY_MS - 20)!.x
-    expect([2000, 100]).toContain(x)
+    buffer.push(1033, at(100), 33)
+    const now = 1016 - 1000 + buffer.clock.delay()
+    expect([2000, 100]).toContain(buffer.sample(now)!.x)
   })
 
   it('ignora paquetes viejos que llegan desordenados', () => {
@@ -40,35 +89,23 @@ describe('SnapshotBuffer (compañero interpolado)', () => {
   })
 })
 
-describe('SnapshotBuffer con la hora de llegada al servidor', () => {
-  it('una posición repetida (misma hora de llegada) no cuenta como nueva', () => {
-    const buffer = new SnapshotBuffer()
-    buffer.push(1000, at(0), 0, 1000)
-    // El servidor reenvía la misma posición en el tick siguiente: se ignora.
-    buffer.push(1050, at(0), 50, 1000)
-    buffer.push(1100, at(20), 100, 1090)
-    // Instante 1045: entre 1000 (x=0) y 1090 (x=20), no quieto en 0.
-    const shown = buffer.sample(1045 - 1000 + INTERPOLATION_DELAY_MS)!
-    expect(shown.x).toBeCloseTo(10, 5)
+describe('NetClock compartido con las cajas', () => {
+  it('las cajas usan el reloj del compañero sin medirlo, y no se adivinan', () => {
+    const partner = new SnapshotBuffer()
+    const crate = new SnapshotBuffer<{ x: number; y: number }>(partner.clock)
+    for (let i = 0; i < 40; i++) crate.push(1000 + i * 33, { x: i, y: 0 }, i * 33 + 200)
+    expect(partner.clock.delay()).toBe(START_DELAY_MS)
+    expect(crate.sample(10_000)).toEqual({ x: 39, y: 0 })
   })
 
-  it('si los paquetes llegan desparejos, dibuja más atrás (con tope)', () => {
+  it('al empezar otra partida se olvida lo medido', () => {
     const clock = new NetClock()
     const buffer = new SnapshotBuffer(clock)
-    buffer.push(1000, at(0), 0)
-    expect(clock.delay()).toBe(INTERPOLATION_DELAY_MS)
-    // Llega 150 ms tarde respecto al reloj estimado.
-    buffer.push(1050, at(10), 200)
-    expect(clock.delay()).toBeGreaterThanOrEqual(200)
-    buffer.push(1100, at(20), 900)
-    expect(clock.delay()).toBe(MAX_INTERPOLATION_DELAY_MS)
-  })
-
-  it('las cajas comparten el reloj y no se extrapolan', () => {
-    const clock = new NetClock()
-    const crate = new SnapshotBuffer<{ x: number; y: number }>(clock)
-    crate.push(1000, { x: 50, y: 0 }, 0)
-    expect(crate.sample(5000)).toEqual({ x: 50, y: 0 })
-    expect(clock.clockOffset()).toBe(1000)
+    expect(buffer.clock).toBe(clock)
+    const own = new SnapshotBuffer()
+    feed(own, 0, 40, (i) => (i % 2 ? 0 : 300))
+    expect(own.clock.delay()).toBeGreaterThan(START_DELAY_MS)
+    own.clear()
+    expect(own.clock.delay()).toBe(START_DELAY_MS)
   })
 })

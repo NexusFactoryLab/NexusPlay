@@ -1,3 +1,5 @@
+import type { AwaitingPlayerView } from './playerWait'
+
 export type SnakesLaddersLink = { from: number; to: number }
 export type SnakesLaddersTriggerType = 'CELL' | 'LADDER' | 'SNAKE'
 export type SnakesLaddersDifficulty = 'LOW' | 'MEDIUM' | 'HIGH'
@@ -50,6 +52,8 @@ export type SnakesLaddersRoomStateView = {
   winnerUserId: string | null
   activePlayerUserId: string | null
   turnDeadline: number | null
+  /** Jugadores desconectados a los que se espera: mientras haya alguno, la partida está en pausa (issue #120). */
+  awaiting?: AwaitingPlayerView[]
   lastRoll: number | null
   pendingChallenge: SnakesLaddersPendingChallengeView | null
   players: SnakesLaddersRoomPlayerView[]
