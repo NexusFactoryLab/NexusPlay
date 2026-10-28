@@ -102,7 +102,13 @@
 }
 
 .ts-layer { position: fixed; inset: 0; z-index: -10; }
-.ts-layer-in { animation: ts-fade-in 0.42s ease-in-out both; }
+.ts-layer-in { animation: ts-fade-in 0.5s ease-in-out both; }
+.ts-layer-out { animation: ts-fade-out 0.5s ease-in-out both; }
+
+@keyframes ts-fade-out {
+  0%, 30% { opacity: 1; }
+  100% { opacity: 0; }
+}
 
 @keyframes ts-fade-in {
   from { opacity: 0; }
@@ -118,5 +124,5 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ts-layer-in, .ts-card[aria-pressed='true'] { animation: none; }
+  .ts-layer-in, .ts-layer-out, .ts-card[aria-pressed='true'] { animation: none; }
 }
