@@ -2969,12 +2969,12 @@ code {
 }
 
 .nx-tile-in {
-  animation: nx-tile-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) backwards;
-  animation-delay: calc(var(--i, 0) * 55ms);
+  animation: nx-tile-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(min(var(--i, 0), 5) * 30ms);
 }
 
 .nx-stage-in {
-  animation: nx-stage-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation: nx-stage-in 0.26s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
 .nx-tile {
