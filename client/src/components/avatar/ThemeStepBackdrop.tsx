@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react'
 import { useTheme } from '../../hooks/useTheme'
+import type { Theme } from '../../hooks/useTheme'
 import { FantasyCloudBank } from '../home/FantasyDecor'
 import { GameThemeBackdrop } from '../home/games/GameThemeBackdrop'
 import './themeStep.css'
@@ -53,9 +55,7 @@ function Floaters({ items }: { items: Floater[] }) {
  * castillo y dragón / globos, arcoíris y confeti); el resto reutiliza el fondo
  * de las pantallas de juego.
  */
-export function ThemeStepBackdrop() {
-  const { theme } = useTheme()
-
+function Scene({ theme }: { theme: Theme }) {
   if (theme === 'fantasy') {
     return (
       <div className="ts-backdrop ts-fantasy" aria-hidden="true">
@@ -84,4 +84,36 @@ export function ThemeStepBackdrop() {
   }
 
   return <GameThemeBackdrop />
+}
+
+/** Tiempo del fundido entre escenas: rápido, solo para que el cambio no sea brusco. */
+const FADE_MS = 320
+
+/**
+ * Al cambiar de tema la escena nueva aparece con un fundido (suave, 0.3 s)
+ * encima de la anterior, que se retira cuando termina.
+ */
+export function ThemeStepBackdrop() {
+  const { theme } = useTheme()
+  const [layers, setLayers] = useState<{ id: number; theme: Theme }[]>([{ id: 0, theme }])
+
+  // Ajuste durante el render (patrón de React): la capa nueva entra en el mismo paso que el cambio de tema.
+  const last = layers[layers.length - 1]
+  if (last.theme !== theme) setLayers([...layers, { id: last.id + 1, theme }])
+
+  useEffect(() => {
+    if (layers.length < 2) return
+    const timer = setTimeout(() => setLayers((current) => current.slice(-1)), FADE_MS + 40)
+    return () => clearTimeout(timer)
+  }, [layers])
+
+  return (
+    <>
+      {layers.map((layer, index) => (
+        <div key={layer.id} className={index > 0 ? 'ts-layer ts-layer-in' : 'ts-layer'}>
+          <Scene theme={layer.theme} />
+        </div>
+      ))}
+    </>
+  )
 }

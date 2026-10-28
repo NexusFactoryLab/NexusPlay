@@ -100,3 +100,23 @@
 @media (prefers-reduced-motion: reduce) {
   .ts-star, .ts-moon-glow, .ts-floater, .ts-confetti, .ts-sun { animation: none; }
 }
+
+.ts-layer { position: fixed; inset: 0; z-index: -10; }
+.ts-layer-in { animation: ts-fade-in 0.32s ease-out both; }
+
+@keyframes ts-fade-in {
+  from { opacity: 0; transform: scale(1.02); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* La tarjeta elegida «salta» un poco al tocarla. */
+.ts-card[aria-pressed='true'] { animation: ts-pick 0.26s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+@keyframes ts-pick {
+  0% { transform: scale(0.96); }
+  100% { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ts-layer-in, .ts-card[aria-pressed='true'] { animation: none; }
+}

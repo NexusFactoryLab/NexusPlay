@@ -51,7 +51,7 @@ export function AvatarOnboardingGate({ user, children }: { user: AuthUser; child
     return (
       <main className="fixed inset-0 flex overflow-y-auto p-4 sm:p-6">
         <ThemeStepBackdrop />
-        <div className="m-auto flex w-full max-w-6xl flex-col gap-4">
+        <div className="nx-stage-in m-auto flex w-full max-w-6xl flex-col gap-4">
           <h1 className="text-2xl font-extrabold text-text-h sm:text-4xl">Elige cómo se ve tu experiencia</h1>
           <ThemesSection compact />
           <button
@@ -67,7 +67,7 @@ export function AvatarOnboardingGate({ user, children }: { user: AuthUser; child
   }
 
   return (
-    <main className="app-main fixed inset-0 overflow-y-auto">
+    <main className="app-main nx-stage-in fixed inset-0 overflow-y-auto">
       <div className={started ? undefined : 'pointer-events-none select-none blur-md'} aria-hidden={!started} inert={!started}>
         <AvatarEditorPage onSkip={skip} />
       </div>
