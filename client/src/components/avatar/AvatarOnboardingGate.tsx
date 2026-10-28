@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import type { AuthUser } from '../../services/auth.service'
 import { isKidsMode } from '../../utils/kidsMode'
+import { resetGreetedThisSession, welcomeStorageKey } from '../home/welcomeTourSteps'
 import { ThemesSection } from '../home/ThemesSection'
 import { ThemeStepBackdrop } from './ThemeStepBackdrop'
 import { randomAvatar } from './avatarConfig'
@@ -25,6 +26,11 @@ export function AvatarOnboardingGate({ user, children }: { user: AuthUser; child
   const kids = isKidsMode(user)
   const needed = needsAvatarOnboarding(user, skipped)
   const autoAssigned = useRef(false)
+
+  // Al terminar (guardar o saltar) debe salir la tarjeta de bienvenida del inicio.
+  useEffect(() => {
+    if (needed) resetGreetedThisSession(welcomeStorageKey(user.id, user.role))
+  }, [needed, user.id, user.role])
 
   // Menores de 10 años: sin pasos, el avatar se genera solo.
   useEffect(() => {
