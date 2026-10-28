@@ -134,7 +134,7 @@ try {
   await guide.waitFor();
   await ana.screenshot({ path: '.scratch/duo-guia-desktop.png' });
   for (let i = 0; i < 5; i++) await guide.getByRole('button', { name: 'Siguiente' }).click();
-  await guide.getByText('Corazones y fichas de pista').waitFor();
+  await guide.getByText('Corazones y pistas').waitFor();
   await ana.screenshot({ path: '.scratch/duo-guia-final-desktop.png' });
   await guide.getByRole('button', { name: '¡A jugar!' }).click();
   await ana.getByRole('button', { name: /Lumen/ }).first().click();
@@ -231,8 +231,14 @@ try {
   await climbPedestal('Luis', 24);
   await until(() => room().phase === 'QUESTION', 'pregunta de la Puerta 1');
   const panel = (page) => page.getByRole('dialog', { name: 'Puerta del Saber' });
-  await panel(ana).getByText('Pregunta espejo').waitFor();
-  await panel(luis).getByText('Pregunta espejo').waitFor();
+  // Cada uno ve solo SU pregunta: mismo concepto, enunciados distintos y sin la del compañero.
+  const asked = room().question.question;
+  for (const [page, role] of [[ana, 'FIRE'], [luis, 'WATER']]) {
+    await panel(page).getByTestId('duo-concept').filter({ hasText: asked.concept }).waitFor();
+    await panel(page).getByTestId('duo-prompt').filter({ hasText: asked.parts[role].prompt }).waitFor();
+    const other = asked.parts[role === 'FIRE' ? 'WATER' : 'FIRE'].prompt;
+    assert.equal(await panel(page).getByText(other, { exact: true }).count(), 0, `${role} no ve la pregunta del compañero`);
+  }
   await ana.screenshot({ path: '.scratch/duo-pregunta-desktop.png' });
   await luis.screenshot({ path: '.scratch/duo-pregunta-mobile.png' });
   await assertNoScroll(ana, 'computador');
@@ -247,7 +253,7 @@ try {
   // Primer intento: Luis se equivoca; pierden un corazón.
   await panel(ana).getByTestId('duo-option').filter({ hasText: right('FIRE') }).click();
   await panel(ana).getByText(/Esperando a Gota/).waitFor();
-  await panel(luis).getByText(/ya respondió/).waitFor();
+  await panel(luis).getByText('¡Te toca!').waitFor();
   await panel(luis).getByTestId('duo-option').filter({ hasNotText: right('WATER') }).first().click();
   await until(() => room().phase === 'REVEAL', 'revelado');
   await panel(ana).locator('[data-testid="duo-reveal"][data-success="false"]').waitFor();

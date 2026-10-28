@@ -1,10 +1,10 @@
-// Deja los 3 juegos de Dúo Lógico de la base listos tras el rediseño (#108):
-//  - "Dúo Lógico" (antes el demo de autenticación web) pasa a ser el juego
-//    principal: publicado, destacado, con portada y el banco por defecto
-//    (ciudades sostenibles en Colombia), igual que MatchMente o Dominexo.
-//  - Los dos del Sylabus «El poder de las probabilidades» reciben preguntas
-//    propias de su tema (muestreo y sesgo; probabilidad y Bayes) y dejan de
-//    estar destacados.
+// Pasa los dos juegos de Dúo Lógico que eran de estadística (Sylabus «El
+// poder de las probabilidades») al formato nuevo de preguntas (#116): cada
+// personaje tiene SU pregunta, distinta a la del compañero, sobre el mismo
+// concepto. De paso cambian de tema a sistemas:
+//  - seed-sylabus-duo-logico-pixi-muestreo → lógica de programación.
+//  - seed-sylabus-duo-logico-bayes         → redes e internet.
+// El juego principal «Dúo Lógico» no se toca (usa el banco por defecto).
 //
 //   npm run build                                      (usa el validador compilado)
 //   node scripts/update-duo-logico-games.mjs           → vista previa
@@ -20,136 +20,138 @@ const APPLY = args.includes('--apply');
 const backupPath = args.includes('--backup') ? args[args.indexOf('--backup') + 1] : null;
 const LEVELS = ['bosque', 'solar'];
 
-const q = (level, format, fields) => ({ level, format, ...fields });
+/** Una puerta: el concepto, la pregunta de Lumen (FIRE) y la de Gota (WATER); la primera opción es la correcta. */
+const q = (level, concept, fire, water, hints, explanation) => ({
+  level,
+  concept,
+  parts: { FIRE: { prompt: fire[0], options: fire[1] }, WATER: { prompt: water[0], options: water[1] } },
+  hints,
+  explanation,
+});
 
-const MUESTREO = [
-  q('bosque', 'MIRROR', {
-    prompt: 'Una investigadora quiere saber cuántas horas duermen los estudiantes de su colegio y pregunta a 50 de ellos. ¿Qué son esos 50 estudiantes?',
-    options: ['Una muestra', 'La población', 'Un parámetro', 'Un sesgo'],
-    hints: ['Son solo una parte del grupo que interesa.', 'El grupo completo sería todo el colegio.'],
-    explanation: 'La población es el grupo completo que se quiere estudiar (todo el colegio); la muestra es la parte que de verdad se observa (los 50 estudiantes).',
-  }),
-  q('bosque', 'SPLIT', {
-    prompt: '¿Qué porcentaje de la población quedó en la muestra?',
-    clues: { FIRE: 'El colegio tiene 800 estudiantes.', WATER: 'Se encuestó a 80 estudiantes.' },
-    options: ['10 %', '8 %', '80 %', '1 %'],
-    hints: ['Uno conoce la población y el otro el tamaño de la muestra.', 'Divide la muestra entre la población.'],
-    explanation: '80 de 800 es la décima parte: la muestra es el 10 % de la población.',
-  }),
-  q('bosque', 'TWO_PART', {
-    prompt: 'Se quiere estimar la estatura promedio de los estudiantes de un colegio.',
-    parts: {
-      FIRE: { prompt: '¿Cuál es la población del estudio?', options: ['Todos los estudiantes del colegio', 'Los 30 estudiantes que se midieron', 'La estatura promedio', 'Los profesores del colegio'] },
-      WATER: { prompt: '¿Cuál es una muestra adecuada?', options: ['30 estudiantes elegidos al azar de todos los cursos', 'Los 30 jugadores del equipo de baloncesto', 'Solo los estudiantes de grado 11', 'Los primeros 30 que lleguen al colegio'] },
-    },
-    hints: ['Una parte es el grupo completo; la otra, cómo tomar una parte justa de él.', 'Los basquetbolistas suelen ser más altos.'],
-    explanation: 'La población son todos los estudiantes; una muestra al azar de todos los cursos la representa mejor que un grupo especial como el equipo de baloncesto.',
-  }),
-  q('solar', 'MIRROR', {
-    prompt: 'Para conocer qué opina una ciudad del transporte público, se encuesta solo a personas en una estación de bicicletas. ¿Qué problema tiene esta muestra?',
-    options: ['Está sesgada: no representa a toda la ciudad', 'Es la población completa', 'Es demasiado aleatoria', 'No tiene ningún problema'],
-    hints: ['¿Todos en la ciudad usan bicicleta?', 'Un sesgo es una inclinación sistemática en cómo se elige.'],
-    explanation: 'Elegir solo a ciclistas deja por fuera a quienes usan bus, metro o carro: la muestra está sesgada y sus conclusiones no valen para toda la ciudad.',
-  }),
-  q('solar', 'SPLIT', {
-    prompt: '¿Cuál es la media de horas de sueño de los cinco estudiantes?',
-    clues: { FIRE: 'Tres estudiantes durmieron 6, 7 y 8 horas.', WATER: 'Los otros dos durmieron 9 y 5 horas.' },
-    options: ['7 horas', '8 horas', '6 horas', '35 horas'],
-    hints: ['Junten los cinco datos.', 'La media es la suma dividida entre cuántos datos hay.'],
-    explanation: '6 + 7 + 8 + 9 + 5 = 35 horas, y 35 ÷ 5 = 7: la media de la muestra es 7 horas.',
-  }),
-  q('solar', 'TWO_PART', {
-    prompt: 'Un curso quiere elegir 20 estudiantes al azar de una lista de 400.',
-    parts: {
-      FIRE: { prompt: '¿Qué método es un muestreo aleatorio simple?', options: ['Sortear 20 números entre los 400 de la lista', 'Elegir a los 20 primeros de la lista', 'Pedir 20 voluntarios', 'Escoger a 20 amigos del curso'] },
-      WATER: { prompt: '¿Por qué conviene elegirlos al azar?', options: ['Para que todos tengan la misma probabilidad de salir elegidos', 'Para que la muestra sea más pequeña', 'Para elegir a los mejores estudiantes', 'Porque así no hay que contar'] },
-    },
-    hints: ['Una parte es el cómo y la otra el porqué.', 'Los voluntarios suelen tener algo en común.'],
-    explanation: 'En el muestreo aleatorio simple cada integrante tiene la misma probabilidad de ser elegido; eso reduce el sesgo de elegir a dedo o pedir voluntarios.',
-  }),
+const PROGRAMACION = [
+  q(
+    'bosque',
+    'Algoritmos',
+    ['¿Qué es un algoritmo?', ['Una lista de pasos ordenados para resolver un problema', 'Un tipo de computador', 'Un virus informático', 'Un lenguaje de programación']],
+    ['Una receta de cocina se parece a un algoritmo porque…', ['Sigue pasos en un orden', 'Usa electricidad', 'Solo la entiende un computador', 'No tiene un final']],
+    ['Piensa en instrucciones paso a paso.', 'El orden importa.'],
+    'Un algoritmo es una secuencia finita y ordenada de pasos; una receta es un buen ejemplo de la vida diaria.',
+  ),
+  q(
+    'bosque',
+    'Variables',
+    ['¿Para qué sirve una variable en un programa?', ['Para guardar un dato que puede cambiar', 'Para apagar el computador', 'Para dibujar en pantalla', 'Para conectarse a internet']],
+    ['Si x = 5 y luego x = x + 2, ¿cuánto vale x?', ['7', '5', '2', '52']],
+    ['Es como una caja con nombre.', 'Primero se lee el valor y luego se guarda el nuevo.'],
+    'Una variable es un espacio con nombre que guarda un valor; ese valor se puede leer y cambiar mientras el programa corre.',
+  ),
+  q(
+    'bosque',
+    'Condicionales',
+    ['¿Qué hace la instrucción «si… entonces» (if)?', ['Ejecuta algo solo si se cumple una condición', 'Repite algo para siempre', 'Borra todos los datos', 'Suma dos números']],
+    ['Si edad = 15, ¿qué imprime «si edad >= 18: "adulto" si no: "menor"»?', ['menor', 'adulto', 'Nada', 'Un error']],
+    ['Es una decisión.', '15 no es mayor o igual que 18.'],
+    'Los condicionales permiten que el programa tome decisiones: según la condición, sigue un camino u otro.',
+  ),
+  q(
+    'solar',
+    'Ciclos',
+    ['¿Para qué sirve un ciclo (bucle) como «repetir» o «for»?', ['Para repetir instrucciones varias veces', 'Para guardar un archivo', 'Para tomar una sola decisión', 'Para cerrar el programa']],
+    ['¿Cuántas veces se ejecuta «repetir 4 veces: saltar»?', ['4', '1', '3', 'Infinitas']],
+    ['Evita escribir lo mismo muchas veces.', 'El número dice cuántas vueltas da.'],
+    'Un ciclo repite un bloque de instrucciones: así un programa hace muchas veces lo mismo sin copiarlo.',
+  ),
+  q(
+    'solar',
+    'Errores (bugs)',
+    ['¿Qué es un bug en programación?', ['Un error que hace que el programa falle o funcione mal', 'Un programa muy rápido', 'Un tipo de teclado', 'Una copia de seguridad']],
+    ['¿Cómo se llama buscar y corregir errores en un programa?', ['Depurar (debugging)', 'Compilar música', 'Formatear', 'Navegar']],
+    ['Su nombre en inglés significa «bicho».', 'Viene de «de-bug».'],
+    'Los bugs son errores del programa; depurar es encontrarlos y corregirlos, una parte normal de programar.',
+  ),
+  q(
+    'solar',
+    'Funciones',
+    ['¿Para qué sirve una función en un programa?', ['Para agrupar pasos y reutilizarlos con un nombre', 'Para apagar la pantalla', 'Para que el programa sea más lento', 'Para borrar variables']],
+    ['Si doble(n) devuelve n × 2, ¿cuánto da doble(6)?', ['12', '6', '8', '62']],
+    ['Se escribe una vez y se usa muchas.', 'Multiplica el número por dos.'],
+    'Una función es un bloque con nombre que recibe datos, hace un trabajo y devuelve un resultado; se puede usar las veces que haga falta.',
+  ),
 ];
 
-const BAYES = [
-  q('bosque', 'MIRROR', {
-    prompt: 'Se lanza un dado justo de seis caras. ¿Cuál es la probabilidad de sacar un número par?',
-    options: ['1/2', '1/3', '1/6', '2/3'],
-    hints: ['Los pares son 2, 4 y 6.', 'Casos favorables entre casos posibles.'],
-    explanation: 'Hay 3 resultados pares entre 6 posibles: 3/6 = 1/2.',
-  }),
-  q('bosque', 'SPLIT', {
-    prompt: 'Se saca una bola al azar de la bolsa. ¿Cuál es la probabilidad de que sea roja?',
-    clues: { FIRE: 'En la bolsa hay 3 bolas rojas.', WATER: 'En total hay 12 bolas en la bolsa.' },
-    options: ['1/4', '1/3', '3/4', '1/12'],
-    hints: ['Uno sabe cuántas rojas hay; el otro, cuántas en total.', 'Simplifiquen la fracción.'],
-    explanation: '3 rojas entre 12 bolas: 3/12 = 1/4.',
-  }),
-  q('bosque', 'TWO_PART', {
-    prompt: 'En un curso de 30 estudiantes, 12 juegan fútbol y, de esos 12, 3 también practican natación.',
-    parts: {
-      FIRE: { prompt: '¿Cuál es la probabilidad de que un estudiante al azar juegue fútbol?', options: ['12/30', '3/30', '3/12', '30/12'] },
-      WATER: { prompt: 'Si el estudiante juega fútbol, ¿cuál es la probabilidad de que también nade?', options: ['3/12', '3/30', '12/30', '12/3'] },
-    },
-    hints: ['Una pregunta mira a todo el curso; la otra, solo a los futbolistas.', 'En la condicional el total cambia.'],
-    explanation: 'P(fútbol) = 12/30. La probabilidad condicional P(natación | fútbol) solo mira a los 12 futbolistas: 3/12 = 1/4.',
-  }),
-  q('solar', 'MIRROR', {
-    prompt: '¿Qué permite calcular el teorema de Bayes?',
-    options: ['La probabilidad de una causa después de observar un efecto', 'El promedio de una muestra', 'El número de resultados posibles de un experimento', 'La moda de un conjunto de datos'],
-    hints: ['Actualiza lo que creemos cuando llega información nueva.', 'Invierte una probabilidad condicional.'],
-    explanation: 'Bayes combina la probabilidad previa con la evidencia para obtener la probabilidad de la causa dado lo observado: P(A | B) = P(B | A)·P(A) / P(B).',
-  }),
-  q('solar', 'SPLIT', {
-    prompt: '¿Cuál es la probabilidad de que ocurran A y B a la vez?',
-    clues: { FIRE: 'La probabilidad de A es 0,5.', WATER: 'Si ocurre A, la probabilidad de B es 0,4.' },
-    options: ['0,2', '0,9', '0,1', '0,8'],
-    hints: ['Uno tiene P(A) y el otro P(B | A).', 'P(A y B) = P(A) · P(B | A).'],
-    explanation: 'P(A y B) = P(A) · P(B | A) = 0,5 · 0,4 = 0,2.',
-  }),
-  q('solar', 'TWO_PART', {
-    prompt: 'Una prueba detecta una enfermedad. De 100 personas, 10 están enfermas: la prueba da positivo en 9 de ellas y también en 9 de las 90 sanas.',
-    parts: {
-      FIRE: { prompt: '¿Cuántos resultados positivos hay en total?', options: ['18', '9', '10', '90'] },
-      WATER: { prompt: 'De quienes dan positivo, ¿qué fracción está enferma de verdad?', options: ['9/18 = 1/2', '9/10', '10/100', '9/90'] },
-    },
-    hints: ['Sumen los positivos de enfermos y de sanos.', 'Solo cuentan quienes dieron positivo.'],
-    explanation: 'Hay 9 + 9 = 18 positivos y solo 9 son enfermos: P(enfermo | positivo) = 9/18 = 1/2. Aunque la prueba acierte casi siempre, un positivo no es certeza: eso es Bayes.',
-  }),
+const REDES = [
+  q(
+    'bosque',
+    'Internet',
+    ['¿Qué es internet?', ['Una red mundial que conecta millones de computadores', 'Un programa para escribir', 'Un solo computador muy grande', 'Un tipo de cable USB']],
+    ['¿Qué necesita un computador para conectarse a internet?', ['Una conexión de red, como wifi o cable', 'Una impresora', 'Más memoria RAM', 'Un mouse inalámbrico']],
+    ['Es una red de redes.', 'Puede ser con o sin cables.'],
+    'Internet une redes de todo el mundo; cada equipo entra a ella con una conexión, por cable o inalámbrica (wifi).',
+  ),
+  q(
+    'bosque',
+    'Direcciones y nombres',
+    ['¿Qué es una dirección IP?', ['El número que identifica a un equipo en la red', 'La contraseña del wifi', 'El nombre del dueño del computador', 'La marca del router']],
+    ['¿Qué traduce un nombre como «google.com» a una dirección IP?', ['El DNS', 'El teclado', 'La pantalla', 'El antivirus']],
+    ['Es como la dirección de una casa.', 'Funciona como una agenda de contactos.'],
+    'Cada equipo tiene una IP; el DNS es la «agenda» que convierte nombres fáciles de recordar en esas direcciones.',
+  ),
+  q(
+    'bosque',
+    'Equipos de red',
+    ['¿Qué aparato reparte el wifi en una casa?', ['El router', 'El monitor', 'El parlante', 'La impresora']],
+    ['¿Qué significa que una red sea inalámbrica?', ['Que transmite datos sin cables, por ondas', 'Que no tiene contraseña', 'Que no gasta energía', 'Que solo funciona de noche']],
+    ['Suele tener antenas y luces.', 'El wifi viaja por el aire.'],
+    'El router conecta los equipos de la casa entre sí y con internet; el wifi lo hace por ondas de radio, sin cables.',
+  ),
+  q(
+    'solar',
+    'Navegar seguro',
+    ['¿Qué indica el candado y el «https» en la barra del navegador?', ['Que la conexión con la página va cifrada', 'Que la página es gratis', 'Que la página no tiene anuncios', 'Que el computador no tiene virus']],
+    ['¿Cuál es la contraseña más segura?', ['Tr3n_Az#l-29', '123456', 'mi nombre', 'contraseña']],
+    ['La «s» es de seguro.', 'Mezcla letras, números y símbolos.'],
+    'HTTPS cifra lo que viaja entre tu equipo y la página; una contraseña larga y variada es mucho más difícil de adivinar.',
+  ),
+  q(
+    'solar',
+    'Velocidad de la red',
+    ['¿Qué mide el ancho de banda de una conexión?', ['Cuántos datos pueden pasar por segundo', 'El tamaño de la pantalla', 'La cantidad de cables', 'La edad del router']],
+    ['Un archivo de 100 MB a 10 MB por segundo, ¿cuánto tarda en bajar?', ['10 segundos', '100 segundos', '1 segundo', '1.000 segundos']],
+    ['Se mide en megas por segundo.', 'Es una división.'],
+    'El ancho de banda es la cantidad de datos por segundo: con 10 MB/s, 100 MB tardan 100 ÷ 10 = 10 segundos.',
+  ),
+  q(
+    'solar',
+    'La nube',
+    ['¿Qué significa guardar archivos «en la nube»?', ['Guardarlos en servidores de internet', 'Guardarlos en una memoria USB', 'Imprimirlos', 'Borrarlos del computador']],
+    ['¿Cuál es una ventaja de la nube?', ['Ver los archivos desde cualquier equipo con internet', 'Funciona sin internet siempre', 'Nunca necesita contraseña', 'Hace el computador más pesado']],
+    ['Los archivos viven en otros computadores.', 'Solo necesitas conectarte.'],
+    'La nube son servidores en internet: tus archivos quedan guardados allí y puedes abrirlos desde cualquier equipo conectado.',
+  ),
 ];
-
-const STATS_NOTE = 'Basado en el Sylabus «El poder de las probabilidades» (FFPO0005). Material de refuerzo: no sustituye el análisis de datos reales con software estadístico.';
 
 const CHANGES = [
   {
-    _id: 'seed-dual-quest-auth-flow',
-    set: {
-      title: 'Dúo Lógico',
-      description: 'Conéctate con un amigo: Lumen y Gota superan escenarios juntos y solo avanzan si los dos responden bien cada Puerta del Saber.',
-      categoryId: 'seed-category-medio-ambiente',
-      status: 'PUBLISHED',
-      featured: true,
-      'theme.coverImageUrl': '/assets/duo-logico/cover.webp',
-      config: { levels: LEVELS },
-      content: [],
-    },
-  },
-  {
     _id: 'seed-sylabus-duo-logico-pixi-muestreo',
     set: {
-      title: 'Sylabus · Dúo Lógico: del muestreo al sesgo',
-      description: `Cooperativo de 2 jugadores: Lumen y Gota recorren el bosque y la planta solar y, en cada Puerta del Saber, responden juntos sobre población, muestra, muestreo y sesgo. ${STATS_NOTE}`,
+      title: 'Dúo Lógico: lógica de programación',
+      description: 'Cooperativo de 2 jugadores: Lumen y Gota recorren el bosque y la planta solar y, en cada Puerta del Saber, cada uno responde su pregunta sobre algoritmos, variables, condicionales, ciclos y funciones.',
+      categoryId: 'seed-category-programacion',
       featured: false,
       config: { levels: LEVELS },
-      content: MUESTREO,
+      content: PROGRAMACION,
     },
   },
   {
     _id: 'seed-sylabus-duo-logico-bayes',
     set: {
-      title: 'Sylabus · Dúo Lógico: Bayes en pareja',
-      description: `Cooperativo de 2 jugadores: Lumen y Gota recorren el bosque y la planta solar y, en cada Puerta del Saber, resuelven juntos problemas de probabilidad condicional y del teorema de Bayes. ${STATS_NOTE}`,
+      title: 'Dúo Lógico: redes e internet',
+      description: 'Cooperativo de 2 jugadores: Lumen y Gota recorren el bosque y la planta solar y, en cada Puerta del Saber, cada uno responde su pregunta sobre internet, direcciones IP, wifi, seguridad y la nube.',
+      categoryId: 'seed-category-tecnologia',
       featured: false,
       config: { levels: LEVELS },
-      content: BAYES,
+      content: REDES,
     },
   },
 ];
@@ -166,11 +168,11 @@ try {
   await client.connect();
   const games = client.db().collection('games');
   const before = await games.find({ _id: { $in: CHANGES.map((c) => c._id) } }).toArray();
-  assert.equal(before.length, CHANGES.length, 'No se encontraron los 3 juegos de Dúo Lógico');
-  for (const doc of before) assert.equal(doc.gameType, 'DUAL_QUEST_PIXI', `${doc._id} no es DUAL_QUEST_PIXI (¿falta migrate-duo-logico.mjs?)`);
+  assert.equal(before.length, CHANGES.length, 'No se encontraron los 2 juegos de Dúo Lógico');
+  for (const doc of before) assert.equal(doc.gameType, 'DUAL_QUEST_PIXI', `${doc._id} no es DUAL_QUEST_PIXI`);
   for (const change of CHANGES) {
     const doc = before.find((d) => d._id === change._id);
-    console.log(`\n${doc._id}\n  título: ${doc.title} → ${change.set.title}\n  destacado: ${doc.featured ?? false} → ${change.set.featured}\n  preguntas propias: ${(doc.content ?? []).length} → ${change.set.content.length}`);
+    console.log(`\n${doc._id}\n  título: ${doc.title} → ${change.set.title}\n  categoría: ${doc.categoryId ?? '(ninguna)'} → ${change.set.categoryId}\n  preguntas propias: ${(doc.content ?? []).length} → ${change.set.content.length}`);
   }
   if (!APPLY) {
     console.log('\nVista previa: no se cambió nada. Para aplicar: --apply --backup <archivo.json>');
@@ -185,9 +187,10 @@ try {
     for (const doc of after) {
       const change = CHANGES.find((c) => c._id === doc._id);
       assert.equal(doc.title, change.set.title);
-      assert.equal(doc.featured, change.set.featured);
+      assert.equal(doc.categoryId, change.set.categoryId);
       assert.deepEqual(doc.config, change.set.config);
       assert.equal(doc.content.length, change.set.content.length);
+      for (const question of doc.content) assert.ok(question.concept && question.parts?.FIRE && question.parts?.WATER, `${doc._id}: pregunta sin el formato nuevo`);
     }
     console.log(`\nAplicado y verificado. Respaldo en ${backupPath}`);
   }

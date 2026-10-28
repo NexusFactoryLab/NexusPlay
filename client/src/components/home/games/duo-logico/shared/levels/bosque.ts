@@ -56,21 +56,18 @@ export const BOSQUE: DuoLevelDef = {
   gates: [
     {
       id: 'puerta-1',
-      format: 'MIRROR',
       pedestals: { FIRE: { col: 22, row: 9 }, WATER: { col: 24, row: 9 } },
       wall: { col: 26, row: 5, height: 5 },
       respawn: { FIRE: { col: 28, row: 9 }, WATER: { col: 29, row: 9 } },
     },
     {
       id: 'puerta-2',
-      format: 'SPLIT',
       pedestals: { FIRE: { col: 46, row: 9 }, WATER: { col: 48, row: 9 } },
       wall: { col: 50, row: 5, height: 5 },
       respawn: { FIRE: { col: 51, row: 9 }, WATER: { col: 52, row: 9 } },
     },
     {
       id: 'portal',
-      format: 'TWO_PART',
       pedestals: { FIRE: { col: 66, row: 6 }, WATER: { col: 68, row: 6 } },
       wall: null,
       respawn: { FIRE: { col: 66, row: 6 }, WATER: { col: 68, row: 6 } },

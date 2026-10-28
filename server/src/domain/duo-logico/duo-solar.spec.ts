@@ -124,7 +124,8 @@ describe('campaña de escenarios', () => {
   });
 
   it('la campaña usa solo los escenarios que eligió el profesor y sus preguntas propias', () => {
-    const own = { id: 'p1', level: 'solar', format: 'MIRROR' as const, prompt: '¿Pregunta del profe?', options: ['Sí', 'No', 'Tal vez', 'Nunca'], hints: [], explanation: 'Bien.' };
+    const part = { prompt: '¿Pregunta del profe?', options: ['Sí', 'No', 'Tal vez', 'Nunca'] };
+    const own = { id: 'p1', level: 'solar', concept: 'Del profe', parts: { FIRE: part, WATER: { ...part, prompt: '¿Otra del profe?' } }, hints: [], explanation: 'Bien.' };
     const r = createDuoRoom({ code: 'C', gameId: 'g', gameTitle: 't', user: ANA, role: 'FIRE', now: 0, campaign: ['solar'], customQuestions: [own] });
     expect(r.levelId).toBe('solar');
     expect(toDuoRoomView(r, 'ana', 0).levels.map((l) => l.id)).toEqual(['solar']);
@@ -198,11 +199,9 @@ describe('campaña de escenarios', () => {
     expect(r.levelId).toBe(DUO_LEVEL_DEFS[0].id);
   });
 
-  it('cada escenario tiene al menos dos preguntas por formato y se pueden contestar', () => {
+  it('cada escenario tiene preguntas para sus tres puertas y se pueden contestar', () => {
     for (const def of DUO_LEVEL_DEFS) {
-      for (const format of ['MIRROR', 'SPLIT', 'TWO_PART'] as const) {
-        expect(DUO_QUESTION_BANK.filter((q) => q.level === def.id && q.format === format).length, `${def.id} ${format}`).toBeGreaterThanOrEqual(2);
-      }
+      expect(DUO_QUESTION_BANK.filter((q) => q.level === def.id).length, def.id).toBeGreaterThanOrEqual(def.gates.length);
     }
     const r = room('solar');
     r.world.gates['puerta-1'] = true;

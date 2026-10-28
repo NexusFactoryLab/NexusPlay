@@ -103,7 +103,7 @@ describe('sala de Dúo Lógico', () => {
     expect(room.phase).toBe('PLAYING');
     reachGate(room, 0, now);
     expect(room.phase).toBe('QUESTION');
-    expect(room.question?.question.format).toBe('MIRROR');
+    expect(room.question?.question.level).toBe('bosque');
   });
 
   it('la respuesta es secreta: el compañero solo sabe que ya respondiste', () => {
@@ -168,22 +168,24 @@ describe('sala de Dúo Lógico', () => {
     expect(room.world.gates).toEqual({});
   });
 
-  it('las tres puertas usan los tres formatos y el portal da la victoria', () => {
+  it('cada uno ve solo su pregunta (distinta, del mismo concepto) y el portal da la victoria', () => {
     const { room, now } = playingRoom();
     let t = now;
-    const formats: string[] = [];
+    const ids: string[] = [];
     for (let gate = 0; gate < 3; gate++) {
       reachGate(room, gate, t);
-      formats.push(room.question!.question.format);
-      const view = toDuoRoomView(room, 'ana', t).question!;
-      if (view.format === 'SPLIT') expect(view.myClue).toBeTruthy();
-      if (view.format === 'TWO_PART') expect(view.myPrompt).not.toBe(view.partnerPrompt);
+      ids.push(room.question!.question.id);
+      const mine = toDuoRoomView(room, 'ana', t).question!;
+      const theirs = toDuoRoomView(room, 'luis', t).question!;
+      expect(mine.concept).toBe(theirs.concept);
+      expect(mine.prompt).not.toBe(theirs.prompt);
+      expect(JSON.stringify(mine)).not.toContain(theirs.prompt);
       answerDuoQuestion(room, 'ana', pick(room, 'ana', true), t);
       answerDuoQuestion(room, 'luis', pick(room, 'luis', true), t);
       t += DUO_REVEAL_SUCCESS_MS;
       tickDuoRoom(room, t, rng);
     }
-    expect(formats).toEqual(['MIRROR', 'SPLIT', 'TWO_PART']);
+    expect(new Set(ids).size).toBe(3);
     expect(room.phase).toBe('VICTORY');
   });
 
@@ -236,11 +238,10 @@ describe('sala de Dúo Lógico', () => {
     expect(room.phase).toBe('ABANDONED');
   });
 
-  it('el banco tiene al menos dos preguntas por formato, con 4 opciones y 2 pistas', () => {
-    for (const format of ['MIRROR', 'SPLIT', 'TWO_PART'] as const) {
-      expect(DUO_QUESTION_BANK.filter((q) => q.format === format).length).toBeGreaterThanOrEqual(2);
-    }
+  it('el banco: dos preguntas distintas por concepto, con 4 opciones y 2 pistas', () => {
     for (const q of DUO_QUESTION_BANK) {
+      expect(q.concept).toBeTruthy();
+      expect(q.parts.FIRE.prompt).not.toBe(q.parts.WATER.prompt);
       for (const role of ['FIRE', 'WATER'] as const) {
         const options = optionsFor(q, role);
         expect(options).toHaveLength(4);

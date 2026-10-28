@@ -1,5 +1,4 @@
 import type { ComponentProps } from 'react'
-import { Brain, Check, Clock, Eye, Layers, Target, Timer } from 'lucide-react'
 import { MemoryMatchGame } from '../MemoryMatchGame'
 import type { MemoryMatchTutorialPart } from '../MemoryMatchGame'
 import type { MemoryMatchPair } from '../memoryMatchTypes'
@@ -89,40 +88,22 @@ export function MemoryMatchTutorial({ onFinish, ...game }: GameProps & { onFinis
     {
       title: 'Memoriza las cartas',
       task: 'Mira bien dónde está cada carta: en unos segundos se van a tapar.',
-      explain: 'Al empezar cada zona ves todas las cartas destapadas unos segundos. ¡Es tu momento para memorizar!',
       success: '¡Listo! Ahora las cartas están boca abajo.',
       art: <ArtMemoryPreview />,
-      points: [
-        { icon: <Eye className="h-4 w-4" />, tone: 'violet', text: <>Fíjate <b className="text-white">dónde está cada una</b>.</> },
-        { icon: <Timer className="h-4 w-4" />, tone: 'cyan', text: <>¿Ya te las sabes? Toca <b className="text-white">«¡Ya, a jugar!»</b>.</> },
-      ],
       render: board('preview', { showPreview: true, difficulty: 'challenging' }),
     },
     {
       title: opposites ? 'Une un concepto con su opuesto' : 'Une una imagen con su nombre',
       task: opposites ? 'Destapa dos cartas que sean opuestas (por ejemplo, Día y Noche).' : 'Destapa una imagen y la carta con su nombre.',
-      explain: opposites
-        ? 'Destapa dos cartas: si son conceptos opuestos, se quedan arriba. Si no, se vuelven a tapar.'
-        : 'Destapa dos cartas: si la imagen va con su nombre, se quedan arriba. Si no, se vuelven a tapar.',
       success: '¡Pareja encontrada!',
       art: <ArtMemoryPair opposites={opposites} />,
-      points: [
-        { icon: <Target className="h-4 w-4" />, tone: 'emerald', text: <>Toca <b className="text-white">una carta y luego otra</b>.</> },
-        { icon: <Check className="h-4 w-4" />, tone: 'emerald', text: <>Si <b className="text-white">hacen pareja</b>, se quedan destapadas.</> },
-        { icon: <Brain className="h-4 w-4" />, tone: 'amber', text: <>Si no, recuerda <b className="text-white">dónde estaban</b>.</> },
-      ],
       render: board('pair', { showPreview: false, timePerZoneSeconds: 300 }),
     },
     {
       title: 'Completa la zona a tiempo',
       task: 'Encuentra todas las parejas antes de que el reloj llegue a cero.',
-      explain: 'Cada zona tiene un reloj. Encuentra todas sus parejas antes de que se acabe el tiempo para pasar a la siguiente.',
       success: '¡Zona superada! Así se gana en MatchMente.',
       art: <ArtMemoryZone />,
-      points: [
-        { icon: <Layers className="h-4 w-4" />, tone: 'violet', text: <>Completa <b className="text-white">todas las parejas</b> de la zona.</> },
-        { icon: <Clock className="h-4 w-4" />, tone: 'rose', text: <>Si se acaba el tiempo, puedes <b className="text-white">reintentar</b>.</> },
-      ],
       render: board('zone', { showPreview: true, difficulty: 'challenging', timePerZoneSeconds: 90 }),
     },
   ]

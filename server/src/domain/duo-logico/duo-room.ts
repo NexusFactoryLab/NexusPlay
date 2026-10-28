@@ -78,7 +78,7 @@ export interface DuoRoomState {
   levelId: string;
   /** Escenarios que eligió el profesor, en el orden en que se juegan. */
   campaign: string[];
-  /** Preguntas que escribió el profesor; si un escenario no tiene de un formato, se usa el banco. */
+  /** Preguntas que escribió el profesor; si un escenario no tiene, se usa el banco. */
   customQuestions: DuoQuestion[];
   hostUserId: string;
   phase: DuoPhase;
@@ -296,9 +296,9 @@ function shuffled(n: number, rng: () => number): number[] {
   return order;
 }
 
-function pickQuestion(room: DuoRoomState, gate: DuoGateDef, rng: () => number): DuoQuestion {
-  const custom = room.customQuestions.filter((q) => q.level === room.levelId && q.format === gate.format);
-  const pool = custom.length > 0 ? custom : questionsOf(gate.format, room.levelId);
+function pickQuestion(room: DuoRoomState, rng: () => number): DuoQuestion {
+  const custom = room.customQuestions.filter((q) => q.level === room.levelId);
+  const pool = custom.length > 0 ? custom : questionsOf(room.levelId);
   const fresh = pool.filter((q) => !room.usedQuestionIds.includes(q.id));
   const from = fresh.length > 0 ? fresh : pool;
   return from[Math.floor(rng() * from.length)];
@@ -311,7 +311,7 @@ function shuffleOptions(active: ActiveQuestion, rng: () => number): void {
 
 function startQuestion(room: DuoRoomState, gate: DuoGateDef, rng: () => number): void {
   const level = levelById(room.levelId);
-  const question = pickQuestion(room, gate, rng);
+  const question = pickQuestion(room, rng);
   room.usedQuestionIds.push(question.id);
   const active: ActiveQuestion = {
     gate,
@@ -469,10 +469,10 @@ function questionView(room: DuoRoomState, role: DuoRole): DuoQuestionView | null
   if (!active || (room.phase !== 'QUESTION' && room.phase !== 'REVEAL')) return null;
   const q = active.question;
   const all = optionsFor(q, role);
-  const view: DuoQuestionView = {
+  return {
     gateId: active.gate.id,
-    format: q.format,
-    prompt: q.prompt,
+    concept: q.concept,
+    prompt: q.parts[role].prompt,
     options: active.order[role].map((i) => all[i]),
     hints: q.hints.slice(0, active.hintsRevealed),
     hintsTotal: q.hints.length,
@@ -480,12 +480,6 @@ function questionView(room: DuoRoomState, role: DuoRole): DuoQuestionView | null
     partnerAnswered: active.answers[otherRole(role)] !== undefined,
     attempt: active.attempt,
   };
-  if (q.format === 'SPLIT') view.myClue = q.clues[role];
-  if (q.format === 'TWO_PART') {
-    view.myPrompt = q.parts[role].prompt;
-    view.partnerPrompt = q.parts[otherRole(role)].prompt;
-  }
-  return view;
 }
 
 function revealView(room: DuoRoomState, role: DuoRole): DuoRevealView | null {

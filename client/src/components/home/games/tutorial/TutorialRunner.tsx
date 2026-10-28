@@ -2,7 +2,7 @@ import { useEffect, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import { Check, GraduationCap, Play, RotateCcw, Target, TriangleAlert, X } from 'lucide-react'
 import { FitScale } from '../true-false-maze/FitScale'
-import { Item, strong } from '../true-false-maze/TrueFalseMazeGuide'
+import { strong } from '../true-false-maze/TrueFalseMazeGuide'
 import './gameGuides.css'
 import { ArrowKeysInline } from './ArrowKeysInline'
 import { GUIDE_ACCENTS } from './GameGuide'
@@ -25,8 +25,6 @@ export type TutorialPartContext = {
   onExit: () => void
 }
 
-export type TutorialPartPoint = { icon: ReactNode; tone?: 'cyan' | 'violet' | 'amber' | 'emerald' | 'rose'; text: ReactNode }
-
 export type TutorialPart = {
   title: string
   /** Qué hacer, en una frase: se lee al empezar y queda arriba mientras se juega. */
@@ -35,14 +33,10 @@ export type TutorialPart = {
   taskTouch?: string
   /** La tarea es mover al personaje: en computador se dibujan las flechas del teclado junto a ella. */
   arrowKeys?: boolean
-  /** Por qué importa (se lee junto con la tarea al empezar la parte). */
-  explain: string
   /** Lo que se dice al lograrla. */
   success: string
   /** Ilustración animada de la tarjeta de instrucciones (como las de la guía). */
   art: ReactNode
-  /** Viñetas con ícono: las ideas clave de la parte, cortas. */
-  points?: TutorialPartPoint[]
   render: (context: TutorialPartContext) => ReactNode
 }
 
@@ -309,26 +303,16 @@ export function TutorialRunner({
               <>
                 <div
                   key={`${index}-${attempt}`}
-                  className="grid min-h-0 flex-1 grid-rows-[minmax(0,38%)_minmax(0,1fr)] gap-3 px-4 py-3 sm:px-6 landscape:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] landscape:grid-rows-1 landscape:gap-6"
+                  className="grid min-h-0 flex-1 grid-rows-[minmax(0,52%)_minmax(0,1fr)] gap-3 px-4 py-3 sm:px-6 landscape:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] landscape:grid-rows-1 landscape:gap-6"
                 >
                   <div className="min-h-0 min-w-0">{part.art}</div>
                   <FitScale
                     className="h-full"
                     fitKey={`${index}-${attempt}`}
                     minScale={0.55}
-                    contentClassName="flex flex-col gap-3 text-[clamp(0.8rem,1.9dvh+0.25vw,1.02rem)] leading-snug text-slate-300"
+                    contentClassName="flex flex-col gap-3 text-[clamp(0.95rem,2.4dvh+0.3vw,1.25rem)] leading-snug text-slate-300"
                   >
                     <h2 className="font-heading text-[clamp(1.15rem,3.4dvh+0.6vw,1.9rem)] leading-tight font-bold tracking-tight text-white">{part.title}</h2>
-                    <p>{part.explain}</p>
-                    {part.points && part.points.length > 0 && (
-                      <ul className="flex flex-col gap-2.5">
-                        {part.points.map((point, i) => (
-                          <Item key={i} icon={point.icon} tone={point.tone}>
-                            {point.text}
-                          </Item>
-                        ))}
-                      </ul>
-                    )}
                     <p className="flex items-start gap-2.5 rounded-2xl border-2 border-dashed border-cyan-300/80 bg-cyan-400/10 px-3 py-2 font-bold text-white">
                       <Target className="mt-0.5 h-5 w-5 shrink-0 text-cyan-300" aria-hidden="true" />
                       <span>

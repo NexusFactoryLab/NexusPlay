@@ -6,7 +6,6 @@ import { TutorialRunner } from './TutorialRunner'
 import type { TutorialPart } from './TutorialRunner'
 import { ArtTruckBottles, ArtTruckCloud, ArtTruckDrive, ArtTruckPower, ArtTruckQuestion } from './tutorialArt'
 import { SUSTAINABLE_CITY_QUESTIONS } from '../mazeCollectorQuestions'
-import { CircleHelp, Flag, Heart, MousePointerClick, Navigation, Shield, Sparkles, Target, Zap } from 'lucide-react'
 
 /** Zonas de la Ciudad Sostenible (en celdas del mapa real) donde ocurre cada parte. */
 const NORTH = { row: 1, col: 0, rows: 6, cols: 11 }
@@ -69,39 +68,22 @@ export function MazeCollectorTutorial({
       task: 'Lleva el camión hasta la bandera 🏁 con las flechas del teclado.',
       arrowKeys: true,
       taskTouch: 'Lleva el camión hasta la bandera 🏁 con la cruceta o deslizando el dedo.',
-      explain: 'El camión recorre las calles de la ciudad. Lo mueves con las flechas del teclado; en el celular, con la cruceta o deslizando el dedo.',
       success: '¡Así se maneja el camión! Sigue derecho hasta que lo hagas girar.',
       art: <ArtTruckDrive />,
-      points: [
-        { icon: <Navigation className="h-4 w-4" />, tone: 'emerald', text: <>El camión <b className="text-white">sigue andando</b> hasta que lo hagas girar.</> },
-        { icon: <Flag className="h-4 w-4" />, tone: 'amber', text: <>Llega a la <b className="text-white">bandera</b> para pasar a lo siguiente.</> },
-      ],
       render: scene({ playerStart: { row: 1, col: 1 }, pickups: [], ghostSpawns: [], goal: { row: 6, col: 9 }, objective: 'reach' }, NORTH),
     },
     {
       title: 'Recoge las botellas',
       task: 'Recoge las 4 botellas PET de esta zona.',
-      explain:
-        'Tu misión es salvar la ciudad: hay que recoger TODAS las botellas PET (basta con pasar por encima). En el juego, antes de empezar eliges cuántas rondas jugar (1, 2, 3 o 5). Cada ronda es limpiar toda la ciudad; el contador PET te dice cuántas botellas faltan. Al superar todas las rondas, ¡salvaste la ciudad!',
       success: '¡Calles limpias! Así se supera cada ronda: sin dejar ni una botella.',
       art: <ArtTruckBottles />,
-      points: [
-        { icon: <Target className="h-4 w-4" />, tone: 'emerald', text: <>Recoge <b className="text-white">todas las botellas PET</b> para salvar la ciudad.</> },
-        { icon: <MousePointerClick className="h-4 w-4" />, tone: 'cyan', text: <>Basta con <b className="text-white">pasar por encima</b>: no hay que frenar.</> },
-        { icon: <Flag className="h-4 w-4" />, tone: 'amber', text: <>Ciudad limpia = <b className="text-white">ronda superada</b>. Supera las rondas que elegiste y ¡salvas la ciudad!</> },
-      ],
       render: scene({ playerStart: { row: 1, col: 1 }, pickups: [pet(1, 5), pet(4, 5), pet(6, 2), pet(6, 8)], ghostSpawns: [], objective: 'collect' }, NORTH),
     },
     {
       title: 'Esquiva la nube',
       task: 'Recoge las 3 botellas sin que la nube de contaminación te toque.',
-      explain: 'Las nubes de contaminación recorren las calles. Si una te toca, pierdes una vida: busca otro camino o espera a que pase.',
       success: '¡Buen manejo! La esquivaste.',
       art: <ArtTruckCloud />,
-      points: [
-        { icon: <Shield className="h-4 w-4" />, tone: 'rose', text: <>Las <b className="text-white">nubes de contaminación</b> te persiguen por las calles.</> },
-        { icon: <Zap className="h-4 w-4" />, tone: 'amber', text: <>Si una te toca, <b className="text-white">pierdes una vida</b>: busca otro camino.</> },
-      ],
       render: scene(
         { playerStart: { row: 6, col: 0 }, pickups: [pet(6, 11), pet(10, 11), pet(10, 0)], ghostSpawns: [{ row: 10, col: 6 }], ghostPersonality: 'PATROLLER', objective: 'collect' },
         CENTER,
@@ -110,13 +92,8 @@ export function MazeCollectorTutorial({
     {
       title: 'Usa la caneca de energía',
       task: 'Toma la caneca de energía ⚡ y atrapa la nube mientras está asustada.',
-      explain: 'La caneca de energía activa el purificador: por unos segundos las nubes se asustan (se ven azules) y puedes atraparlas para ganar puntos extra.',
       success: '¡Purificaste la nube!',
       art: <ArtTruckPower />,
-      points: [
-        { icon: <Zap className="h-4 w-4" />, tone: 'amber', text: <>La <b className="text-white">caneca de energía</b> activa el purificador unos segundos.</> },
-        { icon: <Sparkles className="h-4 w-4" />, tone: 'emerald', text: <>Con las nubes <b className="text-white">asustadas (azules)</b>, tócalas: ¡puntos extra!</> },
-      ],
       render: scene(
         { playerStart: { row: 6, col: 0 }, pickups: [{ pos: { row: 1, col: 0 }, kind: 'POWER' }], ghostSpawns: [{ row: 1, col: 6 }], ghostPersonality: 'PATROLLER', objective: 'catch', purifier: true },
         NORTH,
@@ -125,15 +102,8 @@ export function MazeCollectorTutorial({
     {
       title: 'Responde la pregunta',
       task: 'Lee la pregunta y maneja hasta la letra de la respuesta correcta.',
-      explain:
-        'En el juego, cada pregunta sale primero en grande y el juego espera a que la leas. Luego sus respuestas quedan repartidas por el mapa, cada una con su letra: maneja hasta la correcta. Tienes 15 segundos; si llegas a una equivocada o se acaba el tiempo, pierdes una vida. Y cada 8 segundos sin responder llega una nube más.',
       success: '¡Correcto! Así se responden las preguntas.',
       art: <ArtTruckQuestion />,
-      points: [
-        { icon: <CircleHelp className="h-4 w-4" />, tone: 'cyan', text: <>La <b className="text-white">pregunta</b> sale arriba, con sus respuestas <b className="text-white">A, B, C, D</b>.</> },
-        { icon: <Target className="h-4 w-4" />, tone: 'emerald', text: <>Maneja hasta la <b className="text-white">letra correcta</b> en el mapa.</> },
-        { icon: <Heart className="h-4 w-4" />, tone: 'rose', text: <>Equivocarte o <b className="text-white">pasar de 15 segundos</b> te quita una vida; y cada 8 s sin responder llega una nube más.</> },
-      ],
       render: scene(
         {
           playerStart: { row: 6, col: 0 },

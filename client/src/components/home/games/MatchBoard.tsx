@@ -335,6 +335,8 @@ type MatchBoardProps = {
   onAccuseOpen?: () => void
   /** Tutorial: la selección para adivinar arranca abierta. */
   startAccusing?: boolean
+  /** false: quien usa el tablero decide cuándo avisar el turno (el tutorial). */
+  showTurnPop?: boolean
 }
 
 /**
@@ -434,6 +436,7 @@ export function MatchBoard({
   onSecretCardClick,
   onAccuseOpen,
   startAccusing = false,
+  showTurnPop = true,
 }: MatchBoardProps) {
   const [accusing, setAccusing] = useState(startAccusing)
   const [showHelp, setShowHelp] = useState(false)
@@ -451,11 +454,13 @@ export function MatchBoard({
 
   return (
     <div className={fitHeight ? 'guess-who-board-fit flex h-full min-h-0 flex-col' : 'flex flex-col gap-5'}>
-      <TurnPopBanner
-        isMyTurn={isMyTurn}
-        opponentName={opponent.displayName}
-        accusationMessage={accusationMessage}
-      />
+      {showTurnPop && (
+        <TurnPopBanner
+          isMyTurn={isMyTurn}
+          opponentName={opponent.displayName}
+          accusationMessage={accusationMessage}
+        />
+      )}
 
       {!fitHeight && <TurnStatusStrip
         isMyTurn={isMyTurn}
