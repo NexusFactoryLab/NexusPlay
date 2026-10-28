@@ -37,6 +37,7 @@ import { TrueFalseMazeGuide } from './TrueFalseMazeGuide'
 import { TrueFalseMazeTutorial } from '../tutorial/TrueFalseMazeTutorial'
 import { useTrueFalseMazeSession, type TrueFalseMazeHud } from './useTrueFalseMazeSession'
 import type { TrueFalseMazeConfig, TrueFalseMazeQuestion } from './trueFalseMazeTypes'
+import { ArrowKeysInline } from '../tutorial/ArrowKeysInline'
 
 /** Una parte del tutorial jugable (issue #93): la nave real con una pregunta de práctica. */
 export type TrueFalseMazeTutorialPart = {
@@ -1020,7 +1021,7 @@ function ReadyOverlay({
         </h2>
         <p className="mx-auto mt-1.5 max-w-[420px] text-[13.5px] leading-relaxed text-slate-300">
           Son <b className="text-white">{total} afirmaciones</b> y tienes <b className="text-white">{lives}</b>{' '}
-          {lives === 1 ? 'batería' : 'baterías'}. {touch ? (<>Muévete con la <b className="text-white">cruceta</b> o <b className="text-white">deslizando el dedo</b>.</>) : (<>Muévete con las <b className="text-white">flechas del teclado</b> (o W A S D).</>)}
+          {lives === 1 ? 'batería' : 'baterías'}. {touch ? (<>Muévete con la <b className="text-white">cruceta</b> o <b className="text-white">deslizando el dedo</b>.</>) : (<>Muévete con las <b className="text-white">flechas del teclado</b> <ArrowKeysInline />.</>)}
         </p>
         {fullscreen && <FullscreenChoice {...fullscreen} />}
         <div className="mt-4 flex flex-wrap items-center justify-center gap-2">

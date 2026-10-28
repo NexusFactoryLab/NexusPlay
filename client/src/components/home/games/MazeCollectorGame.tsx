@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { memo, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, BookOpen, CircleHelp, LogOut, Maximize, Minimize, Pause, Play, X, Zap } from 'lucide-react'
 import type { MazeCollectorConfig, MazeCollectorItem, MazeLayoutDef, CellPosition } from './mazeCollectorTypes'
@@ -12,7 +12,7 @@ import {
   ROUND_OPTIONS,
   useMazeCollectorGame,
 } from './useMazeCollectorGame'
-import type { ActiveQuestion, AnswerFeedback, Direction, MazeAnswer, MazeScenario } from './useMazeCollectorGame'
+import type { ActiveQuestion, AnswerFeedback, Direction, MazeAnswer, MazeGameSnapshot, MazeScenario } from './useMazeCollectorGame'
 import type { MazeQuestion } from './mazeCollectorQuestions'
 import { EcoTruckSprite } from './EcoTruckSprite'
 import { PollutionGhostSprite } from './PollutionGhostSprite'
@@ -24,6 +24,9 @@ import { MazeCollectorTutorial } from './tutorial/MazeCollectorTutorial'
 import { ConfettiBurst } from '../../kids/ConfettiBurst'
 import { CartoonClock } from './CartoonClock'
 import { isDarkTheme, useTheme } from '../../../hooks/useTheme'
+import { ArrowKeysInline } from './tutorial/ArrowKeysInline'
+import { FitScale } from './true-false-maze/FitScale'
+import { MazeEffectsLayer, useMazeEffects } from './mazeEffects'
 
 /**
  * Una parte del tutorial jugable (issue #93): la misma ciudad y el mismo
@@ -58,6 +61,11 @@ type MazeCollectorGameProps = {
 const MIN_CELL_SIZE = 14
 /** Celda máxima: en monitores muy grandes el tablero no crece sin límite. */
 const MAX_CELL_SIZE = 96
+/** Ancho del panel lateral de la pregunta: mínimo, y máximo cuando el mapa deja espacio libre a los lados. */
+const ASIDE_MIN_WIDTH = 280
+const ASIDE_MAX_WIDTH = 560
+/** Relleno del escenario del mapa (p-2) a cada lado. */
+const STAGE_PADDING = 8
 /**
  * Si el mapa entero obliga a celdas más chicas que esto (un celular), se deja de
  * mostrar completo: las celdas pasan a CAMERA_CELL_SIZE y la cámara sigue al
@@ -261,6 +269,16 @@ function MazeCollectorSession({
   // Pantalla ancha: la pregunta va en una columna al lado del mapa (el mapa ya está limitado por el alto,
   // así ese ancho sobra). En pantallas angostas va en una franja arriba del mapa.
   const questionAside = useMediaQuery('(min-width: 1000px) and (min-aspect-ratio: 4/3)')
+  // Tamaño de la fila mapa + panel: el panel se queda con el espacio que el mapa (limitado por el alto) no usa.
+  const rowRef = useRef<HTMLDivElement>(null)
+  const [rowSize, setRowSize] = useState({ width: 0, height: 0 })
+  useLayoutEffect(() => {
+    const row = rowRef.current
+    if (!row) return
+    const observer = new ResizeObserver(() => setRowSize({ width: row.clientWidth, height: row.clientHeight }))
+    observer.observe(row)
+    return () => observer.disconnect()
+  }, [])
   // Con la columna de la pregunta, vidas, puntos y reloj se muestran en ella (no en el encabezado).
   const statsAside = Boolean(game.question) && questionAside
   // Borde del mapa según el tema: blanco suave en los oscuros, negro en los claros (nada de verde chillón).
@@ -418,7 +436,6 @@ function MazeCollectorSession({
 
   const width = layout.cols * cellSize
   const height = layout.rows * cellSize
-  const wallColors = wallPalette(primaryColor)
   const CollectorIcon = iconForConcept(config.collectorIcon)
   const energized = game.energizedRemainingMs > 0
   const energyWarning = energized && game.energizedRemainingMs < 2000
@@ -427,10 +444,15 @@ function MazeCollectorSession({
   const pauseKey = fullscreen ? 'P' : 'Esc'
 
   // Si había elegido pantalla completa y se salió (Esc, por ejemplo), se ofrece volver con un clic.
+  // Choques, botellas y nubes atrapadas: efectos de un momento sobre el mapa.
+  const { effects, blinking } = useMazeEffects(game)
   const showFullscreenHint = canFullscreen && wantFullscreen && !fullscreen && !fullscreenHintClosed && playing && !game.paused
 
   // Tablero y ventana: con cámara solo se ve un pedazo, centrado en el camión sin salirse del mapa.
   const boardWidth = width
+  // El mapa se ajusta al alto: lo que sobra a lo ancho es para el panel (entre su mínimo y su máximo).
+  const cellByHeight = Math.min(MAX_CELL_SIZE, Math.floor((rowSize.height - 2 * STAGE_PADDING) / (layout.rows - trimmedRows)))
+  const asideWidth = Math.max(ASIDE_MIN_WIDTH, Math.min(ASIDE_MAX_WIDTH, rowSize.width - layout.cols * cellByHeight - 2 * STAGE_PADDING))
   const boardHeight = height - trimmedRows * cellSize
   const windowWidth = cameraMode ? Math.min(boardWidth, view.width) : boardWidth
   const windowHeight = cameraMode ? Math.min(boardHeight, view.height) : boardHeight
@@ -562,7 +584,7 @@ function MazeCollectorSession({
         )}
       </header>
 
-      <div className={`relative flex min-h-0 flex-1 ${questionAside ? 'flex-row' : 'flex-col'}`}>
+      <div ref={rowRef} className={`relative flex min-h-0 flex-1 ${questionAside ? 'flex-row' : 'flex-col'}`}>
       {game.question && !questionAside && (
         <QuestionPanel question={game.question} feedback={game.answerFeedback} remainingMs={game.questionRemainingMs} layout="bar" />
       )}
@@ -610,69 +632,10 @@ function MazeCollectorSession({
           {/* Capa 1: laberinto estático (sin costo por frame). Ciudad usa el mapa
               en sprites, armado sobre la misma cuadrícula; los demás layouts
               (abstractos, sin arte propio) siguen con paredes/calles por color. */}
-          {isCity ? (
-            <SostenibleCityBackground />
-          ) : (
-            <div
-              className="absolute inset-0 grid"
-              style={{
-                gridTemplateColumns: `repeat(${layout.cols}, ${cellSize}px)`,
-                gridTemplateRows: `repeat(${layout.rows}, ${cellSize}px)`,
-              }}
-            >
-              {layout.grid.map((rowCells, row) =>
-                rowCells.map((cell, col) => {
-                  const key = `${row}:${col}`
-                  if (cell === 1) {
-                    return (
-                      <div
-                        key={key}
-                        style={{
-                          background: `linear-gradient(160deg, ${wallColors.light}, ${wallColors.base} 55%, ${wallColors.dark})`,
-                          border: `1px solid ${wallColors.dark}`,
-                        }}
-                      >
-                        <div
-                          className="h-full w-full animate-[maze-window-glow_3s_ease-in-out_infinite]"
-                          style={{
-                            animationDelay: `${(hashCell(row, col) % 20) * 0.15}s`,
-                            background:
-                              'repeating-linear-gradient(0deg, transparent 0 6px, rgba(254,240,138,0.5) 6px 8px)',
-                            mixBlendMode: 'overlay',
-                          }}
-                        />
-                      </div>
-                    )
-                  }
-                  return <div key={key} className="bg-[#18212c]" />
-                }),
-              )}
-            </div>
-          )}
+          {isCity ? <CityBackground /> : <StaticMaze layout={layout} cellSize={cellSize} primaryColor={primaryColor} />}
 
           {/* Capa 2: coleccionables — solo los que quedan, cada uno en su celda lógica (no interpolan, no se mueven). */}
-          {game.pickups.map((pickup) => {
-            const { left, top } = pixelPos(pickup.pos)
-            return (
-              <div key={pickup.id} className="absolute flex items-center justify-center" style={{ left, top, width: cellSize, height: cellSize }}>
-                {pickup.kind === 'PET' ? (
-                  <span className="flex" style={{ filter: PET_FILTER }}>
-                    <PetSprite size={cellSize * PET_SCALE} />
-                  </span>
-                ) : (
-                  <PowerPelletSprite size={cellSize * POWER_SCALE} />
-                )}
-              </div>
-            )
-          })}
-          {game.bags.map((bag) => {
-            const { left, top } = pixelPos(bag.pos)
-            return (
-              <div key={bag.id} className="absolute flex items-center justify-center" style={{ left, top, width: cellSize, height: cellSize }}>
-                <TrashBagSprite size={cellSize * BAG_SCALE} />
-              </div>
-            )
-          })}
+          <PickupsLayer pickups={game.pickups} bags={game.bags} count={game.pickups.length + game.bags.length} cellSize={cellSize} />
           {game.bonus && <BonusMarker bonus={game.bonus} cellSize={cellSize} pixelPos={pixelPos} />}
           {tutorial?.scenario.goal && (
             <div
@@ -696,6 +659,7 @@ function MazeCollectorSession({
               <div
                 className={ghost.id.startsWith('extra-') ? 'animate-[maze-cloud-arrive_0.9s_ease-out] [filter:drop-shadow(0_0_8px_rgba(244,63,94,0.85))]' : undefined}
               >
+                <div className={ghost.mode === 'FRIGHTENED' ? 'maze-cloud-scared' : ghost.mode === 'EATEN' ? undefined : 'maze-cloud-float'}>
                 <PollutionGhostSprite
                   personality={ghost.personality}
                   mode={ghost.mode}
@@ -703,6 +667,7 @@ function MazeCollectorSession({
                   size={cellSize * GHOST_SCALE}
                   warning={energyWarning}
                 />
+                </div>
               </div>
             </CenteredSprite>
           ))}
@@ -716,7 +681,11 @@ function MazeCollectorSession({
               />
             )}
             {/* Halo claro detrás del camión: sobre el mapa oscuro se encuentra de un vistazo. */}
-            <div className="h-full w-full [filter:drop-shadow(0_0_7px_rgba(255,255,255,0.95))_drop-shadow(0_0_16px_rgba(52,211,153,0.75))]">
+            <div
+              className={`h-full w-full [filter:drop-shadow(0_0_7px_rgba(255,255,255,0.95))_drop-shadow(0_0_16px_rgba(52,211,153,0.75))] ${
+                game.phase === 'levelup' ? 'maze-truck-jump' : blinking ? 'maze-truck-blink' : playing && !game.paused ? 'maze-truck-drive' : ''
+              }`}
+            >
               <EcoTruckSprite
                 facing={game.player.facing}
                 size={cellSize * TRUCK_SCALE}
@@ -725,6 +694,8 @@ function MazeCollectorSession({
               />
             </div>
           </CenteredSprite>
+
+          <MazeEffectsLayer effects={effects} cellSize={cellSize} truckScale={TRUCK_SCALE} />
 
           {/* Respuestas de la pregunta: encima de botellas y nubes, debajo del camión. */}
           {game.question?.answers
@@ -763,8 +734,8 @@ function MazeCollectorSession({
               />
             ))}
         </div>
-        {game.answerFeedback && <AnswerToast key={game.answerFeedback.id} feedback={game.answerFeedback} />}
-        {cloudAlert > 0 && <CloudAlert key={cloudAlert} />}
+        {game.answerFeedback && <AnswerToast key={`answer-${game.answerFeedback.id}`} feedback={game.answerFeedback} />}
+        {cloudAlert > 0 && <CloudAlert key={`cloud-${cloudAlert}`} />}
         {locating && (
           <p
             role="status"
@@ -775,10 +746,12 @@ function MazeCollectorSession({
         )}
       </div>
       {game.question && questionAside && (
-        // Dos recuadros separados: la pregunta arriba (donde va la atención) y el estado de la partida abajo.
-        <aside className="flex w-[300px] shrink-0 flex-col gap-3 overflow-y-auto border-l border-white/10 bg-slate-950/50 p-3 xl:w-[340px]">
-          <QuestionPanel question={game.question} feedback={game.answerFeedback} remainingMs={game.questionRemainingMs} layout="aside" />
-          <GameStatusCard lives={game.lives} score={game.score} remainingMs={game.questionRemainingMs} />
+        // Tiempo y vidas arriba, la pregunta debajo. Sin scroll: si no cabe, el contenido se reduce.
+        <aside className="shrink-0 overflow-hidden border-l border-white/10 bg-slate-950/50 p-3" style={{ width: asideWidth }}>
+          <FitScale className="h-full" align="top" minScale={0.6} fitKey={game.question.id} contentClassName="flex flex-col gap-3">
+            <GameStatusCard lives={game.lives} score={game.score} remainingMs={game.questionRemainingMs} />
+            <QuestionPanel question={game.question} feedback={game.answerFeedback} remainingMs={game.questionRemainingMs} layout="aside" />
+          </FitScale>
         </aside>
       )}
       </div>
@@ -826,7 +799,7 @@ function MazeCollectorSession({
               </>
             ) : (
               <>
-                Muévete con las <b className="text-white">flechas del teclado</b> (o W A S D).
+                Muévete con las <b className="text-white">flechas del teclado</b> <ArrowKeysInline />.
               </>
             )}
           </p>
@@ -983,30 +956,30 @@ function QuestionPanel({
       aria-live="polite"
       className={
         aside
-          ? 'flex flex-col gap-3 rounded-2xl border border-white/15 bg-slate-900/80 p-4 shadow-[0_12px_30px_-18px_rgba(0,0,0,0.9)]'
+          ? 'flex flex-col gap-2.5 rounded-2xl border border-white/15 bg-slate-900/80 p-3 shadow-[0_12px_30px_-18px_rgba(0,0,0,0.9)]'
           : 'z-10 mx-1.5 mt-1.5 shrink-0 rounded-2xl border border-white/10 bg-slate-950/80 px-3 py-2 sm:mx-2 sm:mt-2 [@media(max-height:520px)]:py-1'
       }
     >
       <p
         key={question.id}
-        className={`flex items-start gap-2 font-bold text-white animate-[fade-in-up_0.35s_ease-out] ${aside ? 'text-[17px] leading-snug' : 'text-[14px] leading-tight sm:text-[15px]'}`}
+        className={`flex items-start gap-2 font-bold text-white animate-[fade-in-up_0.35s_ease-out] ${aside ? 'text-[15px] leading-snug' : 'text-[14px] leading-tight sm:text-[15px]'}`}
       >
         <CircleHelp className={`shrink-0 text-emerald-300 ${aside ? 'mt-0.5 h-5 w-5' : 'h-4 w-4'}`} aria-hidden="true" />
         <span className="min-w-0 flex-1">{question.question}</span>
         {remainingMs > 0 && !aside && <QuestionClock remainingMs={remainingMs} compact />}
       </p>
 
-      <ul className={aside ? 'flex flex-col gap-2' : 'mt-1.5 grid grid-cols-2 gap-x-2 gap-y-1 [@media(max-height:520px)]:mt-1 [@media(max-height:520px)]:grid-cols-4'}>
+      <ul className={aside ? 'flex flex-col gap-1.5' : 'mt-1.5 grid grid-cols-2 gap-x-2 gap-y-1 [@media(max-height:520px)]:mt-1 [@media(max-height:520px)]:grid-cols-4'}>
         {question.answers.map((answer) => {
           const missed = answer.wrong
           const flash = feedback?.letter === answer.letter && feedback.kind === 'wrong'
           return (
             <li
               key={answer.letter}
-              className={`flex items-center gap-2 rounded-xl ${aside ? 'bg-white/5 px-2.5 py-2 text-[14px]' : 'text-[12.5px] sm:text-[13px]'} ${missed ? 'text-slate-500 line-through' : 'text-slate-100'} ${flash ? 'animate-[maze-answer-shake_0.4s_ease-in-out]' : ''}`}
+              className={`flex items-center gap-2 rounded-xl ${aside ? 'bg-white/5 px-2 py-1.5 text-[13px]' : 'text-[12.5px] sm:text-[13px]'} ${missed ? 'text-slate-500 line-through' : 'text-slate-100'} ${flash ? 'animate-[maze-answer-shake_0.4s_ease-in-out]' : ''}`}
             >
               <span
-                className={`flex shrink-0 items-center justify-center rounded-full font-black text-slate-950 ${aside ? 'h-7 w-7 text-[14px]' : 'h-5 w-5 text-[11px]'}`}
+                className={`flex shrink-0 items-center justify-center rounded-full font-black text-slate-950 ${aside ? 'h-6 w-6 text-[12.5px]' : 'h-5 w-5 text-[11px]'}`}
                 style={{ background: missed ? '#475569' : ANSWER_COLORS[answer.letter] }}
               >
                 {answer.letter}
@@ -1016,7 +989,7 @@ function QuestionPanel({
           )
         })}
       </ul>
-      {aside && <p className="text-[12px] leading-snug text-slate-400">Maneja hasta la letra de la respuesta correcta. Si te equivocas o se acaba el tiempo, pierdes una vida.</p>}
+      {aside && <p className="text-[11px] leading-snug text-slate-400">Maneja hasta la letra de la respuesta correcta. Si te equivocas o se acaba el tiempo, pierdes una vida.</p>}
     </section>
   )
 }
@@ -1149,28 +1122,28 @@ function OffscreenAnswer({ answer, x, y, width, height }: { answer: MazeAnswer; 
 /** Recuadro de la partida en la columna derecha: tiempo (con reloj), vidas y puntos. */
 function GameStatusCard({ lives, score, remainingMs }: { lives: number; score: number; remainingMs: number }) {
   return (
-    <section aria-label="Estado de la partida" className="flex flex-col gap-3 rounded-2xl border border-white/15 bg-slate-900/80 p-4">
+    <section aria-label="Estado de la partida" className="flex flex-col gap-2 rounded-2xl border border-white/15 bg-slate-900/80 p-3">
       {remainingMs > 0 && (
         <div className="flex items-center gap-3">
-          <CartoonClock className="h-14 w-14 shrink-0" />
+          <CartoonClock className="h-11 w-11 shrink-0" />
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-semibold tracking-[0.12em] text-slate-400 uppercase">Tiempo</p>
             <QuestionClock remainingMs={remainingMs} />
           </div>
         </div>
       )}
-      <div className="grid grid-cols-2 gap-2 border-t border-white/10 pt-3">
+      <div className="grid grid-cols-2 gap-2 border-t border-white/10 pt-2">
         <div aria-label={`Vidas: ${lives}`}>
           <p className="text-[11px] font-semibold tracking-[0.12em] text-slate-400 uppercase">Vidas</p>
           <div className="mt-1 flex items-center gap-0.5">
             {Array.from({ length: Math.max(0, lives) }, (_, index) => (
-              <img key={index} src={mazeSpriteUrl('ui-life')} alt="" className="h-7 w-7" />
+              <img key={index} src={mazeSpriteUrl('ui-life')} alt="" className="h-6 w-6" />
             ))}
           </div>
         </div>
         <div>
           <p className="text-[11px] font-semibold tracking-[0.12em] text-slate-400 uppercase">Puntos</p>
-          <p className="mt-1 flex items-center gap-1.5 text-[22px] font-black text-white tabular-nums">
+          <p className="mt-1 flex items-center gap-1.5 text-[19px] font-black text-white tabular-nums">
             <img src={mazeSpriteUrl('ui-star')} alt="" className="h-6 w-6" />
             {score.toLocaleString('es')}
           </p>
@@ -1495,3 +1468,90 @@ function PadButton({
     </button>
   )
 }
+
+/*
+ * Capas que no cambian cuadro a cuadro: el juego se vuelve a dibujar 60 veces por segundo para mover
+ * el camión y las nubes, y rehacer cada vez el mapa y las ~115 botellas era lo que daba tirones.
+ */
+const CityBackground = memo(SostenibleCityBackground)
+
+/** Laberinto de los layouts sin arte propio: paredes y calles por color. */
+const StaticMaze = memo(function StaticMaze({ layout, cellSize, primaryColor }: { layout: MazeLayoutDef; cellSize: number; primaryColor: string }) {
+  const wallColors = wallPalette(primaryColor)
+  return (
+    <div
+      className="absolute inset-0 grid"
+      style={{
+        gridTemplateColumns: `repeat(${layout.cols}, ${cellSize}px)`,
+        gridTemplateRows: `repeat(${layout.rows}, ${cellSize}px)`,
+      }}
+    >
+      {layout.grid.map((rowCells, row) =>
+        rowCells.map((cell, col) => {
+          const key = `${row}:${col}`
+          if (cell === 1) {
+            return (
+              <div
+                key={key}
+                style={{
+                  background: `linear-gradient(160deg, ${wallColors.light}, ${wallColors.base} 55%, ${wallColors.dark})`,
+                  border: `1px solid ${wallColors.dark}`,
+                }}
+              >
+                <div
+                  className="h-full w-full animate-[maze-window-glow_3s_ease-in-out_infinite]"
+                  style={{
+                    animationDelay: `${(hashCell(row, col) % 20) * 0.15}s`,
+                    background:
+                      'repeating-linear-gradient(0deg, transparent 0 6px, rgba(254,240,138,0.5) 6px 8px)',
+                    mixBlendMode: 'overlay',
+                  }}
+                />
+              </div>
+            )
+          }
+          return <div key={key} className="bg-[#18212c]" />
+        }),
+      )}
+    </div>
+  )
+})
+
+type Collectible = MazeGameSnapshot['pickups'][number]
+
+/**
+ * Botellas, canecas y bolsas: el motor las saca de su lista (splice) al recogerlas, así que la lista es la
+ * misma; `count` es lo que avisa que cambió.
+ */
+const PickupsLayer = memo(
+  function PickupsLayer({ pickups, bags, cellSize }: { pickups: Collectible[]; bags: Collectible[]; count: number; cellSize: number }) {
+    const pixelPos = (cell: { row: number; col: number }) => ({ left: cell.col * cellSize, top: cell.row * cellSize })
+    return (
+      <>
+        {pickups.map((pickup) => {
+          const { left, top } = pixelPos(pickup.pos)
+          return (
+            <div key={pickup.id} className="absolute flex items-center justify-center" style={{ left, top, width: cellSize, height: cellSize }}>
+              {pickup.kind === 'PET' ? (
+                <span className="flex" style={{ filter: PET_FILTER }}>
+                  <PetSprite size={cellSize * PET_SCALE} />
+                </span>
+              ) : (
+                <PowerPelletSprite size={cellSize * POWER_SCALE} />
+              )}
+            </div>
+          )
+        })}
+        {bags.map((bag) => {
+          const { left, top } = pixelPos(bag.pos)
+          return (
+            <div key={bag.id} className="absolute flex items-center justify-center" style={{ left, top, width: cellSize, height: cellSize }}>
+              <TrashBagSprite size={cellSize * BAG_SCALE} />
+            </div>
+          )
+        })}
+      </>
+    )
+  },
+  (before, after) => before.pickups === after.pickups && before.bags === after.bags && before.count === after.count && before.cellSize === after.cellSize,
+)

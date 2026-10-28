@@ -7075,3 +7075,19 @@ code {
   85% { transform: rotate(-6deg); }
   90% { transform: rotate(4deg); }
 }
+
+/* Identidad Oculta: «¡Tu turno!» en un verde intenso que late (barra de turno y aviso en pantalla). */
+.turn-mine-glow {
+  background: linear-gradient(120deg, #16a34a, #22c55e 45%, #84cc16);
+  box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7), 0 14px 32px -12px rgba(22, 163, 74, 0.9);
+  animation: turn-mine-pulse 1.6s ease-out infinite;
+}
+
+@keyframes turn-mine-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7), 0 14px 32px -12px rgba(22, 163, 74, 0.9); }
+  70%, 100% { box-shadow: 0 0 0 12px rgba(74, 222, 128, 0), 0 14px 32px -12px rgba(22, 163, 74, 0.9); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .turn-mine-glow { animation: none; }
+}

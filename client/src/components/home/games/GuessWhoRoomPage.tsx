@@ -254,9 +254,10 @@ function GuessWhoRoomSession() {
       {dealing && <DealCountdownOverlay remainingMs={dealRemainingMs} />}
 
       <div className="guess-who-play-shell">
-        {/* Barra superior fija: el turno a la izquierda, siempre visible; las acciones a la derecha (issue #80). */}
-        <div className="mb-3 flex items-center justify-end gap-2">
-          {room.phase === 'PLAYING' && opponent && <div className="mr-auto min-w-0 flex-1 sm:max-w-[460px]">
+        {/* El turno va al centro, bien a la vista; las acciones quedan a la derecha. */}
+        <div className="mb-3 grid grid-cols-[1fr_minmax(0,460px)_1fr] items-center gap-2 max-sm:grid-cols-[minmax(0,1fr)_auto]">
+          <span className="max-sm:hidden" aria-hidden="true" />
+          {room.phase === 'PLAYING' && opponent ? <div className="min-w-0">
             <TurnStatusStrip
               compact
               isMyTurn={isMyTurn}
@@ -264,7 +265,8 @@ function GuessWhoRoomSession() {
               turnDeadline={room.turnDeadline}
               turnDurationSeconds={room.turnDurationSeconds}
             />
-          </div>}
+          </div> : <span />}
+          <div className="flex items-center justify-end gap-2">
           {copyFeedback && <span className="text-[11px] font-medium text-accent" role="status">{copyFeedback}</span>}
           {/* En solitario no hay a quién invitar: el código no sirve para nada. */}
           {!againstBot && <button
@@ -303,6 +305,7 @@ function GuessWhoRoomSession() {
             <LogOut className="h-4 w-4" strokeWidth={2} />
             Salir
           </button>
+          </div>
         </div>
 
         {pageError && (

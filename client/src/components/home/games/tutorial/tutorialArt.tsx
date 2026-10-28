@@ -30,8 +30,11 @@ export function ArtTruckDrive() {
       <At style={{ left: '8%', top: '44%', width: '84%', height: '16cqw', background: 'repeating-linear-gradient(90deg,#94a3b8 0 5cqw,transparent 5cqw 9cqw)', opacity: 0.35 }} />
       <Strip name="truck-drive" frames={4} size={26} left="12%" top="28%" ms={640} style={{ animation: 'gg-run-right 6s ease-in-out infinite' }} />
       <At style={{ left: '78%', top: '36%', fontSize: cqw(14), lineHeight: 1, ...loop('gg-pulse', 1.4) }}>🏁</At>
-      <Tag tone="info" style={{ left: '10%', top: '84%' }}>
-        Flechas del teclado o W A S D
+      <At style={{ left: '40%', top: '62%' }}>
+        <ArrowKeys size="clamp(1.4rem, 5cqw, 2.4rem)" animated />
+      </At>
+      <Tag tone="info" style={{ left: '6%', top: '86%' }}>
+        Flechas del teclado
       </Tag>
     </Scene>
   )

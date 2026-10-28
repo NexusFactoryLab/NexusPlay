@@ -66,9 +66,10 @@ export function MazeCollectorTutorial({
   const parts: TutorialPart[] = [
     {
       title: 'Maneja el camión',
-      task: 'Lleva el camión hasta la bandera 🏁 con las flechas del teclado (o W A S D).',
+      task: 'Lleva el camión hasta la bandera 🏁 con las flechas del teclado.',
+      arrowKeys: true,
       taskTouch: 'Lleva el camión hasta la bandera 🏁 con la cruceta o deslizando el dedo.',
-      explain: 'El camión recorre las calles de la ciudad. Lo mueves con las flechas del teclado o W A S D; en el celular, con la cruceta o deslizando el dedo.',
+      explain: 'El camión recorre las calles de la ciudad. Lo mueves con las flechas del teclado; en el celular, con la cruceta o deslizando el dedo.',
       success: '¡Así se maneja el camión! Sigue derecho hasta que lo hagas girar.',
       art: <ArtTruckDrive />,
       points: [

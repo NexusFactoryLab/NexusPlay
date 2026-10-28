@@ -89,6 +89,9 @@ function TutorialMatch({ setup, goal, context }: { setup: Setup; goal: Goal; con
   const [messages, setMessages] = useState(setup.messages)
   const [pending, setPending] = useState(setup.pending)
   const [answerHint, setAnswerHint] = useState<string | null>(null)
+  // Cada adivinanza fallida vuelve a montar el tablero con la selección abierta: en esta parte el
+  // tutorial bloquea «¡Creo que es esta!», así que sin esto no quedaba forma de volver a elegir.
+  const [guessTries, setGuessTries] = useState(0)
   const isMyTurn = setup.isMyTurn && !pending
   // Cada parte avisa su logro una sola vez (un segundo toque no la repite).
   const [finished, setFinished] = useState(false)
@@ -147,7 +150,10 @@ function TutorialMatch({ setup, goal, context }: { setup: Setup; goal: Goal; con
   function accuse(cardId: string) {
     if (goal !== 'guess') return
     if (cardId === RIVAL_SECRET) finish(300)
-    else context.onMistake(`No era ${CARDS.find((card) => card.cardId === cardId)?.label}. En el juego perderías el turno. Revisa las respuestas del chat.`)
+    else {
+      context.onMistake(`No era ${CARDS.find((card) => card.cardId === cardId)?.label}. En el juego perderías el turno. Revisa las respuestas del chat.`)
+      setGuessTries((tries) => tries + 1)
+    }
   }
 
   return (
@@ -159,14 +165,15 @@ function TutorialMatch({ setup, goal, context }: { setup: Setup; goal: Goal; con
         <style>{NOT_FLYING.filter((id) => !discarded.includes(id)).map((id) => `[data-card-id="${id}"]`).join(',') + ' { border-radius: 10px; z-index: 3; } @media (prefers-reduced-motion: no-preference) { ' + NOT_FLYING.filter((id) => !discarded.includes(id)).map((id) => `[data-card-id="${id}"]`).join(',') + ' { animation: gg-focus 1.3s ease-in-out infinite; } }'}</style>
       )}
       <div className="guess-who-play-shell">
-        <div className="mb-3 flex items-center justify-end gap-2">
-          <div className="mr-auto min-w-0 flex-1 sm:max-w-[460px]">
+        <div className="mb-3 flex items-center justify-center gap-2">
+          <div className="min-w-0 flex-1 sm:max-w-[460px]">
             <TurnStatusStrip compact isMyTurn={isMyTurn} opponentName={RIVAL} turnDeadline={null} turnDurationSeconds={0} />
           </div>
         </div>
         <div className="guess-who-play-panels">
           <div className="guess-who-play-board">
             <MatchBoard
+              key={guessTries}
               cards={CARDS}
               self={self}
               opponent={opponent}

@@ -4,6 +4,7 @@ import { Check, GraduationCap, Play, RotateCcw, Target, TriangleAlert, X } from 
 import { FitScale } from '../true-false-maze/FitScale'
 import { Item, strong } from '../true-false-maze/TrueFalseMazeGuide'
 import './gameGuides.css'
+import { ArrowKeysInline } from './ArrowKeysInline'
 import { GUIDE_ACCENTS } from './GameGuide'
 import type { GuideAccent } from './GameGuide'
 
@@ -32,6 +33,8 @@ export type TutorialPart = {
   task: string
   /** La misma tarea para celular o tablet (cruceta, tocar…), si cambia respecto a la de computador. */
   taskTouch?: string
+  /** La tarea es mover al personaje: en computador se dibujan las flechas del teclado junto a ella. */
+  arrowKeys?: boolean
   /** Por qué importa (se lee junto con la tarea al empezar la parte). */
   explain: string
   /** Lo que se dice al lograrla. */
@@ -47,7 +50,7 @@ export type TutorialPart = {
 const CURTAIN_MS = 450
 
 /** Lo que dura el fondo desenfocado con la tarea en grande antes de que el juego arranque. */
-const FOCUS_MS = 3000
+const FOCUS_MS = 4100
 
 type Stage =
   | { kind: 'brief'; previous: { result: 'done' | 'failed'; message: string } | null }
@@ -108,6 +111,7 @@ export function TutorialRunner({
   const part = parts[index]
   const task = touch ? (part.taskTouch ?? part.task) : part.task
   const colors = GUIDE_ACCENTS[accent]
+  const showKeys = !touch && part.arrowKeys
 
   // El «Sí» que abrió el tutorial es el gesto que permite pedir la pantalla completa.
   useEffect(() => {
@@ -197,6 +201,7 @@ export function TutorialRunner({
           <span role="status" className="tour-step-in max-w-[760px] font-heading text-[clamp(1.3rem,4.2dvh+1vw,2.6rem)] leading-tight font-bold text-white drop-shadow-[0_4px_18px_rgba(0,0,0,0.8)]">
             {task}
           </span>
+          {showKeys && <ArrowKeysInline size="lg" />}
           <span className="h-1.5 w-[min(320px,70vw)] overflow-hidden rounded-full bg-white/15" aria-hidden="true">
             <span className="tut-focus-bar block h-full rounded-full bg-cyan-300" style={{ animationDuration: `${FOCUS_MS}ms` }} />
           </span>
@@ -214,18 +219,23 @@ export function TutorialRunner({
         >
           <div
             role="status"
-            className="tut-task-bar tour-step-in flex max-w-[720px] items-center gap-2.5 rounded-2xl border-2 border-cyan-300 bg-slate-950/94 py-2 pr-1.5 pl-2.5 text-white backdrop-blur"
+            className={`tut-task-bar tour-step-in flex max-w-[820px] items-center gap-3 rounded-[20px] border-[3px] py-2.5 pr-2 pl-3 text-white sm:py-3 ${mistake ? 'tut-task-bar--mistake border-rose-200' : 'border-white/90'}`}
           >
-            <span className="flex shrink-0 items-center gap-1 rounded-lg bg-cyan-400 px-2 py-0.5 text-[11px] font-black text-slate-950 uppercase">
-              <Target className="h-3.5 w-3.5" aria-hidden="true" /> {index + 1}/{parts.length}
+            <span className="flex shrink-0 flex-col items-center rounded-xl bg-white px-2.5 py-1 leading-none font-black text-slate-950 uppercase shadow-md">
+              <Target className="h-5 w-5 text-cyan-600" aria-hidden="true" />
+              <span className="mt-0.5 text-[11px]">
+                {index + 1}/{parts.length}
+              </span>
             </span>
-            <span className="min-w-0 text-[13.5px] leading-snug font-bold sm:text-[15px]">
+            <span className="min-w-0 text-[15.5px] leading-snug font-extrabold drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)] sm:text-[18px]">
               {mistake ? (
-                <span className="flex items-center gap-1.5 text-rose-200">
-                  <TriangleAlert className="h-4 w-4 shrink-0" aria-hidden="true" /> {mistake}
+                <span className="flex items-center gap-1.5 text-white">
+                  <TriangleAlert className="h-5 w-5 shrink-0" aria-hidden="true" /> {mistake}
                 </span>
               ) : (
-                task
+                <>
+                  {task} {showKeys && <ArrowKeysInline />}
+                </>
               )}
             </span>
             {status && !mistake && <span className="flex shrink-0 items-center gap-1">{status}</span>}
@@ -234,7 +244,7 @@ export function TutorialRunner({
               onClick={onFinish}
               title="Salir del tutorial e ir al juego"
               aria-label="Salir del tutorial"
-              className="pointer-events-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-300 hover:bg-white/10 hover:text-white"
+              className="pointer-events-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black/20 text-white hover:bg-black/35"
             >
               <X className="h-4 w-4" />
             </button>

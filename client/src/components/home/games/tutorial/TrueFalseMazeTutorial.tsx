@@ -189,7 +189,8 @@ export function TrueFalseMazeTutorial({ title, onFinish }: { title: string; onFi
   const parts: TutorialPart[] = [
     {
       title: 'Mueve el robot',
-      task: 'Mueve el robot con las flechas del teclado (o W A S D).',
+      task: 'Mueve el robot con las flechas del teclado.',
+      arrowKeys: true,
       taskTouch: 'Mueve el robot con la cruceta o deslizando el dedo.',
       explain: 'Este es tu robot. Se mueve por los pasillos de la nave y sigue andando hasta que lo hagas girar.',
       success: '¡Así se mueve el robot!',
@@ -272,7 +273,7 @@ export function TrueFalseMazeTutorial({ title, onFinish }: { title: string; onFi
     },
     {
       title: 'Responde con el robot',
-      task: 'Lee la afirmación de arriba y lleva al robot a la sala VERDADERO o FALSO.',
+      task: 'Mueve el personaje a la respuesta correcta (verdadera o falsa).',
       explain: 'Así se responde en el juego: lees la afirmación y entras a la sala VERDADERO si es cierta, o a la FALSO si no lo es.',
       success: '¡Correcto! Ya sabes todo lo necesario para la nave.',
       art: <ArtTfAnswer />,

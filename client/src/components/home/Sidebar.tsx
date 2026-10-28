@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { BarChart3, BookOpen, Bot, Building2, ChevronLeft, FolderOpen, Globe, GraduationCap, House, Plus, SquarePen, Users, Zap } from 'lucide-react'
@@ -34,6 +34,43 @@ const BASE_ITEM_CLASS =
   'flex items-center gap-3 rounded-lg px-3.5 py-2.5 text-[14px] font-medium transition-colors'
 
 const STORAGE_KEY = 'nexusplay-sidebar-collapsed'
+/** Lo que dura la animación de abrir o contraer el menú. */
+const TOGGLE_MS = 220
+
+/**
+ * Abrir o contraer el menú sin animar anchos (eso recalculaba toda la página en cada cuadro y se
+ * trababa): el menú y el contenido toman su tamaño final de una vez y solo se anima lo visual, que
+ * hace la tarjeta gráfica. El contenido se desliza desde donde estaba (transform) y el menú se
+ * destapa (al abrir) o se tapa (al contraer) con un recorte.
+ */
+function animateToggle(aside: HTMLElement, previous: { asideWidth: number; columnLeft: number }) {
+  const column = aside.nextElementSibling
+  if (!(column instanceof HTMLElement) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  const timing = { duration: TOGGLE_MS, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' }
+  const dx = previous.columnLeft - column.getBoundingClientRect().left
+  column.animate([{ transform: `translateX(${dx}px)` }, { transform: 'translateX(0)' }], timing)
+  const hidden = Math.max(0, previous.asideWidth - aside.getBoundingClientRect().width)
+  const shown = Math.max(0, aside.getBoundingClientRect().width - previous.asideWidth)
+  // Al abrir, el menú ya ancho se destapa de izquierda a derecha.
+  if (shown > 0) aside.animate([{ clipPath: `inset(0 ${shown}px 0 0)` }, { clipPath: 'inset(0 -40px 0 0)' }], timing)
+  // Al contraer, una franja del color del menú se recoge sobre el hueco mientras el contenido llega.
+  if (hidden > 0) {
+    const veil = document.createElement('div')
+    const style = getComputedStyle(aside)
+    Object.assign(veil.style, {
+      position: 'absolute',
+      top: '0',
+      bottom: '0',
+      left: '100%',
+      width: `${hidden}px`,
+      background: style.backgroundColor,
+      pointerEvents: 'none',
+      transformOrigin: 'left',
+    })
+    aside.appendChild(veil)
+    veil.animate([{ transform: 'scaleX(1)' }, { transform: 'scaleX(0)' }], timing).onfinish = () => veil.remove()
+  }
+}
 
 function readStoredCollapsed(): boolean {
   try {
@@ -49,6 +86,14 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
   // En móvil el menú desplegable siempre se ve completo (no tiene sentido contraerlo).
   const collapsed = storedCollapsed && !isMobile
   const routerNavigate = useNavigate()
+  const asideRef = useRef<HTMLElement>(null)
+  // Medidas justo antes de abrir o contraer, para animar desde ahí (ver animateToggle).
+  const beforeToggle = useRef<{ asideWidth: number; columnLeft: number } | null>(null)
+  useLayoutEffect(() => {
+    const previous = beforeToggle.current
+    beforeToggle.current = null
+    if (previous && asideRef.current) animateToggle(asideRef.current, previous)
+  }, [collapsed])
   const location = useLocation()
 
   // Al elegir una sección en móvil, el menú se cierra solo.
@@ -67,6 +112,9 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
   }, [mobileOpen, onMobileClose])
 
   function toggleCollapsed() {
+    const aside = asideRef.current
+    const column = aside?.nextElementSibling
+    if (aside && column) beforeToggle.current = { asideWidth: aside.getBoundingClientRect().width, columnLeft: column.getBoundingClientRect().left }
     setCollapsed((current) => {
       const next = !current
       try {
@@ -85,7 +133,8 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
     )}
     <aside
       id="app-sidebar"
-      className={`app-sidebar relative flex shrink-0 flex-col gap-1 border-r border-border bg-bg p-4 transition-[width,transform] duration-200 ease-out max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-50 max-md:w-[min(300px,85vw)] max-md:overflow-y-auto ${
+      ref={asideRef}
+      className={`app-sidebar relative flex shrink-0 flex-col gap-1 border-r border-border bg-bg p-4 transition-transform duration-200 ease-out max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-50 max-md:w-[min(300px,85vw)] max-md:overflow-y-auto ${
         collapsed ? 'is-collapsed w-[76px]' : 'w-[240px]'
       } ${mobileOpen ? '' : 'max-md:-translate-x-full max-md:invisible'}`}
       aria-label="Menú"

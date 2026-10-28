@@ -120,6 +120,10 @@ async function openGame(browser, game, viewport, touch) {
   const page = await browser.newPage({ viewport, hasTouch: touch, isMobile: touch, reducedMotion: process.env.TUT_MOTION ? 'no-preference' : 'reduce' })
   const errors = []
   page.on('pageerror', (error) => errors.push(error.message))
+  // Claves repetidas entre hermanos hacen que React duplique elementos (el aviso «¡Se acabó el tiempo!» del Camión se multiplicaba).
+  page.on('console', (message) => {
+    if (message.type() === 'error' && message.text().includes('same key')) errors.push(message.text())
+  })
   await page.route('**/__tutorial-fixture', (route) => route.fulfill({ contentType: 'text/html', body: fixture(game) }))
   await page.route('**/auth/refresh', (route) => route.fulfill({ status: 401, json: {} }))
   await page.goto(base + '/__tutorial-fixture')
@@ -381,8 +385,13 @@ async function guessWhoTutorial(browser, viewport, touch) {
   // 6. Abrir la selección para adivinar.
   await page.getByRole('button', { name: /¡Creo que es esta!/ }).click()
   await next(7)
-  // 7. Elegir la tarjeta y confirmar.
-  await page.getByRole('dialog').getByRole('button', { name: /Búho/ }).click()
+  // 7. Elegir mal primero (el Murciélago también vuela y sale de noche): el aviso sale y se puede volver a elegir.
+  await page.getByRole('dialog').getByRole('button', { name: /Murciélago/ }).click()
+  await page.getByRole('button', { name: 'Sí, confirmar' }).click()
+  await page.getByText('No era Murciélago').waitFor()
+  await page.screenshot({ path: `.scratch/tutorial-quienes-error-${tag}.png` })
+  // Elegir y confirmar la correcta.
+  await page.getByRole('dialog').getByRole('button', { name: /Búho/ }).click({ timeout: 6000 })
   await page.getByRole('button', { name: 'Sí, confirmar' }).click()
   await card.getByRole('heading', { name: '¡Tutorial completado!' }).waitFor({ timeout: 6000 })
   await page.screenshot({ path: `.scratch/tutorial-quienes-fin-${tag}.png` })
@@ -393,6 +402,40 @@ async function guessWhoTutorial(browser, viewport, touch) {
   await page.close()
 }
 
+/**
+ * Camión, juego real sin pantalla completa: el camión se queda quieto hasta perder todas las vidas
+ * (nubes y tiempo agotado). El aviso «¡Se acabó el tiempo!» sale una sola vez, se quita solo y
+ * queda la pantalla de «Sin batería» (antes el aviso se multiplicaba y trababa la página).
+ */
+async function mazeTimeout(browser) {
+  const { page, errors } = await openGame(browser, 'MAZE', { width: 1366, height: 768 }, false)
+  const guide = page.locator('[data-game-guide="MAZE_COLLECTOR"]')
+  await guide.waitFor()
+  await guide.getByRole('button', { name: /Saltar guía/ }).click()
+  const noTutorial = page.getByRole('button', { name: /^No/ })
+  if (await noTutorial.isVisible().catch(() => false)) await noTutorial.click()
+  const fullscreen = page.getByRole('switch').first()
+  if ((await fullscreen.isVisible().catch(() => false)) && (await fullscreen.getAttribute('aria-checked')) === 'true') await fullscreen.click()
+  await page.getByRole('button', { name: /Empezar|Arrancar|¡A jugar|Jugar/ }).first().click()
+  await page.getByRole('button', { name: /A buscarla/ }).click({ timeout: 8000 })
+  let most = 0
+  const deadline = Date.now() + 60000
+  while (!(await page.getByText('Sin batería').isVisible())) {
+    assert.ok(Date.now() < deadline, 'Se pierden todas las vidas en menos de un minuto')
+    most = Math.max(most, await page.getByText('¡Se acabó el tiempo!').count())
+    await page.waitForTimeout(150)
+  }
+  await page.waitForTimeout(ANSWER_FEEDBACK_WAIT)
+  most = Math.max(most, await page.getByText('¡Se acabó el tiempo!').count())
+  assert.ok(most <= 1, `El aviso de tiempo sale una sola vez (salió ${most})`)
+  assert.equal(await page.getByText('¡Se acabó el tiempo!').count(), 0, 'El aviso se quita solo')
+  await page.screenshot({ path: '.scratch/camion-sin-bateria.png' })
+  assert.deepEqual(errors, [])
+  console.log('PASS 1366 Camión: se acaba el tiempo sin pantalla completa → un solo aviso que se quita y «Sin batería»')
+  await page.close()
+}
+const ANSWER_FEEDBACK_WAIT = 3000
+
 async function main() {
   mkdirSync('.scratch', { recursive: true })
   const browser = await chromium.launch({ channel: 'chrome', headless: true })
@@ -400,6 +443,7 @@ async function main() {
     if (!only || only === 'MAZE') {
       await mazeTutorial(browser, { width: 1280, height: 800 }, false)
       await mazeTutorial(browser, { width: 390, height: 844 }, true)
+      await mazeTimeout(browser)
     }
     if (!only || only === 'TF') {
       await tfTutorial(browser, { width: 1280, height: 800 }, false)
