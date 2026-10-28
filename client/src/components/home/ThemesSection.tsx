@@ -110,10 +110,16 @@ export function ThemesSection({ compact = false }: { compact?: boolean } = {}) {
               // que WelcomeCard: fondo recortado al padding + degradado al
               // borde) en vez del borde plano gris de antes — cada tarjeta luce
               // sus propios colores siempre, no solo cuando está activa.
-              className="group flex flex-col overflow-hidden rounded-2xl border-[3px] border-transparent text-left transition-transform hover:-translate-y-0.5"
+              className="group flex flex-col overflow-hidden rounded-2xl border-[3px] border-transparent text-left transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5"
               style={{
                 background: `linear-gradient(${option.preview.surface}, ${option.preview.surface}) padding-box, linear-gradient(120deg, ${option.preview.accent2}, ${option.preview.accent}) border-box`,
-                boxShadow: active ? `0 12px 28px -12px ${option.preview.accent}` : undefined,
+                boxShadow: compact
+                  ? active
+                    ? `0 0 0 2px ${option.preview.accent2}, 0 0 14px ${option.preview.accent2}, 0 0 34px ${option.preview.accent}, 0 0 64px ${option.preview.accent}99`
+                    : `0 0 12px ${option.preview.accent}88, 0 0 26px ${option.preview.accent}44`
+                  : active
+                    ? `0 12px 28px -12px ${option.preview.accent}`
+                    : undefined,
               }}
             >
               <div className={`relative ${compact ? 'h-20 sm:h-28' : 'h-32'}`} style={{ background: option.preview.bg }}>
