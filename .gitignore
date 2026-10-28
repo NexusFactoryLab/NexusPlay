@@ -7,3 +7,6 @@ dist-seed/
 server/src/generated/
 *.tsbuildinfo
 .scratch/
+
+# Caché de Python de los scripts de assets (client/scripts)
+__pycache__/

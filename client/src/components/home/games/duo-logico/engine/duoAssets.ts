@@ -19,6 +19,9 @@ export interface DuoAssets {
   lavaTop: Texture[]
   sludge: Texture
   sludgeTop: Texture[]
+  /** Agua translúcida y su ola (issue #125); si faltan, el agua se dibuja a mano. */
+  water: Texture | null
+  waterTop: Texture[]
   thorns: Texture
   background: Texture
 }
@@ -41,6 +44,8 @@ export function loadDuoAssets(): Promise<DuoAssets> {
       ...[0, 1, 2, 3].map((i) => tex(`lava-top-${i}`)),
       ...[0, 1, 2, 3].map((i) => tex(`sludge-top-${i}`)),
     ])
+    // El agua es opcional: si no carga, el juego sigue con la dibujada a mano.
+    const water = await Promise.all([tex('water'), ...[0, 1, 2, 3].map((i) => tex(`water-top-${i}`))]).catch(() => null)
     return {
       characters: { FIRE: lumen, WATER: gota },
       objects,
@@ -51,6 +56,8 @@ export function loadDuoAssets(): Promise<DuoAssets> {
       lavaTop: tops.slice(0, 4),
       sludge,
       sludgeTop: tops.slice(4, 8),
+      water: water ? water[0] : null,
+      waterTop: water ? water.slice(1) : [],
       thorns,
       background,
     }

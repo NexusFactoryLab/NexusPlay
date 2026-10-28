@@ -9,6 +9,12 @@ Pasos:
   3. py build-duo-logico-assets.py ../public/assets/duo-logico <trabajo>
 Requiere numpy, scipy y Pillow.
 
+Brillos limpios (issue #125): el brillo de un sprite (portal, pedestales,
+puentes, palanca) se "des-mezcla" del fondo que tenía detrás —el cuadriculado
+reconstruido de su hoja, o blanco— con duo_checker.py, ambos suavizados al
+tamaño de un cuadro: así el tablero gris que antes se veía dentro desaparece.
+Al achicar se usa alfa premultiplicado (sin halos en los bordes).
+
 Salida en client/public/assets/duo-logico/:
   lumen.webp/json, gota.webp/json  -> animaciones de los personajes (spritesheet de Pixi)
   objects.webp/json                -> botón, palanca, caja, puerta, puente, ficha, portal, pedestales
@@ -22,6 +28,7 @@ import sys
 import numpy as np
 from PIL import Image
 from scipy import ndimage
+from duo_checker import background_for, fit_checker, unmix
 
 OUT = sys.argv[1]
 SRC = sys.argv[2] if len(sys.argv) > 2 else os.path.dirname(os.path.abspath(__file__))
@@ -82,6 +89,108 @@ def deglow(im, sat_floor=18, gain=5):
     return Image.fromarray(np.clip(out, 0, 255).astype(np.uint8), 'RGBA')
 
 
+_BACKGROUNDS = {}
+
+
+def sheet_background(name, sheet):
+    """Fondo que había detrás de cada píxel de la hoja, el tamaño de su cuadro y el
+    signo de cada cuadro (+1/−1), o None si el fondo era liso."""
+    if name not in _BACKGROUNDS:
+        rgb = np.asarray(sheet)[..., :3]
+        fit = fit_checker(rgb)
+        if fit is None:
+            _BACKGROUNDS[name] = None
+        else:
+            sign = np.where(fit['parity'] == 0, 1.0, -1.0).astype(np.float32)
+            _BACKGROUNDS[name] = (background_for(rgb, fit), (fit['cx'] + fit['cy']) / 2, sign)
+    return _BACKGROUNDS[name]
+
+
+def checker_showing(gray, sign, cell):
+    """0..1: cuánto se trasluce el cuadriculado en cada zona. Donde un brillo
+    semitransparente lo deja ver, el brillo de los píxeles sube y baja siguiendo
+    los cuadros (aunque el desfase no sea perfecto, se mira el valor absoluto)."""
+    s = max(1.5, cell)
+    hp = gray - ndimage.gaussian_filter(gray, s)
+    corr = ndimage.gaussian_filter(hp * sign, s)
+    energy = np.sqrt(np.maximum(ndimage.gaussian_filter(hp * hp, s), 1e-3))
+    return np.clip(np.abs(corr) / energy, 0, 1)
+
+
+def clean_cut(sheet, background, box, glow=False, hollow=False, smooth=False):
+    """Recorta `box` (x0, y0, x1, y1). Sin brillo, tal como lo dejó el limpiador.
+
+    Con brillo, sobre cuadriculado: donde el cuadriculado se trasluce (el brillo
+    semitransparente) se le resta la oscilación de los cuadros —medida zona por
+    zona y canal por canal, así el dibujo que no sigue el patrón queda intacto— y
+    lo que queda se des-mezcla del tono medio del fondo: semitransparente y del
+    color real. El resto (el objeto) queda nítido y opaco. `hollow`: lo que el
+    brillo rodea también es translúcido (el centro de un portal). `smooth`: todo
+    lo translúcido sale de la versión suavizada (un cuerpo liso, como el agua).
+    """
+    x0, y0, x1, y1 = box
+    crop = sheet.crop(box)
+    if not glow:
+        return crop
+    if background is None:
+        # Fondo blanco liso: el brillo sale de la saturación (no hay cuadros que borrar).
+        return deglow(crop)
+    bgimg, cell, sign = background
+    a = np.asarray(crop).astype(np.float32)
+    rgb, kept = a[..., :3], a[..., 3] > 0
+    gray = rgb.mean(axis=2)
+    showing = checker_showing(gray, sign[y0:y1, x0:x1], cell)
+    # Zona translúcida: donde se ve el cuadriculado, ensanchada y con borde suave.
+    zone = showing > 0.35
+    center = np.zeros_like(zone)
+    if hollow:
+        filled = ndimage.binary_fill_holes(ndimage.binary_closing(zone, iterations=3))
+        # El centro que rodea el remolino (un vórtice oscuro): siempre la versión suave.
+        center = filled & ~ndimage.binary_dilation(zone, iterations=int(cell))
+        zone = filled
+    see_through = ndimage.gaussian_filter(zone.astype(np.float32), cell * 0.5)
+    see_through = np.clip(see_through * 1.6, 0, 1)
+    sgn = sign[y0:y1, x0:x1]
+    demod = np.empty_like(rgb)
+    for ch in range(3):
+        c = rgb[..., ch]
+        hp = c - ndimage.gaussian_filter(c, cell)
+        amp = ndimage.gaussian_filter(hp * sgn, cell)
+        demod[..., ch] = c - amp * sgn
+    # Un toque de suavizado borra la línea fina que queda en el borde de cada cuadro.
+    demod = ndimage.gaussian_filter(demod, sigma=(0.9, 0.9, 0))
+    flat_bg = ndimage.gaussian_filter(bgimg[y0:y1, x0:x1], sigma=(cell, cell, 0))
+    fg_detail, alpha_detail = unmix(demod, flat_bg, floor=0.08)
+    # En la orilla tenue del brillo casi todo es fondo y cualquier desfase de la
+    # cuadrícula se notaría: ahí manda la versión suavizada al tamaño de un cuadro
+    # (el patrón no sobrevive al suavizado); donde el brillo es fuerte, el detalle.
+    sigma = 0.6 * cell
+    soft_rgb = ndimage.gaussian_filter(rgb, sigma=(sigma, sigma, 0))
+    soft_bg = ndimage.gaussian_filter(bgimg[y0:y1, x0:x1], sigma=(sigma, sigma, 0))
+    fg_soft, alpha_soft = unmix(soft_rgb, soft_bg, floor=0.08)
+    detail = np.clip((alpha_soft - 0.3) / 0.4, 0, 1) * (1 - ndimage.gaussian_filter(center.astype(np.float32), cell * 0.5))
+    if smooth:
+        detail = np.zeros_like(detail)
+    fg = fg_detail * detail[..., None] + fg_soft * (1 - detail[..., None])
+    alpha = alpha_detail * detail + alpha_soft * (1 - detail)
+    opaque = kept.astype(np.float32)
+    out_rgb = rgb * (1 - see_through[..., None]) + fg * see_through[..., None]
+    # Fuera de lo que conservó el limpiador no hay nada (ni rastros del cuadriculado).
+    # En la orilla del brillo el limpiador dejó cuadros sueltos (borró los oscuros):
+    # se cierran al tamaño de un cuadro y el borde se suaviza para desvanecerse sin corte.
+    steps = max(2, int(round(cell * 0.7)))
+    closed = ndimage.binary_closing(np.pad(kept, steps), iterations=steps)[steps:-steps, steps:-steps]
+    inside = np.clip(ndimage.gaussian_filter(closed.astype(np.float32), cell * 0.35) * 1.3, 0, 1)
+    out_a = (opaque * (1 - see_through) + alpha * see_through) * inside
+    out = np.dstack([out_rgb, out_a * 255]).round().clip(0, 255).astype(np.uint8)
+    return Image.fromarray(out, 'RGBA')
+
+
+def resize_rgba(im, size):
+    """Achica con alfa premultiplicado: el color de lo transparente no se cuela en los bordes."""
+    return im.convert('RGBa').resize(size, Image.LANCZOS).convert('RGBA')
+
+
 def trim(im, pad=2):
     bbox = im.getbbox()
     if not bbox:
@@ -104,7 +213,7 @@ class Atlas:
         items = []
         for name, im, anchor in self.items:
             if scale != 1.0:
-                im = im.resize((max(1, round(im.width * scale)), max(1, round(im.height * scale))), Image.LANCZOS)
+                im = resize_rgba(im, (max(1, round(im.width * scale)), max(1, round(im.height * scale))))
             items.append((name, im, anchor))
         items.sort(key=lambda it: -it[1].height)
         x = y = shelf = 0
@@ -156,13 +265,14 @@ BASELINE = 168
 
 def build_character(sheet_name, key):
     sheet = load(sheet_name)
+    background = sheet_background(sheet_name, sheet)
     atlas = Atlas(width=1100)
     animations = {}
     for anim, (row, cols) in CHAR_ROWS.items():
         names = []
         for col in cols:
             box = (round(col * CELL), round(row * CELL), round((col + 1) * CELL), round((row + 1) * CELL))
-            cell = keep_main(sheet.crop(box))
+            cell = keep_main(clean_cut(sheet, background, box))
             bottom, cx = body_bottom(cell)
             canvas = Image.new('RGBA', (FRAME, FRAME), (0, 0, 0, 0))
             canvas.alpha_composite(cell, (round(FRAME / 2 - cx), BASELINE - bottom))
@@ -182,13 +292,14 @@ build_character('Gota_Sprite_Sheet', 'gota')
 
 # ---------- Objetos ----------
 obj = load('Assets_Interaccion')
+obj_background = sheet_background('Assets_Interaccion', obj)
 objects = Atlas(width=1400)
 
 
 def crop_obj(box, glow=False):
     y0, y1, x0, x1 = box
-    im = obj.crop((x0 - 4, y0 - 4, x1 + 4, y1 + 4))
-    return trim(deglow(im) if glow else keep_main(im, min_sat=10))
+    im = clean_cut(obj, obj_background, (x0 - 4, y0 - 4, x1 + 4, y1 + 4), glow=bool(glow), hollow=glow == 'hollow')
+    return trim(im if glow else keep_main(im, min_sat=10))
 
 
 OBJECTS = {
@@ -207,10 +318,13 @@ OBJECTS = {
     'coin-1': ((385, 519, 202, 322), False, (0.5, 0.5)),
     'coin-2': ((385, 519, 392, 468), False, (0.5, 0.5)),
     'coin-3': ((385, 519, 534, 655), False, (0.5, 0.5)),
-    'portal-0': ((533, 694, 15, 169), True, (0.5, 0.5)),
-    'portal-1': ((534, 690, 184, 339), True, (0.5, 0.5)),
-    'portal-2': ((534, 692, 352, 503), True, (0.5, 0.5)),
-    'portal-3': ((533, 694, 520, 675), True, (0.5, 0.5)),
+    'portal-0': ((533, 694, 15, 169), 'hollow', (0.5, 0.5)),
+    'portal-1': ((534, 690, 184, 339), 'hollow', (0.5, 0.5)),
+    'portal-2': ((534, 692, 352, 503), 'hollow', (0.5, 0.5)),
+    'portal-3': ((533, 694, 520, 675), 'hollow', (0.5, 0.5)),
+    'portal-side-0': ((701, 853, 20, 164), 'hollow', (0.5, 0.5)),
+    'portal-side-1': ((701, 853, 201, 324), 'hollow', (0.5, 0.5)),
+    'portal-side-2': ((701, 853, 380, 478), 'hollow', (0.5, 0.5)),
     'pedestal-fire': ((539, 684, 681, 843), False, (0.5, 1)),
     'pedestal-water': ((539, 686, 872, 996), False, (0.5, 1)),
     'pedestal-fire-on': ((690, 857, 681, 843), True, (0.5, 1)),
@@ -218,7 +332,12 @@ OBJECTS = {
 }
 for name, (box, glow, anchor) in OBJECTS.items():
     objects.add(name, crop_obj(box, glow), anchor)
-objects.save('objects', {'coin': ['coin-0', 'coin-1', 'coin-2', 'coin-3', 'coin-2', 'coin-1'], 'portal': ['portal-0', 'portal-1', 'portal-2', 'portal-3']}, scale=0.6)
+objects.save('objects', {
+    'coin': ['coin-0', 'coin-1', 'coin-2', 'coin-3', 'coin-2', 'coin-1'],
+    'portal': ['portal-0', 'portal-1', 'portal-2', 'portal-3'],
+    # Se abre: de perfil (una línea) a de frente.
+    'portal-open': ['portal-side-2', 'portal-side-1', 'portal-side-0', 'portal-0'],
+}, scale=0.6)
 
 # ---------- Terreno ----------
 tiles = load('Tileset_Plataformas')
@@ -253,7 +372,7 @@ def pad_y(im, rows=4):
 
 def save_tex(name, im, size=None, pad=False):
     if size:
-        im = im.resize(size, Image.LANCZOS)
+        im = resize_rgba(im, size) if im.mode == 'RGBA' else im.resize(size, Image.LANCZOS)
     if pad:
         im = pad_y(im)
     im.save(os.path.join(OUT, name + '.webp'), 'WEBP', quality=90, method=6)
@@ -276,14 +395,15 @@ TERRAIN = {
     # caras laterales (pasto que crece por la pared)
     'wall-left': ((733, 1009, 822, 900), (0, 0)),
     'wall-right': ((733, 1009, 90, 171), (1, 0)),
-    # plataforma flotante en 3 partes
-    'float-left': ((418, 541, 27, 120), (0, 0)),
-    'float-mid': ((396, 542, 380, 630), (0, 0)),
-    'float-right': ((418, 539, 760, 833), (1, 0)),
+    # plataforma flotante en 3 partes, todas de la misma isla y con el mismo
+    # borde de arriba: el juego las escala igual y calzan sin escalón
+    'float-left': ((418, 541, 31, 104), (0, 0)),
+    'float-mid': ((418, 541, 120, 222), (0, 0)),
+    'float-right': ((418, 541, 232, 308), (1, 0)),
     'float-small': ((418, 543, 864, 999), (0.5, 0)),
     # rama: plataforma delgada que se atraviesa desde abajo
     'branch-left': ((570, 701, 20, 338), (0, 0)),
-    'branch-mid': ((620, 698, 351, 660), (0, 0)),
+    'branch-mid': ((569, 701, 351, 660), (0, 0)),
     'branch-right': ((569, 701, 686, 1004), (1, 0)),
     # decoración
     'flowers': ((872, 1004, 185, 346), (0.5, 1)),
@@ -291,10 +411,15 @@ TERRAIN = {
     'fern': ((876, 1004, 530, 673), (0.5, 1)),
     'mushroom': ((891, 1004, 709, 813), (0.5, 1)),
 }
+tiles_background = sheet_background('Tileset_Plataformas', tiles)
 for name, ((y0, y1, x0, x1), anchor) in TERRAIN.items():
-    terrain.add(name, trim(tiles.crop((x0, y0, x1, y1)), 0), anchor)
+    im = clean_cut(tiles, tiles_background, (x0, y0, x1, y1))
+    # Las piezas en 3 partes no se recortan arriba: conservan el mismo borde para calzar.
+    terrain.add(name, im if name.startswith(('float-', 'branch-')) else trim(im, 0), anchor)
+# El centro de la plataforma se repite: sin costura entre una copia y la siguiente.
+terrain.items = [(n, seamless_x(im, 24) if n == 'float-mid' else im, a) for n, im, a in terrain.items]
 # La roca del pie de la pared derecha, aparte.
-terrain.add('rock', trim(tiles.crop((820, 940, 935, 1012)), 0), (0.5, 1))
+terrain.add('rock', trim(clean_cut(tiles, tiles_background, (820, 940, 935, 1012)), 0), (0.5, 1))
 terrain.save('terrain', scale=0.5)
 
 # ---------- Trampas ----------
@@ -304,6 +429,12 @@ lava_frames = [haz.crop((x0 + 8, 30, x0 + 190, 210)) for x0 in (2, 202, 402, 602
 for i, fr in enumerate(lava_frames):
     save_tex(f'lava-top-{i}', seamless_x(trim(fr, 0), 24), (160, 140), pad=True)
 save_tex('lava', seamless_y(seamless_x(haz.crop((835, 80, 1000, 190)), 30), 24), (128, 96))
+# Agua: semitransparente sobre el cuadriculado, se limpia como un brillo.
+haz_background = sheet_background('Trampas_Hazards', haz)
+water_frames = [clean_cut(haz, haz_background, (x0 + 8, 255, x0 + 190, 452), glow=True, smooth=True) for x0 in (2, 202, 402, 602)]
+for i, fr in enumerate(water_frames):
+    save_tex(f'water-top-{i}', seamless_x(trim(fr, 0), 24), (160, 150), pad=True)
+save_tex('water', seamless_y(seamless_x(clean_cut(haz, haz_background, (835, 330, 1000, 440), glow=True, smooth=True), 30), 24), (128, 96))
 sludge_frames = [haz.crop((x0 + 8, 500, x0 + 190, 705)) for x0 in (2, 202, 402, 602)]
 for i, fr in enumerate(sludge_frames):
     save_tex(f'sludge-top-{i}', seamless_x(trim(fr, 0), 24), (160, 150), pad=True)
@@ -383,14 +514,17 @@ def build_theme(key, spec):
     x0, y0, x1, y1 = spec['top']
     save_tex(f'{key}-top', seamless_x(tiles_im.crop((x0, y0, x1, y1)), 50), (160, 64), pad=True)
     terrain_atlas = Atlas(width=1400)
+    tiles_bg = sheet_background(spec['tiles'], tiles_im)
     for name, ((ty0, ty1, tx0, tx1), anchor) in spec['terrain'].items():
-        terrain_atlas.add(name, trim(tiles_im.crop((tx0, ty0, tx1, ty1)), 0), anchor)
+        im = clean_cut(tiles_im, tiles_bg, (tx0, ty0, tx1, ty1))
+        terrain_atlas.add(name, im if name.startswith(('float-', 'thin-')) else trim(im, 0), anchor)
     terrain_atlas.save(f'{key}-terrain', scale=0.5)
     obj_im = load(spec['sheet'])
+    obj_bg = sheet_background(spec['sheet'], obj_im)
     objects_atlas = Atlas(width=1400)
     for name, ((oy0, oy1, ox0, ox1), glow, anchor) in spec['objects'].items():
-        im = obj_im.crop((ox0 - 4, oy0 - 4, ox1 + 4, oy1 + 4))
-        objects_atlas.add(name, trim(deglow(im) if glow else keep_main(im, min_sat=0)), anchor)
+        im = clean_cut(obj_im, obj_bg, (ox0 - 4, oy0 - 4, ox1 + 4, oy1 + 4), glow=glow)
+        objects_atlas.add(name, trim(im if glow else keep_main(im, min_sat=0)), anchor)
     objects_atlas.save(f'{key}-objects', scale=0.5)
     bg = Image.open(os.path.join(SRC, spec['bg'])).convert('RGB')
     both = Image.new('RGB', (bg.width * 2, bg.height))
