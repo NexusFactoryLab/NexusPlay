@@ -1,9 +1,10 @@
-import type { DuoClientState, DuoEmote, DuoRole, DuoSnapshot } from './duoTypes.js';
+import type { DuoClientState, DuoEmote, DuoPeerState, DuoRole, DuoSnapshot } from './duoTypes.js';
 
 /**
  * Mensajes del socket de Dúo Lógico (namespace /rooms). El servidor manda
- * `duo:room` cuando cambia algo de la partida (fase, jugadores, pregunta) y
- * `duo:snapshot` ~20 veces por segundo mientras se juega (posiciones y mundo).
+ * `duo:room` cuando cambia algo de la partida (fase, jugadores, pregunta),
+ * `duo:snapshot` ~30 veces por segundo mientras se juega (posiciones y mundo)
+ * y `duo:peer` al compañero apenas llega la posición de un jugador.
  */
 export const DUO_EVENTS = {
   create: 'duo:create',
@@ -16,8 +17,10 @@ export const DUO_EVENTS = {
   /** Girar un espejo desde su panel: { mirrorId, dir: 1 | -1 }. */
   mirror: 'duo:mirror',
   ready: 'duo:ready',
-  /** Cliente → servidor: posición propia y cajas que mueve, ~20 veces por segundo. */
+  /** Cliente → servidor: posición propia y cajas que mueve, ~30 veces por segundo. */
   state: 'duo:state',
+  /** Servidor → compañero: esa posición, reenviada en cuanto llega. */
+  peer: 'duo:peer',
   answer: 'duo:answer',
   emote: 'duo:emote',
   chat: 'duo:chat',
@@ -129,6 +132,7 @@ export type DuoClientMessages = {
 export type DuoServerMessages = {
   'duo:room': DuoRoomView;
   'duo:snapshot': DuoSnapshot;
+  'duo:peer': DuoPeerState;
   'duo:emote-shown': { role: DuoRole; emote: DuoEmote };
   'duo:chat-message': { userId: string; role: DuoRole; displayName: string; text: string; sentAt: number };
   'duo:notice': DuoNotice;

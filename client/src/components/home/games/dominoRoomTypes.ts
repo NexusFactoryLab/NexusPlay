@@ -1,4 +1,5 @@
 import type { DominoConcept, DominoLevel } from './dominoTypes'
+import type { AwaitingPlayerView } from './playerWait'
 
 export type DominoRoomPhase = 'WAITING' | 'PLAYING' | 'FINISHED'
 
@@ -74,5 +75,7 @@ export type DominoRoomStateView = {
   endedByBlock: boolean
   activePlayerUserId: string | null
   turnDeadline: number | null
+  /** Jugadores desconectados a los que se espera: mientras haya alguno, la partida está en pausa (issue #120). */
+  awaiting?: AwaitingPlayerView[]
   players: DominoRoomPlayerView[]
 }

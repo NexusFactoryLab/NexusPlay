@@ -21,6 +21,7 @@ model RoleModel {
 
 model UserModel {
   id                       String                         @id @default(uuid())
+  /// Siempre en minúsculas: lo fuerza `users_email_lowercase_chk` (migración 20261028000100).
   email                    String                         @unique
   /// Nullable (issue #197): un usuario que solo entra por un proveedor OAuth
   /// (ej. Google) no tiene contraseña local. Ver `Password.none()`.

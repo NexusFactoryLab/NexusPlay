@@ -1,4 +1,5 @@
 import type { DominoConcept, DominoLevel } from '../../application/content-validators/domino.content-validator.js';
+import type { PausableGame } from '../services/player-wait.js';
 
 export const DOMINO_ROOM_STORE = Symbol('DOMINO_ROOM_STORE');
 
@@ -30,7 +31,7 @@ export interface DominoRoomPlayer {
   hand: DominoTile[];
 }
 
-export interface DominoRoomState {
+export interface DominoRoomState extends PausableGame {
   code: string;
   gameId: string;
   gameTitle: string;

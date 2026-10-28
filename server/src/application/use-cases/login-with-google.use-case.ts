@@ -16,7 +16,6 @@ import {
 } from '../../domain/ports/identity-provider-account.repository.port.js';
 import { ID_GENERATOR, type IdGenerator } from '../../domain/ports/id-generator.port.js';
 import {
-  GoogleAccountEmailConflictError,
   InvalidGoogleTokenError,
   UserInactiveError,
 } from '../errors/application.errors.js';
@@ -41,6 +40,7 @@ interface GoogleIdentity {
   firstName: string;
   lastName: string;
   avatarUrl: string | null;
+  emailVerified: boolean;
 }
 
 /**
@@ -109,10 +109,13 @@ export class LoginWithGoogleUseCase
     const existingUser = await this.userRepository.findByEmail(email);
 
     if (existingUser) {
-      // Regla de negocio confirmada (issue #197): no se auto-vincula. Quien
-      // ya tiene cuenta local con este email debe entrar con su contraseña;
-      // vincular Google después es un flujo separado desde el perfil.
-      throw new GoogleAccountEmailConflictError(email.getValue());
+      // Issue #121: quien ya tenía cuenta (con contraseña o no) entra con
+      // Google y se vincula por correo. Solo es seguro si Google garantiza
+      // que el titular controla ese correo.
+      if (!identity.emailVerified) {
+        throw new InvalidGoogleTokenError();
+      }
+      return this.linkGoogleToExistingUser(existingUser, identity, email);
     }
 
     const name = PersonName.create(identity.firstName, identity.lastName);
@@ -140,6 +143,26 @@ export class LoginWithGoogleUseCase
     return newUser;
   }
 
+  private async linkGoogleToExistingUser(
+    user: User,
+    identity: GoogleIdentity,
+    email: Email,
+  ): Promise<User> {
+    if (!user.isEmailVerified) {
+      user.verifyEmail();
+    }
+    await this.identityProviderAccountRepository.save(
+      IdentityProviderAccount.create({
+        id: this.idGenerator.generate(),
+        userId: user.id,
+        provider: 'GOOGLE',
+        providerUserId: identity.providerUserId,
+        emailAtLinking: email.getValue(),
+      }),
+    );
+    return user;
+  }
+
   private async verifyIdToken(idToken: string): Promise<GoogleIdentity> {
     try {
       const ticket = await this.googleClient.verifyIdToken({
@@ -161,6 +184,7 @@ export class LoginWithGoogleUseCase
         // con un valor neutro en vez de fallar el login por un dato opcional.
         lastName: payload.family_name ?? '-',
         avatarUrl: payload.picture ?? null,
+        emailVerified: payload.email_verified === true,
       };
     } catch (error) {
       if (error instanceof InvalidGoogleTokenError) {

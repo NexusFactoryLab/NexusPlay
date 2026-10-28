@@ -1,5 +1,5 @@
 import { DUO_LEVEL_DEFS, duoLevel } from './shared/levels/index.js';
-import { MIRROR_ANGLES, mirrorRect, type DuoGateDef, type DuoLevel } from './shared/duoLevel.js';
+import { MIRROR_ANGLES, TILE, mirrorRect, type DuoGateDef, type DuoLevel } from './shared/duoLevel.js';
 import {
   coinsForGate,
   collectCoins,
@@ -14,6 +14,7 @@ import {
   type DuoAnim,
   type DuoClientState,
   type DuoEmote,
+  type DuoPeerState,
   type DuoPlayerNet,
   type DuoRole,
   type DuoSnapshot,
@@ -259,14 +260,17 @@ function finite(n: unknown): n is number {
   return typeof n === 'number' && Number.isFinite(n);
 }
 
-/** Posición que manda un jugador. Se ignora fuera del juego activo o si viene mal formada. */
-export function applyClientState(room: DuoRoomState, userId: string, state: DuoClientState, now: number): void {
-  if (room.phase !== 'PLAYING' || room.waitingPartnerUntil) return;
+/**
+ * Posición que manda un jugador. Se ignora fuera del juego activo o si viene
+ * mal formada. Devuelve lo aceptado, para reenviárselo al compañero en el acto.
+ */
+export function applyClientState(room: DuoRoomState, userId: string, state: DuoClientState, now: number): DuoPeerState | null {
+  if (room.phase !== 'PLAYING' || room.waitingPartnerUntil) return null;
   const player = room.players.find((p) => p.userId === userId);
-  if (!player || !state || typeof state !== 'object') return;
+  if (!player || !state || typeof state !== 'object') return null;
   const level = levelById(room.levelId);
   const s = state.player;
-  if (!s || !finite(s.x) || !finite(s.y) || !finite(s.vx) || !finite(s.vy)) return;
+  if (!s || !finite(s.x) || !finite(s.y) || !finite(s.vx) || !finite(s.vy)) return null;
   player.state = {
     x: Math.max(0, Math.min(level.widthPx, s.x)),
     y: Math.max(-200, Math.min(level.heightPx + 300, s.y)),
@@ -276,8 +280,14 @@ export function applyClientState(room: DuoRoomState, userId: string, state: DuoC
     anim: ANIMS.includes(s.anim) ? s.anim : 'idle',
     dead: s.dead === true,
   };
+  const riding = s.mover && typeof s.mover === 'object' ? s.mover : null;
+  const mover = riding ? level.def.movers?.find((m) => m.id === riding.id) : undefined;
+  if (riding && mover && finite(riding.dx)) {
+    player.state.mover = { id: mover.id, dx: Math.max(-TILE, Math.min((mover.width + 1) * TILE, riding.dx)) };
+  }
   player.stateAt = now;
-  if (!Array.isArray(state.crates)) return;
+  const peer: DuoPeerState = { role: player.role, at: now, player: player.state, crates: [] };
+  if (!Array.isArray(state.crates)) return peer;
   for (const update of state.crates.slice(0, room.world.crates.length)) {
     const crate = room.world.crates.find((c) => c.id === update?.id);
     if (!crate || !finite(update.x) || !finite(update.y)) continue;
@@ -288,7 +298,9 @@ export function applyClientState(room: DuoRoomState, userId: string, state: DuoC
     crate.owner = player.role;
     crate.at = now;
     room.crateLeases[crate.id] = now + DUO_CRATE_LEASE_MS;
+    peer.crates.push({ id: crate.id, x: crate.x, y: crate.y });
   }
+  return peer;
 }
 
 function shuffled(n: number, rng: () => number): number[] {

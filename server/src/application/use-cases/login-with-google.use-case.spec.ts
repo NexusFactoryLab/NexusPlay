@@ -9,7 +9,6 @@ import { Password } from '../../domain/value-objects/password.vo.js'
 import { PersonName } from '../../domain/value-objects/person-name.vo.js'
 import { Role } from '../../domain/value-objects/role.vo.js'
 import {
-  GoogleAccountEmailConflictError,
   InvalidGoogleTokenError,
 } from '../errors/application.errors.js'
 import { TokenPairIssuer } from '../services/token-pair-issuer.service.js'
@@ -160,10 +159,11 @@ describe('LoginWithGoogleUseCase', () => {
     expect(result.accessToken).toBe('access')
   })
 
-  it('email de Google coincide con cuenta local existente → GoogleAccountEmailConflictError, no crea nada', async () => {
+  it('email de Google coincide con cuenta local → la vincula y permite entrar', async () => {
     mockGooglePayload({
       sub: 'google-sub-2',
       email: 'ana@colegio.edu.co',
+      email_verified: true,
       given_name: 'Ana',
       family_name: 'Pérez',
     })
@@ -171,9 +171,25 @@ describe('LoginWithGoogleUseCase', () => {
       userByEmail: localUser(),
     })
 
-    await expect(useCase.execute({ idToken: 'token' })).rejects.toThrow(
-      GoogleAccountEmailConflictError,
-    )
+    const result = await useCase.execute({ idToken: 'token' })
+
+    expect(identityProviderAccountRepository.save).toHaveBeenCalledTimes(1)
+    const account = (identityProviderAccountRepository.save as ReturnType<typeof vi.fn>).mock
+      .calls[0][0] as IdentityProviderAccount
+    expect(account.userId).toBe('user-1')
+    expect(account.providerUserId).toBe('google-sub-2')
+    const saved = (userRepository.save as ReturnType<typeof vi.fn>).mock.calls[0][0] as User
+    expect(saved.password.hasPassword()).toBe(true)
+    expect(result.accessToken).toBe('access')
+  })
+
+  it('email de Google sin verificar no se vincula a una cuenta existente', async () => {
+    mockGooglePayload({ sub: 'google-sub-4', email: 'ana@colegio.edu.co', email_verified: false })
+    const { useCase, userRepository, identityProviderAccountRepository } = setup({
+      userByEmail: localUser(),
+    })
+
+    await expect(useCase.execute({ idToken: 'token' })).rejects.toThrow(InvalidGoogleTokenError)
     expect(userRepository.save).not.toHaveBeenCalled()
     expect(identityProviderAccountRepository.save).not.toHaveBeenCalled()
   })

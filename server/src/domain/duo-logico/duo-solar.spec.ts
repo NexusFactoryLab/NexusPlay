@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TILE, moverRect, standPoint } from './shared/duoLevel.js';
-import { STEP, createPlayer, stepPlayer, type PlayerSim, type StepEvent } from './shared/duoPhysics.js';
+import { STEP, createPlayer, stepPlayer, toNet, type PlayerSim, type StepEvent } from './shared/duoPhysics.js';
 import { createWorldState, isReceiverLit, litMirrorCount, updateSwitches } from './shared/duoWorld.js';
 import { DUO_LEVEL_DEFS, duoLevel, nextDuoLevelId } from './shared/levels/index.js';
 import { SOLAR } from './shared/levels/solar.js';
@@ -52,6 +52,20 @@ describe('Planta solar', () => {
     expect(off.events).toHaveLength(0);
     expect(p.x).toBeGreaterThan(17 * TILE);
     expect(p.y).toBe(10 * TILE);
+  });
+
+  it('quien va sobre la plataforma lo cuenta (y dónde va parado) para que el compañero lo dibuje pegado a ella', () => {
+    const mover = SOLAR.movers![0];
+    const p = createPlayer('WATER', standPoint({ col: 9, row: 9 }));
+    const first = run(p, (q) => ({ right: q.x < mover.col * TILE + TILE / 2 }), 0.6, 0);
+    const ride = run(p, () => ({}), 1.2, first.t);
+    const sent = toNet(p);
+    expect(sent.mover?.id).toBe(mover.id);
+    expect(sent.mover!.dx).toBeCloseTo(p.x - moverRect(mover, ride.t).x, 0);
+    const rest = run(p, () => ({}), 1.4, ride.t);
+    run(p, () => ({ right: true }), 1, rest.t);
+    expect(p.y).toBe(10 * TILE);
+    expect(toNet(p).mover).toBeUndefined();
   });
 
   it('sin la plataforma, el foso apaga a cualquiera', () => {
@@ -121,6 +135,18 @@ describe('campaña de escenarios', () => {
     expect(() => rotateDuoMirror(r, 'ana', 'otro', 1)).toThrow('no existe');
     applyClientState(r, 'ana', { player: net({ x: near.x + 400, y: near.y }), crates: [] }, DUO_COUNTDOWN_MS);
     expect(() => rotateDuoMirror(r, 'ana', m1.id, 1)).toThrow('Acércate');
+  });
+
+  it('el servidor reenvía la posición en el acto y solo acepta plataformas que existen', () => {
+    const r = room('solar');
+    const t = DUO_COUNTDOWN_MS + 5;
+    const peer = applyClientState(r, 'ana', { player: { ...net({ x: 700, y: 640 }), mover: { id: 'plataforma-foso', dx: 30 } }, crates: [] }, t);
+    expect(peer).toMatchObject({ role: 'FIRE', at: t, player: { x: 700, mover: { id: 'plataforma-foso', dx: 30 } }, crates: [] });
+    const fake = applyClientState(r, 'ana', { player: { ...net({ x: 700, y: 640 }), mover: { id: 'no-existe', dx: 30 } }, crates: [] }, t + 1);
+    expect(fake?.player.mover).toBeUndefined();
+    const far = applyClientState(r, 'ana', { player: { ...net({ x: 700, y: 640 }), mover: { id: 'plataforma-foso', dx: 1e6 } }, crates: [] }, t + 2);
+    expect(far?.player.mover?.dx).toBe((SOLAR.movers![0].width + 1) * TILE);
+    expect(applyClientState(r, 'ana', { player: { ...net({ x: 700, y: 640 }), x: Number.NaN }, crates: [] }, t + 3)).toBeNull();
   });
 
   it('la campaña usa solo los escenarios que eligió el profesor y sus preguntas propias', () => {
