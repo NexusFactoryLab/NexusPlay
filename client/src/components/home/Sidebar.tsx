@@ -1,9 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { BarChart3, BookOpen, Bot, Building2, ChevronLeft, FolderOpen, Globe, GraduationCap, House, Plus, SquarePen, Users, Zap } from 'lucide-react'
+import { ChevronLeft, Plus, Zap } from 'lucide-react'
 import type { AuthUser } from '../../services/auth.service'
 import { ProfileMenu } from './ProfileMenu'
+import { NAV_ICONS, navIcon, navTileStyle } from './sidebarIcons'
+import { useTheme } from '../../hooks/useTheme'
 
 type SidebarProps = {
   user: AuthUser
@@ -193,65 +195,53 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
       <nav data-tour="navigation" className="scroll-fade flex flex-1 flex-col gap-1 overflow-y-auto" aria-label="Navegación principal">
         <SidebarItem
           tourTarget="nav-home"
-          emoji="🗡️"
           label="Inicio"
           collapsed={collapsed}
           active={location.pathname === '/'}
           onClick={() => navigate('/')}
-          icon={<House className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />}
         />
 
         <SidebarSectionLabel collapsed={collapsed}>Explorar</SidebarSectionLabel>
         <SidebarItem
           tourTarget="nav-subjects"
-          emoji="📕"
           label="Áreas"
           collapsed={collapsed}
           active={location.pathname.startsWith('/areas')}
           onClick={() => navigate('/areas')}
-          icon={<BookOpen className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />}
         />
         <SidebarItem
           tourTarget="nav-community"
-          emoji="🧑‍🤝‍🧑"
           label="Comunidad"
           collapsed={collapsed}
           active={location.pathname.startsWith('/comunidad')}
           onClick={() => navigate('/comunidad')}
-          icon={<Globe className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />}
         />
 
         <SidebarSectionLabel collapsed={collapsed}>Mi espacio</SidebarSectionLabel>
         {userRole.toUpperCase() === 'TEACHER' && (
           <SidebarItem
             tourTarget="nav-classes"
-            emoji="🏫"
             label="Mis clases"
             collapsed={collapsed}
             active={location.pathname.startsWith('/mis-clases')}
             onClick={() => navigate('/mis-clases')}
-            icon={<GraduationCap className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />}
           />
         )}
         {userRole.toUpperCase() === 'STUDENT' && (
           <SidebarItem
             tourTarget="nav-my-metrics"
-            emoji="📊"
             label="Mis métricas"
             collapsed={collapsed}
             active={location.pathname.startsWith('/mis-metricas')}
             onClick={() => navigate('/mis-metricas')}
-            icon={<BarChart3 className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />}
           />
         )}
         <SidebarItem
           tourTarget="nav-own-games"
-          emoji="🔒"
           label="Mis juegos"
           collapsed={collapsed}
           active={location.pathname.startsWith('/mis-juegos')}
           onClick={() => navigate('/mis-juegos')}
-          icon={<FolderOpen className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />}
         />
         {(canManageUsers || canAccessOrganization) && (
           <>
@@ -259,45 +249,37 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
             {canManageUsers && (
               <SidebarItem
                 tourTarget="nav-users"
-                emoji="🧑‍💼"
                 label="Usuarios"
                 collapsed={collapsed}
                 active={location.pathname === '/usuarios'}
                 onClick={() => navigate('/usuarios')}
-                icon={<Users className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />}
               />
             )}
             {canManageUsers && (
               <SidebarItem
                 tourTarget="nav-edition"
-                emoji="✏️"
                 label="Edición"
                 collapsed={collapsed}
                 active={location.pathname.startsWith('/edicion')}
                 onClick={() => navigate('/edicion')}
-                icon={<SquarePen className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />}
               />
             )}
             {canManageUsers && (
               <SidebarItem
                 tourTarget="nav-ai-providers"
-                emoji="🤖"
                 label="Proveedores de IA"
                 collapsed={collapsed}
                 active={location.pathname === '/ia'}
                 onClick={() => navigate('/ia')}
-                icon={<Bot className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />}
               />
             )}
             {canAccessOrganization && (
               <SidebarItem
                 tourTarget="nav-organization"
-                emoji="🏰"
                 label="Organización"
                 collapsed={collapsed}
                 active={location.pathname === '/organizacion'}
                 onClick={() => navigate('/organizacion')}
-                icon={<Building2 className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />}
               />
             )}
           </>
@@ -320,22 +302,19 @@ function SidebarSectionLabel({ collapsed, children }: { collapsed: boolean; chil
 
 function SidebarItem({
   tourTarget,
-  emoji,
   label,
   active,
   collapsed,
   onClick,
-  icon,
 }: {
   tourTarget: string
-  /** Ícono a color del tema Fantasía (en los demás temas se ve el ícono de línea). */
-  emoji: string
   label: string
   active: boolean
   collapsed: boolean
   onClick: () => void
-  icon: ReactNode
 }) {
+  const { theme } = useTheme()
+  const entry = NAV_ICONS[tourTarget]
   return (
     <button
       type="button"
@@ -347,8 +326,12 @@ function SidebarItem({
       aria-current={active ? 'page' : undefined}
       onClick={onClick}
     >
-      <span className="fx-line-icon flex shrink-0">{icon}</span>
-      <span className="fx-emoji sidebar-emoji" aria-hidden="true">{emoji}</span>
+      <span
+        className="sidebar-icon-tile flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px]"
+        style={navTileStyle(theme)}
+      >
+        {navIcon(entry)}
+      </span>
       {!collapsed && <span className="truncate">{label}</span>}
     </button>
   )

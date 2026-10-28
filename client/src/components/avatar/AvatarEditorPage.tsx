@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Check, Dices, Plus, RotateCcw, RotateCw, Undo2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Dices, Plus, RotateCcw, RotateCw, Undo2 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
 import type { AvatarConfig } from '../../services/avatar.service'
@@ -72,7 +72,7 @@ const DEFAULT_HAIR = 'short'
  * botones arriba del panel y el avatar al lado. Los cambios son un borrador
  * hasta tocar Guardar; Deshacer recorre el historial.
  */
-export function AvatarEditorPage() {
+export function AvatarEditorPage({ onSkip }: { onSkip?: () => void } = {}) {
   const { user, saveAvatar } = useAuth()
   const { showToast } = useToast()
   const navigate = useNavigate()
@@ -260,10 +260,17 @@ export function AvatarEditorPage() {
             Personaliza <span>tu avatar</span>
           </h1>
         </div>
-        <button type="button" className="avatar-back avatar-chip-btn" onClick={goBack}>
-          <ArrowLeft className="h-4 w-4" strokeWidth={2.5} />
-          Volver
-        </button>
+        {onSkip ? (
+          <button type="button" className="avatar-back avatar-chip-btn avatar-skip" onClick={onSkip}>
+            Saltar por ahora
+            <ArrowRight className="h-5 w-5" strokeWidth={3} />
+          </button>
+        ) : (
+          <button type="button" className="avatar-back avatar-chip-btn" onClick={goBack}>
+            <ArrowLeft className="h-4 w-4" strokeWidth={2.5} />
+            Volver
+          </button>
+        )}
 
         <nav className="avatar-rail avatar-area-rail" aria-label="Categorías del avatar">
           {CATEGORIES.map((item) => (

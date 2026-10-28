@@ -34,6 +34,7 @@ import { GuessWhoRoomPage } from './components/home/games/GuessWhoRoomPage'
 import { TournamentRoomPage } from './components/home/games/TournamentRoomPage'
 import { RoleSelectionPage } from './components/RoleSelectionPage'
 import { AvatarEditorPage } from './components/avatar/AvatarEditorPage'
+import { AvatarOnboardingGate } from './components/avatar/AvatarOnboardingGate'
 import { PublicHomePage } from './components/legal/PublicHomePage'
 import { PrivacyPolicyPage } from './components/legal/PrivacyPolicyPage'
 import { TermsOfServicePage } from './components/legal/TermsOfServicePage'
@@ -109,7 +110,7 @@ function App() {
   }
 
   return (
-    <>
+    <AvatarOnboardingGate user={user}>
     {/* Recorrido interactivo: si un paso lo llevó a otra página, la barra lo obliga a volver a la guía. */}
     <TourReturnBar owner={welcomeStorageKey(user.id, user.role)} />
     <Routes>
@@ -192,7 +193,7 @@ function App() {
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
-    </>
+    </AvatarOnboardingGate>
   )
 }
 

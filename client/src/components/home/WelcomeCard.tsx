@@ -1,19 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
-import { Compass, Play, X, Zap } from 'lucide-react'
-import studyIcon from '../../assets/welcome/emoji-study.webp'
-import competeIcon from '../../assets/welcome/emoji-compete.webp'
-import createIcon from '../../assets/welcome/emoji-create.webp'
+import { BookOpenCheck, Compass, Hammer, Play, Trophy, X, Zap } from 'lucide-react'
 import truckArt from './games/assets/maze-collector/truck-drive.webp'
 import cloudArt from './games/assets/maze-collector/cloud-chaser.webp'
 import robotArt from './games/true-false-maze/assets/spaceship/robot/robot-down-0.png'
 import jellyArt from './games/true-false-maze/assets/spaceship/jellyfish/jelly-down-0.png'
 import './welcomeCard.css'
 
-/** Las tres formas de empezar, en una palabra cada una (el icono es imagen: igual en todos los sistemas). */
+/** Las tres formas de empezar, en una palabra cada una (iconos de Lucide en una ficha de color). */
 const HIGHLIGHTS = [
-  { icon: studyIcon, title: 'Estudia' },
-  { icon: competeIcon, title: 'Compite' },
-  { icon: createIcon, title: 'Crea' },
+  { Icon: BookOpenCheck, title: 'Estudia', from: '#0ea5e9', to: '#6366f1' },
+  { Icon: Trophy, title: 'Compite', from: '#f59e0b', to: '#f97316' },
+  { Icon: Hammer, title: 'Crea', from: '#ec4899', to: '#8b5cf6' },
 ] as const
 
 /**
@@ -181,7 +178,13 @@ export function WelcomeCard({ onClose, onQuickGuide }: WelcomeCardProps) {
                 key={item.title}
                 className="flex items-center gap-1.5 rounded-full bg-surface/80 px-3.5 py-1.5 text-[13.5px] font-bold text-text-h shadow-sm ring-1 ring-accent/20"
               >
-                <img src={item.icon} alt="" width={18} height={18} draggable={false} />
+                <span
+                  className="flex h-6 w-6 items-center justify-center rounded-full text-white"
+                  style={{ background: `linear-gradient(135deg, ${item.from}, ${item.to})` }}
+                  aria-hidden="true"
+                >
+                  <item.Icon className="h-3.5 w-3.5" strokeWidth={2.5} />
+                </span>
                 {item.title}
               </li>
             ))}
