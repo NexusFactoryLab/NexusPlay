@@ -26,10 +26,27 @@ export const EMOTE_TEXT: Record<DuoEmote, string> = {
   idea: '💡 Tengo una idea',
 }
 
-/** Un personaje en pantalla: sprite animado, nombre arriba y globo de emote. */
+/** En el aire (sin sombra en el piso). */
+export function isAirborne(anim: DuoAnim): boolean {
+  return anim === 'rise' || anim === 'peak' || anim === 'fall'
+}
+
+/** 0→1 con un pequeño rebote al final. */
+function easeOutBack(t: number): number {
+  const c1 = 1.70158
+  const c3 = c1 + 1
+  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2)
+}
+
+/**
+ * Un personaje en pantalla: sprite animado, sombra, nombre arriba y globo de
+ * emote. Además del cuadro de la hoja, se estira al saltar, se aplasta al
+ * caer (y rebota), respira quieto y reaparece creciendo.
+ */
 export class CharacterView {
   readonly root = new Container()
   private readonly sprite: AnimatedSprite
+  private readonly shadow = new Graphics()
   private readonly animations: Record<string, Texture[]>
   private readonly label: Container
   private readonly bubble = new Container()
@@ -38,6 +55,11 @@ export class CharacterView {
   private readonly baseScale: number
   private bob = 0
   private deadFor = 0
+  private squashX = 1
+  private squashY = 1
+  /** 0→1 al reaparecer (crece con rebote). */
+  private appear = 1
+  private readonly breathPhase = Math.random() * 10
 
   constructor(assets: DuoAssets, role: DuoRole, displayName: string, isMe: boolean) {
     const sheet = assets.characters[role]
@@ -47,10 +69,29 @@ export class CharacterView {
     this.baseScale = FRAME_DISPLAY / first.frame.height
     this.sprite.scale.set(this.baseScale)
     this.sprite.play()
+    this.shadow.ellipse(0, 0, 20, 5).fill({ color: 0x000000, alpha: 0.22 })
     this.label = makeLabel(isMe ? `${ROLE_NAME[role]} · Tú` : `${ROLE_NAME[role]} · ${displayName}`, role, isMe)
     this.label.y = -FRAME_DISPLAY - 6
     this.bubble.visible = false
-    this.root.addChild(this.sprite, this.label, this.bubble)
+    this.root.addChild(this.shadow, this.sprite, this.label, this.bubble)
+  }
+
+  /** Al saltar: se estira hacia arriba. */
+  stretch(): void {
+    this.squashX = 0.84
+    this.squashY = 1.2
+  }
+
+  /** Al aterrizar: se aplasta según la fuerza de la caída (0..1) y rebota. */
+  land(strength: number): void {
+    const s = 0.08 + 0.2 * Math.max(0, Math.min(1, strength))
+    this.squashX = 1 + s
+    this.squashY = 1 - s
+  }
+
+  /** Reaparece: crece desde chico con un rebote. */
+  respawn(): void {
+    this.appear = 0
   }
 
   update(state: DuoPlayerNet, now: number, dtMs: number): void {
@@ -63,13 +104,25 @@ export class CharacterView {
       if (spec.speed > 0) this.sprite.gotoAndPlay(0)
       else this.sprite.gotoAndStop(0)
     }
-    this.sprite.scale.x = this.baseScale * state.facing
     // Al nadar se mece; al apagarse sube y se desvanece.
     this.bob += dtMs / 1000
     this.deadFor = state.dead ? this.deadFor + dtMs / 1000 : 0
     this.sprite.rotation = state.anim === 'swim' ? Math.sin(this.bob * 5) * 0.12 : 0
     this.sprite.alpha = state.dead ? Math.max(0.15, 1 - this.deadFor) : 1
     this.sprite.y = -Math.min(40, this.deadFor * 50)
+
+    // El estirón y el aplastón vuelven a la forma normal como un resorte.
+    const k = 1 - Math.exp(-dtMs / 70)
+    this.squashX += (1 - this.squashX) * k
+    this.squashY += (1 - this.squashY) * k
+    this.appear = Math.min(1, this.appear + dtMs / 420)
+    const pop = this.appear < 1 ? Math.max(0.05, easeOutBack(this.appear)) : 1
+    const breathe = state.anim === 'idle' ? 1 + Math.sin(now / 420 + this.breathPhase) * 0.018 : 1
+    this.sprite.scale.set(this.baseScale * state.facing * this.squashX * pop, this.baseScale * this.squashY * breathe * pop)
+
+    // Sombra en el piso: se esconde en el aire, al nadar y al apagarse.
+    this.shadow.visible = !state.dead && !isAirborne(state.anim) && state.anim !== 'swim'
+    this.shadow.scale.set(this.squashX)
     if (this.bubble.visible && now > this.bubbleUntil) this.bubble.visible = false
   }
 

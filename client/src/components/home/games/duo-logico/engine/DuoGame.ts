@@ -4,10 +4,11 @@ import { STEP, createPlayer, stepCrate, stepPlayer, toNet, type CrateSim, type D
 import { checkpointFor, collectCoins, isOnPedestal, litMirrorCount, updateSwitches } from '../shared/duoWorld'
 import { otherRole, type DuoEmote, type DuoPeerState, type DuoPlayerNet, type DuoRole, type DuoSnapshot, type DuoWorldState } from '../shared/duoTypes'
 import type { DuoPhase } from '../shared/duoProtocol'
-import { CharacterView } from './characterView'
+import { CharacterView, isAirborne } from './characterView'
 import { loadDuoAssets, loadThemeAssets, type DuoAssets, type DuoThemeAssets } from './duoAssets'
 import { DuoInputState } from './duoInput'
 import { recordTrace } from './duoTrace'
+import { Fx, Shake, makeFxTextures } from './fx'
 import { LevelView } from './levelView'
 import { SnapshotBuffer } from './snapshotBuffer'
 
@@ -40,6 +41,14 @@ export interface NearMirror {
 
 /** Celdas de alto que se quieren ver (la cámara acerca o aleja según la pantalla). */
 const VIEW_ROWS = 10.5
+
+/** Colores de cada elemento para sus partículas (brasas de Lumen, gotas de Gota). */
+const ELEMENT_COLORS: Record<DuoRole, number[]> = {
+  FIRE: [0xffd166, 0xff9f1c, 0xff6b35],
+  WATER: [0xbfefff, 0x7dd3fc, 0x38bdf8],
+}
+const DUST_COLORS = [0xe7e5e4, 0xd6d3d1, 0xc8bfb5]
+const CONFETTI_COLORS = [0xfde047, 0xf472b6, 0x60a5fa, 0x4ade80, 0xfb923c, 0xffffff]
 
 export interface DuoGameOptions {
   level: DuoLevel
@@ -77,6 +86,13 @@ export class DuoGame {
   private levelView!: LevelView
   private views = {} as Record<DuoRole, CharacterView>
   private readonly partnerArrow = new Graphics()
+  private fx!: Fx
+  private readonly shake = new Shake()
+  /** Para los efectos de cada personaje: su estado del cuadro anterior y cuándo soltó partículas. */
+  private readonly prevNet: Partial<Record<DuoRole, DuoPlayerNet>> = {}
+  private readonly trailAt: Record<DuoRole, number> = { FIRE: 0, WATER: 0 }
+  private readonly dustAt: Record<DuoRole, number> = { FIRE: 0, WATER: 0 }
+  private cheerAt = 0
 
   private me: PlayerSim
   private crates: CrateSim[]
@@ -168,11 +184,12 @@ export class DuoGame {
     host.appendChild(app.canvas)
 
     this.background = new TilingSprite({ texture: this.theme.background, width: app.screen.width, height: app.screen.height })
-    this.levelView = new LevelView(this.assets, this.theme, this.level)
+    this.fx = new Fx(makeFxTextures(app.renderer))
+    this.levelView = new LevelView(this.assets, this.theme, this.level, this.fx, (power, ms) => this.shake.start(power, ms, performance.now()))
     const other = otherRole(this.role)
     this.views[this.role] = new CharacterView(this.assets, this.role, this.options.names[this.role], true)
     this.views[other] = new CharacterView(this.assets, other, this.options.names[other], false)
-    this.worldLayer.addChild(this.levelView.back, this.views[other].root, this.views[this.role].root, this.levelView.front)
+    this.worldLayer.addChild(this.levelView.back, this.views[other].root, this.views[this.role].root, this.levelView.front, this.fx.layer)
     this.hud.addChild(this.partnerArrow)
     app.stage.addChild(this.background, this.worldLayer, this.hud)
 
@@ -206,6 +223,9 @@ export class DuoGame {
       this.localWorld = this.emptyWorld()
       this.partner.clear()
       this.partnerDrawn = null
+      this.fx?.clear()
+      delete this.prevNet.FIRE
+      delete this.prevNet.WATER
       this.cam.ready = false
     }
     this.phase = phase
@@ -465,6 +485,16 @@ export class DuoGame {
     }
     this.views[this.role].update(mine, now, deltaMs)
     this.views[other].update(partner, now, deltaMs)
+    this.characterFx(this.role, mine, now)
+    if (this.partnerDrawn) this.characterFx(other, partner, now)
+    if (this.phase === 'VICTORY' && now >= this.cheerAt) {
+      // ¡Lo lograron!: confeti sobre los dos.
+      this.cheerAt = now + 320
+      for (const who of [mine, partner]) {
+        this.fx.burst({ x: who.x, y: who.y - 90, count: 6, texture: 'star', tint: CONFETTI_COLORS, speed: [120, 260], angle: [-Math.PI * 0.85, -Math.PI * 0.15], life: [700, 1100], scale: [0.7, 0.3], gravity: 420, spin: [-6, 6] })
+      }
+    }
+    this.fx.update(deltaMs)
     recordTrace(this.me, this.partnerDrawn)
 
     const gate = this.level.def.gates.find((g) => !this.serverWorld.gates[g.id])
@@ -473,7 +503,7 @@ export class DuoGame {
       const prev = this.prevCrates.get(c.id)
       return prev ? { id: c.id, x: smooth(prev.x, c.x), y: smooth(prev.y, c.y) } : c
     })
-    this.levelView.update(this.localWorld, crates, onPedestal, now, drawTime)
+    this.levelView.update(this.localWorld, crates, onPedestal, now, drawTime, deltaMs)
 
     // --- Cámara ---
     const sw = app.screen.width
@@ -494,7 +524,9 @@ export class DuoGame {
     const camX = Math.max(0, Math.min(maxX, this.cam.x))
     const camY = worldH <= sh ? -(sh / zoom - this.level.heightPx) : Math.max(0, Math.min(this.level.heightPx - sh / zoom, this.cam.y))
     this.worldLayer.scale.set(zoom)
-    this.worldLayer.position.set(worldW < sw ? (sw - worldW) / 2 : -camX * zoom, -camY * zoom)
+    const jolt = this.shake.offset(now)
+    this.worldLayer.position.set((worldW < sw ? (sw - worldW) / 2 : -camX * zoom) + jolt.x, -camY * zoom + jolt.y)
+    this.levelView.setView(camX, camY, sw / zoom, sh / zoom)
 
     // Fondo con paralaje: se mueve más lento que el mundo.
     this.background.width = sw
@@ -504,6 +536,64 @@ export class DuoGame {
     this.background.tilePosition.x = -camX * zoom * 0.3
 
     this.drawPartnerArrow(partner, zoom, sw, sh)
+  }
+
+  /**
+   * Partículas de un personaje según cómo cambió su estado: polvo al saltar y
+   * al caer, humo al apagarse, destellos al reaparecer, el rastro de su
+   * elemento (brasas de Lumen, gotitas de Gota), polvo al correr y burbujas al nadar.
+   */
+  private characterFx(role: DuoRole, s: DuoPlayerNet, now: number): void {
+    const view = this.views[role]
+    const prev = this.prevNet[role]
+    this.prevNet[role] = s
+    if (!prev) return
+    const fx = this.fx
+    const colors = ELEMENT_COLORS[role]
+    const grounded = (a: DuoPlayerNet) => !a.dead && !isAirborne(a.anim) && a.anim !== 'swim'
+    if (grounded(prev) && s.anim === 'rise') {
+      view.stretch()
+      fx.burst({ x: s.x, y: s.y - 2, count: 6, texture: 'soft', tint: DUST_COLORS, speed: [40, 110], angle: [-Math.PI, 0], life: [300, 500], scale: [0.35, 0.8], alpha: [0.6, 0], drag: 4, spread: [24, 2] })
+    }
+    if (isAirborne(prev.anim) && grounded(s)) {
+      const strength = Math.min(1, Math.max(0, prev.vy) / 900)
+      view.land(strength)
+      fx.burst({ x: s.x, y: s.y - 2, count: 5 + Math.round(8 * strength), texture: 'soft', tint: DUST_COLORS, speed: [50, 160], angle: [-Math.PI, 0], life: [320, 560], scale: [0.35, 0.95], alpha: [0.65, 0], drag: 4, spread: [34, 2] })
+    }
+    if (!prev.dead && s.dead) {
+      // Se apagó: una nube de humo y chispas de su elemento.
+      fx.burst({ x: s.x, y: s.y - 30, count: 14, texture: 'soft', tint: [0xf5f5f4, 0xd6d3d1, 0xa8a29e], speed: [30, 120], angle: [-Math.PI, 0], life: [700, 1100], scale: [0.6, 1.6], alpha: [0.7, 0], gravity: -40, drag: 1.5, spread: 14 })
+      fx.burst({ x: s.x, y: s.y - 30, count: 10, texture: 'star', tint: colors, speed: [90, 220], angle: [0, Math.PI * 2], life: [380, 620], scale: [0.7, 0.1], glow: true, drag: 2 })
+    }
+    if (prev.dead && !s.dead) {
+      // Reapareció: crece con un anillo de destellos.
+      view.respawn()
+      fx.burst({ x: s.x, y: s.y - 40, count: 20, texture: 'star', tint: [0xfde047, ...colors], speed: [90, 210], angle: [0, Math.PI * 2], life: [420, 700], scale: [0.85, 0.1], glow: true, drag: 2.2 })
+    }
+    if (s.dead) return
+    // El rastro del elemento: más seguido mientras se mueve.
+    const moving = Math.abs(s.vx) > 60 || isAirborne(s.anim)
+    if (now >= this.trailAt[role] && fx.count < 360) {
+      this.trailAt[role] = now + (moving ? 70 : 240)
+      if (role === 'FIRE') {
+        fx.burst({ x: s.x + (Math.random() - 0.5) * 22, y: s.y - 48 - Math.random() * 12, count: 1, texture: 'dot', tint: colors, speed: [30, 80], angle: [-Math.PI * 0.65, -Math.PI * 0.35], life: [500, 900], scale: [0.55, 0.05], glow: true, gravity: -40, sway: 5 })
+      } else if (moving || s.anim === 'swim') {
+        fx.burst({ x: s.x + (Math.random() - 0.5) * 18, y: s.y - 26, count: 1, texture: 'drop', tint: colors, speed: [20, 70], angle: [Math.PI * 0.25, Math.PI * 0.75], life: [380, 620], scale: [0.5, 0.25], alpha: [0.9, 0], gravity: 520 })
+      }
+    }
+    if (s.anim === 'walk' && Math.abs(s.vx) > 180 && now >= this.dustAt[role]) {
+      this.dustAt[role] = now + 150
+      fx.burst({ x: s.x - Math.sign(s.vx) * 12, y: s.y - 2, count: 1, texture: 'soft', tint: DUST_COLORS, speed: [15, 45], angle: [-Math.PI * 0.9, -Math.PI * 0.1], life: [260, 420], scale: [0.25, 0.6], alpha: [0.5, 0], drag: 3 })
+    }
+    if (s.anim === 'swim' && now >= this.dustAt[role]) {
+      // Nadando en su elemento: burbujas (Gota) o brasas (Lumen) que suben.
+      this.dustAt[role] = now + 140
+      fx.burst(
+        role === 'WATER'
+          ? { x: s.x + (Math.random() - 0.5) * 24, y: s.y - 30, count: 1, texture: 'ring', tint: [0xe0f2fe, 0xbae6fd], speed: [40, 80], angle: -Math.PI / 2, life: [500, 800], scale: [0.35, 0.6], alpha: [0.9, 0], sway: 3 }
+          : { x: s.x + (Math.random() - 0.5) * 24, y: s.y - 30, count: 2, texture: 'dot', tint: colors, speed: [60, 120], angle: [-Math.PI * 0.7, -Math.PI * 0.3], life: [400, 700], scale: [0.6, 0.1], glow: true, gravity: -30 },
+      )
+    }
   }
 
   /** Flecha en el borde de la pantalla cuando el compañero no se ve. */
