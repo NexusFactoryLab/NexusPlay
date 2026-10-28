@@ -1,4 +1,5 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useState } from 'react'
+import type { ReactNode } from 'react'
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { LoginPage } from './components/LoginPage'
 import { RegisterPage } from './components/RegisterPage'
@@ -34,6 +35,12 @@ import { GuessWhoRoomPage } from './components/home/games/GuessWhoRoomPage'
 import { TournamentRoomPage } from './components/home/games/TournamentRoomPage'
 import { RoleSelectionPage } from './components/RoleSelectionPage'
 import { AvatarEditorPage } from './components/avatar/AvatarEditorPage'
+import {
+  hasSkippedAvatarOnboarding,
+  markAvatarOnboardingSkipped,
+  needsAvatarOnboarding,
+} from './components/avatar/avatarOnboarding'
+import type { AuthUser } from './services/auth.service'
 import { PublicHomePage } from './components/legal/PublicHomePage'
 import { PrivacyPolicyPage } from './components/legal/PrivacyPolicyPage'
 import { TermsOfServicePage } from './components/legal/TermsOfServicePage'
@@ -109,7 +116,7 @@ function App() {
   }
 
   return (
-    <>
+    <AvatarOnboardingGate user={user}>
     {/* Recorrido interactivo: si un paso lo llevó a otra página, la barra lo obliga a volver a la guía. */}
     <TourReturnBar owner={welcomeStorageKey(user.id, user.role)} />
     <Routes>
@@ -192,7 +199,28 @@ function App() {
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
-    </>
+    </AvatarOnboardingGate>
+  )
+}
+
+/**
+ * Primer inicio de sesión: después de elegir rol y antes de la guía, se ofrece
+ * crear el avatar. Guardarlo o saltarlo deja pasar al resto de la app.
+ */
+function AvatarOnboardingGate({ user, children }: { user: AuthUser; children: ReactNode }) {
+  const [skipped, setSkipped] = useState(() => hasSkippedAvatarOnboarding(user.id))
+
+  if (!needsAvatarOnboarding(user, skipped)) return <>{children}</>
+
+  return (
+    <main className="app-main fixed inset-0 overflow-y-auto">
+      <AvatarEditorPage
+        onSkip={() => {
+          markAvatarOnboardingSkipped(user.id)
+          setSkipped(true)
+        }}
+      />
+    </main>
   )
 }
 

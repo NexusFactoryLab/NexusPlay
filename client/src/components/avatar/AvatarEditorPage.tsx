@@ -72,7 +72,7 @@ const DEFAULT_HAIR = 'short'
  * botones arriba del panel y el avatar al lado. Los cambios son un borrador
  * hasta tocar Guardar; Deshacer recorre el historial.
  */
-export function AvatarEditorPage() {
+export function AvatarEditorPage({ onSkip }: { onSkip?: () => void } = {}) {
   const { user, saveAvatar } = useAuth()
   const { showToast } = useToast()
   const navigate = useNavigate()
@@ -260,10 +260,16 @@ export function AvatarEditorPage() {
             Personaliza <span>tu avatar</span>
           </h1>
         </div>
-        <button type="button" className="avatar-back avatar-chip-btn" onClick={goBack}>
-          <ArrowLeft className="h-4 w-4" strokeWidth={2.5} />
-          Volver
-        </button>
+        {onSkip ? (
+          <button type="button" className="avatar-back avatar-chip-btn" onClick={onSkip}>
+            Saltar por ahora
+          </button>
+        ) : (
+          <button type="button" className="avatar-back avatar-chip-btn" onClick={goBack}>
+            <ArrowLeft className="h-4 w-4" strokeWidth={2.5} />
+            Volver
+          </button>
+        )}
 
         <nav className="avatar-rail avatar-area-rail" aria-label="Categorías del avatar">
           {CATEGORIES.map((item) => (
