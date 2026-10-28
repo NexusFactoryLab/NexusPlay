@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Check, Dices, Plus, RotateCcw, RotateCw, Undo2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Dices, Plus, RotateCcw, RotateCw, Undo2 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
 import type { AvatarConfig } from '../../services/avatar.service'
@@ -261,8 +261,9 @@ export function AvatarEditorPage({ onSkip }: { onSkip?: () => void } = {}) {
           </h1>
         </div>
         {onSkip ? (
-          <button type="button" className="avatar-back avatar-chip-btn" onClick={onSkip}>
+          <button type="button" className="avatar-back avatar-chip-btn avatar-skip" onClick={onSkip}>
             Saltar por ahora
+            <ArrowRight className="h-5 w-5" strokeWidth={3} />
           </button>
         ) : (
           <button type="button" className="avatar-back avatar-chip-btn" onClick={goBack}>
