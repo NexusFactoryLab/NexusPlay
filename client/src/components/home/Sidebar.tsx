@@ -1,9 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { BrainCircuit, ChartNoAxesCombined, ChevronLeft, Gamepad2, HeartHandshake, Landmark, PencilRuler, Plus, Rocket, School, Shapes, UserCog, Zap } from 'lucide-react'
+import { ChevronLeft, Plus, Zap } from 'lucide-react'
 import type { AuthUser } from '../../services/auth.service'
 import { ProfileMenu } from './ProfileMenu'
+import { NAV_ICONS, navIcon, navTileStyle } from './sidebarIcons'
+import { useTheme } from '../../hooks/useTheme'
 
 type SidebarProps = {
   user: AuthUser
@@ -197,8 +199,6 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
           collapsed={collapsed}
           active={location.pathname === '/'}
           onClick={() => navigate('/')}
-          icon={<Rocket className="h-[18px] w-[18px] shrink-0" strokeWidth={2.25} />}
-          tone={["#7c3aed", "#a78bfa"]}
         />
 
         <SidebarSectionLabel collapsed={collapsed}>Explorar</SidebarSectionLabel>
@@ -208,8 +208,6 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
           collapsed={collapsed}
           active={location.pathname.startsWith('/areas')}
           onClick={() => navigate('/areas')}
-          icon={<Shapes className="h-[18px] w-[18px] shrink-0" strokeWidth={2.25} />}
-          tone={["#0ea5e9", "#38bdf8"]}
         />
         <SidebarItem
           tourTarget="nav-community"
@@ -217,8 +215,6 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
           collapsed={collapsed}
           active={location.pathname.startsWith('/comunidad')}
           onClick={() => navigate('/comunidad')}
-          icon={<HeartHandshake className="h-[18px] w-[18px] shrink-0" strokeWidth={2.25} />}
-          tone={["#ec4899", "#fb7185"]}
         />
 
         <SidebarSectionLabel collapsed={collapsed}>Mi espacio</SidebarSectionLabel>
@@ -229,8 +225,6 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
             collapsed={collapsed}
             active={location.pathname.startsWith('/mis-clases')}
             onClick={() => navigate('/mis-clases')}
-            icon={<School className="h-[18px] w-[18px] shrink-0" strokeWidth={2.25} />}
-          tone={["#f59e0b", "#fbbf24"]}
           />
         )}
         {userRole.toUpperCase() === 'STUDENT' && (
@@ -240,8 +234,6 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
             collapsed={collapsed}
             active={location.pathname.startsWith('/mis-metricas')}
             onClick={() => navigate('/mis-metricas')}
-            icon={<ChartNoAxesCombined className="h-[18px] w-[18px] shrink-0" strokeWidth={2.25} />}
-          tone={["#10b981", "#34d399"]}
           />
         )}
         <SidebarItem
@@ -250,8 +242,6 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
           collapsed={collapsed}
           active={location.pathname.startsWith('/mis-juegos')}
           onClick={() => navigate('/mis-juegos')}
-          icon={<Gamepad2 className="h-[18px] w-[18px] shrink-0" strokeWidth={2.25} />}
-          tone={["#8b5cf6", "#ec4899"]}
         />
         {(canManageUsers || canAccessOrganization) && (
           <>
@@ -263,8 +253,6 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
                 collapsed={collapsed}
                 active={location.pathname === '/usuarios'}
                 onClick={() => navigate('/usuarios')}
-                icon={<UserCog className="h-[18px] w-[18px] shrink-0" strokeWidth={2.25} />}
-          tone={["#3b82f6", "#6366f1"]}
               />
             )}
             {canManageUsers && (
@@ -274,8 +262,6 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
                 collapsed={collapsed}
                 active={location.pathname.startsWith('/edicion')}
                 onClick={() => navigate('/edicion')}
-                icon={<PencilRuler className="h-[18px] w-[18px] shrink-0" strokeWidth={2.25} />}
-          tone={["#f97316", "#fb923c"]}
               />
             )}
             {canManageUsers && (
@@ -285,8 +271,6 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
                 collapsed={collapsed}
                 active={location.pathname === '/ia'}
                 onClick={() => navigate('/ia')}
-                icon={<BrainCircuit className="h-[18px] w-[18px] shrink-0" strokeWidth={2.25} />}
-          tone={["#14b8a6", "#06b6d4"]}
               />
             )}
             {canAccessOrganization && (
@@ -296,8 +280,6 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
                 collapsed={collapsed}
                 active={location.pathname === '/organizacion'}
                 onClick={() => navigate('/organizacion')}
-                icon={<Landmark className="h-[18px] w-[18px] shrink-0" strokeWidth={2.25} />}
-          tone={["#64748b", "#94a3b8"]}
               />
             )}
           </>
@@ -324,18 +306,15 @@ function SidebarItem({
   active,
   collapsed,
   onClick,
-  icon,
-  tone,
 }: {
   tourTarget: string
   label: string
   active: boolean
   collapsed: boolean
   onClick: () => void
-  icon: ReactNode
-  /** Dos colores del degradado de la ficha del icono. */
-  tone: [string, string]
 }) {
+  const { theme } = useTheme()
+  const entry = NAV_ICONS[tourTarget]
   return (
     <button
       type="button"
@@ -348,10 +327,10 @@ function SidebarItem({
       onClick={onClick}
     >
       <span
-        className="sidebar-icon-tile flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] text-white"
-        style={{ background: `linear-gradient(135deg, ${tone[0]}, ${tone[1]})`, boxShadow: `0 4px 10px -4px ${tone[0]}` }}
+        className="sidebar-icon-tile flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px]"
+        style={navTileStyle(theme, entry.tone)}
       >
-        {icon}
+        {navIcon(theme, entry)}
       </span>
       {!collapsed && <span className="truncate">{label}</span>}
     </button>
