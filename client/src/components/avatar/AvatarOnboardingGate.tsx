@@ -4,7 +4,7 @@ import { useAuth } from '../../hooks/useAuth'
 import type { AuthUser } from '../../services/auth.service'
 import { isKidsMode } from '../../utils/kidsMode'
 import { ThemesSection } from '../home/ThemesSection'
-import { GameThemeBackdrop } from '../home/games/GameThemeBackdrop'
+import { ThemeStepBackdrop } from './ThemeStepBackdrop'
 import { randomAvatar } from './avatarConfig'
 import { AvatarEditorPage } from './AvatarEditorPage'
 import { hasSkippedAvatarOnboarding, markAvatarOnboardingSkipped, needsAvatarOnboarding } from './avatarOnboarding'
@@ -50,7 +50,7 @@ export function AvatarOnboardingGate({ user, children }: { user: AuthUser; child
   if (!themeDone) {
     return (
       <main className="fixed inset-0 flex overflow-y-auto p-4 sm:p-6">
-        <GameThemeBackdrop />
+        <ThemeStepBackdrop />
         <div className="m-auto flex w-full max-w-6xl flex-col gap-4">
           <h1 className="text-2xl font-extrabold text-text-h sm:text-4xl">Elige cómo se ve tu experiencia</h1>
           <ThemesSection compact />
