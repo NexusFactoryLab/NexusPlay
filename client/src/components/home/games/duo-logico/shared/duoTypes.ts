@@ -42,6 +42,11 @@ export interface DuoPlayerNet {
   anim: DuoAnim;
   /** Murió y está esperando reaparecer: el compañero lo ve desvanecerse. */
   dead: boolean;
+  /**
+   * Va parado sobre una plataforma móvil (y a qué distancia de su borde). El
+   * compañero lo dibuja pegado a ella aunque lo vea con algo de atraso.
+   */
+  mover?: { id: string; dx: number };
 }
 
 export interface DuoCrateNet {
@@ -51,6 +56,18 @@ export interface DuoCrateNet {
 }
 
 export interface DuoClientState {
+  player: DuoPlayerNet;
+  crates: DuoCrateNet[];
+}
+
+/**
+ * Servidor → compañero, apenas llega una posición (sin esperar el tick): el
+ * estado de un jugador y las cajas que movió y el servidor aceptó.
+ */
+export interface DuoPeerState {
+  role: DuoRole;
+  /** Hora del servidor en que llegó; la misma que trae `at` en la instantánea. */
+  at: number;
   player: DuoPlayerNet;
   crates: DuoCrateNet[];
 }

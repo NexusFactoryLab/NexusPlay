@@ -217,8 +217,16 @@ describe('Intermedio: pregunta antes de colocar', () => {
   it('la salida de un jugador descarta la pregunta pendiente', () => {
     const h = mediumPlaying();
     h.gateway.handleDominoPlay(h.p1, { tileId: 'to1', side: 'right' });
-    h.gateway.handleDisconnect(h.p2);
+    h.gateway.handleDominoLeave(h.p2);
     expect(h.room.pendingQuestion).toBeNull();
+  });
+
+  it('si al otro se le corta la conexión, la pregunta pendiente se conserva para cuando vuelva (issue #120)', () => {
+    const h = mediumPlaying();
+    h.gateway.handleDominoPlay(h.p1, { tileId: 'to1', side: 'right' });
+    h.gateway.handleDisconnect(h.p2);
+    expect(h.room.pendingQuestion).toMatchObject({ userId: 'p1', tileId: 'to1' });
+    expect(h.room.phase).toBe('PLAYING');
   });
 });
 

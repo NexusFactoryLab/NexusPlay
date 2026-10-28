@@ -50,6 +50,10 @@ export interface PlayerSim {
   dead: boolean;
   deadTimer: number;
   cheering: boolean;
+  /** Plataforma móvil sobre la que quedó parado en el último paso (o null). */
+  standingOn: string | null;
+  /** Distancia desde el borde izquierdo de esa plataforma. */
+  moverDx: number;
 }
 
 export interface CrateSim {
@@ -94,6 +98,8 @@ export function createPlayer(role: DuoRole, at: { x: number; y: number }): Playe
     dead: false,
     deadTimer: 0,
     cheering: false,
+    standingOn: null,
+    moverDx: 0,
   };
 }
 
@@ -223,7 +229,22 @@ function kill(p: PlayerSim, cause: DeathCause): StepEvent {
   p.vy = 0;
   p.swimming = false;
   p.pushing = false;
+  p.standingOn = null;
   return { kind: 'died', cause };
+}
+
+/** Anota si quedó parado sobre una plataforma móvil (y dónde), para que el compañero lo dibuje pegado a ella. */
+function noteMover(level: DuoLevel, p: PlayerSim, time: number): void {
+  p.standingOn = null;
+  if (!p.grounded) return;
+  for (const mover of level.def.movers ?? []) {
+    const r = moverRect(mover, time);
+    if (Math.abs(p.y - r.y) < 1 && p.x + PLAYER_W / 2 > r.x && p.x - PLAYER_W / 2 < r.x + r.w) {
+      p.standingOn = mover.id;
+      p.moverDx = p.x - r.x;
+      return;
+    }
+  }
 }
 
 /** Un paso de simulación del personaje propio. */
@@ -352,6 +373,7 @@ export function stepPlayer(p: PlayerSim, input: DuoInput, ctx: StepContext, dt: 
   // --- Bordes del mundo ---
   p.x = Math.max(PLAYER_W / 2, Math.min(level.widthPx - PLAYER_W / 2, p.x));
   if (p.y - PLAYER_H > level.heightPx) return kill(p, 'fall');
+  noteMover(level, p, time);
 
   // --- Líquidos y peligros ---
   const hazard = hazardUnder(level, p);
@@ -384,5 +406,6 @@ export function toNet(p: PlayerSim): DuoPlayerNet {
     facing: p.facing,
     anim: animFor(p),
     dead: p.dead,
+    ...(p.standingOn && !p.dead ? { mover: { id: p.standingOn, dx: Math.round(p.moverDx * 10) / 10 } } : {}),
   };
 }

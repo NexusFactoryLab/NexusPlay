@@ -1,17 +1,26 @@
 import { Application, Container, Graphics, TilingSprite } from 'pixi.js'
-import { crateSpawn, mirrorRect, standPoint, type DuoLevel } from '../shared/duoLevel'
+import { crateSpawn, mirrorRect, moverRect, standPoint, type DuoLevel } from '../shared/duoLevel'
 import { STEP, createPlayer, stepCrate, stepPlayer, toNet, type CrateSim, type DeathCause, type PlayerSim } from '../shared/duoPhysics'
 import { checkpointFor, collectCoins, isOnPedestal, litMirrorCount, updateSwitches } from '../shared/duoWorld'
-import { otherRole, type DuoEmote, type DuoPlayerNet, type DuoRole, type DuoSnapshot, type DuoWorldState } from '../shared/duoTypes'
+import { otherRole, type DuoEmote, type DuoPeerState, type DuoPlayerNet, type DuoRole, type DuoSnapshot, type DuoWorldState } from '../shared/duoTypes'
 import type { DuoPhase } from '../shared/duoProtocol'
 import { CharacterView } from './characterView'
 import { loadDuoAssets, loadThemeAssets, type DuoAssets, type DuoThemeAssets } from './duoAssets'
 import { DuoInputState } from './duoInput'
+import { recordTrace } from './duoTrace'
 import { LevelView } from './levelView'
 import { SnapshotBuffer } from './snapshotBuffer'
 
-/** Cada cuánto se manda la posición propia (ms): 20 por segundo. */
-const SEND_EVERY_MS = 50
+/** Cada cuánto se manda la posición propia (ms): 30 por segundo. */
+const SEND_EVERY_MS = 33
+/** Duración de un paso de física (ms). */
+const STEP_MS = STEP * 1000
+/** Si la pestaña estuvo dormida más que esto, no se recupera paso a paso: se retoma desde ahora. */
+const MAX_CATCH_UP_MS = 250
+/** Un cambio mayor entre dos pasos es un salto (reaparecer): no se suaviza. */
+const TELEPORT_PX = 96
+/** Lo más que se corrige por cuadro el reloj de las plataformas móviles (ms): sin saltos visibles. */
+const MOVER_CLOCK_SLEW_MS = 2
 /** Una caja empujada sigue siendo "mía" este tiempo después del último empujón. */
 const CRATE_HOLD_MS = 350
 /** Tras soltar una caja, se espera hasta este tiempo a que el servidor confirme dónde quedó (sin rebotar). */
@@ -48,6 +57,12 @@ export interface DuoGameOptions {
  * dibuja al compañero con las posiciones que reparte el servidor y pinta todo
  * con Pixi. React solo le pasa la fase de la sala y las posiciones; nunca toca
  * el canvas.
+ *
+ * Relojes:
+ * - la física avanza a pasos fijos de 1/60 s con su propio reloj, y se dibuja
+ *   entre el paso anterior y el último (suave también en pantallas de 90/120 Hz);
+ * - el compañero y sus cajas, con el reloj de dibujo de `SnapshotBuffer`;
+ * - las plataformas móviles, con la hora del servidor estimada (corregida de a poco).
  */
 export class DuoGame {
   readonly input = new DuoInputState()
@@ -75,12 +90,22 @@ export class DuoGame {
   private serverWorld: DuoWorldState
   private localWorld: DuoWorldState
   private readonly partner = new SnapshotBuffer()
+  /** El compañero tal como se dibuja en este cuadro. */
+  private partnerDrawn: DuoPlayerNet | null = null
   private partnerDead = false
   /** Al entrar a mitad de partida (recargar la página), el personaje retoma donde estaba. */
   private resumeFromServer = true
   private phase: DuoPhase = 'WAITING'
   private runId = -1
-  private accumulator = 0
+  /** Hora local (performance.now) del último paso de física. */
+  private simClock: number | null = null
+  /** Hora del servidor (s) del último paso de física: ubica las plataformas móviles. */
+  private stepLabel = 0
+  /** Posiciones del paso anterior, para dibujar entre pasos. */
+  private readonly prevMe = { x: 0, y: 0 }
+  private readonly prevCrates = new Map<string, { x: number; y: number }>()
+  /** Diferencia con el reloj del servidor que usan las plataformas móviles (ms). */
+  private moverOffset: number | null = null
   private sinceSend = 0
   private cam = { x: 0, y: 0, ready: false }
   private destroyed = false
@@ -93,6 +118,8 @@ export class DuoGame {
   constructor(options: DuoGameOptions) {
     this.options = options
     this.me = createPlayer(options.role, standPoint(options.level.def.spawns[options.role]))
+    this.prevMe.x = this.me.x
+    this.prevMe.y = this.me.y
     this.crates = this.freshCrates()
     this.serverWorld = this.emptyWorld()
     this.localWorld = this.emptyWorld()
@@ -121,11 +148,14 @@ export class DuoGame {
   async mount(host: HTMLElement): Promise<void> {
     ;[this.assets, this.theme] = await Promise.all([loadDuoAssets(), loadThemeAssets(this.level.def.theme)])
     if (this.destroyed) return
+    // En pantallas táctiles (celulares) se ahorra el suavizado de bordes: con la
+    // densidad de esas pantallas casi no se nota y libera trabajo de la GPU.
+    const touch = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches
     const app = new Application()
     await app.init({
       resizeTo: host,
       background: 0x9fd3c7,
-      antialias: true,
+      antialias: !touch,
       resolution: Math.min(window.devicePixelRatio || 1, 2),
       autoDensity: true,
     })
@@ -164,7 +194,10 @@ export class DuoGame {
       if (this.runId !== -1) this.resumeFromServer = false
       this.runId = runId
       this.me = createPlayer(this.role, standPoint(this.level.def.spawns[this.role]))
+      this.prevMe.x = this.me.x
+      this.prevMe.y = this.me.y
       this.crates = this.freshCrates()
+      this.prevCrates.clear()
       this.crateTracks.clear()
       this.ownedUntil.clear()
       this.releasedAt.clear()
@@ -172,51 +205,68 @@ export class DuoGame {
       this.serverWorld = this.emptyWorld()
       this.localWorld = this.emptyWorld()
       this.partner.clear()
+      this.partnerDrawn = null
       this.cam.ready = false
     }
     this.phase = phase
     this.me.cheering = phase === 'VICTORY'
   }
 
+  /** Lo que reparte el servidor ~30 veces por segundo: el mundo, las cajas y (de respaldo) las posiciones. */
   applySnapshot(snapshot: DuoSnapshot, receivedAt: number): void {
     this.serverWorld = snapshot.world
     if (this.resumeFromServer) {
       this.resumeFromServer = false
       const mine = snapshot.players[this.role]
       if (mine && !mine.dead) {
-        this.me.x = mine.x
-        this.me.y = mine.y
+        this.me.x = this.prevMe.x = mine.x
+        this.me.y = this.prevMe.y = mine.y
         this.cam.ready = false
       }
     }
-    const partner = snapshot.players[otherRole(this.role)]
-    if (partner) {
-      this.partner.push(snapshot.t, partner, receivedAt, snapshot.at?.[otherRole(this.role)] ?? snapshot.t)
-      if (partner.dead && !this.partnerDead) this.options.onFainted?.(otherRole(this.role), null)
-      this.partnerDead = partner.dead
-    }
-    const now = performance.now()
-    const partnerMoves = (owner: DuoRole | null) => owner === otherRole(this.role)
+    const other = otherRole(this.role)
+    const partner = snapshot.players[other]
+    if (partner) this.takePartner(partner, snapshot.t, snapshot.at?.[other] ?? snapshot.t, receivedAt)
     for (const crate of snapshot.world.crates) {
-      const mine = (this.ownedUntil.get(crate.id) ?? 0) > now
-      // Si el servidor dice que la mueve el compañero, se le cede aunque yo la estuviera empujando.
-      if (mine && !partnerMoves(crate.owner)) continue
-      const local = this.crates.find((c) => c.id === crate.id)
-      const released = this.releasedAt.get(crate.id)
-      if (released !== undefined && !partnerMoves(crate.owner) && local) {
-        // Recién soltada: el servidor puede traer aún una posición vieja; se espera a que confirme.
-        const confirmed = Math.abs(local.x - crate.x) < 2 && Math.abs(local.y - crate.y) < 2
-        if (!confirmed && now - released < CRATE_SETTLE_MS) continue
-      }
-      this.releasedAt.delete(crate.id)
-      this.ownedUntil.delete(crate.id)
-      let track = this.crateTracks.get(crate.id)
-      if (!track) {
-        track = new SnapshotBuffer<{ x: number; y: number }>(this.partner.clock)
-        this.crateTracks.set(crate.id, track)
-      }
-      track.push(snapshot.t, { x: crate.x, y: crate.y }, receivedAt, crate.at ?? snapshot.t)
+      this.takeCrate(crate.id, crate.x, crate.y, crate.owner, snapshot.t, crate.at ?? snapshot.t, receivedAt)
     }
+  }
+
+  /** La posición del compañero (y las cajas que movió), reenviada por el servidor apenas llegó. */
+  applyPeer(peer: DuoPeerState, receivedAt: number): void {
+    if (peer.role === this.role) return
+    this.takePartner(peer.player, peer.at, peer.at, receivedAt)
+    for (const crate of peer.crates) this.takeCrate(crate.id, crate.x, crate.y, peer.role, peer.at, peer.at, receivedAt)
+  }
+
+  private takePartner(state: DuoPlayerNet, t: number, at: number, receivedAt: number): void {
+    // La misma posición llega dos veces (al instante y en la instantánea): solo cuenta la primera.
+    if (!this.partner.push(t, state, receivedAt, at)) return
+    if (state.dead && !this.partnerDead) this.options.onFainted?.(otherRole(this.role), null)
+    this.partnerDead = state.dead
+  }
+
+  private takeCrate(id: string, x: number, y: number, owner: DuoRole | null, t: number, at: number, receivedAt: number): void {
+    const now = performance.now()
+    const partnerMoves = owner === otherRole(this.role)
+    const mine = (this.ownedUntil.get(id) ?? 0) > now
+    // Si el servidor dice que la mueve el compañero, se le cede aunque yo la estuviera empujando.
+    if (mine && !partnerMoves) return
+    const local = this.crates.find((c) => c.id === id)
+    const released = this.releasedAt.get(id)
+    if (released !== undefined && !partnerMoves && local) {
+      // Recién soltada: el servidor puede traer aún una posición vieja; se espera a que confirme.
+      const confirmed = Math.abs(local.x - x) < 2 && Math.abs(local.y - y) < 2
+      if (!confirmed && now - released < CRATE_SETTLE_MS) return
+    }
+    this.releasedAt.delete(id)
+    this.ownedUntil.delete(id)
+    let track = this.crateTracks.get(id)
+    if (!track) {
+      track = new SnapshotBuffer<{ x: number; y: number }>(this.partner.clock)
+      this.crateTracks.set(id, track)
+    }
+    track.push(t, { x, y }, receivedAt, at)
   }
 
   /** Diferencia del reloj del servidor según la vista de la sala (ms). */
@@ -224,9 +274,16 @@ export class DuoGame {
     this.clockSkew = ms
   }
 
-  /** Segundos del reloj del servidor, para que los dos vean las plataformas móviles en el mismo lugar. */
-  private serverSeconds(): number {
-    return (Date.now() + (this.partner.clockOffset() ?? this.clockSkew)) / 1000
+  /** Acerca de a poco el reloj de las plataformas a la diferencia estimada (sin saltos). */
+  private updateMoverClock(): void {
+    const raw = this.partner.clockOffset() ?? this.clockSkew
+    if (this.moverOffset === null || Math.abs(raw - this.moverOffset) > 1000) this.moverOffset = raw
+    else this.moverOffset += Math.max(-MOVER_CLOCK_SLEW_MS, Math.min(MOVER_CLOCK_SLEW_MS, raw - this.moverOffset))
+  }
+
+  /** Segundos del reloj del servidor a la hora local `wallMs` (Date.now): los dos ven las plataformas en el mismo lugar. */
+  private serverSecondsAt(wallMs: number): number {
+    return (wallMs + (this.moverOffset ?? this.clockSkew)) / 1000
   }
 
   setFrozen(frozen: boolean): void {
@@ -242,21 +299,37 @@ export class DuoGame {
     const app = this.app
     if (!app) return
     const now = performance.now()
+    const wallNow = Date.now()
     const playing = this.phase === 'PLAYING'
-    // Con el panel del espejo abierto no se simula, pero se sigue contando la posición (quieto).
+    // Con el panel del espejo abierto no se simula, pero el reloj sigue.
     const simulating = playing && !this.frozen
+    this.updateMoverClock()
 
-    this.accumulator = Math.min(this.accumulator + deltaMs, 250)
-    const time = this.serverSeconds()
-    let pending = Math.floor(this.accumulator / (STEP * 1000))
-    while (pending > 0) {
-      this.accumulator -= STEP * 1000
-      pending -= 1
-      if (simulating) this.simulate(now, time - pending * STEP)
+    // --- Física a pasos fijos, con su propio reloj ---
+    if (this.simClock === null || now - this.simClock > MAX_CATCH_UP_MS) {
+      this.simClock = now - STEP_MS
+      this.prevMe.x = this.me.x
+      this.prevMe.y = this.me.y
     }
+    while (this.simClock + STEP_MS <= now) {
+      this.simClock += STEP_MS
+      this.stepLabel = this.serverSecondsAt(wallNow - (now - this.simClock))
+      this.prevMe.x = this.me.x
+      this.prevMe.y = this.me.y
+      for (const crate of this.crates) {
+        const prev = this.prevCrates.get(crate.id)
+        if (prev) {
+          prev.x = crate.x
+          prev.y = crate.y
+        } else this.prevCrates.set(crate.id, { x: crate.x, y: crate.y })
+      }
+      if (simulating) this.simulate(this.simClock, this.stepLabel)
+    }
+    // Cuánto del paso siguiente ya pasó: se dibuja entre el paso anterior y el último.
+    const alpha = Math.min(1, Math.max(0, (now - this.simClock) / STEP_MS))
+    const drawTime = this.stepLabel - (1 - alpha) * STEP
 
     // Cajas que mueve el otro (o nadie): se dibujan en el mismo instante que su personaje.
-    const wallNow = Date.now()
     for (const crate of this.crates) {
       if ((this.ownedUntil.get(crate.id) ?? 0) > now || this.releasedAt.has(crate.id)) continue
       const target = this.crateTracks.get(crate.id)?.sample(wallNow)
@@ -264,14 +337,22 @@ export class DuoGame {
       crate.x = target.x
       crate.y = target.y
       crate.vy = 0
+      const prev = this.prevCrates.get(crate.id)
+      if (prev) {
+        prev.x = target.x
+        prev.y = target.y
+      }
     }
 
+    const sampled = this.partner.sample(wallNow)
+    this.partnerDrawn = sampled ? this.onMover(sampled, drawTime) : null
     this.localWorld = this.predictWorld()
 
     if (playing) {
       this.sinceSend += deltaMs
       if (this.sinceSend >= SEND_EVERY_MS) {
-        this.sinceSend = 0
+        // Se descuenta (no se reinicia): así salen 30 por segundo aunque los cuadros no calcen.
+        this.sinceSend = Math.min(this.sinceSend - SEND_EVERY_MS, SEND_EVERY_MS)
         const ownedIds = new Set(this.crates.filter((c) => (this.ownedUntil.get(c.id) ?? 0) > now).map((c) => c.id))
         // Las que acabo de soltar van una última vez, en un envío que no se puede perder.
         const justReleased = [...this.lastSentCrates].filter((id) => !ownedIds.has(id))
@@ -284,8 +365,18 @@ export class DuoGame {
       }
     }
 
-    this.render(now, deltaMs, time)
+    this.render(now, deltaMs, alpha, drawTime)
     this.reportNearMirror()
+  }
+
+  /** El compañero sobre una plataforma móvil se dibuja pegado a ella, donde la plataforma está ahora. */
+  private onMover(partner: DuoPlayerNet, time: number): DuoPlayerNet {
+    const riding = partner.mover
+    if (!riding || partner.dead) return partner
+    const mover = this.level.def.movers?.find((m) => m.id === riding.id)
+    if (!mover) return partner
+    const rect = moverRect(mover, time)
+    return { ...partner, x: rect.x + riding.dx, y: rect.y }
   }
 
   /** Avisa a React cuando el personaje queda junto a un espejo (o se aleja). */
@@ -313,6 +404,7 @@ export class DuoGame {
     this.options.onNearMirror?.(current)
   }
 
+  /** Un paso de física. `now`: hora local del paso; `time`: segundos del servidor. */
   private simulate(now: number, time: number): void {
     const ctx = {
       level: this.level,
@@ -345,7 +437,7 @@ export class DuoGame {
       gates: { ...this.serverWorld.gates },
       mirrors: { ...this.serverWorld.mirrors },
     }
-    const bodies = { [this.role]: toNet(this.me), [otherRole(this.role)]: this.partnerNow() ?? undefined }
+    const bodies = { [this.role]: toNet(this.me), [otherRole(this.role)]: this.partnerDrawn ?? undefined }
     updateSwitches(this.level, world, bodies)
     // Las palancas no se desactivan: lo que el servidor ya activó sigue activo.
     for (const [id, on] of Object.entries(this.serverWorld.switches)) {
@@ -355,16 +447,14 @@ export class DuoGame {
     return world
   }
 
-  private partnerNow(): DuoPlayerNet | null {
-    // El mismo reloj con el que se anotó la llegada de los paquetes (Date.now), no performance.now.
-    return this.partner.sample(Date.now())
-  }
-
-  private render(now: number, deltaMs: number, time: number): void {
+  private render(now: number, deltaMs: number, alpha: number, drawTime: number): void {
     const app = this.app!
     const other = otherRole(this.role)
+    const smooth = (from: number, to: number) => (Math.abs(to - from) > TELEPORT_PX ? to : from + (to - from) * alpha)
     const mine = toNet(this.me)
-    let partner = this.partnerNow()
+    mine.x = smooth(this.prevMe.x, this.me.x)
+    mine.y = smooth(this.prevMe.y, this.me.y)
+    let partner = this.partnerDrawn
     if (!partner) {
       const spawn = standPoint(this.level.def.spawns[other])
       partner = { ...spawn, vx: 0, vy: 0, facing: 1, anim: 'idle', dead: false }
@@ -375,10 +465,15 @@ export class DuoGame {
     }
     this.views[this.role].update(mine, now, deltaMs)
     this.views[other].update(partner, now, deltaMs)
+    recordTrace(this.me, this.partnerDrawn)
 
     const gate = this.level.def.gates.find((g) => !this.serverWorld.gates[g.id])
     const onPedestal = gate ? { [gate.id]: { [this.role]: isOnPedestal(gate, this.role, mine), [other]: isOnPedestal(gate, other, partner) } as Record<DuoRole, boolean> } : {}
-    this.levelView.update(this.localWorld, this.crates, onPedestal, now, time)
+    const crates = this.crates.map((c) => {
+      const prev = this.prevCrates.get(c.id)
+      return prev ? { id: c.id, x: smooth(prev.x, c.x), y: smooth(prev.y, c.y) } : c
+    })
+    this.levelView.update(this.localWorld, crates, onPedestal, now, drawTime)
 
     // --- Cámara ---
     const sw = app.screen.width
@@ -386,8 +481,8 @@ export class DuoGame {
     const zoom = Math.max(0.42, Math.min(1.35, sh / (VIEW_ROWS * 64), sw / (8 * 64)))
     const worldW = this.level.widthPx * zoom
     const worldH = this.level.heightPx * zoom
-    const targetX = this.me.x - sw / 2 / zoom + (this.me.facing * 60)
-    const targetY = this.me.y - sh * 0.62 / zoom
+    const targetX = mine.x - sw / 2 / zoom + (this.me.facing * 60)
+    const targetY = mine.y - sh * 0.62 / zoom
     if (!this.cam.ready) {
       this.cam.x = targetX
       this.cam.y = targetY

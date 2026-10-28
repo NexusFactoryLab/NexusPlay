@@ -17,6 +17,8 @@ import { setGuessWhoSoundMuted, startGuessWhoAmbience, stopGuessWhoAmbience } fr
 import { BOT_CHAT_NOTICE, parseBotDifficulty } from './guessWhoBot'
 import { AutoDiscardToggle } from './AutoDiscardToggle'
 import { useToast } from '../../../hooks/useToast'
+import { PlayerWaitOverlay } from './PlayerWaitOverlay'
+import { usePlayerWait } from './playerWait'
 
 /** Cuánto dura el aviso de que el bot no lee mensajes sueltos. */
 const BOT_NOTICE_MS = 10_000
@@ -130,6 +132,8 @@ function GuessWhoRoomSession() {
     setDealDeadline(Date.now() + dealCountdownMs)
   }, [dealCountdownMs])
   const dealRemainingMs = useCountdown(dealDeadline)
+  // Se cortó la conexión del rival: la partida espera (issue #120).
+  const playerWait = usePlayerWait(room?.awaiting, user?.id)
 
   function handleExit() {
     stopGuessWhoAmbience()
@@ -252,6 +256,7 @@ function GuessWhoRoomSession() {
     <div className="fixed inset-0 z-50 overflow-y-auto bg-bg">
       <GameThemeBackdrop />
       {dealing && <DealCountdownOverlay remainingMs={dealRemainingMs} />}
+      {playerWait && room.phase === 'PLAYING' && <PlayerWaitOverlay wait={playerWait} onLeave={handleExit} />}
 
       <div className="guess-who-play-shell">
         {/* El turno va al centro, bien a la vista; las acciones quedan a la derecha. */}

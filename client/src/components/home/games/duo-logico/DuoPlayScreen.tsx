@@ -15,6 +15,7 @@ import { DUO_EMOTES, otherRole, type DuoRole } from './shared/duoTypes'
 import type { DuoRoomView } from './shared/duoProtocol'
 import type { DeathCause } from './shared/duoPhysics'
 import type { useDuoRoom } from './useDuoRoom'
+import { PlayerWaitOverlay } from '../PlayerWaitOverlay'
 
 const CAUSE_TEXT: Record<DeathCause, string> = {
   lava: 'en la lava',
@@ -106,6 +107,7 @@ export function DuoPlayScreen({
     void game.mount(host)
     setRealtimeListener({
       onSnapshot: (snapshot, receivedAt) => game.applySnapshot(snapshot, receivedAt),
+      onPeer: (peer, receivedAt) => game.applyPeer(peer, receivedAt),
       onEmote: (role, emote) => game.showEmote(role, emote),
     })
     return () => {
@@ -147,14 +149,19 @@ export function DuoPlayScreen({
     }
   }, [duo.notices, me, toast])
 
-  // Reloj para la cuenta regresiva y la espera del compañero.
-  const needsClock = room.phase === 'COUNTDOWN' || !!room.waitingPartnerUntil
+  // Reloj para la cuenta regresiva.
+  const needsClock = room.phase === 'COUNTDOWN'
   useEffect(() => {
     if (!needsClock) return
     const timer = window.setInterval(() => setNow(Date.now()), 200)
     return () => window.clearInterval(timer)
   }, [needsClock])
   const clockSkew = useMemo(() => room.serverNow - Date.now(), [room.serverNow])
+  // El compañero se desconectó: la misma ventana de espera que en los demás juegos (issue #120).
+  const partnerWait = useMemo(
+    () => (room.waitingPartnerUntil ? { names: [partner?.displayName ?? 'tu compañero'], deadline: room.waitingPartnerUntil - clockSkew } : null),
+    [room.waitingPartnerUntil, partner?.displayName, clockSkew],
+  )
 
   // Atajos de emotes: teclas 1 a 6.
   useEffect(() => {
@@ -170,7 +177,6 @@ export function DuoPlayScreen({
 
   const unread = Math.max(0, duo.messages.length - readCount)
   const countdown = room.countdownEndsAt ? Math.max(0, Math.ceil((room.countdownEndsAt - (now + clockSkew)) / 1000)) : null
-  const waitingSeconds = room.waitingPartnerUntil ? Math.max(0, Math.ceil((room.waitingPartnerUntil - (now + clockSkew)) / 1000)) : null
   const ended = room.phase === 'VICTORY' || room.phase === 'DEFEAT' || room.phase === 'ABANDONED'
   const inQuestion = room.phase === 'QUESTION' || room.phase === 'REVEAL'
 
@@ -303,14 +309,7 @@ export function DuoPlayScreen({
         </div>
       )}
 
-      {waitingSeconds !== null && !ended && (
-        <div className="absolute inset-0 z-40 flex items-center justify-center bg-slate-950/70 p-4">
-          <div className="max-w-[380px] rounded-2xl bg-slate-900 p-5 text-center shadow-2xl">
-            <p className="text-[18px] font-bold">Esperando a {partner?.displayName ?? 'tu compañero'}…</p>
-            <p className="mt-1 text-[14px] text-slate-300">Se desconectó. El juego sigue cuando vuelva ({waitingSeconds} s).</p>
-          </div>
-        </div>
-      )}
+      {partnerWait && !ended && <PlayerWaitOverlay wait={partnerWait} onLeave={onExit} />}
 
       {inQuestion && <DuoQuestionPanel room={room} onAnswer={duo.answer} messages={duo.messages} selfUserId={selfUserId} onSendChat={duo.sendChat} />}
 

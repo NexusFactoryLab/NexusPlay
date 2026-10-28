@@ -41,8 +41,11 @@ interface AuthenticatedSocket extends Socket {
   data: { userId: string; displayName: string };
 }
 
-/** Cada cuánto avanza el servidor las salas en partida y reparte posiciones (20 por segundo). */
-const TICK_MS = 50;
+/**
+ * Cada cuánto avanza el servidor las salas en partida y reparte el mundo (30
+ * por segundo). Las posiciones no esperan al tick: se reenvían al llegar.
+ */
+const TICK_MS = 33;
 const MAX_CHAT_LENGTH = 300;
 
 /**
@@ -153,9 +156,14 @@ export class DuoLogicoGateway implements OnGatewayDisconnect, OnModuleInit, OnMo
 
   @SubscribeMessage(DUO_EVENTS.state)
   handleState(@ConnectedSocket() socket: AuthenticatedSocket, @MessageBody() body: DuoClientState) {
-    // Llega ~20 veces por segundo: nada de excepciones, si no aplica se ignora.
+    // Llega ~30 veces por segundo: nada de excepciones, si no aplica se ignora.
     const room = this.store.findBySocketId(socket.id);
-    if (room) applyClientState(room, socket.data.userId, body, Date.now());
+    if (!room) return;
+    const peer = applyClientState(room, socket.data.userId, body, Date.now());
+    if (!peer) return;
+    // Al compañero en el acto: esperar el tick sumaría hasta 33 ms de atraso.
+    const partner = room.players.find((p) => p.role !== peer.role);
+    if (partner?.socketId) this.server.to(partner.socketId).volatile.emit(DUO_EVENTS.peer, peer);
   }
 
   @SubscribeMessage(DUO_EVENTS.answer)
