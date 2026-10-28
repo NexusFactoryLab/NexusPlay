@@ -1,5 +1,4 @@
-import { lazy, Suspense, useState } from 'react'
-import type { ReactNode } from 'react'
+import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { LoginPage } from './components/LoginPage'
 import { RegisterPage } from './components/RegisterPage'
@@ -35,12 +34,7 @@ import { GuessWhoRoomPage } from './components/home/games/GuessWhoRoomPage'
 import { TournamentRoomPage } from './components/home/games/TournamentRoomPage'
 import { RoleSelectionPage } from './components/RoleSelectionPage'
 import { AvatarEditorPage } from './components/avatar/AvatarEditorPage'
-import {
-  hasSkippedAvatarOnboarding,
-  markAvatarOnboardingSkipped,
-  needsAvatarOnboarding,
-} from './components/avatar/avatarOnboarding'
-import type { AuthUser } from './services/auth.service'
+import { AvatarOnboardingGate } from './components/avatar/AvatarOnboardingGate'
 import { PublicHomePage } from './components/legal/PublicHomePage'
 import { PrivacyPolicyPage } from './components/legal/PrivacyPolicyPage'
 import { TermsOfServicePage } from './components/legal/TermsOfServicePage'
@@ -203,50 +197,4 @@ function App() {
   )
 }
 
-/**
- * Primer inicio de sesión: después de elegir rol y antes de la guía, se ofrece
- * crear el avatar. Guardarlo o saltarlo deja pasar al resto de la app.
- */
-function AvatarOnboardingGate({ user, children }: { user: AuthUser; children: ReactNode }) {
-  const [skipped, setSkipped] = useState(() => hasSkippedAvatarOnboarding(user.id))
-  const [started, setStarted] = useState(false)
-
-  if (!needsAvatarOnboarding(user, skipped)) return <>{children}</>
-
-  function skip() {
-    markAvatarOnboardingSkipped(user.id)
-    setSkipped(true)
-  }
-
-  if (!started) return <AvatarIntro onStart={() => setStarted(true)} onSkip={skip} />
-
-  return (
-    <main className="app-main fixed inset-0 overflow-y-auto">
-      <AvatarEditorPage onSkip={skip} />
-    </main>
-  )
-}
-
 export default App
-
-/** Antes de empezar: solo un título y una razón corta, con «Saltar» bien a la vista. */
-function AvatarIntro({ onStart, onSkip }: { onStart: () => void; onSkip: () => void }) {
-  return (
-    <main className="fixed inset-0 flex flex-col items-center justify-center gap-6 p-6 text-center">
-      <h1 className="text-4xl font-extrabold text-text-h sm:text-5xl">Personaliza tu avatar</h1>
-      <p className="text-lg text-text">Así tus amigos te reconocen en cada partida.</p>
-      <div className="flex flex-wrap items-center justify-center gap-3">
-        <button type="button" onClick={onStart} className="avatar-chip-btn avatar-skip">
-          Empezar
-        </button>
-        <button
-          type="button"
-          onClick={onSkip}
-          className="rounded-full border-2 border-text-h px-5 py-2.5 text-base font-extrabold text-text-h hover:bg-surface"
-        >
-          Saltar por ahora
-        </button>
-      </div>
-    </main>
-  )
-}
