@@ -48,10 +48,10 @@ export function AvatarOnboardingGate({ user, children }: { user: AuthUser; child
 
   if (!themeDone) {
     return (
-      <main className="fixed inset-0 overflow-y-auto p-6">
-        <div className="mx-auto flex max-w-3xl flex-col gap-5">
-          <h1 className="text-3xl font-extrabold text-text-h sm:text-4xl">Elige cómo se ve tu página</h1>
-          <ThemesSection />
+      <main className="fixed inset-0 flex overflow-y-auto p-4 sm:p-6">
+        <div className="m-auto flex w-full max-w-6xl flex-col gap-4">
+          <h1 className="text-2xl font-extrabold text-text-h sm:text-4xl">Elige cómo se ve tu experiencia</h1>
+          <ThemesSection compact />
           <button
             type="button"
             onClick={() => setThemeDone(true)}
