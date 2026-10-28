@@ -1,47 +1,52 @@
-import {
-  Activity, Bird, Bot, Building2, Cpu, GraduationCap, Globe, House, Joystick, LibraryBig, Network, Orbit, Presentation, Puzzle,
-  SquarePen, Telescope, Users, Wrench, ChartColumn, UserRoundCog, BrainCircuit, Brush, Castle, ChartNoAxesCombined, Cloud, Crown, Dices, Feather, Flag, Flower2, Gamepad2, Gem,
-  HeartHandshake, Landmark, Map as MapIcon, Mountain, PencilRuler, Rocket, School, Shapes, Shield, Sparkles, Sprout,
-  Sun, Tent, TreePine, UserCog, Wand2,
-} from 'lucide-react'
 import { createElement } from 'react'
+import {
+  Activity, Bird, Bot, Brush, Building2, Castle, ChartColumn, ChartNoAxesCombined, Cloud, Cpu, Crown, Dices, Feather,
+  Flag, Flower2, Gamepad2, Gem, Globe, GraduationCap, HeartHandshake, House, Joystick, LibraryBig, Map as MapIcon,
+  Mountain, Network, Orbit, PencilRuler, Presentation, Puzzle, Rabbit, Rocket, School, ScrollText, Shapes, Shield,
+  ShieldUser, SquarePen, Sprout, Sun, Telescope, Tent, TreePine, UserCog, UserRoundCog, Users, Wand2, Wrench, BrainCircuit,
+} from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { Theme } from '../../hooks/useTheme'
 
-type NavIcons = { base: LucideIcon; light: LucideIcon; dark: LucideIcon; fantasy: LucideIcon; meadow: LucideIcon; tone: [string, string] }
+type NavIcons = Record<Theme, LucideIcon>
 
-/** Icono de cada opción del menú: uno para Kids, uno limpio para Claro, uno tecnológico para Oscuro y uno propio de Fantasía (castillo, gemas, pergaminos) y de Pradera (campo, árboles, nubes). */
+/**
+ * Icono de cada opción del menú, un juego completo por tema y cada uno con una sola idea:
+ * Kids (juguetón), Claro (educación y oficina), Oscuro (espacio y tecnología),
+ * Fantasía (aventura medieval) y Pradera (campo y animales).
+ */
 export const NAV_ICONS: Record<string, NavIcons> = {
-  'nav-home': { base: Rocket, light: House, dark: Orbit, fantasy: Castle, meadow: Sun, tone: ['#7c3aed', '#a78bfa'] },
-  'nav-subjects': { base: Shapes, light: LibraryBig, dark: Telescope, fantasy: MapIcon, meadow: Mountain, tone: ['#0ea5e9', '#38bdf8'] },
-  'nav-community': { base: HeartHandshake, light: Users, dark: Globe, fantasy: Shield, meadow: Flower2, tone: ['#ec4899', '#fb7185'] },
-  'nav-classes': { base: School, light: GraduationCap, dark: Presentation, fantasy: Wand2, meadow: Sprout, tone: ['#f59e0b', '#fbbf24'] },
-  'nav-my-metrics': { base: ChartNoAxesCombined, light: ChartColumn, dark: Activity, fantasy: Gem, meadow: Bird, tone: ['#10b981', '#34d399'] },
-  'nav-own-games': { base: Gamepad2, light: Puzzle, dark: Joystick, fantasy: Dices, meadow: Gamepad2, tone: ['#8b5cf6', '#ec4899'] },
-  'nav-users': { base: UserCog, light: UserRoundCog, dark: Users, fantasy: Crown, meadow: TreePine, tone: ['#3b82f6', '#6366f1'] },
-  'nav-edition': { base: PencilRuler, light: SquarePen, dark: Wrench, fantasy: Feather, meadow: Brush, tone: ['#f97316', '#fb923c'] },
-  'nav-ai-providers': { base: BrainCircuit, light: Bot, dark: Cpu, fantasy: Sparkles, meadow: Cloud, tone: ['#14b8a6', '#06b6d4'] },
-  'nav-organization': { base: Landmark, light: Building2, dark: Network, fantasy: Flag, meadow: Tent, tone: ['#64748b', '#94a3b8'] },
+  'nav-home': { kids: Rocket, light: House, dark: Orbit, fantasy: Castle, meadow: Sun },
+  'nav-subjects': { kids: Shapes, light: LibraryBig, dark: Telescope, fantasy: MapIcon, meadow: Mountain },
+  'nav-community': { kids: HeartHandshake, light: Users, dark: Globe, fantasy: Shield, meadow: Flower2 },
+  'nav-classes': { kids: School, light: GraduationCap, dark: Presentation, fantasy: ScrollText, meadow: Sprout },
+  'nav-my-metrics': { kids: ChartNoAxesCombined, light: ChartColumn, dark: Activity, fantasy: Gem, meadow: Bird },
+  'nav-own-games': { kids: Gamepad2, light: Puzzle, dark: Joystick, fantasy: Dices, meadow: Rabbit },
+  'nav-users': { kids: UserCog, light: UserRoundCog, dark: ShieldUser, fantasy: Crown, meadow: TreePine },
+  'nav-edition': { kids: PencilRuler, light: SquarePen, dark: Wrench, fantasy: Feather, meadow: Brush },
+  'nav-ai-providers': { kids: BrainCircuit, light: Bot, dark: Cpu, fantasy: Wand2, meadow: Cloud },
+  'nav-organization': { kids: Building2, light: Building2, dark: Network, fantasy: Flag, meadow: Tent },
 }
 
-/** Ficha del icono: degradado en Kids; tinte suave con icono de color en Claro; neón sobre fondo oscuro en Oscuro; piedra con borde dorado en Fantasía; madera clara en Pradera. */
-export function navTileStyle(theme: Theme, tone: [string, string]) {
-  if (theme === 'fantasy') {
-    return { background: 'linear-gradient(160deg, #4a2a12, #24140a)', border: '2px solid #ffc83d', color: '#ffe58a', boxShadow: '0 0 10px rgba(255, 200, 61, 0.45)' }
+/**
+ * Ficha del icono: un solo color por tema para que el menú se vea coordinado
+ * (el acento del tema en Kids, Claro y Oscuro; dorado en Fantasía; madera y verde en Pradera).
+ */
+export function navTileStyle(theme: Theme) {
+  switch (theme) {
+    case 'fantasy':
+      return { background: 'linear-gradient(160deg, #4a2a12, #24140a)', border: '2px solid #ffc83d', color: '#ffe58a', boxShadow: '0 0 10px rgba(255, 200, 61, 0.45)' }
+    case 'meadow':
+      return { background: 'linear-gradient(180deg, #f8e6c4, #ecca93)', border: '2px solid #b98a52', color: '#3f7d3a', boxShadow: '0 3px 0 #b98a52' }
+    case 'light':
+      return { background: 'color-mix(in srgb, var(--accent) 12%, transparent)', border: '1.5px solid color-mix(in srgb, var(--accent) 40%, transparent)', color: 'var(--accent)' }
+    case 'dark':
+      return { background: '#12121a', border: '1.5px solid var(--accent)', color: 'var(--accent)', boxShadow: '0 0 9px color-mix(in srgb, var(--accent) 60%, transparent), inset 0 0 8px color-mix(in srgb, var(--accent) 25%, transparent)' }
+    default:
+      return { background: 'linear-gradient(135deg, var(--accent), var(--accent-2))', color: '#ffffff', boxShadow: '0 4px 10px -4px var(--accent)' }
   }
-  if (theme === 'meadow') {
-    return { background: 'linear-gradient(180deg, #f8e6c4, #ecca93)', border: '2px solid #b98a52', color: '#3f7d3a', boxShadow: '0 3px 0 #b98a52' }
-  }
-  if (theme === 'light') {
-    return { background: `${tone[0]}1f`, border: `1.5px solid ${tone[0]}55`, color: tone[0] }
-  }
-  if (theme === 'dark') {
-    return { background: '#12121a', border: `1.5px solid ${tone[1]}`, color: tone[1], boxShadow: `0 0 9px ${tone[1]}99, inset 0 0 8px ${tone[0]}40` }
-  }
-  return { background: `linear-gradient(135deg, ${tone[0]}, ${tone[1]})`, color: '#ffffff', boxShadow: `0 4px 10px -4px ${tone[0]}` }
 }
 
 export function navIcon(theme: Theme, entry: NavIcons) {
-  const Icon = { fantasy: entry.fantasy, meadow: entry.meadow, light: entry.light, dark: entry.dark, kids: entry.base }[theme]
-  return createElement(Icon, { className: 'h-[18px] w-[18px] shrink-0', strokeWidth: 2.25 })
+  return createElement(entry[theme], { className: 'h-[18px] w-[18px] shrink-0', strokeWidth: 2.25 })
 }
