@@ -53,21 +53,18 @@ export const SOLAR: DuoLevelDef = {
   gates: [
     {
       id: 'puerta-1',
-      format: 'MIRROR',
       pedestals: { FIRE: { col: 20, row: 9 }, WATER: { col: 22, row: 9 } },
       wall: { col: 24, row: 5, height: 5 },
       respawn: { FIRE: { col: 25, row: 9 }, WATER: { col: 26, row: 9 } },
     },
     {
       id: 'puerta-2',
-      format: 'SPLIT',
       pedestals: { FIRE: { col: 51, row: 4 }, WATER: { col: 53, row: 4 } },
       wall: { col: 55, row: 0, height: 5 },
       respawn: { FIRE: { col: 56, row: 4 }, WATER: { col: 57, row: 4 } },
     },
     {
       id: 'portal',
-      format: 'TWO_PART',
       pedestals: { FIRE: { col: 73, row: 9 }, WATER: { col: 75, row: 9 } },
       wall: null,
       respawn: { FIRE: { col: 73, row: 9 }, WATER: { col: 75, row: 9 } },

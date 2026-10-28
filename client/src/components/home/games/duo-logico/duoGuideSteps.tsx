@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react'
-import { DoorOpen, Hand, Heart, Keyboard, Lock, MessageCircle, Smartphone, Sparkles, Sun, Users } from 'lucide-react'
-import { At, Item, Scene, Tag, strong } from '../true-false-maze/TrueFalseMazeGuide'
+import { Hand, Heart, Keyboard, Lock, MessageCircle, Smartphone, Sparkles, Sun, Users } from 'lucide-react'
+import { At, Item, Scene, Tag } from '../true-false-maze/TrueFalseMazeGuide'
 import { loop } from '../tutorial/guideSteps'
 import type { GuideStep } from '../tutorial/GameGuide'
 import '../tutorial/gameGuides.css'
@@ -214,19 +214,14 @@ export function duoGuideSteps(): GuideStep[] {
   return [
     {
       id: 'mision',
-      title: 'Misión: ¡crucen juntos los escenarios!',
+      title: '¡Crucen juntos!',
       art: <SceneMission />,
       body: (
         <>
-          <p>
-            Juegan <b className={strong('text-amber-300')}>en pareja, cada uno desde su dispositivo</b>. Recorren el Bosque y la Planta solar superando obstáculos que solo se pasan ayudándose.
-          </p>
+          <p className="text-[1.15em] text-white">Juegan en pareja, cada uno en su dispositivo.</p>
           <ul className="flex flex-col gap-2.5">
             <Item icon={<Users className="h-4 w-4" />} tone="amber">
-              Uno crea la sala y el otro entra con el <b className="text-white">código o el enlace</b>.
-            </Item>
-            <Item icon={<DoorOpen className="h-4 w-4" />} tone="violet">
-              Cada tramo termina en una <b className="text-white">Puerta del Saber</b>: el último es el portal.
+              Entra con el <b className="text-white">código</b>
             </Item>
           </ul>
         </>
@@ -234,22 +229,17 @@ export function duoGuideSteps(): GuideStep[] {
     },
     {
       id: 'personajes',
-      title: 'Cada uno tiene su elemento',
+      title: 'Cada uno, su elemento',
       art: <SceneCharacters />,
       body: (
-        <>
-          <p>
-            <b className="text-amber-300">Lumen</b> (fuego) nada en la lava y el agua lo apaga. <b className="text-sky-300">Gota</b> (agua) nada en el agua y la lava la evapora.
-          </p>
-          <ul className="flex flex-col gap-2.5">
-            <Item icon={<Sparkles className="h-4 w-4" />} tone="emerald">
-              Usen su elemento: cada uno llega a lugares a los que el otro <b className="text-white">no puede ir</b>.
-            </Item>
-            <Item icon={<Heart className="h-4 w-4" />} tone="rose">
-              Si se apagan, vuelven al último punto seguro: no pierden corazones.
-            </Item>
-          </ul>
-        </>
+        <ul className="flex flex-col gap-2.5">
+          <Item icon={<Sparkles className="h-4 w-4" />} tone="amber">
+            <b className="text-amber-300">Lumen</b> nada en lava
+          </Item>
+          <Item icon={<Sparkles className="h-4 w-4" />} tone="cyan">
+            <b className="text-sky-300">Gota</b> nada en agua
+          </Item>
+        </ul>
       ),
     },
     {
@@ -259,50 +249,39 @@ export function duoGuideSteps(): GuideStep[] {
       body: (
         <ul className="flex flex-col gap-2.5">
           <Item icon={<Keyboard className="h-4 w-4" />} tone="violet">
-            Computador: <b className="text-white">flechas ← →</b> para moverte y <b className="text-white">↑</b> (o espacio) para saltar. ↓ baja de las ramas.
+            <b className="text-white">← →</b> moverse · <b className="text-white">↑</b> saltar
           </Item>
           <Item icon={<Smartphone className="h-4 w-4" />} tone="cyan">
-            Celular: botones <b className="text-white">◀ ▶</b> a la izquierda y <b className="text-white">saltar</b> a la derecha (mejor con el celular acostado).
-          </Item>
-          <Item icon={<MessageCircle className="h-4 w-4" />} tone="amber">
-            Mensajes rápidos (😊, teclas 1 a 6) y chat para ponerse de acuerdo.
+            Celular: <b className="text-white">botones en pantalla</b>
           </Item>
         </ul>
       ),
     },
     {
       id: 'cooperar',
-      title: 'Ayúdense con los mecanismos',
+      title: 'Ayúdense',
       art: <SceneCooperate />,
       body: (
         <ul className="flex flex-col gap-2.5">
           <Item icon={<Hand className="h-4 w-4" />} tone="emerald">
-            <b className="text-white">Botones</b>: funcionan mientras alguien los pisa. <b className="text-white">Palancas</b>: quedan activas.
+            Pisa <b className="text-white">botones</b> y <b className="text-white">palancas</b>
           </Item>
           <Item icon={<Sun className="h-4 w-4" />} tone="amber">
-            <b className="text-white">Espejos</b>: acércate y gíralos con ◀ ▶ (o E) hasta que la luz llegue al receptor.
-          </Item>
-          <Item icon={<Sparkles className="h-4 w-4" />} tone="violet">
-            Empujen <b className="text-white">cajas</b> para trepar y súbanse a tiempo a las <b className="text-white">plataformas móviles</b>.
+            Gira los <b className="text-white">espejos</b> con <b className="text-white">E</b>
           </Item>
         </ul>
       ),
     },
     {
       id: 'puertas',
-      title: 'Puertas del Saber: aciertan los dos',
+      title: 'Puertas del Saber',
       art: <SceneGate />,
       body: (
         <>
-          <p>
-            Párense <b className={strong('text-violet-300')}>cada uno en su pedestal</b> y aparece la pregunta. Respondan en secreto: solo pasan si <b className="text-white">los dos aciertan</b>.
-          </p>
+          <p className="text-[1.15em] text-white">Cada uno responde su pregunta. Pasan si aciertan los dos.</p>
           <ul className="flex flex-col gap-2.5">
-            <Item icon={<DoorOpen className="h-4 w-4" />} tone="violet">
-              Tres formatos: <b className="text-white">espejo</b> (la misma pregunta), <b className="text-white">dividida</b> (cada uno ve un dato) y <b className="text-white">dos partes</b>.
-            </Item>
             <Item icon={<MessageCircle className="h-4 w-4" />} tone="cyan">
-              En la dividida, cuéntense por el chat lo que ve cada uno.
+              Ayúdense por el <b className="text-white">chat</b>
             </Item>
           </ul>
         </>
@@ -310,18 +289,15 @@ export function duoGuideSteps(): GuideStep[] {
     },
     {
       id: 'corazones',
-      title: 'Corazones y fichas de pista',
+      title: 'Corazones y pistas',
       art: <SceneHearts />,
       body: (
         <ul className="flex flex-col gap-2.5">
           <Item icon={<Heart className="h-4 w-4" />} tone="rose">
-            Tienen <b className="text-white">3 corazones compartidos</b>: cada respuesta equivocada cuesta uno y vuelven a intentarlo.
+            Fallar: <b className="text-white">−1 corazón</b>
           </Item>
           <Item icon={<Lock className="h-4 w-4" />} tone="emerald">
-            Las <b className="text-white">fichas</b> del camino destapan pistas para la puerta de su tramo.
-          </Item>
-          <Item icon={<Sparkles className="h-4 w-4" />} tone="amber">
-            Al ganar un escenario, votan para pasar <b className="text-white">al siguiente</b>.
+            Las fichas dan <b className="text-white">pistas</b>
           </Item>
         </ul>
       ),

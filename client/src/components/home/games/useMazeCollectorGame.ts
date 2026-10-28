@@ -69,6 +69,8 @@ export type MazeAnswer = { letter: string; text: string; correct: boolean; pos: 
 export type ActiveQuestion = { id: number; question: string; answers: MazeAnswer[] }
 /** Lo último que pasó con una respuesta, para el aviso en pantalla (`id` cambia con cada intento). */
 export type AnswerFeedback = { id: number; kind: 'correct' | 'wrong' | 'timeout'; letter: string }
+/** Por qué se perdió la última vida (se muestra en la pantalla final, no en un aviso aparte). */
+export type LostReason = 'wrong' | 'timeout' | 'caught'
 /** Tiempo para llegar a la respuesta correcta; solo corre mientras se juega (no en pausa ni con la pregunta en pantalla). */
 export const QUESTION_TIME_MS = 15000
 /**
@@ -189,6 +191,7 @@ type InternalState = {
   question: ActiveQuestion | null
   answeredCorrect: number
   answerFeedback: AnswerFeedback | null
+  lostReason: LostReason | null
   /** Momento (reloj del juego) en que se acaba el tiempo de la pregunta; null = todavía no empezó a correr. */
   questionDeadline: number | null
   /** Hasta cuándo dura el aviso de la última respuesta; mientras tanto nada se mueve. */
@@ -420,6 +423,9 @@ function resolveAnswer(state: InternalState, layout: MazeLayoutDef, answer: Maze
   state.lives -= 1
   if (state.lives <= 0) {
     state.phase = 'lost'
+    state.lostReason = 'wrong'
+    state.answerFeedback = null
+    state.feedbackUntil = null
     return
   }
   state.player = resetPlayer(layout)
@@ -435,7 +441,11 @@ function questionTimedOut(state: InternalState, layout: MazeLayoutDef, now: numb
   state.feedbackUntil = now + ANSWER_FEEDBACK_MS
   state.lives -= 1
   if (state.lives <= 0) {
+    // La última vida: nada de aviso «¡Se acabó el tiempo!» encima; el motivo va en la pantalla final.
     state.phase = 'lost'
+    state.lostReason = 'timeout'
+    state.answerFeedback = null
+    state.feedbackUntil = null
     return
   }
   state.player = resetPlayer(layout)
@@ -489,6 +499,7 @@ function createInitialState(
     question: scenarioQuestion(scenario),
     answeredCorrect: 0,
     answerFeedback: null,
+    lostReason: null,
     questionDeadline: null,
     feedbackUntil: null,
     nextExtraCloudAt: null,
@@ -719,6 +730,7 @@ function resolveGhostCollisions(state: InternalState, layout: MazeLayoutDef) {
     state.lives -= 1
     if (state.lives <= 0) {
       state.phase = 'lost'
+      state.lostReason = 'caught'
       return
     }
     state.player = resetPlayer(layout)
@@ -831,6 +843,7 @@ export type MazeGameSnapshot = {
   question: ActiveQuestion | null
   answeredCorrect: number
   answerFeedback: AnswerFeedback | null
+  lostReason: LostReason | null
   /** Lo que queda para responder (0 si la pregunta no tiene reloj). */
   questionRemainingMs: number
   /** El aviso de la última respuesta sigue en pantalla (el juego está congelado). */
@@ -874,6 +887,7 @@ function toSnapshot(state: InternalState, now: number, cols: number): MazeGameSn
     question: state.question,
     answeredCorrect: state.answeredCorrect,
     answerFeedback: state.answerFeedback,
+    lostReason: state.lostReason,
     extraClouds: state.ghosts.filter((ghost) => ghost.id.startsWith(EXTRA_CLOUD_PREFIX)).length,
     feedbackActive: state.feedbackUntil !== null,
     questionRemainingMs:

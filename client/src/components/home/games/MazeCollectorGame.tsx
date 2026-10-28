@@ -734,7 +734,7 @@ function MazeCollectorSession({
               />
             ))}
         </div>
-        {game.answerFeedback && <AnswerToast key={`answer-${game.answerFeedback.id}`} feedback={game.answerFeedback} />}
+        {game.answerFeedback && game.phase !== 'lost' && <AnswerToast key={`answer-${game.answerFeedback.id}`} feedback={game.answerFeedback} />}
         {cloudAlert > 0 && <CloudAlert key={`cloud-${cloudAlert}`} />}
         {locating && (
           <p
@@ -858,6 +858,11 @@ function MazeCollectorSession({
         <Overlay>
           <SpriteStrip name="truck-hit" frames={1} size={96} className="mx-auto" />
           <h2 className="mt-1 text-[22px] font-bold text-white">Sin batería</h2>
+          {game.lostReason && (
+            <p className="mb-2 text-[15px] font-bold text-rose-300" data-lost-reason={game.lostReason}>
+              {game.lostReason === 'timeout' ? '¡Se acabó el tiempo!' : game.lostReason === 'wrong' ? 'Esa no era la respuesta' : 'Te alcanzó una nube'}
+            </p>
+          )}
           <p className="mb-4 flex items-center justify-center gap-1.5 text-[14px] text-slate-300">
             <img src={mazeSpriteUrl('ui-star')} alt="" className="h-5 w-5" />
             Puntaje final: <b className="text-white">{game.score.toLocaleString('es')}</b>

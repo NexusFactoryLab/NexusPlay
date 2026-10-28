@@ -23,43 +23,34 @@ import { listSubjects as listCategories, type SubjectWithGameCount as CategoryWi
 import { listMyOrganizations, type OrganizationWithMyRole } from '../../../../services/organization.service'
 import { ApiError } from '../../../../utils/http'
 import { DUO_LEVEL_DEFS } from './shared/levels/index'
-import type { DuoQuestionFormat } from './shared/duoTypes'
 import { CHARACTERS } from './duoCharacters'
 
 const PHASES = [{ label: 'Identidad del juego' }, { label: 'Escenarios' }, { label: 'Preguntas' }] as const
 const TOTAL_PHASES = PHASES.length
-const FORMATS: DuoQuestionFormat[] = ['MIRROR', 'SPLIT', 'TWO_PART']
-const FORMAT_LABEL: Record<DuoQuestionFormat, { name: string; help: string; gate: string }> = {
-  MIRROR: { name: 'Pregunta espejo', gate: 'Puerta 1', help: 'Los dos ven la misma pregunta y responden en secreto.' },
-  SPLIT: { name: 'Información dividida', gate: 'Puerta 2', help: 'Cada uno ve un dato distinto: necesitan juntarlos para responder.' },
-  TWO_PART: { name: 'Pregunta en dos partes', gate: 'Portal', help: 'Un problema común; cada uno resuelve su parte.' },
-}
+/** Cada escenario tiene tres puertas: dos Puertas del Saber y el portal final. */
+const GATE_NAMES = ['Puerta 1', 'Puerta 2', 'Portal']
 const LETTERS = ['A', 'B', 'C', 'D']
 
 type OptionSet = { options: string[]; correct: number }
+type Part = { prompt: string; set: OptionSet }
+/** Una puerta: el concepto y una pregunta distinta para cada personaje. */
 type Slot = {
-  prompt: string
-  set: OptionSet
-  clueFire: string
-  clueWater: string
-  fire: { prompt: string; set: OptionSet }
-  water: { prompt: string; set: OptionSet }
+  concept: string
+  fire: Part
+  water: Part
   hints: string[]
   explanation: string
 }
 
 const emptySet = (): OptionSet => ({ options: ['', '', '', ''], correct: 0 })
 const emptySlot = (): Slot => ({
-  prompt: '',
-  set: emptySet(),
-  clueFire: '',
-  clueWater: '',
+  concept: '',
   fire: { prompt: '', set: emptySet() },
   water: { prompt: '', set: emptySet() },
   hints: ['', ''],
   explanation: '',
 })
-const slotKey = (level: string, format: DuoQuestionFormat) => `${level}:${format}`
+const slotKey = (level: string, gate: number) => `${level}:${gate}`
 
 /** La opción correcta va primero: así lo espera el servidor (que baraja al mostrar). */
 function correctFirst(set: OptionSet): string[] {
@@ -73,40 +64,29 @@ function setIsComplete(set: OptionSet): boolean {
 
 /** Una puerta con algo escrito cuenta como pregunta propia; las vacías usan el banco. */
 function slotStarted(slot: Slot | undefined): boolean {
-  return !!slot && !!slot.prompt.trim()
+  return !!slot && !!(slot.concept.trim() || slot.fire.prompt.trim() || slot.water.prompt.trim())
 }
 
-function slotError(slot: Slot, format: DuoQuestionFormat): string | null {
-  if (format === 'TWO_PART') {
-    if (!slot.fire.prompt.trim() || !slot.water.prompt.trim()) return 'escribe la parte de Lumen y la de Gota.'
-    if (!setIsComplete(slot.fire.set) || !setIsComplete(slot.water.set)) return 'cada parte necesita 4 opciones distintas.'
-    return null
-  }
-  if (format === 'SPLIT' && (!slot.clueFire.trim() || !slot.clueWater.trim())) return 'escribe el dato de Lumen y el de Gota.'
-  if (!setIsComplete(slot.set)) return 'necesita 4 opciones distintas.'
+function slotError(slot: Slot): string | null {
+  if (!slot.concept.trim()) return 'escribe el concepto.'
+  if (!slot.fire.prompt.trim() || !slot.water.prompt.trim()) return `escribe la pregunta de ${CHARACTERS.FIRE.name} y la de ${CHARACTERS.WATER.name}.`
+  if (slot.fire.prompt.trim().toLowerCase() === slot.water.prompt.trim().toLowerCase()) return 'las dos preguntas deben ser distintas.'
+  if (!setIsComplete(slot.fire.set) || !setIsComplete(slot.water.set)) return 'cada pregunta necesita 4 opciones distintas.'
   return null
 }
 
-function toQuestion(level: string, format: DuoQuestionFormat, slot: Slot, index: number) {
-  const base = {
+function toQuestion(level: string, slot: Slot, index: number) {
+  return {
     id: `propia-${index + 1}`,
     level,
-    format,
-    prompt: slot.prompt.trim(),
+    concept: slot.concept.trim(),
+    parts: {
+      FIRE: { prompt: slot.fire.prompt.trim(), options: correctFirst(slot.fire.set) },
+      WATER: { prompt: slot.water.prompt.trim(), options: correctFirst(slot.water.set) },
+    },
     hints: slot.hints.map((h) => h.trim()).filter(Boolean),
     explanation: slot.explanation.trim() || undefined,
   }
-  if (format === 'TWO_PART') {
-    return {
-      ...base,
-      parts: {
-        FIRE: { prompt: slot.fire.prompt.trim(), options: correctFirst(slot.fire.set) },
-        WATER: { prompt: slot.water.prompt.trim(), options: correctFirst(slot.water.set) },
-      },
-    }
-  }
-  if (format === 'SPLIT') return { ...base, clues: { FIRE: slot.clueFire.trim(), WATER: slot.clueWater.trim() }, options: correctFirst(slot.set) }
-  return { ...base, options: correctFirst(slot.set) }
 }
 
 type Props = {
@@ -130,7 +110,7 @@ export function DuoLogicoGameForm({ onClose, onCreated, onBack, onCategoryCreate
   const [levels, setLevels] = useState<string[]>(DUO_LEVEL_DEFS.map((d) => d.id))
   const [ownQuestions, setOwnQuestions] = useState(false)
   const [slots, setSlots] = useState<Record<string, Slot>>({})
-  const [openSlot, setOpenSlot] = useState<string>(slotKey(DUO_LEVEL_DEFS[0].id, 'MIRROR'))
+  const [openSlot, setOpenSlot] = useState<string>(slotKey(DUO_LEVEL_DEFS[0].id, 0))
   const [categories, setCategories] = useState<CategoryWithGameCount[]>([])
   const [categoryId, setCategoryId] = useState('')
   const [organizations, setOrganizations] = useState<OrganizationWithMyRole[]>([])
@@ -200,19 +180,16 @@ export function DuoLogicoGameForm({ onClose, onCreated, onBack, onCategoryCreate
       const list = Array.isArray(value) ? value.map((v) => String(v ?? '')) : []
       return { options: [0, 1, 2, 3].map((i) => list[i] ?? ''), correct: 0 }
     }
+    const perLevel: Record<string, number> = {}
     for (const q of content) {
-      const format = q.format as DuoQuestionFormat
-      if (typeof q.level !== 'string' || !FORMATS.includes(format)) continue
-      const key = slotKey(q.level, format)
-      if (next[key]) continue
-      const clues = (q.clues ?? {}) as Record<string, unknown>
+      if (typeof q.level !== 'string') continue
+      const gate = perLevel[q.level] ?? 0
+      if (gate >= GATE_NAMES.length) continue
+      perLevel[q.level] = gate + 1
       const parts = (q.parts ?? {}) as Record<string, Record<string, unknown> | undefined>
       const hints = Array.isArray(q.hints) ? q.hints.map((h) => String(h ?? '')) : []
-      next[key] = {
-        prompt: String(q.prompt ?? ''),
-        set: asSet(q.options),
-        clueFire: String(clues.FIRE ?? ''),
-        clueWater: String(clues.WATER ?? ''),
+      next[slotKey(q.level, gate)] = {
+        concept: String(q.concept ?? ''),
         fire: { prompt: String(parts.FIRE?.prompt ?? ''), set: asSet(parts.FIRE?.options) },
         water: { prompt: String(parts.WATER?.prompt ?? ''), set: asSet(parts.WATER?.options) },
         hints: [hints[0] ?? '', hints[1] ?? ''],
@@ -229,7 +206,7 @@ export function DuoLogicoGameForm({ onClose, onCreated, onBack, onCategoryCreate
     setSlots((current) => ({ ...current, [key]: patch(current[key] ?? emptySlot()) }))
   }
 
-  const filled = levels.flatMap((level) => FORMATS.filter((f) => slotStarted(slots[slotKey(level, f)])).map((f) => ({ level, format: f })))
+  const filled = levels.flatMap((level) => GATE_NAMES.map((_, gate) => ({ level, gate })).filter(({ gate }) => slotStarted(slots[slotKey(level, gate)])))
 
   function validateIdentity(): string | null {
     if (title.trim().length < 3) return 'El título debe tener al menos 3 caracteres.'
@@ -244,12 +221,12 @@ export function DuoLogicoGameForm({ onClose, onCreated, onBack, onCategoryCreate
 
   function validateQuestions(): string | null {
     if (!ownQuestions) return null
-    for (const { level, format } of filled) {
-      const problem = slotError(slots[slotKey(level, format)], format)
+    for (const { level, gate } of filled) {
+      const problem = slotError(slots[slotKey(level, gate)])
       if (problem) {
-        setOpenSlot(slotKey(level, format))
+        setOpenSlot(slotKey(level, gate))
         const levelTitle = DUO_LEVEL_DEFS.find((d) => d.id === level)?.title ?? level
-        return `${levelTitle} · ${FORMAT_LABEL[format].gate}: ${problem}`
+        return `${levelTitle} · ${GATE_NAMES[gate]}: ${problem}`
       }
     }
     return null
@@ -279,7 +256,7 @@ export function DuoLogicoGameForm({ onClose, onCreated, onBack, onCategoryCreate
     setSubmitting(true)
     setError(null)
     try {
-      const content = ownQuestions ? filled.map(({ level, format }, i) => toQuestion(level, format, slots[slotKey(level, format)], i)) : []
+      const content = ownQuestions ? filled.map(({ level, gate }, i) => toQuestion(level, slots[slotKey(level, gate)], i)) : []
       const game = await createGame(token, {
         title: title.trim(),
         description: description.trim(),
@@ -387,7 +364,7 @@ export function DuoLogicoGameForm({ onClose, onCreated, onBack, onCategoryCreate
         )}
 
         {phase === 2 && (
-          <FormSection icon={MessageCircleQuestion} title="Preguntas de las Puertas del Saber" subtitle="Cada escenario tiene tres puertas, una por formato." tone={3}>
+          <FormSection icon={MessageCircleQuestion} title="Preguntas de las Puertas del Saber" subtitle="En cada puerta, Lumen y Gota responden preguntas distintas del mismo concepto." tone={3}>
             <div data-nx-wide className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Origen de las preguntas">
               {[
                 { own: false, title: 'Usar el banco de preguntas', text: 'Preguntas listas sobre ciudades sostenibles en Colombia, distintas por escenario.' },
@@ -416,8 +393,8 @@ export function DuoLogicoGameForm({ onClose, onCreated, onBack, onCategoryCreate
                       <ListChecks className="h-4 w-4 text-accent" /> {def.title}
                     </p>
                     <div className="flex flex-col gap-2">
-                      {FORMATS.map((format) => {
-                        const key = slotKey(level, format)
+                      {GATE_NAMES.map((gateName, gate) => {
+                        const key = slotKey(level, gate)
                         const slot = slots[key] ?? emptySlot()
                         const open = openSlot === key
                         const started = slotStarted(slots[key])
@@ -425,14 +402,14 @@ export function DuoLogicoGameForm({ onClose, onCreated, onBack, onCategoryCreate
                           <div key={key} className="rounded-2xl border border-border bg-surface">
                             <button type="button" onClick={() => setOpenSlot(open ? '' : key)} className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left" aria-expanded={open}>
                               <span>
-                                <span className="text-[12px] font-bold uppercase text-accent">{FORMAT_LABEL[format].gate}</span>{' '}
-                                <span className="text-[14px] font-semibold text-text-h">{FORMAT_LABEL[format].name}</span>
+                                <span className="text-[12px] font-bold uppercase text-accent">{gateName}</span>{' '}
+                                <span className="text-[14px] font-semibold text-text-h">{slot.concept.trim() || 'Sin concepto'}</span>
                               </span>
                               <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${started ? 'bg-accent/15 text-accent' : 'bg-border/60 text-text'}`}>
                                 {started ? 'Propia' : 'Del banco'}
                               </span>
                             </button>
-                            {open && <SlotEditor format={format} slot={slot} disabled={submitting} onChange={(next) => updateSlot(key, () => next)} />}
+                            {open && <SlotEditor slot={slot} disabled={submitting} onChange={(next) => updateSlot(key, () => next)} />}
                           </div>
                         )
                       })}
@@ -469,44 +446,26 @@ export function DuoLogicoGameForm({ onClose, onCreated, onBack, onCategoryCreate
   )
 }
 
-/** Editor de una puerta: cambia según el formato. */
-function SlotEditor({ format, slot, disabled, onChange }: { format: DuoQuestionFormat; slot: Slot; disabled: boolean; onChange: (slot: Slot) => void }) {
+/** Editor de una puerta: el concepto y la pregunta de cada personaje. */
+function SlotEditor({ slot, disabled, onChange }: { slot: Slot; disabled: boolean; onChange: (slot: Slot) => void }) {
   return (
     <div className="flex flex-col gap-2.5 border-t border-border px-3 pb-3 pt-2.5">
-      <p className="text-[12px] text-text">{FORMAT_LABEL[format].help}</p>
-      <TextField
-        label={format === 'TWO_PART' ? 'Problema común' : format === 'SPLIT' ? 'Pregunta (que necesita los dos datos)' : 'Pregunta'}
-        type="text"
-        value={slot.prompt}
-        disabled={disabled}
-        onChange={(prompt) => onChange({ ...slot, prompt })}
-        onBlur={() => {}}
-      />
-      {format === 'SPLIT' && (
-        <div className="grid gap-2 sm:grid-cols-2">
-          <TextField label={`Dato que solo ve ${CHARACTERS.FIRE.name}`} type="text" value={slot.clueFire} disabled={disabled} onChange={(clueFire) => onChange({ ...slot, clueFire })} onBlur={() => {}} />
-          <TextField label={`Dato que solo ve ${CHARACTERS.WATER.name}`} type="text" value={slot.clueWater} disabled={disabled} onChange={(clueWater) => onChange({ ...slot, clueWater })} onBlur={() => {}} />
-        </div>
-      )}
-      {format === 'TWO_PART' ? (
-        <div className="grid gap-3 lg:grid-cols-2">
-          {(['fire', 'water'] as const).map((who) => (
-            <div key={who} className="rounded-xl border border-border p-2.5">
-              <TextField
-                label={`Parte de ${who === 'fire' ? CHARACTERS.FIRE.name : CHARACTERS.WATER.name}`}
-                type="text"
-                value={slot[who].prompt}
-                disabled={disabled}
-                onChange={(prompt) => onChange({ ...slot, [who]: { ...slot[who], prompt } })}
-                onBlur={() => {}}
-              />
-              <OptionsEditor set={slot[who].set} disabled={disabled} onChange={(set) => onChange({ ...slot, [who]: { ...slot[who], set } })} />
-            </div>
-          ))}
-        </div>
-      ) : (
-        <OptionsEditor set={slot.set} disabled={disabled} onChange={(set) => onChange({ ...slot, set })} />
-      )}
+      <TextField label="Concepto (lo ven los dos)" type="text" value={slot.concept} disabled={disabled} onChange={(concept) => onChange({ ...slot, concept })} onBlur={() => {}} />
+      <div className="grid gap-3 lg:grid-cols-2">
+        {(['fire', 'water'] as const).map((who) => (
+          <div key={who} className="rounded-xl border border-border p-2.5">
+            <TextField
+              label={`Pregunta de ${who === 'fire' ? CHARACTERS.FIRE.name : CHARACTERS.WATER.name}`}
+              type="text"
+              value={slot[who].prompt}
+              disabled={disabled}
+              onChange={(prompt) => onChange({ ...slot, [who]: { ...slot[who], prompt } })}
+              onBlur={() => {}}
+            />
+            <OptionsEditor set={slot[who].set} disabled={disabled} onChange={(set) => onChange({ ...slot, [who]: { ...slot[who], set } })} />
+          </div>
+        ))}
+      </div>
       <div className="grid gap-2 sm:grid-cols-2">
         {[0, 1].map((i) => (
           <TextField

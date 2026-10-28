@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { Check, DoorOpen, Eye, Heart, Lock, MessageCircle, Sparkles, X } from 'lucide-react'
+import { Check, DoorOpen, Heart, Lock, MessageCircle, Sparkles, X } from 'lucide-react'
 import { ChatPanel } from '../ChatPanel'
 import { FitScale } from '../true-false-maze/FitScale'
 import { CHARACTERS } from './duoCharacters'
-import { otherRole, type DuoQuestionFormat, type DuoRole } from './shared/duoTypes'
+import { otherRole, type DuoRole } from './shared/duoTypes'
 import type { DuoRoomView } from './shared/duoProtocol'
 import type { DuoChatMessage } from './useDuoRoom'
 
@@ -11,17 +11,11 @@ const LETTERS = ['A', 'B', 'C', 'D']
 /** Cada letra con su color, como en los botones de un concurso. */
 const LETTER_TONE = ['bg-amber-400 text-amber-950', 'bg-sky-400 text-sky-950', 'bg-emerald-400 text-emerald-950', 'bg-rose-400 text-rose-950']
 
-const FORMAT_INFO: Record<DuoQuestionFormat, { name: string; howTo: string }> = {
-  MIRROR: { name: 'Pregunta espejo', howTo: 'Los dos ven la misma pregunta y responden en secreto.' },
-  SPLIT: { name: 'Información dividida', howTo: 'Cada uno tiene un dato distinto: cuéntenselo por el chat.' },
-  TWO_PART: { name: 'Dos partes', howTo: 'Cada uno resuelve su parte del mismo problema.' },
-}
-
 /**
  * La Puerta del Saber: un panel de juego que siempre cabe en la pantalla
- * (FitScale lo reduce en vez de hacer scroll). Muestra a los dos personajes
- * con su estado, la pregunta con la parte de cada uno, las pistas de las
- * fichas, las opciones y, al responder los dos, qué eligió cada uno.
+ * (FitScale lo reduce en vez de hacer scroll). Cada uno ve solo SU pregunta
+ * (la del compañero es otra, del mismo concepto): el concepto arriba, la
+ * pregunta, las pistas de las fichas, las opciones y el estado de los dos.
  */
 export function DuoQuestionPanel({
   room,
@@ -38,14 +32,12 @@ export function DuoQuestionPanel({
 }) {
   const q = room.question
   const reveal = room.phase === 'REVEAL' ? room.reveal : null
-  const [chatOpen, setChatOpen] = useState(q?.format === 'SPLIT')
+  const [chatOpen, setChatOpen] = useState(false)
   const [readCount, setReadCount] = useState(messages.length)
   if (!q || !room.you) return null
   const meRole = room.you
   const partnerRole = otherRole(meRole)
-  const me = CHARACTERS[meRole]
   const partner = CHARACTERS[partnerRole]
-  const info = FORMAT_INFO[q.format]
   const answered = q.myAnswer !== null
   const lockedHints = q.hintsTotal - q.hints.length
   const unread = Math.max(0, messages.length - readCount)
@@ -61,8 +53,8 @@ export function DuoQuestionPanel({
           </span>
           <div className="min-w-0 flex-1 leading-tight">
             <p className="text-[11px] font-black uppercase tracking-[0.18em] text-violet-300">Puerta del Saber{q.attempt > 1 ? ` · intento ${q.attempt}` : ''}</p>
-            <p className="truncate text-[14px] font-bold text-white">
-              {info.name} <span className="font-normal text-slate-300">· {info.howTo}</span>
+            <p className="truncate text-[15px] font-bold text-white" data-testid="duo-concept">
+              {q.concept}
             </p>
           </div>
           <span className="flex shrink-0 items-center gap-0.5" aria-label={`${room.hearts} corazones`}>
@@ -104,7 +96,7 @@ export function DuoQuestionPanel({
                       {CHARACTERS[role].name}
                       {isMe ? ' (tú)' : ''}
                     </p>
-                    <p className="text-[12px] text-slate-300">{pick ? (pick.correct ? '¡Acertó!' : 'Falló') : done ? 'Ya respondió ✓' : 'Pensando…'}</p>
+                    <p className="text-[12px] text-slate-300">{pick ? (pick.correct ? '¡Acertó!' : 'Falló') : done ? 'Listo ✓' : 'Pensando…'}</p>
                   </div>
                   {pick && (pick.correct ? <Check className="h-5 w-5 text-emerald-300" /> : <X className="h-5 w-5 text-rose-300" />)}
                 </div>
@@ -116,33 +108,6 @@ export function DuoQuestionPanel({
             {q.prompt}
           </h2>
 
-          {q.myClue && (
-            <div className="mx-auto mt-3 max-w-[640px] rounded-2xl border-2 border-dashed border-amber-300/80 bg-amber-400/10 px-4 py-2.5 text-center">
-              <p className="flex items-center justify-center gap-1.5 text-[12px] font-black uppercase tracking-wide text-amber-300">
-                <Eye className="h-4 w-4" /> Solo tú ves este dato
-              </p>
-              <p className="text-[18px] font-bold" data-testid="duo-clue">
-                {q.myClue}
-              </p>
-              <p className="text-[12px] text-amber-200/80">{partner.name} tiene el otro: pídeselo por el chat.</p>
-            </div>
-          )}
-
-          {q.myPrompt && (
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              <div className="rounded-2xl border-2 border-violet-300/70 bg-violet-500/15 px-3 py-2">
-                <p className="text-[12px] font-black uppercase tracking-wide text-violet-300">Tu parte · {me.name}</p>
-                <p className="text-[16px] font-bold" data-testid="duo-my-part">
-                  {q.myPrompt}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-white/15 bg-white/5 px-3 py-2 text-slate-300">
-                <p className="text-[12px] font-black uppercase tracking-wide">La parte de {partner.name}</p>
-                <p className="text-[15px]">{q.partnerPrompt}</p>
-              </div>
-            </div>
-          )}
-
           {(q.hints.length > 0 || lockedHints > 0) && (
             <div className="mt-3 flex flex-wrap justify-center gap-1.5">
               {q.hints.map((hint) => (
@@ -152,7 +117,7 @@ export function DuoQuestionPanel({
               ))}
               {lockedHints > 0 && (
                 <span className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[12px] text-slate-400">
-                  <Lock className="h-3.5 w-3.5" /> {lockedHints === 1 ? '1 pista más' : `${lockedHints} pistas más`} con las fichas
+                  <Lock className="h-3.5 w-3.5" /> +{lockedHints} con fichas
                 </span>
               )}
             </div>
@@ -187,40 +152,24 @@ export function DuoQuestionPanel({
 
           {!reveal && (
             <p className="mt-3 text-center text-[14px] font-semibold text-slate-300" role="status" data-testid="duo-answer-status">
-              {answered
-                ? q.partnerAnswered
-                  ? 'Revelando…'
-                  : `Respuesta guardada. Esperando a ${partner.name}…`
-                : q.partnerAnswered
-                  ? `${partner.name} ya respondió. ¡Te toca!`
-                  : `Elige tu respuesta: ${partner.name} no verá cuál hasta que respondan los dos.`}
+              {answered ? (q.partnerAnswered ? 'Revelando…' : `Esperando a ${partner.name}…`) : q.partnerAnswered ? '¡Te toca!' : 'Los dos deben acertar.'}
             </p>
           )}
 
           {reveal && (
             <div className="mt-4" data-testid="duo-reveal" data-success={reveal.success}>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {[
-                  { who: `${me.name} (tú)`, pick: reveal.mine },
-                  { who: partner.name, pick: reveal.partner },
-                ].map(({ who, pick }) => (
-                  <div key={who} className={`rounded-2xl border-2 px-3 py-2 ${pick.correct ? 'border-emerald-400 bg-emerald-500/15' : 'border-rose-400 bg-rose-500/15'}`}>
-                    <p className="flex items-center gap-1.5 text-[12px] font-black uppercase tracking-wide">
-                      {pick.correct ? <Check className="h-4 w-4 text-emerald-300" /> : <X className="h-4 w-4 text-rose-300" />} {who}
-                    </p>
-                    <p className="text-[16px] font-bold">{pick.option}</p>
-                  </div>
-                ))}
-              </div>
+              <p className={`text-center text-[16px] font-bold ${reveal.mine.correct ? 'text-emerald-300' : 'text-rose-300'}`}>
+                {reveal.mine.correct ? <Check className="mr-1 inline h-5 w-5" /> : <X className="mr-1 inline h-5 w-5" />}
+                {reveal.mine.option}
+              </p>
               {reveal.success ? (
                 <div className="mt-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-3">
-                  <p className="text-[20px] font-black">{reveal.final ? '¡Lo lograron! El portal se abre…' : '¡Los dos acertaron! La puerta se abre.'}</p>
+                  <p className="text-[20px] font-black">{reveal.final ? '¡Portal abierto!' : '¡Puerta abierta!'}</p>
                   {reveal.explanation && <p className="mt-1 text-[15px] text-emerald-50">{reveal.explanation}</p>}
                 </div>
               ) : (
                 <div className="mt-3 rounded-2xl bg-gradient-to-r from-rose-600 to-orange-600 px-4 py-3">
-                  <p className="text-[20px] font-black">{room.hearts > 0 ? `Pierden un corazón. Les quedan ${room.hearts}.` : 'Se acabaron los corazones.'}</p>
-                  {room.hearts > 0 && <p className="mt-1 text-[15px]">Hablen y vuelvan a intentarlo: las opciones cambian de lugar.</p>}
+                  <p className="text-[20px] font-black">{room.hearts > 0 ? `−1 corazón · quedan ${room.hearts}` : 'Sin corazones'}</p>
                 </div>
               )}
             </div>

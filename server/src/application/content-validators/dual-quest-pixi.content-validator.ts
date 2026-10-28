@@ -12,10 +12,11 @@ import type { ContentValidator } from './content-validator.port.js';
  *
  *  - `config.levels`: ids de los escenarios, en el orden de la campaña.
  *  - `content`: preguntas propias (puede ir vacío: se usa el banco por
- *    defecto). Misma forma que el banco del servidor: la primera opción de
- *    cada lista es la correcta (se barajan al mostrarlas).
+ *    defecto). Misma forma que el banco del servidor: un concepto y una
+ *    pregunta distinta para cada personaje; la primera opción de cada lista
+ *    es la correcta (se barajan al mostrarlas).
  */
-const FORMATS = new Set(['MIRROR', 'SPLIT', 'TWO_PART']);
+const MAX_CONCEPT = 80;
 export const DUO_MAX_CUSTOM_QUESTIONS = 45;
 const MAX_PROMPT = 220;
 const MAX_OPTION = 120;
@@ -67,29 +68,16 @@ export class DualQuestPixiContentValidator implements ContentValidator {
       if (ids.has(id)) throw new InvalidGameContentError(`${where} repite su id.`);
       ids.add(id);
       if (typeof raw.level !== 'string' || !levels.includes(raw.level)) throw new InvalidGameContentError(`${where} es de un escenario que el juego no incluye.`);
-      if (!FORMATS.has(raw.format as string)) throw new InvalidGameContentError(`${where} tiene un formato desconocido.`);
       const hintsRaw = Array.isArray(raw.hints) ? raw.hints : [];
       const hints = hintsRaw.filter((h) => typeof h === 'string' && h.trim()).slice(0, 3).map((h, i) => text(h, MAX_HINT, `${where}, pista ${i + 1}`));
       const explanation = typeof raw.explanation === 'string' && raw.explanation.trim() ? text(raw.explanation, MAX_EXPLANATION, `${where}, explicación`) : '¡Muy bien! Los dos acertaron.';
-      const base = { id, level: raw.level, hints, explanation };
-      const prompt = text(raw.prompt, MAX_PROMPT, `${where}, enunciado`);
-      if (raw.format === 'MIRROR') return { ...base, format: 'MIRROR', prompt, options: options(raw.options, where) };
-      if (raw.format === 'SPLIT') {
-        const clues = (raw.clues ?? {}) as Record<string, unknown>;
-        return {
-          ...base,
-          format: 'SPLIT',
-          prompt,
-          clues: { FIRE: text(clues.FIRE, MAX_PROMPT, `${where}, dato de Lumen`), WATER: text(clues.WATER, MAX_PROMPT, `${where}, dato de Gota`) },
-          options: options(raw.options, where),
-        };
-      }
+      const concept = text(raw.concept, MAX_CONCEPT, `${where}, concepto`);
       const parts = (raw.parts ?? {}) as Record<string, Record<string, unknown> | undefined>;
       const part = (role: 'FIRE' | 'WATER', name: string) => ({
         prompt: text(parts[role]?.prompt, MAX_PROMPT, `${where}, parte de ${name}`),
         options: options(parts[role]?.options, `${where}, parte de ${name}`),
       });
-      return { ...base, format: 'TWO_PART', prompt, parts: { FIRE: part('FIRE', 'Lumen'), WATER: part('WATER', 'Gota') } };
+      return { id, level: raw.level, concept, parts: { FIRE: part('FIRE', 'Lumen'), WATER: part('WATER', 'Gota') }, hints, explanation };
     });
   }
 }

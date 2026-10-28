@@ -1,6 +1,6 @@
 import { useRef } from 'react'
 import type { ReactNode } from 'react'
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Footprints, KeyRound, Lightbulb, LightbulbOff, Pointer, Shield, ShieldAlert, Wind, Zap } from 'lucide-react'
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp } from 'lucide-react'
 import { TrueFalseMazeGame } from '../true-false-maze/TrueFalseMazeGame'
 import { parseShipMap } from '../true-false-maze/spaceshipMap'
 import type { ShipMap } from '../true-false-maze/spaceshipMap'
@@ -192,25 +192,15 @@ export function TrueFalseMazeTutorial({ title, onFinish }: { title: string; onFi
       task: 'Mueve el robot con las flechas del teclado.',
       arrowKeys: true,
       taskTouch: 'Mueve el robot con la cruceta o deslizando el dedo.',
-      explain: 'Este es tu robot. Se mueve por los pasillos de la nave y sigue andando hasta que lo hagas girar.',
       success: '¡Así se mueve el robot!',
       art: <ArtTfMove />,
-      points: [
-        { icon: <Footprints className="h-4 w-4" />, tone: 'cyan', text: <>Prueba las <b className="text-white">cuatro direcciones</b>: arriba, abajo, izquierda y derecha.</> },
-        { icon: <Pointer className="h-4 w-4" />, tone: 'violet', text: <>En el celular, usa la <b className="text-white">cruceta</b> o desliza el dedo.</> },
-      ],
       render: task(MOVE, CALM, (state, _events, memo, context) => movedEveryWay(state, memo, context.setStatus), undefined, <DirectionProgress used={new Set()} />),
     },
     {
       title: 'Esquiva a la medusa',
       task: 'Cruza de izquierda a derecha hasta la puerta sin que la medusa te toque.',
-      explain: 'Las medusas galácticas recorren la nave. Si te tocan, pierdes una batería. Mira hacia dónde va y pasa cuando se aleje.',
       success: '¡Cruzaste sin que te atrapara!',
       art: <ArtTfCorridor />,
-      points: [
-        { icon: <ShieldAlert className="h-4 w-4" />, tone: 'rose', text: <>Si la medusa te toca, <b className="text-white">pierdes una batería</b>.</> },
-        { icon: <KeyRound className="h-4 w-4" />, tone: 'emerald', text: <>Llega a la <b className="text-white">puerta</b>: se abre apenas estés ahí.</> },
-      ],
       render: task(
         CORRIDOR,
         { ...CALM, enemyCount: 1 },
@@ -222,13 +212,8 @@ export function TrueFalseMazeTutorial({ title, onFinish }: { title: string; onFi
     {
       title: 'Aturde a la medusa',
       task: 'Toma el núcleo de energía (la esfera brillante) y luego toca a la medusa mientras está aturdida.',
-      explain: 'Los núcleos de energía lanzan un pulso: por unos segundos las medusas quedan aturdidas y si las tocas, vuelven a su nido y ganas puntos.',
       success: '¡Medusa aturdida y de vuelta a su nido!',
       art: <ArtTfCore />,
-      points: [
-        { icon: <Zap className="h-4 w-4" />, tone: 'cyan', text: <>El <b className="text-white">núcleo de energía</b> lanza un pulso que aturde a las medusas.</> },
-        { icon: <Shield className="h-4 w-4" />, tone: 'amber', text: <>Aturdidas, <b className="text-white">tócalas</b>: vuelven a su nido y sumas puntos.</> },
-      ],
       render: task(
         CORE,
         { ...CALM, enemyCount: 1 },
@@ -242,25 +227,15 @@ export function TrueFalseMazeTutorial({ title, onFinish }: { title: string; onFi
     {
       title: 'Usa la rejilla',
       task: 'Entra a la rejilla de ventilación para pasar al otro lado del muro.',
-      explain: 'Las rejillas están conectadas de dos en dos: entras por una y sales por la otra. Sirven para escapar o llegar más rápido.',
       success: '¡Atravesaste la nave por la rejilla!',
       art: <ArtTfVent />,
-      points: [
-        { icon: <Wind className="h-4 w-4" />, tone: 'cyan', text: <>Las rejillas vienen <b className="text-white">de dos en dos</b>: entras por una y sales por la otra.</> },
-        { icon: <Zap className="h-4 w-4" />, tone: 'violet', text: <>Sirven para <b className="text-white">escapar</b> o llegar más rápido.</> },
-      ],
       render: task(VENT, CALM, (_state, events) => events.some((event) => event.type === 'vent')),
     },
     {
       title: 'Apagón',
       task: 'Se apagan las luces: recorre los pasillos hasta la puerta de abajo a la derecha.',
-      explain: 'A veces hay un apagón y solo ves alrededor del robot. Avanza con calma: las luces vuelven en unos segundos.',
       success: '¡Llegaste a oscuras!',
       art: <ArtTfDark />,
-      points: [
-        { icon: <LightbulbOff className="h-4 w-4" />, tone: 'amber', text: <>En un <b className="text-white">sabotaje</b> solo ves cerca del robot.</> },
-        { icon: <Lightbulb className="h-4 w-4" />, tone: 'cyan', text: <>Avanza con calma: <b className="text-white">las luces vuelven</b> en unos segundos.</> },
-      ],
       // El apagón se fuerza enseguida (en el juego llega cuando menos lo esperas).
       render: task(
         DARK,
@@ -274,13 +249,8 @@ export function TrueFalseMazeTutorial({ title, onFinish }: { title: string; onFi
     {
       title: 'Responde con el robot',
       task: 'Mueve el personaje a la respuesta correcta (verdadera o falsa).',
-      explain: 'Así se responde en el juego: lees la afirmación y entras a la sala VERDADERO si es cierta, o a la FALSO si no lo es.',
       success: '¡Correcto! Ya sabes todo lo necesario para la nave.',
       art: <ArtTfAnswer />,
-      points: [
-        { icon: <Zap className="h-4 w-4" />, tone: 'emerald', text: <>Si la afirmación es verdad, ve a <b className="text-emerald-300">VERDADERO</b>; si no, a <b className="text-rose-300">FALSO</b>.</> },
-        { icon: <Lightbulb className="h-4 w-4" />, tone: 'amber', text: <>Una respuesta equivocada cuesta <b className="text-white">una batería</b>.</> },
-      ],
       render: (context) => (
         <TrueFalseMazeGame
           title={title}

@@ -1,4 +1,4 @@
-import type { DuoQuestionFormat, DuoRole, Rect } from './duoTypes.js';
+import type { DuoRole, Rect } from './duoTypes.js';
 
 /** Lado de una celda del mapa, en píxeles de mundo. */
 export const TILE = 64;
@@ -38,7 +38,6 @@ export interface DuoCondition {
 
 export interface DuoGateDef {
   id: string;
-  format: DuoQuestionFormat;
   /** Pedestal de cada personaje: la celda sobre la que se para. */
   pedestals: Record<DuoRole, Cell>;
   /** Barrera que se abre al responder bien; null en el portal final. */

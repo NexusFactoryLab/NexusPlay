@@ -98,7 +98,7 @@ export class DuoLogicoGateway implements OnGatewayDisconnect, OnModuleInit, OnMo
       now: Date.now(),
       // Juegos creados antes del formulario nuevo no traen `levels` ni preguntas propias: van todos los escenarios con el banco.
       campaign: Array.isArray(game.config.levels) ? (game.config.levels as string[]).filter(isDuoLevelId) : undefined,
-      customQuestions: (game.content as Array<Partial<DuoQuestion>>).filter((q): q is DuoQuestion => !!q && typeof q.format === 'string' && typeof q.level === 'string'),
+      customQuestions: (game.content as Array<Partial<DuoQuestion>>).filter((q): q is DuoQuestion => !!q && typeof q.level === 'string' && !!q.parts?.FIRE && !!q.parts?.WATER),
     });
     this.store.create(room);
     await socket.join(this.channel(room));

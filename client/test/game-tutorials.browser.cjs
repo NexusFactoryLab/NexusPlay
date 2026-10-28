@@ -347,6 +347,14 @@ async function guessWhoTutorial(browser, viewport, touch) {
   await question.waitFor()
   assert.equal(await intro.evaluate((el) => el.scrollHeight <= el.clientHeight + 1), true, 'La guía no tiene scroll')
   await page.screenshot({ path: `.scratch/tutorial-quienes-pregunta-${tag}.png` })
+  // Cada aviso grande de turno que aparece queda anotado: deben seguir la historia del tutorial.
+  await page.evaluate(() => {
+    window.turnPops = []
+    new MutationObserver((records) => {
+      for (const record of records)
+        for (const node of record.addedNodes) if (node.nodeType === 1 && node.matches('[data-turn-pop]')) window.turnPops.push(node.getAttribute('data-turn-pop'))
+    }).observe(document.body, { childList: true })
+  })
   await question.getByRole('button', { name: 'Sí' }).click()
 
   const card = page.getByRole('dialog', { name: /Tutorial de/ })
@@ -395,6 +403,8 @@ async function guessWhoTutorial(browser, viewport, touch) {
   await page.getByRole('button', { name: 'Sí, confirmar' }).click()
   await card.getByRole('heading', { name: '¡Tutorial completado!' }).waitFor({ timeout: 6000 })
   await page.screenshot({ path: `.scratch/tutorial-quienes-fin-${tag}.png` })
+  // Tu turno al empezar, el del rival cuando te pregunta y otra vez el tuyo para adivinar (adivinar mal no lo repite).
+  assert.deepEqual(await page.evaluate(() => window.turnPops), ['mine', 'rival', 'mine'], 'Los avisos de turno siguen la historia')
   await card.getByRole('button', { name: /¡A jugar!/ }).click()
   await page.locator('#room').waitFor()
   assert.deepEqual(errors, [])
@@ -422,14 +432,16 @@ async function mazeTimeout(browser) {
   const deadline = Date.now() + 60000
   while (!(await page.getByText('Sin batería').isVisible())) {
     assert.ok(Date.now() < deadline, 'Se pierden todas las vidas en menos de un minuto')
-    most = Math.max(most, await page.getByText('¡Se acabó el tiempo!').count())
+    most = Math.max(most, await page.locator('[role=status]', { hasText: '¡Se acabó el tiempo!' }).count())
     await page.waitForTimeout(150)
   }
   await page.waitForTimeout(ANSWER_FEEDBACK_WAIT)
-  most = Math.max(most, await page.getByText('¡Se acabó el tiempo!').count())
-  assert.ok(most <= 1, `El aviso de tiempo sale una sola vez (salió ${most})`)
-  assert.equal(await page.getByText('¡Se acabó el tiempo!').count(), 0, 'El aviso se quita solo')
+  most = Math.max(most, await page.locator('[role=status]', { hasText: '¡Se acabó el tiempo!' }).count())
+  assert.ok(most <= 1, `El aviso de tiempo sale a lo sumo una vez (salió ${most})`)
+  assert.equal(await page.locator('[role=status]', { hasText: '¡Se acabó el tiempo!' }).count(), 0, 'El aviso se quita solo')
   await page.screenshot({ path: '.scratch/camion-sin-bateria.png' })
+  // El motivo de la derrota va en la pantalla final (no en un aviso aparte antes del puntaje).
+  assert.equal(await page.locator('[data-lost-reason]').count(), 1, 'La pantalla final dice por qué se perdió')
   assert.deepEqual(errors, [])
   console.log('PASS 1366 Camión: se acaba el tiempo sin pantalla completa → un solo aviso que se quita y «Sin batería»')
   await page.close()

@@ -1,8 +1,7 @@
-import { useState } from 'react'
-import { Brain, Check, CircleHelp, Eye, Layers, MessageCircleQuestion, MousePointerClick, Sparkles, Target, Trophy, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { ChatPanel } from '../ChatPanel'
 import { GameThemeBackdrop } from '../GameThemeBackdrop'
-import { MatchBoard, TurnStatusStrip } from '../MatchBoard'
+import { MatchBoard, TurnPopBanner, TurnStatusStrip } from '../MatchBoard'
 import { MIN_DISCARDS_TO_ACCUSE } from '../guessWhoTypes'
 import type { GuessWhoCard, GuessWhoChatMessage, GuidedQuestion, PendingQuestion, RoomPlayerView } from '../guessWhoTypes'
 import { TutorialRunner } from './TutorialRunner'
@@ -84,7 +83,7 @@ type Setup = {
 }
 
 /** La pantalla de la partida (con el fondo del tema), en el estado de una parte del tutorial. */
-function TutorialMatch({ setup, goal, context }: { setup: Setup; goal: Goal; context: TutorialPartContext }) {
+function TutorialMatch({ setup, goal, context, lastTurn }: { setup: Setup; goal: Goal; context: TutorialPartContext; lastTurn: { current: boolean | null } }) {
   const [discarded, setDiscarded] = useState(setup.discarded)
   const [messages, setMessages] = useState(setup.messages)
   const [pending, setPending] = useState(setup.pending)
@@ -93,6 +92,14 @@ function TutorialMatch({ setup, goal, context }: { setup: Setup; goal: Goal; con
   // tutorial bloquea «¡Creo que es esta!», así que sin esto no quedaba forma de volver a elegir.
   const [guessTries, setGuessTries] = useState(0)
   const isMyTurn = setup.isMyTurn && !pending
+  // El aviso grande de turno sale solo cuando el turno cambia de verdad (no cada vez que una parte
+  // vuelve a montar el tablero) y ya jugando, no detrás de la tarjeta de instrucciones.
+  const [turnPop, setTurnPop] = useState(0)
+  useEffect(() => {
+    if (!context.active || lastTurn.current === isMyTurn) return
+    lastTurn.current = isMyTurn
+    setTurnPop((n) => n + 1)
+  }, [context.active, isMyTurn, lastTurn])
   // Cada parte avisa su logro una sola vez (un segundo toque no la repite).
   const [finished, setFinished] = useState(false)
   const finish = (delay = 500) => {
@@ -160,6 +167,7 @@ function TutorialMatch({ setup, goal, context }: { setup: Setup; goal: Goal; con
     <div className="tut-lock fixed inset-0 z-50 overflow-y-auto bg-bg" data-tut-goal={goal}>
       <style>{lockCss(goal)}</style>
       <GameThemeBackdrop />
+      {turnPop > 0 && <TurnPopBanner key={turnPop} isMyTurn={isMyTurn} opponentName={RIVAL} />}
       {/* Las tarjetas que faltan por descartar laten para que se vea cuáles tocar. */}
       {(goal === 'discard' || goal === 'discard-one') && (
         <style>{NOT_FLYING.filter((id) => !discarded.includes(id)).map((id) => `[data-card-id="${id}"]`).join(',') + ' { border-radius: 10px; z-index: 3; } @media (prefers-reduced-motion: no-preference) { ' + NOT_FLYING.filter((id) => !discarded.includes(id)).map((id) => `[data-card-id="${id}"]`).join(',') + ' { animation: gg-focus 1.3s ease-in-out infinite; } }'}</style>
@@ -187,6 +195,7 @@ function TutorialMatch({ setup, goal, context }: { setup: Setup; goal: Goal; con
               onSecretCardClick={goal === 'secret' ? () => finish(700) : undefined}
               onAccuseOpen={goal === 'open-guess' ? () => finish(500) : undefined}
               startAccusing={goal === 'guess'}
+              showTurnPop={false}
               fitHeight
             />
           </div>
@@ -222,67 +231,44 @@ export function GuessWhoTutorial({ tournament, onFinish }: { tournament: boolean
     messages: [...flyAnswer, message(SELF_ID, '¿Sale de noche?', 3), message(RIVAL_ID, 'Sí', 4)],
     pending: null,
   }
-  const play = (goal: Goal, setup: Setup): TutorialPart['render'] => (context) => <TutorialMatch goal={goal} context={context} setup={setup} />
+  // De quién era el turno al terminar la parte anterior: así el aviso solo sale cuando cambia.
+  const lastTurn = useRef<boolean | null>(null)
+  const play = (goal: Goal, setup: Setup): TutorialPart['render'] => (context) => <TutorialMatch goal={goal} context={context} setup={setup} lastTurn={lastTurn} />
 
   const parts: TutorialPart[] = [
     {
       title: 'Mira tu tarjeta secreta',
       task: 'Toca tu tarjeta en «Tú eres…» (a la izquierda).',
-      explain: 'Cada jugador tiene una tarjeta secreta: tu rival tiene que adivinar la tuya. Solo tú puedes verla.',
       success: '¡Esa es tu tarjeta! Recuérdala para responder con la verdad.',
       art: <ArtGwSecret />,
-      points: [
-        { icon: <Eye className="h-4 w-4" />, tone: 'violet', text: <>Tu tarjeta aparece en <b className="text-white">«Tú eres…»</b>.</> },
-        { icon: <Target className="h-4 w-4" />, tone: 'rose', text: <>Tu meta: adivinar <b className="text-white">la de tu rival</b>.</> },
-      ],
       render: play('secret', { isMyTurn: true, discarded: [], messages: [], pending: null }),
     },
     {
       title: 'Haz una pregunta',
       task: 'En el chat, elige una de las preguntas sugeridas.',
-      explain: 'En tu turno le preguntas cosas a tu rival que se respondan con Sí o No.',
       success: '¡Eso es! Cada respuesta es una pista para descartar.',
       art: <ArtGwAsk />,
-      points: [
-        { icon: <MessageCircleQuestion className="h-4 w-4" />, tone: 'violet', text: <>Elige una <b className="text-white">pregunta sugerida</b> del chat.</> },
-        { icon: <Brain className="h-4 w-4" />, tone: 'cyan', text: <>Tu rival responde <b className="text-white">Sí o No</b>.</> },
-      ],
       render: play('ask', { isMyTurn: true, discarded: [], messages: [], pending: null }),
     },
     {
       title: 'Descarta una tarjeta',
       task: 'Tu rival dijo que su tarjeta vuela: toca una tarjeta que NO vuele (el Pez, el Pulpo o la Tortuga).',
-      explain: 'Con cada respuesta descartas las tarjetas que ya no pueden ser. Tócalas en tu tablero para apagarlas.',
       success: '¡Descartada! Se apagó en tu tablero.',
       art: <ArtGwDiscard />,
-      points: [
-        { icon: <X className="h-4 w-4" />, tone: 'rose', text: <>Toca una tarjeta para <b className="text-white">apagarla</b>.</> },
-        { icon: <MousePointerClick className="h-4 w-4" />, tone: 'amber', text: <>Se puede <b className="text-white">volver a encender</b> con otro toque.</> },
-      ],
       render: play('discard-one', { isMyTurn: true, discarded: [], messages: flyAnswer, pending: null }),
     },
     {
       title: 'Descarta todas las que no encajan',
       task: 'Descarta las tarjetas que faltan y que NO vuelan.',
-      explain: 'Entre más descartes, menos opciones quedan. ¡Para poder adivinar necesitas descartar al menos 3!',
       success: `¡Bien! Ya descartaste las que no vuelan: con ${MIN_DISCARDS_TO_ACCUSE} o más ya puedes adivinar.`,
       art: <ArtGwDiscard />,
-      points: [
-        { icon: <Layers className="h-4 w-4" />, tone: 'violet', text: <>Cada vez quedan <b className="text-white">menos tarjetas</b>.</> },
-        { icon: <Check className="h-4 w-4" />, tone: 'emerald', text: <>Descarta <b className="text-white">3 o más</b> para poder adivinar.</> },
-      ],
       render: play('discard', { isMyTurn: true, discarded: ['pez'], messages: flyAnswer, pending: null }),
     },
     {
       title: 'Responde a tu rival',
       task: 'Tu rival te preguntó algo: mira tu tarjeta y responde Sí o No en el chat.',
-      explain: 'En el turno del rival, él te pregunta a ti. Mira tu tarjeta secreta («Tú eres…») y responde con la verdad.',
       success: '¡Correcto! Responder bien es parte del juego limpio.',
       art: <ArtGwAnswer />,
-      points: [
-        { icon: <Eye className="h-4 w-4" />, tone: 'violet', text: <>Mira <b className="text-white">tu tarjeta</b> antes de responder.</> },
-        { icon: <Check className="h-4 w-4" />, tone: 'emerald', text: <>Responde con la <b className="text-white">verdad</b>: el juego te avisa si no coincide.</> },
-      ],
       render: play('answer', {
         isMyTurn: false,
         discarded: NOT_FLYING,
@@ -293,27 +279,15 @@ export function GuessWhoTutorial({ tournament, onFinish }: { tournament: boolean
     {
       title: 'Cuando estés seguro, ¡adivina!',
       task: 'Toca el botón «¡Creo que es esta!».',
-      explain: 'Con 3 o más tarjetas descartadas y en tu turno, puedes intentar adivinar la tarjeta de tu rival.',
       success: '¡Muy bien! Se abrió la selección para adivinar.',
       art: <ArtGwGuess />,
-      points: [
-        { icon: <Sparkles className="h-4 w-4" />, tone: 'violet', text: <>El botón <b className="text-white">«¡Creo que es esta!»</b> está a la izquierda.</> },
-        { icon: <CircleHelp className="h-4 w-4" />, tone: 'amber', text: <>Solo se activa <b className="text-white">en tu turno</b>.</> },
-      ],
       render: play('open-guess', near),
     },
     {
       title: tournament ? 'Elige y avanza en el torneo' : 'Elige la tarjeta y confirma',
       task: 'Vuela, sale de noche y tiene plumas: elige la tarjeta de tu rival y confirma con «Sí, confirmar».',
-      explain: tournament
-        ? 'Elige la tarjeta que crees que tiene tu rival y confirma. Si aciertas, ganas el duelo y pasas a la siguiente ronda.'
-        : 'Elige la tarjeta que crees que tiene tu rival y confirma. Si aciertas, ganas la partida; si fallas, pierdes el turno.',
       success: tournament ? '¡Acertaste! En el torneo pasarías a la siguiente ronda.' : '¡Acertaste! Gana quien adivina primero.',
       art: <ArtGwGuess />,
-      points: [
-        { icon: <Target className="h-4 w-4" />, tone: 'rose', text: <>Elige <b className="text-white">una sola tarjeta</b> y confirma.</> },
-        { icon: <Trophy className="h-4 w-4" />, tone: 'emerald', text: tournament ? <>Ganar el duelo te lleva a <b className="text-white">la siguiente ronda</b>.</> : <>Si aciertas, <b className="text-white">ganas</b>.</> },
-      ],
       render: play('guess', near),
     },
   ]

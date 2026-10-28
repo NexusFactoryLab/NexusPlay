@@ -1,4 +1,4 @@
-import type { DuoClientState, DuoEmote, DuoQuestionFormat, DuoRole, DuoSnapshot } from './duoTypes.js';
+import type { DuoClientState, DuoEmote, DuoRole, DuoSnapshot } from './duoTypes.js';
 
 /**
  * Mensajes del socket de Dúo Lógico (namespace /rooms). El servidor manda
@@ -51,14 +51,10 @@ export interface DuoPlayerView {
 
 export interface DuoQuestionView {
   gateId: string;
-  format: DuoQuestionFormat;
-  /** Enunciado común (en TWO_PART, el problema que comparten). */
+  /** El concepto que une las dos preguntas (lo ven los dos). */
+  concept: string;
+  /** La pregunta de este jugador (la del compañero es otra y no se envía). */
   prompt: string;
-  /** SPLIT: el dato que solo ve este jugador. */
-  myClue?: string;
-  /** TWO_PART: la parte que resuelve este jugador y la del compañero. */
-  myPrompt?: string;
-  partnerPrompt?: string;
   /** Opciones de este jugador, ya barajadas. */
   options: string[];
   hints: string[];

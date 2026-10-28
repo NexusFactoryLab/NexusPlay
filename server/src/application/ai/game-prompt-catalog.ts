@@ -405,24 +405,20 @@ const DUAL_QUEST_PIXI_SPEC: GamePromptSpec = {
 (Lumen y Gota) recorren escenarios y en cada "Puerta del Saber" responden una pregunta: solo avanzan
 si los DOS aciertan. Los escenarios ya existen: ${DUO_LEVEL_LIST}.
 1. En "config.levels" pon los ids de TODOS los escenarios, en ese orden.
-2. En "content" escribe EXACTAMENTE 3 preguntas por escenario, una de cada formato:
-   - "MIRROR": la misma pregunta para los dos ("prompt" y 4 "options").
-   - "SPLIT": cada uno ve solo un dato ("clues": {"FIRE": ..., "WATER": ...}) y necesitan juntar los dos
-     para responder "prompt" (4 "options"). Ninguno de los dos datos por sí solo da la respuesta.
-   - "TWO_PART": un problema común en "prompt" y una parte para cada uno en "parts" (cada parte con su
-     propio "prompt" y 4 "options").
+2. En "content" escribe EXACTAMENTE 3 preguntas por escenario. Cada pregunta tiene un "concept" corto
+   (el tema que une a los dos) y en "parts" una pregunta DISTINTA para cada personaje ("FIRE" es Lumen y
+   "WATER" es Gota), cada una con su "prompt" y 4 "options". Las dos preguntas son del mismo concepto pero
+   no iguales: cada jugador solo ve la suya.
 3. En TODAS las listas de "options", la PRIMERA opción es la correcta (el juego las baraja). Las
    incorrectas deben ser plausibles y distintas entre sí.
 4. Cada pregunta lleva "level" (el id del escenario), 2 "hints" cortas que ayudan sin dar la respuesta
    y una "explanation" breve de lo que se aprende.
-5. Todo sale del texto fuente, en español, claro para estudiantes de colegio. Enunciados de máximo 200
-   caracteres y opciones de máximo 100.`,
+5. Todo sale del texto fuente, en español, claro para estudiantes de colegio. Enunciados de máximo 150
+   caracteres y opciones de máximo 80.`,
   jsonShapeExample: `{
   "config": { "levels": [${DUO_LEVEL_DEFS.map((def) => `"${def.id}"`).join(', ')}] },
   "content": [
-    { "level": "bosque", "format": "MIRROR", "prompt": "¿...?", "options": ["Correcta", "Incorrecta 1", "Incorrecta 2", "Incorrecta 3"], "hints": ["...", "..."], "explanation": "..." },
-    { "level": "bosque", "format": "SPLIT", "prompt": "¿...?", "clues": { "FIRE": "Dato 1", "WATER": "Dato 2" }, "options": ["Correcta", "Incorrecta 1", "Incorrecta 2", "Incorrecta 3"], "hints": ["...", "..."], "explanation": "..." },
-    { "level": "bosque", "format": "TWO_PART", "prompt": "Problema común", "parts": { "FIRE": { "prompt": "¿Parte de Lumen?", "options": ["Correcta", "Incorrecta 1", "Incorrecta 2", "Incorrecta 3"] }, "WATER": { "prompt": "¿Parte de Gota?", "options": ["Correcta", "Incorrecta 1", "Incorrecta 2", "Incorrecta 3"] } }, "hints": ["...", "..."], "explanation": "..." }
+    { "level": "bosque", "concept": "Concepto corto", "parts": { "FIRE": { "prompt": "¿Pregunta de Lumen?", "options": ["Correcta", "Incorrecta 1", "Incorrecta 2", "Incorrecta 3"] }, "WATER": { "prompt": "¿Otra pregunta, de Gota?", "options": ["Correcta", "Incorrecta 1", "Incorrecta 2", "Incorrecta 3"] } }, "hints": ["...", "..."], "explanation": "..." }
   ]
 }`,
   imageRequirement: null,

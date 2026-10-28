@@ -82,4 +82,3 @@ export interface DuoSnapshot {
 export type DuoEmote = 'here' | 'wait' | 'button' | 'go' | 'thanks' | 'idea';
 export const DUO_EMOTES: readonly DuoEmote[] = ['here', 'wait', 'button', 'go', 'thanks', 'idea'];
 
-export type DuoQuestionFormat = 'MIRROR' | 'SPLIT' | 'TWO_PART';
