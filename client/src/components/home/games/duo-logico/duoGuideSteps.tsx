@@ -259,7 +259,7 @@ export function duoGuideSteps(): GuideStep[] {
       body: (
         <ul className="flex flex-col gap-2.5">
           <Item icon={<Keyboard className="h-4 w-4" />} tone="violet">
-            Computador: <b className="text-white">flechas o A / D</b> para moverte y <b className="text-white">↑, W o espacio</b> para saltar. ↓ baja de las ramas.
+            Computador: <b className="text-white">flechas ← →</b> para moverte y <b className="text-white">↑</b> (o espacio) para saltar. ↓ baja de las ramas.
           </Item>
           <Item icon={<Smartphone className="h-4 w-4" />} tone="cyan">
             Celular: botones <b className="text-white">◀ ▶</b> a la izquierda y <b className="text-white">saltar</b> a la derecha (mejor con el celular acostado).

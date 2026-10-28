@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { BarChart3, BookOpen, Bot, Building2, ChevronLeft, FolderOpen, Globe, GraduationCap, House, Plus, SquarePen, Users, Zap } from 'lucide-react'
@@ -34,6 +34,41 @@ const BASE_ITEM_CLASS =
   'flex items-center gap-3 rounded-lg px-3.5 py-2.5 text-[14px] font-medium transition-colors'
 
 const STORAGE_KEY = 'nexusplay-sidebar-collapsed'
+/** Lo que dura la animación del ancho del menú (duration-200), con un margen. */
+const TOGGLE_MS = 220
+
+/** Ancho que tendrá el menú en el otro estado (cada tema define el suyo): se prueba sin animación y se deshace. */
+function widthWhenToggled(aside: HTMLElement): number {
+  const classes = ['is-collapsed', 'w-[76px]', 'w-[240px]']
+  const before = aside.style.transition
+  aside.style.transition = 'none'
+  classes.forEach((name) => aside.classList.toggle(name))
+  const width = aside.getBoundingClientRect().width
+  classes.forEach((name) => aside.classList.toggle(name))
+  void aside.offsetWidth
+  aside.style.transition = before
+  return width
+}
+
+/**
+ * Mientras el menú cambia de ancho, la columna de al lado (cabecera + contenido) se fija en su ancho
+ * final, pegada a la derecha: así se calcula una sola vez en vez de en cada cuadro de la animación
+ * (con carruseles y tarjetas eso trababa la animación). El menú se desliza por encima o hacia el hueco.
+ */
+function lockNeighbourDuringToggle(aside: HTMLElement | null, collapsing: boolean) {
+  const column = aside?.nextElementSibling
+  if (!aside || !(column instanceof HTMLElement) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  const delta = Math.abs(aside.getBoundingClientRect().width - widthWhenToggled(aside))
+  const finalWidth = column.getBoundingClientRect().width + (collapsing ? delta : -delta)
+  column.style.flex = `0 0 ${finalWidth}px`
+  column.style.marginLeft = collapsing ? `-${delta}px` : 'auto'
+  aside.style.zIndex = '20'
+  window.setTimeout(() => {
+    column.style.flex = ''
+    column.style.marginLeft = ''
+    aside.style.zIndex = ''
+  }, TOGGLE_MS)
+}
 
 function readStoredCollapsed(): boolean {
   try {
@@ -49,6 +84,7 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
   // En móvil el menú desplegable siempre se ve completo (no tiene sentido contraerlo).
   const collapsed = storedCollapsed && !isMobile
   const routerNavigate = useNavigate()
+  const asideRef = useRef<HTMLElement>(null)
   const location = useLocation()
 
   // Al elegir una sección en móvil, el menú se cierra solo.
@@ -67,6 +103,7 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
   }, [mobileOpen, onMobileClose])
 
   function toggleCollapsed() {
+    lockNeighbourDuringToggle(asideRef.current, !storedCollapsed)
     setCollapsed((current) => {
       const next = !current
       try {
@@ -85,6 +122,7 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
     )}
     <aside
       id="app-sidebar"
+      ref={asideRef}
       className={`app-sidebar relative flex shrink-0 flex-col gap-1 border-r border-border bg-bg p-4 transition-[width,transform] duration-200 ease-out max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-50 max-md:w-[min(300px,85vw)] max-md:overflow-y-auto ${
         collapsed ? 'is-collapsed w-[76px]' : 'w-[240px]'
       } ${mobileOpen ? '' : 'max-md:-translate-x-full max-md:invisible'}`}

@@ -89,6 +89,9 @@ function TutorialMatch({ setup, goal, context }: { setup: Setup; goal: Goal; con
   const [messages, setMessages] = useState(setup.messages)
   const [pending, setPending] = useState(setup.pending)
   const [answerHint, setAnswerHint] = useState<string | null>(null)
+  // Cada adivinanza fallida vuelve a montar el tablero con la selección abierta: en esta parte el
+  // tutorial bloquea «¡Creo que es esta!», así que sin esto no quedaba forma de volver a elegir.
+  const [guessTries, setGuessTries] = useState(0)
   const isMyTurn = setup.isMyTurn && !pending
   // Cada parte avisa su logro una sola vez (un segundo toque no la repite).
   const [finished, setFinished] = useState(false)
@@ -147,7 +150,10 @@ function TutorialMatch({ setup, goal, context }: { setup: Setup; goal: Goal; con
   function accuse(cardId: string) {
     if (goal !== 'guess') return
     if (cardId === RIVAL_SECRET) finish(300)
-    else context.onMistake(`No era ${CARDS.find((card) => card.cardId === cardId)?.label}. En el juego perderías el turno. Revisa las respuestas del chat.`)
+    else {
+      context.onMistake(`No era ${CARDS.find((card) => card.cardId === cardId)?.label}. En el juego perderías el turno. Revisa las respuestas del chat.`)
+      setGuessTries((tries) => tries + 1)
+    }
   }
 
   return (
@@ -167,6 +173,7 @@ function TutorialMatch({ setup, goal, context }: { setup: Setup; goal: Goal; con
         <div className="guess-who-play-panels">
           <div className="guess-who-play-board">
             <MatchBoard
+              key={guessTries}
               cards={CARDS}
               self={self}
               opponent={opponent}

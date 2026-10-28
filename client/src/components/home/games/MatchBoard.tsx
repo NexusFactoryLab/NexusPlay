@@ -481,7 +481,7 @@ export function MatchBoard({
             {/* Se muestra la imagen real (no solo el nombre) para que sea
                 más intuitivo y pedagógico: quien juega ve la bandera/tarjeta
                 que su rival debe adivinar, no solo su etiqueta de texto. */}
-            <p className="mt-1 text-[11px] font-bold tracking-wide text-accent-2 uppercase">Tu bandera es</p>
+            <p className="mt-1 text-[11px] font-bold tracking-wide text-accent-2 uppercase">Tu tarjeta oculta es:</p>
             {secretCard?.imageUrl && (
               <div className="relative mt-2">
                 <img

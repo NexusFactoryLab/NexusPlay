@@ -4,6 +4,7 @@ import { Check, GraduationCap, Play, RotateCcw, Target, TriangleAlert, X } from 
 import { FitScale } from '../true-false-maze/FitScale'
 import { Item, strong } from '../true-false-maze/TrueFalseMazeGuide'
 import './gameGuides.css'
+import { ArrowKeysInline } from './ArrowKeysInline'
 import { GUIDE_ACCENTS } from './GameGuide'
 import type { GuideAccent } from './GameGuide'
 
@@ -32,6 +33,8 @@ export type TutorialPart = {
   task: string
   /** La misma tarea para celular o tablet (cruceta, tocar…), si cambia respecto a la de computador. */
   taskTouch?: string
+  /** La tarea es mover al personaje: en computador se dibujan las flechas del teclado junto a ella. */
+  arrowKeys?: boolean
   /** Por qué importa (se lee junto con la tarea al empezar la parte). */
   explain: string
   /** Lo que se dice al lograrla. */
@@ -47,7 +50,7 @@ export type TutorialPart = {
 const CURTAIN_MS = 450
 
 /** Lo que dura el fondo desenfocado con la tarea en grande antes de que el juego arranque. */
-const FOCUS_MS = 3000
+const FOCUS_MS = 3500
 
 type Stage =
   | { kind: 'brief'; previous: { result: 'done' | 'failed'; message: string } | null }
@@ -108,6 +111,7 @@ export function TutorialRunner({
   const part = parts[index]
   const task = touch ? (part.taskTouch ?? part.task) : part.task
   const colors = GUIDE_ACCENTS[accent]
+  const showKeys = !touch && part.arrowKeys
 
   // El «Sí» que abrió el tutorial es el gesto que permite pedir la pantalla completa.
   useEffect(() => {
@@ -197,6 +201,7 @@ export function TutorialRunner({
           <span role="status" className="tour-step-in max-w-[760px] font-heading text-[clamp(1.3rem,4.2dvh+1vw,2.6rem)] leading-tight font-bold text-white drop-shadow-[0_4px_18px_rgba(0,0,0,0.8)]">
             {task}
           </span>
+          {showKeys && <ArrowKeysInline size="lg" />}
           <span className="h-1.5 w-[min(320px,70vw)] overflow-hidden rounded-full bg-white/15" aria-hidden="true">
             <span className="tut-focus-bar block h-full rounded-full bg-cyan-300" style={{ animationDuration: `${FOCUS_MS}ms` }} />
           </span>
@@ -225,7 +230,9 @@ export function TutorialRunner({
                   <TriangleAlert className="h-4 w-4 shrink-0" aria-hidden="true" /> {mistake}
                 </span>
               ) : (
-                task
+                <>
+                  {task} {showKeys && <ArrowKeysInline />}
+                </>
               )}
             </span>
             {status && !mistake && <span className="flex shrink-0 items-center gap-1">{status}</span>}
