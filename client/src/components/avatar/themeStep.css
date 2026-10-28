@@ -102,11 +102,11 @@
 }
 
 .ts-layer { position: fixed; inset: 0; z-index: -10; }
-.ts-layer-in { animation: ts-fade-in 0.32s ease-out both; }
+.ts-layer-in { animation: ts-fade-in 0.42s ease-in-out both; }
 
 @keyframes ts-fade-in {
-  from { opacity: 0; transform: scale(1.02); }
-  to { opacity: 1; transform: scale(1); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* La tarjeta elegida «salta» un poco al tocarla. */

@@ -83,14 +83,14 @@ function Scene({ theme }: { theme: Theme }) {
     )
   }
 
-  return <GameThemeBackdrop />
+  return <GameThemeBackdrop theme={theme} />
 }
 
 /** Tiempo del fundido entre escenas: rápido, solo para que el cambio no sea brusco. */
-const FADE_MS = 320
+const FADE_MS = 420
 
 /**
- * Al cambiar de tema la escena nueva aparece con un fundido (suave, 0.3 s)
+ * Al cambiar de tema la escena nueva aparece con un fundido (suave, 0.4 s)
  * encima de la anterior, que se retira cuando termina.
  */
 export function ThemeStepBackdrop() {
@@ -110,7 +110,9 @@ export function ThemeStepBackdrop() {
   return (
     <>
       {layers.map((layer, index) => (
-        <div key={layer.id} className={index > 0 ? 'ts-layer ts-layer-in' : 'ts-layer'}>
+        // Cada capa lleva su propio tema: los adornos de Pradera y Fantasía se dibujan según el
+        // `data-theme` más cercano, así la escena vieja no se apaga de golpe al cambiar el de la página.
+        <div key={layer.id} data-theme={layer.theme} className={index > 0 ? 'ts-layer ts-layer-in' : 'ts-layer'}>
           <Scene theme={layer.theme} />
         </div>
       ))}
