@@ -51,6 +51,8 @@ export interface DuoRoomPlayer {
   role: DuoRole;
   ready: boolean;
   state: DuoPlayerNet | null;
+  /** Hora en que llegó `state`. */
+  stateAt?: number;
 }
 
 interface ActiveQuestion {
@@ -274,6 +276,7 @@ export function applyClientState(room: DuoRoomState, userId: string, state: DuoC
     anim: ANIMS.includes(s.anim) ? s.anim : 'idle',
     dead: s.dead === true,
   };
+  player.stateAt = now;
   if (!Array.isArray(state.crates)) return;
   for (const update of state.crates.slice(0, room.world.crates.length)) {
     const crate = room.world.crates.find((c) => c.id === update?.id);
@@ -283,6 +286,7 @@ export function applyClientState(room: DuoRoomState, userId: string, state: DuoC
     crate.x = Math.max(0, Math.min(level.widthPx, update.x));
     crate.y = Math.max(-200, Math.min(level.heightPx, update.y));
     crate.owner = player.role;
+    crate.at = now;
     room.crateLeases[crate.id] = now + DUO_CRATE_LEASE_MS;
   }
 }
@@ -534,6 +538,11 @@ export function toDuoRoomView(room: DuoRoomState, userId: string, now: number): 
 
 export function toDuoSnapshot(room: DuoRoomState, now: number): DuoSnapshot {
   const players: DuoSnapshot['players'] = {};
-  for (const p of room.players) if (p.state) players[p.role] = p.state;
-  return { t: now, players, world: room.world };
+  const at: DuoSnapshot['at'] = {};
+  for (const p of room.players) {
+    if (!p.state) continue;
+    players[p.role] = p.state;
+    at[p.role] = p.stateAt ?? now;
+  }
+  return { t: now, players, at, world: room.world };
 }

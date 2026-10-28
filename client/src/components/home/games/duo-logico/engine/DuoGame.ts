@@ -14,6 +14,8 @@ import { SnapshotBuffer } from './snapshotBuffer'
 const SEND_EVERY_MS = 50
 /** Una caja empujada sigue siendo "mía" este tiempo después del último empujón. */
 const CRATE_HOLD_MS = 350
+/** Tras soltar una caja, se espera hasta este tiempo a que el servidor confirme dónde quedó (sin rebotar). */
+const CRATE_SETTLE_MS = 1000
 /** Distancia (px) a la que aparece el panel de un espejo; la misma que acepta el servidor. */
 const MIRROR_REACH = 80
 
@@ -34,7 +36,8 @@ export interface DuoGameOptions {
   level: DuoLevel
   role: DuoRole
   names: Record<DuoRole, string>
-  sendState: (state: { player: DuoPlayerNet; crates: Array<{ id: string; x: number; y: number }> }) => void
+  /** `reliable`: el envío no puede perderse (p. ej. al soltar una caja). */
+  sendState: (state: { player: DuoPlayerNet; crates: Array<{ id: string; x: number; y: number }> }, reliable?: boolean) => void
   onFainted?: (role: DuoRole, cause: DeathCause | null) => void
   /** Cambió el espejo cercano (o su ángulo); null al alejarse. */
   onNearMirror?: (mirror: NearMirror | null) => void
@@ -62,8 +65,13 @@ export class DuoGame {
 
   private me: PlayerSim
   private crates: CrateSim[]
-  private crateTargets = new Map<string, { x: number; y: number }>()
+  /** Cajas que mueve el compañero (o nadie): se interpolan igual que su personaje. */
+  private crateTracks = new Map<string, SnapshotBuffer<{ x: number; y: number }>>()
   private ownedUntil = new Map<string, number>()
+  /** Cajas que acabo de soltar (hora local de cuando las solté). */
+  private releasedAt = new Map<string, number>()
+  /** Cajas que mandé en el último envío, para avisar con un envío seguro cuando las suelto. */
+  private lastSentCrates = new Set<string>()
   private serverWorld: DuoWorldState
   private localWorld: DuoWorldState
   private readonly partner = new SnapshotBuffer()
@@ -157,8 +165,10 @@ export class DuoGame {
       this.runId = runId
       this.me = createPlayer(this.role, standPoint(this.level.def.spawns[this.role]))
       this.crates = this.freshCrates()
-      this.crateTargets.clear()
+      this.crateTracks.clear()
       this.ownedUntil.clear()
+      this.releasedAt.clear()
+      this.lastSentCrates.clear()
       this.serverWorld = this.emptyWorld()
       this.localWorld = this.emptyWorld()
       this.partner.clear()
@@ -181,17 +191,31 @@ export class DuoGame {
     }
     const partner = snapshot.players[otherRole(this.role)]
     if (partner) {
-      this.partner.push(snapshot.t, partner, receivedAt)
+      this.partner.push(snapshot.t, partner, receivedAt, snapshot.at?.[otherRole(this.role)] ?? snapshot.t)
       if (partner.dead && !this.partnerDead) this.options.onFainted?.(otherRole(this.role), null)
       this.partnerDead = partner.dead
     }
     const now = performance.now()
+    const partnerMoves = (owner: DuoRole | null) => owner === otherRole(this.role)
     for (const crate of snapshot.world.crates) {
       const mine = (this.ownedUntil.get(crate.id) ?? 0) > now
       // Si el servidor dice que la mueve el compañero, se le cede aunque yo la estuviera empujando.
-      if (mine && crate.owner !== otherRole(this.role)) continue
+      if (mine && !partnerMoves(crate.owner)) continue
+      const local = this.crates.find((c) => c.id === crate.id)
+      const released = this.releasedAt.get(crate.id)
+      if (released !== undefined && !partnerMoves(crate.owner) && local) {
+        // Recién soltada: el servidor puede traer aún una posición vieja; se espera a que confirme.
+        const confirmed = Math.abs(local.x - crate.x) < 2 && Math.abs(local.y - crate.y) < 2
+        if (!confirmed && now - released < CRATE_SETTLE_MS) continue
+      }
+      this.releasedAt.delete(crate.id)
       this.ownedUntil.delete(crate.id)
-      this.crateTargets.set(crate.id, { x: crate.x, y: crate.y })
+      let track = this.crateTracks.get(crate.id)
+      if (!track) {
+        track = new SnapshotBuffer<{ x: number; y: number }>(this.partner.clock)
+        this.crateTracks.set(crate.id, track)
+      }
+      track.push(snapshot.t, { x: crate.x, y: crate.y }, receivedAt, crate.at ?? snapshot.t)
     }
   }
 
@@ -231,13 +255,14 @@ export class DuoGame {
       if (simulating) this.simulate(now, time - pending * STEP)
     }
 
-    // Cajas que mueve el otro (o nadie): se acercan suave a la posición del servidor.
+    // Cajas que mueve el otro (o nadie): se dibujan en el mismo instante que su personaje.
+    const wallNow = Date.now()
     for (const crate of this.crates) {
-      if ((this.ownedUntil.get(crate.id) ?? 0) > now) continue
-      const target = this.crateTargets.get(crate.id)
+      if ((this.ownedUntil.get(crate.id) ?? 0) > now || this.releasedAt.has(crate.id)) continue
+      const target = this.crateTracks.get(crate.id)?.sample(wallNow)
       if (!target) continue
-      crate.x += (target.x - crate.x) * 0.35
-      crate.y += (target.y - crate.y) * 0.35
+      crate.x = target.x
+      crate.y = target.y
       crate.vy = 0
     }
 
@@ -247,8 +272,15 @@ export class DuoGame {
       this.sinceSend += deltaMs
       if (this.sinceSend >= SEND_EVERY_MS) {
         this.sinceSend = 0
-        const owned = this.crates.filter((c) => (this.ownedUntil.get(c.id) ?? 0) > now).map((c) => ({ id: c.id, x: Math.round(c.x * 10) / 10, y: Math.round(c.y * 10) / 10 }))
-        this.options.sendState({ player: toNet(this.me), crates: owned })
+        const ownedIds = new Set(this.crates.filter((c) => (this.ownedUntil.get(c.id) ?? 0) > now).map((c) => c.id))
+        // Las que acabo de soltar van una última vez, en un envío que no se puede perder.
+        const justReleased = [...this.lastSentCrates].filter((id) => !ownedIds.has(id))
+        for (const id of justReleased) this.releasedAt.set(id, now)
+        const crates = this.crates
+          .filter((c) => ownedIds.has(c.id) || justReleased.includes(c.id))
+          .map((c) => ({ id: c.id, x: Math.round(c.x * 10) / 10, y: Math.round(c.y * 10) / 10 }))
+        this.lastSentCrates = ownedIds
+        this.options.sendState({ player: toNet(this.me), crates }, justReleased.length > 0)
       }
     }
 
@@ -324,7 +356,8 @@ export class DuoGame {
   }
 
   private partnerNow(): DuoPlayerNet | null {
-    return this.partner.sample(performance.now())
+    // El mismo reloj con el que se anotó la llegada de los paquetes (Date.now), no performance.now.
+    return this.partner.sample(Date.now())
   }
 
   private render(now: number, deltaMs: number, time: number): void {

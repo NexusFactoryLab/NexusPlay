@@ -7,6 +7,7 @@ import {
   DUO_REVEAL_SUCCESS_MS,
   answerDuoQuestion,
   applyClientState,
+  toDuoSnapshot,
   chooseRole,
   createDuoRoom,
   disconnectDuoPlayer,
@@ -211,6 +212,17 @@ describe('sala de Dúo Lógico', () => {
     applyClientState(room, 'luis', { player: body(200, 640), crates: [{ id: crate.id, x: x + 50, y: crate.y }] }, now + DUO_CRATE_LEASE_MS + 30);
     expect(crate.owner).toBe('WATER');
     expect(crate.x).toBe(x + 50);
+  });
+
+  it('la instantánea dice cuándo llegó cada posición, para no repetir una vieja como nueva', () => {
+    const { room, now } = playingRoom();
+    const crate = room.world.crates[0];
+    applyClientState(room, 'ana', { player: body(100, 640), crates: [{ id: crate.id, x: crate.x + 10, y: crate.y }] }, now);
+    applyClientState(room, 'luis', { player: body(200, 640), crates: [] }, now + 30);
+    const later = toDuoSnapshot(room, now + 50);
+    expect(later.t).toBe(now + 50);
+    expect(later.at).toEqual({ FIRE: now, WATER: now + 30 });
+    expect(later.world.crates[0].at).toBe(now);
   });
 
   it('ignora posiciones mal formadas', () => {
