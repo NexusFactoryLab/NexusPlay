@@ -126,12 +126,19 @@ async function openGame(browser, game, viewport, touch) {
   return { page, errors }
 }
 
-/** Cada parte empieza con su instrucción en el centro: «Entendido» la cierra y arranca el juego. */
+/**
+ * Cada parte empieza con su instrucción en el centro: «Entendido» la cierra; luego la tarea se lee
+ * en grande sobre el juego desenfocado durante 3 s (se espera completa) y el juego arranca.
+ */
 async function understood(page, part) {
   const card = page.getByRole('dialog', { name: /Tutorial de/ })
   if (part) await card.getByText(part).waitFor({ timeout: 12000 })
   await card.getByRole('button', { name: /Entendido/ }).click()
   await card.waitFor({ state: 'hidden' })
+  const focus = page.getByRole('button', { name: 'Empezar ya' })
+  await focus.waitFor()
+  await page.screenshot({ path: '.scratch/tutorial-enfoque.png' })
+  await focus.waitFor({ state: 'hidden', timeout: 6000 })
 }
 
 const press = async (page, key, wait = 0) => {
@@ -252,6 +259,26 @@ async function tfTutorial(browser, viewport, touch) {
       await understood(page)
     }
     await understood(page, 'Parte 3 de 6')
+    // Bug #112: si la medusa atrapa al robot después de gastar el núcleo, la parte vuelve a empezar
+    // con el núcleo en su lugar (antes el núcleo no reaparecía y la tarea quedaba imposible).
+    await page.waitForTimeout(400)
+    await press(page, 'ArrowUp', 350)
+    await press(page, 'ArrowLeft')
+    await robotAt(1, 1)
+    await page.waitForFunction(() => window.__tfMaze?.state.cores.every((core) => core.taken), null, { timeout: 5000 })
+    await page.evaluate(() => {
+      const state = window.__tfMaze.state
+      state.empUntil = null
+      for (const jelly of state.jellies) {
+        jelly.mode = 'NORMAL'
+        jelly.releaseAt = 0
+      }
+    })
+    await card.getByText('¡La medusa te atrapó! Vuelve a intentarlo').waitFor({ timeout: 20000 })
+    await card.getByText('Parte 3 de 6').waitFor()
+    await page.screenshot({ path: `.scratch/tutorial-tf-medusa-reintento-${tag}.png` })
+    await understood(page)
+    assert.equal(await page.evaluate(() => window.__tfMaze.state.cores.some((core) => !core.taken)), true, 'El núcleo vuelve a aparecer al reintentar')
     // 3. Núcleo arriba a la izquierda y después hacia la medusa, a la derecha.
     // La medusa sale al azar: si alcanza al robot antes de aturdirla, la parte se reintenta desde el principio.
     for (let attempt = 0; attempt < 5; attempt++) {
