@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { CircleHelp, Clock3, Hourglass, SkipForward, Sparkles, Volume2 } from 'lucide-react'
 import { MIN_DISCARDS_TO_ACCUSE, type GuessWhoCard, type RoomPlayerView } from './guessWhoTypes'
 import { CardInfoBubble } from './CardInfoBubble'
@@ -150,18 +151,24 @@ export function TurnPopBanner({
     // "Barajando cartas…" tapaba este aviso durante toda su ventana de 1.7s
     // — el jugador que NO empezaba el turno podía terminar sin ver nunca
     // "Turno de X", aunque el aviso sí se hubiera disparado.
-    <div className="pointer-events-none fixed inset-0 z-[75] flex items-center justify-center p-5">
-      <div
-        className={`rounded-2xl border px-8 py-5 text-center shadow-[var(--shadow)] backdrop-blur-sm animate-[turn-pop-in_0.35s_cubic-bezier(0.16,1,0.3,1),turn-pop-out_0.3s_ease-in_1.35s_forwards] ${
-          isMyTurn ? 'border-accent/50 bg-accent/15' : 'border-border bg-surface/95'
-        }`}
-      >
-        <p className={`text-[22px] font-bold tracking-tight ${isMyTurn ? 'text-accent' : 'text-text-h'}`}>
-          {isMyTurn ? '¡Es tu turno!' : `Turno de ${opponentName}`}
-        </p>
-        {accusationMessage && <p className="mt-1 text-[14px] font-semibold text-danger">{accusationMessage}</p>}
-      </div>
-    </div>
+    // En un portal: el tablero es un contenedor de consultas (`container`), y eso encierra a los
+    // `position: fixed` de adentro; el aviso quedaba recortado dentro del tablero y casi no se veía.
+    createPortal(
+      <div className="pointer-events-none fixed inset-0 z-[75] flex items-center justify-center bg-black/25 p-5" data-turn-pop={isMyTurn ? 'mine' : 'rival'}>
+        <div
+          className={`rounded-3xl border-4 px-10 py-6 text-center text-white animate-[turn-pop-in_0.35s_cubic-bezier(0.16,1,0.3,1),turn-pop-out_0.3s_ease-in_1.35s_forwards] ${
+            isMyTurn ? 'border-white bg-gradient-to-br from-green-600 via-green-500 to-lime-500 shadow-[0_0_60px_rgba(74,222,128,0.7)]' : 'border-white/70 bg-slate-700 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.8)]'
+          }`}
+        >
+          <p className="text-[clamp(1.7rem,4vw,2.6rem)] leading-tight font-black tracking-tight uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.35)]">
+            {isMyTurn ? '¡Es tu turno!' : `Turno de ${opponentName}`}
+          </p>
+          <p className="mt-1 text-[15px] font-semibold text-white/90">{isMyTurn ? 'Pregunta, descarta o adivina.' : 'Espera mientras tu rival juega.'}</p>
+          {accusationMessage && <p className="mt-2 rounded-xl bg-white/90 px-3 py-1 text-[14px] font-bold text-danger">{accusationMessage}</p>}
+        </div>
+      </div>,
+      document.body,
+    )
   )
 }
 
@@ -365,9 +372,8 @@ export function TurnStatusStrip({
       role="status"
       data-turn={isMyTurn ? 'mine' : 'rival'}
       className={`relative min-w-0 overflow-hidden rounded-2xl border-2 transition-colors duration-300 ${compact ? 'px-3 py-1.5' : 'px-4 py-3'} ${
-        isMyTurn ? 'border-transparent text-white shadow-[0_12px_28px_-14px_var(--accent)]' : 'border-dashed border-border bg-surface text-text-h'
+        isMyTurn ? 'turn-mine-glow border-white text-white' : 'border-dashed border-border bg-surface text-text-h'
       }`}
-      style={isMyTurn ? { background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' } : undefined}
     >
       <div className={`flex items-center ${compact ? 'gap-2.5' : 'gap-3'}`}>
         <span

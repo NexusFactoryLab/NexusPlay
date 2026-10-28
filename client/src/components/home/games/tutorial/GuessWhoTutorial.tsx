@@ -165,8 +165,8 @@ function TutorialMatch({ setup, goal, context }: { setup: Setup; goal: Goal; con
         <style>{NOT_FLYING.filter((id) => !discarded.includes(id)).map((id) => `[data-card-id="${id}"]`).join(',') + ' { border-radius: 10px; z-index: 3; } @media (prefers-reduced-motion: no-preference) { ' + NOT_FLYING.filter((id) => !discarded.includes(id)).map((id) => `[data-card-id="${id}"]`).join(',') + ' { animation: gg-focus 1.3s ease-in-out infinite; } }'}</style>
       )}
       <div className="guess-who-play-shell">
-        <div className="mb-3 flex items-center justify-end gap-2">
-          <div className="mr-auto min-w-0 flex-1 sm:max-w-[460px]">
+        <div className="mb-3 flex items-center justify-center gap-2">
+          <div className="min-w-0 flex-1 sm:max-w-[460px]">
             <TurnStatusStrip compact isMyTurn={isMyTurn} opponentName={RIVAL} turnDeadline={null} turnDurationSeconds={0} />
           </div>
         </div>

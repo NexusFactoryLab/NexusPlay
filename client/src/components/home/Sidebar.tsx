@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { BarChart3, BookOpen, Bot, Building2, ChevronLeft, FolderOpen, Globe, GraduationCap, House, Plus, SquarePen, Users, Zap } from 'lucide-react'
@@ -34,40 +34,42 @@ const BASE_ITEM_CLASS =
   'flex items-center gap-3 rounded-lg px-3.5 py-2.5 text-[14px] font-medium transition-colors'
 
 const STORAGE_KEY = 'nexusplay-sidebar-collapsed'
-/** Lo que dura la animación del ancho del menú (duration-200), con un margen. */
+/** Lo que dura la animación de abrir o contraer el menú. */
 const TOGGLE_MS = 220
 
-/** Ancho que tendrá el menú en el otro estado (cada tema define el suyo): se prueba sin animación y se deshace. */
-function widthWhenToggled(aside: HTMLElement): number {
-  const classes = ['is-collapsed', 'w-[76px]', 'w-[240px]']
-  const before = aside.style.transition
-  aside.style.transition = 'none'
-  classes.forEach((name) => aside.classList.toggle(name))
-  const width = aside.getBoundingClientRect().width
-  classes.forEach((name) => aside.classList.toggle(name))
-  void aside.offsetWidth
-  aside.style.transition = before
-  return width
-}
-
 /**
- * Mientras el menú cambia de ancho, la columna de al lado (cabecera + contenido) se fija en su ancho
- * final, pegada a la derecha: así se calcula una sola vez en vez de en cada cuadro de la animación
- * (con carruseles y tarjetas eso trababa la animación). El menú se desliza por encima o hacia el hueco.
+ * Abrir o contraer el menú sin animar anchos (eso recalculaba toda la página en cada cuadro y se
+ * trababa): el menú y el contenido toman su tamaño final de una vez y solo se anima lo visual, que
+ * hace la tarjeta gráfica. El contenido se desliza desde donde estaba (transform) y el menú se
+ * destapa (al abrir) o se tapa (al contraer) con un recorte.
  */
-function lockNeighbourDuringToggle(aside: HTMLElement | null, collapsing: boolean) {
-  const column = aside?.nextElementSibling
-  if (!aside || !(column instanceof HTMLElement) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-  const delta = Math.abs(aside.getBoundingClientRect().width - widthWhenToggled(aside))
-  const finalWidth = column.getBoundingClientRect().width + (collapsing ? delta : -delta)
-  column.style.flex = `0 0 ${finalWidth}px`
-  column.style.marginLeft = collapsing ? `-${delta}px` : 'auto'
-  aside.style.zIndex = '20'
-  window.setTimeout(() => {
-    column.style.flex = ''
-    column.style.marginLeft = ''
-    aside.style.zIndex = ''
-  }, TOGGLE_MS)
+function animateToggle(aside: HTMLElement, previous: { asideWidth: number; columnLeft: number }) {
+  const column = aside.nextElementSibling
+  if (!(column instanceof HTMLElement) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  const timing = { duration: TOGGLE_MS, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' }
+  const dx = previous.columnLeft - column.getBoundingClientRect().left
+  column.animate([{ transform: `translateX(${dx}px)` }, { transform: 'translateX(0)' }], timing)
+  const hidden = Math.max(0, previous.asideWidth - aside.getBoundingClientRect().width)
+  const shown = Math.max(0, aside.getBoundingClientRect().width - previous.asideWidth)
+  // Al abrir, el menú ya ancho se destapa de izquierda a derecha.
+  if (shown > 0) aside.animate([{ clipPath: `inset(0 ${shown}px 0 0)` }, { clipPath: 'inset(0 -40px 0 0)' }], timing)
+  // Al contraer, una franja del color del menú se recoge sobre el hueco mientras el contenido llega.
+  if (hidden > 0) {
+    const veil = document.createElement('div')
+    const style = getComputedStyle(aside)
+    Object.assign(veil.style, {
+      position: 'absolute',
+      top: '0',
+      bottom: '0',
+      left: '100%',
+      width: `${hidden}px`,
+      background: style.backgroundColor,
+      pointerEvents: 'none',
+      transformOrigin: 'left',
+    })
+    aside.appendChild(veil)
+    veil.animate([{ transform: 'scaleX(1)' }, { transform: 'scaleX(0)' }], timing).onfinish = () => veil.remove()
+  }
 }
 
 function readStoredCollapsed(): boolean {
@@ -85,6 +87,13 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
   const collapsed = storedCollapsed && !isMobile
   const routerNavigate = useNavigate()
   const asideRef = useRef<HTMLElement>(null)
+  // Medidas justo antes de abrir o contraer, para animar desde ahí (ver animateToggle).
+  const beforeToggle = useRef<{ asideWidth: number; columnLeft: number } | null>(null)
+  useLayoutEffect(() => {
+    const previous = beforeToggle.current
+    beforeToggle.current = null
+    if (previous && asideRef.current) animateToggle(asideRef.current, previous)
+  }, [collapsed])
   const location = useLocation()
 
   // Al elegir una sección en móvil, el menú se cierra solo.
@@ -103,7 +112,9 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
   }, [mobileOpen, onMobileClose])
 
   function toggleCollapsed() {
-    lockNeighbourDuringToggle(asideRef.current, !storedCollapsed)
+    const aside = asideRef.current
+    const column = aside?.nextElementSibling
+    if (aside && column) beforeToggle.current = { asideWidth: aside.getBoundingClientRect().width, columnLeft: column.getBoundingClientRect().left }
     setCollapsed((current) => {
       const next = !current
       try {
@@ -123,7 +134,7 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
     <aside
       id="app-sidebar"
       ref={asideRef}
-      className={`app-sidebar relative flex shrink-0 flex-col gap-1 border-r border-border bg-bg p-4 transition-[width,transform] duration-200 ease-out max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-50 max-md:w-[min(300px,85vw)] max-md:overflow-y-auto ${
+      className={`app-sidebar relative flex shrink-0 flex-col gap-1 border-r border-border bg-bg p-4 transition-transform duration-200 ease-out max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-50 max-md:w-[min(300px,85vw)] max-md:overflow-y-auto ${
         collapsed ? 'is-collapsed w-[76px]' : 'w-[240px]'
       } ${mobileOpen ? '' : 'max-md:-translate-x-full max-md:invisible'}`}
       aria-label="Menú"

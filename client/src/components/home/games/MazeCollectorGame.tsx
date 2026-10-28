@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { memo, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, BookOpen, CircleHelp, LogOut, Maximize, Minimize, Pause, Play, X, Zap } from 'lucide-react'
 import type { MazeCollectorConfig, MazeCollectorItem, MazeLayoutDef, CellPosition } from './mazeCollectorTypes'
@@ -12,7 +12,7 @@ import {
   ROUND_OPTIONS,
   useMazeCollectorGame,
 } from './useMazeCollectorGame'
-import type { ActiveQuestion, AnswerFeedback, Direction, MazeAnswer, MazeScenario } from './useMazeCollectorGame'
+import type { ActiveQuestion, AnswerFeedback, Direction, MazeAnswer, MazeGameSnapshot, MazeScenario } from './useMazeCollectorGame'
 import type { MazeQuestion } from './mazeCollectorQuestions'
 import { EcoTruckSprite } from './EcoTruckSprite'
 import { PollutionGhostSprite } from './PollutionGhostSprite'
@@ -436,7 +436,6 @@ function MazeCollectorSession({
 
   const width = layout.cols * cellSize
   const height = layout.rows * cellSize
-  const wallColors = wallPalette(primaryColor)
   const CollectorIcon = iconForConcept(config.collectorIcon)
   const energized = game.energizedRemainingMs > 0
   const energyWarning = energized && game.energizedRemainingMs < 2000
@@ -633,69 +632,10 @@ function MazeCollectorSession({
           {/* Capa 1: laberinto estático (sin costo por frame). Ciudad usa el mapa
               en sprites, armado sobre la misma cuadrícula; los demás layouts
               (abstractos, sin arte propio) siguen con paredes/calles por color. */}
-          {isCity ? (
-            <SostenibleCityBackground />
-          ) : (
-            <div
-              className="absolute inset-0 grid"
-              style={{
-                gridTemplateColumns: `repeat(${layout.cols}, ${cellSize}px)`,
-                gridTemplateRows: `repeat(${layout.rows}, ${cellSize}px)`,
-              }}
-            >
-              {layout.grid.map((rowCells, row) =>
-                rowCells.map((cell, col) => {
-                  const key = `${row}:${col}`
-                  if (cell === 1) {
-                    return (
-                      <div
-                        key={key}
-                        style={{
-                          background: `linear-gradient(160deg, ${wallColors.light}, ${wallColors.base} 55%, ${wallColors.dark})`,
-                          border: `1px solid ${wallColors.dark}`,
-                        }}
-                      >
-                        <div
-                          className="h-full w-full animate-[maze-window-glow_3s_ease-in-out_infinite]"
-                          style={{
-                            animationDelay: `${(hashCell(row, col) % 20) * 0.15}s`,
-                            background:
-                              'repeating-linear-gradient(0deg, transparent 0 6px, rgba(254,240,138,0.5) 6px 8px)',
-                            mixBlendMode: 'overlay',
-                          }}
-                        />
-                      </div>
-                    )
-                  }
-                  return <div key={key} className="bg-[#18212c]" />
-                }),
-              )}
-            </div>
-          )}
+          {isCity ? <CityBackground /> : <StaticMaze layout={layout} cellSize={cellSize} primaryColor={primaryColor} />}
 
           {/* Capa 2: coleccionables — solo los que quedan, cada uno en su celda lógica (no interpolan, no se mueven). */}
-          {game.pickups.map((pickup) => {
-            const { left, top } = pixelPos(pickup.pos)
-            return (
-              <div key={pickup.id} className="absolute flex items-center justify-center" style={{ left, top, width: cellSize, height: cellSize }}>
-                {pickup.kind === 'PET' ? (
-                  <span className="flex" style={{ filter: PET_FILTER }}>
-                    <PetSprite size={cellSize * PET_SCALE} />
-                  </span>
-                ) : (
-                  <PowerPelletSprite size={cellSize * POWER_SCALE} />
-                )}
-              </div>
-            )
-          })}
-          {game.bags.map((bag) => {
-            const { left, top } = pixelPos(bag.pos)
-            return (
-              <div key={bag.id} className="absolute flex items-center justify-center" style={{ left, top, width: cellSize, height: cellSize }}>
-                <TrashBagSprite size={cellSize * BAG_SCALE} />
-              </div>
-            )
-          })}
+          <PickupsLayer pickups={game.pickups} bags={game.bags} count={game.pickups.length + game.bags.length} cellSize={cellSize} />
           {game.bonus && <BonusMarker bonus={game.bonus} cellSize={cellSize} pixelPos={pixelPos} />}
           {tutorial?.scenario.goal && (
             <div
@@ -1528,3 +1468,90 @@ function PadButton({
     </button>
   )
 }
+
+/*
+ * Capas que no cambian cuadro a cuadro: el juego se vuelve a dibujar 60 veces por segundo para mover
+ * el camión y las nubes, y rehacer cada vez el mapa y las ~115 botellas era lo que daba tirones.
+ */
+const CityBackground = memo(SostenibleCityBackground)
+
+/** Laberinto de los layouts sin arte propio: paredes y calles por color. */
+const StaticMaze = memo(function StaticMaze({ layout, cellSize, primaryColor }: { layout: MazeLayoutDef; cellSize: number; primaryColor: string }) {
+  const wallColors = wallPalette(primaryColor)
+  return (
+    <div
+      className="absolute inset-0 grid"
+      style={{
+        gridTemplateColumns: `repeat(${layout.cols}, ${cellSize}px)`,
+        gridTemplateRows: `repeat(${layout.rows}, ${cellSize}px)`,
+      }}
+    >
+      {layout.grid.map((rowCells, row) =>
+        rowCells.map((cell, col) => {
+          const key = `${row}:${col}`
+          if (cell === 1) {
+            return (
+              <div
+                key={key}
+                style={{
+                  background: `linear-gradient(160deg, ${wallColors.light}, ${wallColors.base} 55%, ${wallColors.dark})`,
+                  border: `1px solid ${wallColors.dark}`,
+                }}
+              >
+                <div
+                  className="h-full w-full animate-[maze-window-glow_3s_ease-in-out_infinite]"
+                  style={{
+                    animationDelay: `${(hashCell(row, col) % 20) * 0.15}s`,
+                    background:
+                      'repeating-linear-gradient(0deg, transparent 0 6px, rgba(254,240,138,0.5) 6px 8px)',
+                    mixBlendMode: 'overlay',
+                  }}
+                />
+              </div>
+            )
+          }
+          return <div key={key} className="bg-[#18212c]" />
+        }),
+      )}
+    </div>
+  )
+})
+
+type Collectible = MazeGameSnapshot['pickups'][number]
+
+/**
+ * Botellas, canecas y bolsas: el motor las saca de su lista (splice) al recogerlas, así que la lista es la
+ * misma; `count` es lo que avisa que cambió.
+ */
+const PickupsLayer = memo(
+  function PickupsLayer({ pickups, bags, cellSize }: { pickups: Collectible[]; bags: Collectible[]; count: number; cellSize: number }) {
+    const pixelPos = (cell: { row: number; col: number }) => ({ left: cell.col * cellSize, top: cell.row * cellSize })
+    return (
+      <>
+        {pickups.map((pickup) => {
+          const { left, top } = pixelPos(pickup.pos)
+          return (
+            <div key={pickup.id} className="absolute flex items-center justify-center" style={{ left, top, width: cellSize, height: cellSize }}>
+              {pickup.kind === 'PET' ? (
+                <span className="flex" style={{ filter: PET_FILTER }}>
+                  <PetSprite size={cellSize * PET_SCALE} />
+                </span>
+              ) : (
+                <PowerPelletSprite size={cellSize * POWER_SCALE} />
+              )}
+            </div>
+          )
+        })}
+        {bags.map((bag) => {
+          const { left, top } = pixelPos(bag.pos)
+          return (
+            <div key={bag.id} className="absolute flex items-center justify-center" style={{ left, top, width: cellSize, height: cellSize }}>
+              <TrashBagSprite size={cellSize * BAG_SCALE} />
+            </div>
+          )
+        })}
+      </>
+    )
+  },
+  (before, after) => before.pickups === after.pickups && before.bags === after.bags && before.count === after.count && before.cellSize === after.cellSize,
+)
