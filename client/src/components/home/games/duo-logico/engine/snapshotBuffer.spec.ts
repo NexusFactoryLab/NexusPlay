@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { INTERPOLATION_DELAY_MS, SnapshotBuffer } from './snapshotBuffer'
+import { INTERPOLATION_DELAY_MS, MAX_INTERPOLATION_DELAY_MS, NetClock, SnapshotBuffer } from './snapshotBuffer'
 import type { DuoPlayerNet } from '../shared/duoTypes'
 
 const at = (x: number, extra: Partial<DuoPlayerNet> = {}): DuoPlayerNet => ({ x, y: 640, vx: 0, vy: 0, facing: 1, anim: 'walk', dead: false, ...extra })
@@ -37,5 +37,38 @@ describe('SnapshotBuffer (compañero interpolado)', () => {
     buffer.push(1100, at(20), 100)
     buffer.push(1050, at(999), 101)
     expect(buffer.sample(1000)!.x).toBe(20)
+  })
+})
+
+describe('SnapshotBuffer con la hora de llegada al servidor', () => {
+  it('una posición repetida (misma hora de llegada) no cuenta como nueva', () => {
+    const buffer = new SnapshotBuffer()
+    buffer.push(1000, at(0), 0, 1000)
+    // El servidor reenvía la misma posición en el tick siguiente: se ignora.
+    buffer.push(1050, at(0), 50, 1000)
+    buffer.push(1100, at(20), 100, 1090)
+    // Instante 1045: entre 1000 (x=0) y 1090 (x=20), no quieto en 0.
+    const shown = buffer.sample(1045 - 1000 + INTERPOLATION_DELAY_MS)!
+    expect(shown.x).toBeCloseTo(10, 5)
+  })
+
+  it('si los paquetes llegan desparejos, dibuja más atrás (con tope)', () => {
+    const clock = new NetClock()
+    const buffer = new SnapshotBuffer(clock)
+    buffer.push(1000, at(0), 0)
+    expect(clock.delay()).toBe(INTERPOLATION_DELAY_MS)
+    // Llega 150 ms tarde respecto al reloj estimado.
+    buffer.push(1050, at(10), 200)
+    expect(clock.delay()).toBeGreaterThanOrEqual(200)
+    buffer.push(1100, at(20), 900)
+    expect(clock.delay()).toBe(MAX_INTERPOLATION_DELAY_MS)
+  })
+
+  it('las cajas comparten el reloj y no se extrapolan', () => {
+    const clock = new NetClock()
+    const crate = new SnapshotBuffer<{ x: number; y: number }>(clock)
+    crate.push(1000, { x: 50, y: 0 }, 0)
+    expect(crate.sample(5000)).toEqual({ x: 50, y: 0 })
+    expect(clock.clockOffset()).toBe(1000)
   })
 })

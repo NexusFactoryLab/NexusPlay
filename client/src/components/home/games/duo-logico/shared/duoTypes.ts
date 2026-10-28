@@ -57,6 +57,8 @@ export interface DuoClientState {
 
 export interface DuoCrateState extends DuoCrateNet {
   owner: DuoRole | null;
+  /** Hora del servidor en que llegó su última posición (para interpolarla sin saltos). */
+  at?: number;
 }
 
 /** Estado del mundo que arbitra el servidor y reparte a los dos. */
@@ -76,6 +78,8 @@ export interface DuoSnapshot {
   /** Reloj del servidor (ms) — el cliente interpola al compañero con él. */
   t: number;
   players: Partial<Record<DuoRole, DuoPlayerNet>>;
+  /** Hora del servidor en que llegó la posición de cada uno: si no cambió, el cliente no la cuenta como nueva. */
+  at: Partial<Record<DuoRole, number>>;
   world: DuoWorldState;
 }
 

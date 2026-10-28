@@ -96,10 +96,15 @@ export function useDuoRoom(token: string | null) {
   const sendChat = useCallback((text: string) => {
     if (text.trim()) emit(DUO_EVENTS.chat, { text: text.trim() })
   }, [emit])
-  /** Posición propia: la manda el motor ~20 veces por segundo. Volátil: si se pierde una, llega la siguiente. */
-  const sendState = useCallback((state: DuoClientState) => {
+  /**
+   * Posición propia: la manda el motor ~20 veces por segundo. Volátil: si se
+   * pierde una, llega la siguiente; salvo `reliable` (al soltar una caja).
+   */
+  const sendState = useCallback((state: DuoClientState, reliable = false) => {
     const socket = socketRef.current
-    if (socket?.connected) socket.volatile.emit(DUO_EVENTS.state, state)
+    if (!socket?.connected) return
+    if (reliable) socket.emit(DUO_EVENTS.state, state)
+    else socket.volatile.emit(DUO_EVENTS.state, state)
   }, [])
   const setRealtimeListener = useCallback((listener: DuoRealtimeListener | null) => {
     listenerRef.current = listener
