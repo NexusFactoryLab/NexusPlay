@@ -1,31 +1,23 @@
 import { createElement } from 'react'
-import {
-  Activity, Bird, Bot, Brush, Building2, Castle, ChartColumn, ChartNoAxesCombined, Cloud, Cpu, Crown, Dices, Feather,
-  Flag, Flower2, Gamepad2, Gem, Globe, GraduationCap, HeartHandshake, House, Joystick, LibraryBig, Map as MapIcon,
-  Mountain, Network, Orbit, PencilRuler, Presentation, Puzzle, Rabbit, Rocket, School, ScrollText, Shapes, Shield,
-  ShieldUser, SquarePen, Sprout, Sun, Telescope, Tent, TreePine, UserCog, UserRoundCog, Users, Wand2, Wrench, BrainCircuit,
-} from 'lucide-react'
+import { Bot, Building2, ChartColumn, Gamepad2, GraduationCap, House, LibraryBig, SquarePen, Users, UserRoundCog } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { Theme } from '../../hooks/useTheme'
 
-type NavIcons = Record<Theme, LucideIcon>
-
 /**
- * Icono de cada opción del menú, un juego completo por tema y cada uno con una sola idea:
- * Kids (juguetón), Claro (educación y oficina), Oscuro (espacio y tecnología),
- * Fantasía (aventura medieval) y Pradera (campo y animales).
+ * Icono de cada opción del menú: es el mismo en todos los temas (métricas siempre
+ * es una gráfica, juegos siempre un control) y lo que cambia con el tema es la ficha.
  */
-export const NAV_ICONS: Record<string, NavIcons> = {
-  'nav-home': { kids: Rocket, light: House, dark: Orbit, fantasy: Castle, meadow: Sun },
-  'nav-subjects': { kids: Shapes, light: LibraryBig, dark: Telescope, fantasy: MapIcon, meadow: Mountain },
-  'nav-community': { kids: HeartHandshake, light: Users, dark: Globe, fantasy: Shield, meadow: Flower2 },
-  'nav-classes': { kids: School, light: GraduationCap, dark: Presentation, fantasy: ScrollText, meadow: Sprout },
-  'nav-my-metrics': { kids: ChartNoAxesCombined, light: ChartColumn, dark: Activity, fantasy: Gem, meadow: Bird },
-  'nav-own-games': { kids: Gamepad2, light: Puzzle, dark: Joystick, fantasy: Dices, meadow: Rabbit },
-  'nav-users': { kids: UserCog, light: UserRoundCog, dark: ShieldUser, fantasy: Crown, meadow: TreePine },
-  'nav-edition': { kids: PencilRuler, light: SquarePen, dark: Wrench, fantasy: Feather, meadow: Brush },
-  'nav-ai-providers': { kids: BrainCircuit, light: Bot, dark: Cpu, fantasy: Wand2, meadow: Cloud },
-  'nav-organization': { kids: Building2, light: Building2, dark: Network, fantasy: Flag, meadow: Tent },
+export const NAV_ICONS: Record<string, LucideIcon> = {
+  'nav-home': House,
+  'nav-subjects': LibraryBig,
+  'nav-community': Users,
+  'nav-classes': GraduationCap,
+  'nav-my-metrics': ChartColumn,
+  'nav-own-games': Gamepad2,
+  'nav-users': UserRoundCog,
+  'nav-edition': SquarePen,
+  'nav-ai-providers': Bot,
+  'nav-organization': Building2,
 }
 
 /**
@@ -47,6 +39,6 @@ export function navTileStyle(theme: Theme) {
   }
 }
 
-export function navIcon(theme: Theme, entry: NavIcons) {
-  return createElement(entry[theme], { className: 'h-[18px] w-[18px] shrink-0', strokeWidth: 2.25 })
+export function navIcon(entry: LucideIcon) {
+  return createElement(entry, { className: 'h-[18px] w-[18px] shrink-0', strokeWidth: 2.25 })
 }

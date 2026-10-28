@@ -330,7 +330,7 @@ function SidebarItem({
         className="sidebar-icon-tile flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px]"
         style={navTileStyle(theme)}
       >
-        {navIcon(theme, entry)}
+        {navIcon(entry)}
       </span>
       {!collapsed && <span className="truncate">{label}</span>}
     </button>
