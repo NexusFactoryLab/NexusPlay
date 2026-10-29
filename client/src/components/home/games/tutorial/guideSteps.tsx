@@ -1,7 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react'
-import { Bot, Brain, Check, CircleHelp, Clock, Crown, Eye, Gauge, Layers, MessageCircleQuestion, Shuffle, Sparkles, Swords, Target, Timer, Trophy, Users, X } from 'lucide-react'
-import { At, Floor, Item, Scene, Sprite, Tag, strong } from '../true-false-maze/TrueFalseMazeGuide'
-import { spaceshipSpriteUrl } from '../true-false-maze/spaceshipAssets'
+import { Brain, Check, CircleHelp, Clock, Crown, Eye, Layers, MessageCircleQuestion, Shuffle, Sparkles, Target, Timer, Trophy, X } from 'lucide-react'
+import { At, Floor, Item, Scene, Tag, strong } from '../true-false-maze/TrueFalseMazeGuide'
 import type { GuideStep } from './GameGuide'
 import { AvatarBuddy, GuideAvatarCircle } from './guideAvatars'
 import './gameGuides.css'
@@ -347,93 +346,30 @@ function SceneScoreboard() {
   )
 }
 
-const ROUND_GAMES: Array<{ name: string; icon: ReactNode }> = [
-  { name: 'Identidad Oculta', icon: <CircleHelp style={{ width: '9cqw', height: '9cqw' }} /> },
-  { name: 'Dominexo', icon: <Layers style={{ width: '9cqw', height: '9cqw' }} /> },
-  { name: 'Laberinto V/F', icon: <Sprite src={spaceshipSpriteUrl('robot/robot-down-0')} style={{ width: '9cqw', height: '9cqw', objectFit: 'contain' }} /> },
-]
-
 function SceneRandomGame() {
   return (
     <Scene>
       <Floor />
-      {ROUND_GAMES.map((game, i) => (
-        <At key={game.name} style={{ left: `${6 + i * 31}%`, top: '14%', width: '27%' }}>
+      {[0, 1, 2].map((i) => (
+        <At key={i} style={{ left: `${6 + i * 31}%`, top: '16%', width: '27%' }}>
           <div
-            className="flex flex-col items-center border-2 border-violet-300/60 bg-slate-900/85 text-violet-100 shadow-lg"
-            style={{ borderRadius: '2cqw', padding: '3cqw 1cqw 2.4cqw', gap: '1.6cqw', ...loop('gg-glow', 6, i * 2) }}
+            className="flex items-center justify-center border-2 border-violet-300/60 bg-slate-900/85 font-black text-violet-100 shadow-lg"
+            style={{ borderRadius: '2cqw', height: '26cqw', fontSize: '12cqw', ...loop('gg-glow', 6, i * 2) }}
           >
-            {game.icon}
-            <span className="text-center font-extrabold leading-tight" style={{ fontSize: '2.9cqw' }}>
-              {game.name}
-            </span>
+            ?
           </div>
         </At>
       ))}
-      <At style={{ left: '40%', top: '60%', fontSize: '11cqw', lineHeight: 1, ...loop('gg-pulse', 1.8) }}>
+      <At style={{ left: '40%', top: '62%', ...loop('gg-pulse', 1.8) }}>
         <Shuffle style={{ width: '14cqw', height: '14cqw' }} className="text-amber-300" />
       </At>
-      <Tag tone="info" style={{ left: '14%', top: '88%' }}>
-        Cada ronda, un juego al azar
+      <Tag tone="info" style={{ left: '20%', top: '88%' }}>
+        Cada ronda, una sorpresa
       </Tag>
     </Scene>
   )
 }
 
-function SceneDuelRound() {
-  return (
-    <Scene>
-      <Floor />
-      <AvatarBuddy who="self" left="6%" top="14%" size={28} style={loop('gg-bob', 3)} />
-      <AvatarBuddy who={3} left="66%" top="14%" size={28} style={loop('gg-bob', 3, 0.5)} />
-      <At style={{ left: '43%', top: '30%', fontSize: '12cqw', lineHeight: 1, ...loop('gg-pulse', 1.6) }}>
-        <Swords style={{ width: '14cqw', height: '14cqw' }} className="text-amber-300" />
-      </At>
-      <At style={{ left: '14%', top: '64%' }}>
-        <span className="inline-flex items-center rounded-full border border-white/20 bg-slate-900/85 font-bold text-white" style={{ fontSize: '3cqw', padding: '0.6cqw 2.2cqw', gap: '1.2cqw' }}>
-          Tú
-        </span>
-      </At>
-      <At style={{ left: '71%', top: '64%' }}>
-        <span className="inline-flex items-center rounded-full border border-white/20 bg-slate-900/85 font-bold text-white" style={{ fontSize: '3cqw', padding: '0.6cqw 2.2cqw', gap: '1.2cqw' }}>
-          Tu rival
-        </span>
-      </At>
-      <Tag tone="true" style={{ left: '31%', top: '86%' }}>
-        Ganas el duelo: +1 punto
-      </Tag>
-    </Scene>
-  )
-}
-
-function SceneSoloMaze() {
-  return (
-    <Scene>
-      <Floor />
-      <At style={{ left: '38%', top: '30%', width: '22%', ...loop('gg-bob', 2.4) }}>
-        <Sprite src={spaceshipSpriteUrl('robot/robot-down-0')} style={{ width: '100%' }} />
-      </At>
-      <At style={{ left: '8%', top: '8%', width: '26%' }}>
-        <Sprite src={spaceshipSpriteUrl('decor/zone-true')} style={{ width: '100%' }} />
-      </At>
-      <At style={{ left: '66%', top: '8%', width: '26%' }}>
-        <Sprite src={spaceshipSpriteUrl('decor/zone-false')} style={{ width: '100%' }} />
-      </At>
-      <At style={{ left: '70%', top: '52%', width: '14%', ...loop('gg-patrol', 5) }}>
-        <Sprite src={spaceshipSpriteUrl('jellyfish/jelly-down-0')} style={{ width: '100%' }} />
-      </At>
-      <At style={{ left: '8%', top: '56%' }}>
-        <GuideAvatarCircle who="self" size={10} />
-      </At>
-      <Tag tone="true" style={{ left: '8%', top: '78%' }}>
-        Todas bien: +1 punto
-      </Tag>
-      <Tag tone="info" style={{ left: '8%', top: '90%' }}>
-        Juegas solo, en tu pantalla
-      </Tag>
-    </Scene>
-  )
-}
 
 function ScenePodium() {
   return (
@@ -467,121 +403,28 @@ function ScenePodium() {
 }
 
 export function tournamentGuideSteps(): GuideStep[] {
-  const duel = guessWhoGuideSteps()
   return [
     {
       id: 'torneo',
-      title: 'Torneo: ¡suma puntos ronda a ronda!',
+      title: 'Suma puntos ronda a ronda',
       art: <SceneScoreboard />,
-      body: (
-        <>
-          <p>
-            Varias personas compiten en <b className={strong('text-amber-300')}>rondas</b> y cada ronda ganada suma <b className="text-white">puntos</b>. Nadie queda fuera: ¡todos juegan todas las rondas!
-          </p>
-          <ul className="flex flex-col gap-2.5">
-            <Item icon={<Users className="h-4 w-4" />} tone="violet">
-              Ganar una ronda te da <b className="text-white">1 punto</b>.
-            </Item>
-            <Item icon={<Trophy className="h-4 w-4" />} tone="amber">
-              Al terminar las rondas, gana quien tenga <b className="text-white">más puntos</b>.
-            </Item>
-            <Item icon={<Timer className="h-4 w-4" />} tone="cyan">
-              El administrador modera: no juega y puede cerrar una ronda si alguien se queda inactivo.
-            </Item>
-          </ul>
-        </>
-      ),
+      body: <p>Todos juegan todas las rondas. Ganar una da 1 punto.</p>,
     },
     {
-      id: 'juego-al-azar',
-      title: 'Cada ronda, un juego sorpresa',
+      id: 'sorpresa',
+      title: 'Cada ronda, una sorpresa',
       art: <SceneRandomGame />,
-      body: (
-        <>
-          <p>
-            El administrador elige los juegos del torneo y, <b className={strong('text-violet-300')}>en cada ronda, se sortea uno al azar</b>. Nunca toca el mismo juego dos rondas seguidas, pero sí puede volver después.
-          </p>
-          <ul className="flex flex-col gap-2.5">
-            <Item icon={<Shuffle className="h-4 w-4" />} tone="violet">
-              Pueden salir <b className="text-white">Identidad Oculta, Dominexo o el Laberinto V/F</b>, según lo que haya elegido.
-            </Item>
-            <Item icon={<Gauge className="h-4 w-4" />} tone="amber">
-              Cada juego tiene su <b className="text-white">nivel</b> (niños, adolescentes o universitarios).
-            </Item>
-          </ul>
-        </>
-      ),
-    },
-    {
-      id: 'duelo',
-      title: 'Identidad Oculta y Dominexo: duelo 1 contra 1',
-      art: <SceneDuelRound />,
-      body: (
-        <>
-          <p>
-            Te toca <b className={strong('text-amber-300')}>una persona del grupo al azar</b>. Quien gana el duelo suma <b className="text-white">1 punto</b>.
-          </p>
-          <ul className="flex flex-col gap-2.5">
-            <Item icon={<Swords className="h-4 w-4" />} tone="violet">
-              <b className="text-white">Identidad Oculta:</b> pregunta, descarta tarjetas y adivina la de tu rival.
-            </Item>
-            <Item icon={<Layers className="h-4 w-4" />} tone="cyan">
-              <b className="text-white">Dominexo:</b> conecta fichas y responde las preguntas.
-            </Item>
-            <Item icon={<Bot className="h-4 w-4" />} tone="amber">
-              Si el grupo es impar, a alguien le toca jugar contra el <b className="text-white">bot</b>. Se reparte parejo.
-            </Item>
-          </ul>
-        </>
-      ),
-    },
-    { ...duel[1], id: 'duelo-preguntar', title: 'En Identidad Oculta, pregunta' },
-    { ...duel[4], id: 'duelo-adivinar', title: 'Adivina para ganar el duelo' },
-    {
-      id: 'laberinto',
-      title: 'Laberinto V/F: juegas solo',
-      art: <SceneSoloMaze />,
-      body: (
-        <>
-          <p>
-            En esta ronda <b className={strong('text-cyan-300')}>no hay rival</b>: todos juegan a la vez, cada uno en su pantalla. Lleva al robot a la sala <b className="text-emerald-300">VERDADERO</b> o <b className="text-rose-300">FALSO</b>.
-          </p>
-          <ul className="flex flex-col gap-2.5">
-            <Item icon={<Check className="h-4 w-4" />} tone="emerald">
-              Si respondes <b className="text-white">todas bien</b>, sumas <b className="text-white">1 punto</b>.
-            </Item>
-            <Item icon={<X className="h-4 w-4" />} tone="rose">
-              Si fallas alguna sigues en el torneo, solo que sin punto esa ronda.
-            </Item>
-            <Item icon={<Clock className="h-4 w-4" />} tone="amber">
-              La ronda termina cuando todos acaban o la cierra el administrador.
-            </Item>
-          </ul>
-        </>
-      ),
+      body: <p>El juego de cada ronda se sortea al azar.</p>,
     },
     {
       id: 'campeon',
       title: 'Gana quien más puntos tenga',
       art: <ScenePodium />,
-      body: (
-        <>
-          <p>
-            Al terminar la última ronda se muestra el <b className={strong('text-amber-300')}>podio</b>. Entre rondas puedes ver la clasificación y cuántos puntos llevas.
-          </p>
-          <ul className="flex flex-col gap-2.5">
-            <Item icon={<Trophy className="h-4 w-4" />} tone="amber">
-              ¡Cada ronda cuenta: <b className="text-white">no te confíes</b>!
-            </Item>
-            <Item icon={<Crown className="h-4 w-4" />} tone="violet">
-              Si hay empate, gana quien tuvo <b className="text-white">menos acusaciones fallidas</b>.
-            </Item>
-          </ul>
-        </>
-      ),
+      body: <p>Al final se muestra el podio.</p>,
     },
   ]
 }
+
 
 // ==================== MatchMente ====================
 

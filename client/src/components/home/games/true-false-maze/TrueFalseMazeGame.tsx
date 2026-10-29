@@ -34,6 +34,7 @@ import type { TfEvent, TfState } from './trueFalseMazeEngine'
 import { INTRO_MS, type Direction, type TfAnswerRecord } from './trueFalseMazeEngine'
 import type { Insets } from './TrueFalseMazeRenderer'
 import { TrueFalseMazeGuide } from './TrueFalseMazeGuide'
+import { useInTournamentPlay } from '../tournamentPlay'
 import { TrueFalseMazeTutorial } from '../tutorial/TrueFalseMazeTutorial'
 import { useTrueFalseMazeSession, type TrueFalseMazeHud } from './useTrueFalseMazeSession'
 import type { TrueFalseMazeConfig, TrueFalseMazeQuestion } from './trueFalseMazeTypes'
@@ -116,7 +117,9 @@ function saveFullscreenPreference(value: boolean) {
  * pasos; se puede volver a abrir desde el botón de ayuda.
  */
 export function TrueFalseMazeGame(props: TrueFalseMazeGameProps) {
-  const [guideOpen, setGuideOpen] = useState(!props.tutorial)
+  // En el torneo no se abre sola (issue #131); sigue disponible desde "Cómo se juega".
+  const inTournamentPlay = useInTournamentPlay()
+  const [guideOpen, setGuideOpen] = useState(!props.tutorial && !inTournamentPlay)
   // Al final de la guía se ofrece el tutorial jugable (issue #93); al terminarlo
   // empieza una partida nueva (la sesión se vuelve a montar con otra clave).
   const [inTutorial, setInTutorial] = useState(false)

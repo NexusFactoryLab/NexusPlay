@@ -1,5 +1,6 @@
 import { GameInstructionsGate } from './GameInstructionsGate'
 import { MultiplayerLobby } from './MultiplayerLobby'
+import { TournamentPlay } from './tournamentPlay'
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -48,9 +49,9 @@ import { useTheme } from '../../../hooks/useTheme'
  */
 export function DominoRoomPage() {
   const [searchParams] = useSearchParams()
-  // Dentro de un torneo se entra directo a la partida: la guía ya se puede ver desde la sala de espera del torneo.
-  if (searchParams.get('torneo')) return <DominoRoomPageSession />
-  return <GameInstructionsGate kind="DOMINO"><DominoRoomPageSession /></GameInstructionsGate>
+  // Dentro de un torneo el gate no muestra la guía (issue #131).
+  const session = <GameInstructionsGate kind="DOMINO"><DominoRoomPageSession /></GameInstructionsGate>
+  return searchParams.get('torneo') ? <TournamentPlay>{session}</TournamentPlay> : session
 }
 
 function DominoRoomPageSession() {

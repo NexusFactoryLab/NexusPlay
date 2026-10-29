@@ -1,5 +1,4 @@
 import { GameInstructionsGate } from './GameInstructionsGate'
-import { GuessWhoTutorial } from './tutorial/GuessWhoTutorial'
 import { ChatPanel } from './ChatPanel'
 import { TournamentLobby } from './TournamentLobby'
 import { TournamentModeratorPanel } from './TournamentModeratorPanel'
@@ -12,6 +11,9 @@ import { useAuth } from '../../../hooks/useAuth'
 import { useGuessWhoTournament } from './useGuessWhoTournament'
 import { Modal } from './Modal'
 import { MatchBoard } from './MatchBoard'
+import { AvatarCircle } from '../../avatar/AvatarCircle'
+import { AvatarFigure } from '../../avatar/AvatarFigure'
+import { usePlayersAvatars } from '../../avatar/usePlayersAvatars'
 import { MIN_DISCARDS_TO_ACCUSE } from './guessWhoTypes'
 import { TOURNAMENT_LEVEL_INFO } from './tournamentLevels'
 
@@ -20,6 +22,43 @@ const PAIRING_OVERLAY_MS = 3200
 /** Espera antes de entrar a la partida de Dominó o a la misión: es lo que dura su anuncio. */
 const MATCH_ENTRY_DELAY_MS = 2600
 const MAZE_ENTRY_DELAY_MS = MATCH_ENTRY_DELAY_MS
+/** Cuánto se ve la clasificación al terminar la partida (issue #131): nunca más de 5 s. */
+const STANDINGS_OVERLAY_MS = 4500
+const PLAYED_ROUND_KEY_PREFIX = 'nexusplay:torneo-ronda-jugada:'
+const GUIDE_SEEN_KEY_PREFIX = 'nexusplay:torneo-guia-vista:'
+
+/** Última ronda en la que esta persona tuvo partida (0 = ninguna pendiente de mostrar). */
+function readPlayedRound(code: string): number {
+  try {
+    return Number(window.sessionStorage.getItem(PLAYED_ROUND_KEY_PREFIX + code)) || 0
+  } catch {
+    return 0
+  }
+}
+
+function writePlayedRound(code: string, round: number): void {
+  try {
+    window.sessionStorage.setItem(PLAYED_ROUND_KEY_PREFIX + code, String(round))
+  } catch {
+    // Sin almacenamiento: solo no se recuerda.
+  }
+}
+
+function wasTournamentGuideSeen(code: string): boolean {
+  try {
+    return window.sessionStorage.getItem(GUIDE_SEEN_KEY_PREFIX + code) === '1'
+  } catch {
+    return false
+  }
+}
+
+function markTournamentGuideSeen(code: string): void {
+  try {
+    window.sessionStorage.setItem(GUIDE_SEEN_KEY_PREFIX + code, '1')
+  } catch {
+    // Sin almacenamiento: solo no se recuerda.
+  }
+}
 
 /**
  * Sala de torneo por puntos, moderado por un administrador ("¿Quién Es?" grupal) en página propia (ruta
@@ -27,12 +66,16 @@ const MAZE_ENTRY_DELAY_MS = MATCH_ENTRY_DELAY_MS
  * GuessWhoRoomPage/DominoRoomPage: reconecta al torneo en curso vía el
  * código en la URL, y no deja el Sidebar/header de HomeLayout montado detrás.
  *
- * Antes de entrar se muestra la guía con el tutorial jugable (`GameInstructionsGate`);
+ * Antes de entrar se muestra la guía corta del torneo (`GameInstructionsGate`), sin nada de los juegos;
  * también se puede abrir a demanda desde la sala de espera.
  */
 export function TournamentRoomPage() {
+  const { code } = useParams<{ code?: string }>()
+  // Se decide una sola vez al montar: si ya se vio en este torneo, se entra directo.
+  const [guideAlreadySeen] = useState(() => (code ? wasTournamentGuideSeen(code.toUpperCase()) : false))
+  if (guideAlreadySeen) return <TournamentSession />
   return (
-    <GameInstructionsGate kind={'GUESS_WHO_GROUP'} tutorial={(onFinish) => <GuessWhoTutorial tournament onFinish={onFinish} />}>
+    <GameInstructionsGate kind={'GUESS_WHO_GROUP'}>
       <TournamentSession />
     </GameInstructionsGate>
   )
@@ -72,6 +115,7 @@ function TournamentSession() {
   const startedRef = useRef(false)
   const [joinCodeInput, setJoinCodeInput] = useState('')
   const [showPairingOverlay, setShowPairingOverlay] = useState(false)
+  const [showStandings, setShowStandings] = useState(false)
 
   // Arranque de la sala: si la URL trae un código en el path, se une a esa
   // sala — mismo patrón de reconexión que Dominó/Escaleras/GuessWho.
@@ -101,28 +145,55 @@ function TournamentSession() {
     return () => clearTimeout(timeout)
   }, [pairingAnnouncement, clearPairingAnnouncement])
 
+  // Al terminar su partida la persona ve quién va de primero (máx. 5 s). Se recuerda la ronda en la que
+  // jugó (sobrevive a ir y volver de la página del juego); al verla sin esa partida, se muestra y se olvida.
+  const myRound = tournament?.myMatch?.round ?? 0
+  useEffect(() => {
+    if (!tournament || tournament.isModerator || tournament.phase !== 'RUNNING') return
+    const playedRound = readPlayedRound(tournament.code)
+    if (myRound) {
+      // Con partida de una ronda distinta a la recordada (p. ej. la siguiente): se muestra la de la anterior.
+      if (playedRound && playedRound !== myRound) setShowStandings(true)
+      writePlayedRound(tournament.code, myRound)
+    } else if (playedRound) {
+      writePlayedRound(tournament.code, 0)
+      setShowStandings(true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myRound, tournament?.code, tournament?.phase])
+  useEffect(() => {
+    if (!showStandings) return
+    const timeout = setTimeout(() => setShowStandings(false), STANDINGS_OVERLAY_MS)
+    return () => clearTimeout(timeout)
+  }, [showStandings])
+
+  // La guía del torneo se ve una sola vez por torneo: al volver de un juego no se repite.
+  useEffect(() => {
+    if (tournament?.code) markTournamentGuideSeen(tournament.code)
+  }, [tournament?.code])
+
   // Dominó: cada partida del torneo es una sala de dominó real. Se muestra el anuncio del duelo y se entra
   // a ella; al terminar, la pantalla del torneo vuelve a recibir a la persona.
   const dominoMatch =
     tournament?.myMatch?.gameType === 'DOMINO' && tournament.myMatch.phase === 'PLAYING' ? tournament.myMatch : null
   useEffect(() => {
-    if (!dominoMatch?.dominoRoomCode || !tournament) return
+    if (!dominoMatch?.dominoRoomCode || !tournament || showStandings) return
     const target = `/domino/sala/${encodeURIComponent(dominoMatch.dominoRoomCode)}?torneo=${encodeURIComponent(tournament.code)}`
     const timeout = setTimeout(() => navigate(target), MATCH_ENTRY_DELAY_MS)
     return () => clearTimeout(timeout)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dominoMatch?.matchCode])
+  }, [dominoMatch?.matchCode, showStandings])
 
   // Misión Galáctica: cada persona juega sola, en su propia pantalla. Se avisa y se entra a ella.
   const mazeMatch =
     tournament?.myMatch?.gameType === 'TRUE_FALSE_MAZE' && tournament.myMatch.phase === 'PLAYING' ? tournament.myMatch : null
   useEffect(() => {
-    if (!mazeMatch || !tournament) return
+    if (!mazeMatch || !tournament || showStandings) return
     const target = `/laberinto-vf/torneo/${encodeURIComponent(tournament.code)}`
     const timeout = setTimeout(() => navigate(target), MAZE_ENTRY_DELAY_MS)
     return () => clearTimeout(timeout)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mazeMatch?.matchCode])
+  }, [mazeMatch?.matchCode, showStandings])
 
   useEffect(() => {
     if (!matchAccusationFailedMessage) return
@@ -275,6 +346,9 @@ function TournamentSession() {
         />
       )}
       {mazeMatch && <MazeRoundAnnouncement round={mazeMatch.round} title={mazeMatch.gameTitle} />}
+      {showStandings && (
+        <StandingsOverlay participants={tournament.participants} selfUserId={user?.id ?? null} round={Math.max(tournament.currentRound - (tournament.myMatch ? 1 : 0), 1)} />
+      )}
       {!dominoMatch && showPairingOverlay && pairingAnnouncement && (
         <PairingAnnouncementOverlay announcement={pairingAnnouncement} selfUserId={user?.id ?? null} />
       )}
@@ -546,6 +620,91 @@ function RoundsRanking({
           ))}
         </div>
       </div>
+    </div>
+  )
+}
+
+/**
+ * Quién va de primero y los 3 que le siguen, con sus personajes; si nadie tiene puntos, lo dice.
+ * Se desvanece solo (`.overlay-timed`).
+ */
+function StandingsOverlay({
+  participants,
+  selfUserId,
+  round,
+}: {
+  participants: NonNullable<ReturnType<typeof useGuessWhoTournament>['tournament']>['participants']
+  selfUserId: string | null
+  round: number
+}) {
+  const ranked = [...participants].sort((a, b) => b.points - a.points || b.wins - a.wins)
+  const leader = ranked[0]
+  const nobodyScored = !leader || leader.points === 0
+  const chasers = ranked.slice(1, 4)
+  const shown = nobodyScored ? ranked.slice(0, 4) : [leader, ...chasers]
+  const avatars = usePlayersAvatars(shown.map((p) => p.userId).filter((id) => !id.startsWith('bot:')))
+  const nameOf = (p: { userId: string; displayName: string }) => `${p.displayName}${p.userId === selfUserId ? ' (tú)' : ''}`
+  const leaderAvatar = leader ? avatars[leader.userId] : null
+  const pts = (n: number) => `${n} ${n === 1 ? 'punto' : 'puntos'}`
+
+  return (
+    <div
+      className="overlay-timed fixed inset-0 z-[80] flex flex-col items-center justify-center gap-5 bg-black/80 px-5 text-center text-white backdrop-blur-md"
+      style={{ '--overlay-ms': `${STANDINGS_OVERLAY_MS}ms` } as React.CSSProperties}
+      role="status"
+    >
+      <p className="stagger-in text-[13px] font-semibold tracking-[0.22em] text-white/70 uppercase">Fin de la ronda {round}</p>
+      {nobodyScored ? (
+        <>
+          <div className="flex items-end justify-center -space-x-3" aria-hidden="true">
+            {shown.map((p, index) => (
+              <div key={p.userId} className="chip-pop" style={{ '--stagger': index } as React.CSSProperties}>
+                <AvatarCircle config={avatars[p.userId]} name={p.displayName} className="h-16 w-16 border-[3px] border-white/30 text-[20px] shadow-lg" />
+              </div>
+            ))}
+          </div>
+          <p className="stagger-in text-[22px] font-bold sm:text-[28px]" style={{ '--stagger': 2 } as React.CSSProperties}>
+            Nadie ha sumado puntos todavía
+          </p>
+          <p className="stagger-in text-[14px] text-white/75" style={{ '--stagger': 3 } as React.CSSProperties}>
+            ¡La primera victoria te pone arriba!
+          </p>
+        </>
+      ) : (
+        <>
+          <div className="chip-pop flex flex-col items-center gap-1">
+            <Crown className="h-9 w-9 text-amber-300 drop-shadow animate-[trophy-pop-in_0.6s_cubic-bezier(0.16,1,0.3,1)]" strokeWidth={2} aria-hidden="true" />
+            {leaderAvatar ? (
+              <AvatarFigure config={leaderAvatar} className="w-[120px] drop-shadow-[0_10px_18px_rgba(0,0,0,0.5)] sm:w-[150px]" />
+            ) : (
+              <AvatarCircle config={null} name={leader.displayName} className="h-24 w-24 text-[30px] shadow-lg" />
+            )}
+            <p className="text-[12px] font-semibold tracking-[0.18em] text-amber-300 uppercase">Va de primero</p>
+            <p className="max-w-[320px] truncate text-[26px] font-bold sm:text-[32px]">{nameOf(leader)}</p>
+            <span className="rounded-full bg-amber-400/25 px-3 py-0.5 text-[14px] font-bold text-amber-100">{pts(leader.points)}</span>
+          </div>
+          {chasers.length > 0 && (
+            <ol className="flex w-full max-w-[460px] items-start justify-center gap-3">
+              {chasers.map((p, index) => (
+                <li
+                  key={p.userId}
+                  className="chip-pop flex min-w-0 flex-1 flex-col items-center gap-1"
+                  style={{ '--stagger': index + 2 } as React.CSSProperties}
+                >
+                  <span className="relative">
+                    <AvatarCircle config={avatars[p.userId]} name={p.displayName} className="h-14 w-14 border-2 border-white/30 text-[18px] shadow-lg" />
+                    <span className="absolute -right-1.5 -bottom-1 flex h-6 w-6 items-center justify-center rounded-full bg-white text-[12px] font-extrabold text-slate-900">
+                      {index + 2}
+                    </span>
+                  </span>
+                  <span className="w-full truncate text-[12.5px] font-semibold">{nameOf(p)}</span>
+                  <span className="text-[11.5px] text-white/70">{pts(p.points)}</span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </>
+      )}
     </div>
   )
 }

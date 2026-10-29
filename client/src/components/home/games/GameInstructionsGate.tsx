@@ -7,6 +7,7 @@ import { gameInstructions, type InstructionKind } from './gameInstructions'
 import { DominoVisualDemo } from './DominoVisualDemo'
 import { TutorialQuestion } from './tutorial/TutorialQuestion'
 import { GameGuide } from './tutorial/GameGuide'
+import { useInTournamentPlay } from './tournamentPlay'
 import { guessWhoGuideSteps, memoryGuideSteps, tournamentGuideSteps } from './tutorial/guideSteps'
 
 const SEEN_KEY_PREFIX = 'nexusplay:guia-vista:'
@@ -53,7 +54,9 @@ export function GameInstructionsGate({
   const [accepted, setAccepted] = useState(false)
   const [inTutorial, setInTutorial] = useState(false)
   const [seenBefore] = useState(() => wasSeen(kind))
-  if (accepted) return children
+  const inTournamentPlay = useInTournamentPlay()
+  // En una partida de torneo no se muestra la guía (issue #131).
+  if (accepted || inTournamentPlay) return children
   const content = gameInstructions[kind]
   const onContinue = () => {
     markSeen(kind)

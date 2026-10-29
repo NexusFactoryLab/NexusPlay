@@ -5,6 +5,7 @@ import { getGameById, type GameDetail } from '../../../../services/game.service'
 import { useGuessWhoTournament } from '../useGuessWhoTournament'
 import type { TournamentLevel } from '../tournamentLevels'
 import { TrueFalseMazeGame } from './TrueFalseMazeGame'
+import { TournamentPlay } from '../tournamentPlay'
 import { applyTournamentLevel, resolveTrueFalseMazeConfig, resolveTrueFalseMazeQuestions } from './trueFalseMazeTypes'
 
 type Run = { matchCode: string; gameId: string; level: TournamentLevel; title: string }
@@ -126,7 +127,7 @@ export function TrueFalseMazeTournamentPage() {
   }
 
   return (
-    <>
+    <TournamentPlay>
       <TrueFalseMazeGame
         key={run.matchCode}
         title={run.title}
@@ -158,6 +159,6 @@ export function TrueFalseMazeTournamentPage() {
           </div>
         </div>
       )}
-    </>
+    </TournamentPlay>
   )
 }
