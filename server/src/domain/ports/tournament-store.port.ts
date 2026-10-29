@@ -1,5 +1,6 @@
 import type { PendingQuestion, GuidedMessage } from '../services/guided-questions.js';
 import type { BotDifficulty } from './guess-who-bot-policy.port.js';
+import type { PausableGame } from '../services/player-wait.js';
 export const TOURNAMENT_STORE = Symbol('TOURNAMENT_STORE');
 
 export type TournamentPhase = 'WAITING' | 'RUNNING' | 'FINISHED';
@@ -70,7 +71,7 @@ export interface TournamentParticipant {
  * partida (cartas, descartes, turnos) que RoomState, pero vive embebido
  * dentro del torneo en vez de en el RoomStore de salas 1v1.
  */
-export interface TournamentMatch {
+export interface TournamentMatch extends PausableGame {
   pendingQuestion?: PendingQuestion | null;
   guidedChat?: GuidedMessage[];
   /** Código único del match, ej. "AB12CD-R1-M2". */

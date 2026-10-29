@@ -30,8 +30,11 @@ export function ArtTruckDrive() {
       <At style={{ left: '8%', top: '44%', width: '84%', height: '16cqw', background: 'repeating-linear-gradient(90deg,#94a3b8 0 5cqw,transparent 5cqw 9cqw)', opacity: 0.35 }} />
       <Strip name="truck-drive" frames={4} size={26} left="12%" top="28%" ms={640} style={{ animation: 'gg-run-right 6s ease-in-out infinite' }} />
       <At style={{ left: '78%', top: '36%', fontSize: cqw(14), lineHeight: 1, ...loop('gg-pulse', 1.4) }}>🏁</At>
-      <Tag tone="info" style={{ left: '10%', top: '84%' }}>
-        Flechas del teclado o W A S D
+      <At style={{ left: '40%', top: '62%' }}>
+        <ArrowKeys size="clamp(1.4rem, 5cqw, 2.4rem)" animated />
+      </At>
+      <Tag tone="info" style={{ left: '6%', top: '86%' }}>
+        Flechas del teclado
       </Tag>
     </Scene>
   )
@@ -75,6 +78,34 @@ export function ArtTruckPower() {
       <Strip name="cloud-frightened" frames={2} size={22} left="66%" top="34%" ms={500} style={loop('gg-bob', 1.2)} />
       <Tag tone="info" style={{ left: '12%', top: '84%' }}>
         Purificador: ¡las nubes se asustan!
+      </Tag>
+    </Scene>
+  )
+}
+
+export function ArtTruckQuestion() {
+  const letters = [
+    { letter: 'A', color: '#f59e0b', left: '58%', top: '14%', ok: true },
+    { letter: 'B', color: '#38bdf8', left: '80%', top: '40%', ok: false },
+    { letter: 'C', color: '#f472b6', left: '58%', top: '62%', ok: false },
+  ]
+  return (
+    <Scene>
+      <Floor />
+      <At style={{ left: '6%', top: '6%', width: '44%', borderRadius: '0.8cqw', background: 'rgba(15,23,42,0.85)', border: '1px solid rgba(255,255,255,0.2)', padding: '1.2cqw 1.6cqw', fontSize: cqw(3.2), fontWeight: 700, color: 'white', lineHeight: 1.25 }}>
+        ¿Qué es una ciudad sostenible?
+      </At>
+      {letters.map(({ letter, color, left, top, ok }, i) => (
+        <At
+          key={letter}
+          style={{ left, top, width: cqw(10), height: cqw(10), borderRadius: '50%', background: color, border: '0.5cqw solid white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: cqw(5.5), fontWeight: 900, color: '#0f172a', ...loop(ok ? 'gg-pulse' : 'gg-bob', ok ? 1.2 : 2, i * 0.3) }}
+        >
+          {letter}
+        </At>
+      ))}
+      <Strip name="truck-drive" frames={4} size={24} left="14%" top="46%" ms={640} style={{ animation: 'gg-run-right 6s ease-in-out infinite' }} />
+      <Tag tone="true" style={{ left: '8%', top: '84%' }}>
+        Maneja hasta la respuesta correcta
       </Tag>
     </Scene>
   )

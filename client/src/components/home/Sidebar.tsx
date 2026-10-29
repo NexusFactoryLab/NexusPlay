@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { BarChart3, BookOpen, Bot, Building2, ChevronLeft, FolderOpen, Globe, GraduationCap, House, Plus, SquarePen, Users, Zap } from 'lucide-react'
+import { ChevronLeft, Plus, Zap } from 'lucide-react'
 import type { AuthUser } from '../../services/auth.service'
 import { ProfileMenu } from './ProfileMenu'
+import { NAV_ICONS, navIcon, navTileStyle } from './sidebarIcons'
+import { useTheme } from '../../hooks/useTheme'
 
 type SidebarProps = {
   user: AuthUser
@@ -34,6 +36,43 @@ const BASE_ITEM_CLASS =
   'flex items-center gap-3 rounded-lg px-3.5 py-2.5 text-[14px] font-medium transition-colors'
 
 const STORAGE_KEY = 'nexusplay-sidebar-collapsed'
+/** Lo que dura la animación de abrir o contraer el menú. */
+const TOGGLE_MS = 220
+
+/**
+ * Abrir o contraer el menú sin animar anchos (eso recalculaba toda la página en cada cuadro y se
+ * trababa): el menú y el contenido toman su tamaño final de una vez y solo se anima lo visual, que
+ * hace la tarjeta gráfica. El contenido se desliza desde donde estaba (transform) y el menú se
+ * destapa (al abrir) o se tapa (al contraer) con un recorte.
+ */
+function animateToggle(aside: HTMLElement, previous: { asideWidth: number; columnLeft: number }) {
+  const column = aside.nextElementSibling
+  if (!(column instanceof HTMLElement) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  const timing = { duration: TOGGLE_MS, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' }
+  const dx = previous.columnLeft - column.getBoundingClientRect().left
+  column.animate([{ transform: `translateX(${dx}px)` }, { transform: 'translateX(0)' }], timing)
+  const hidden = Math.max(0, previous.asideWidth - aside.getBoundingClientRect().width)
+  const shown = Math.max(0, aside.getBoundingClientRect().width - previous.asideWidth)
+  // Al abrir, el menú ya ancho se destapa de izquierda a derecha.
+  if (shown > 0) aside.animate([{ clipPath: `inset(0 ${shown}px 0 0)` }, { clipPath: 'inset(0 -40px 0 0)' }], timing)
+  // Al contraer, una franja del color del menú se recoge sobre el hueco mientras el contenido llega.
+  if (hidden > 0) {
+    const veil = document.createElement('div')
+    const style = getComputedStyle(aside)
+    Object.assign(veil.style, {
+      position: 'absolute',
+      top: '0',
+      bottom: '0',
+      left: '100%',
+      width: `${hidden}px`,
+      background: style.backgroundColor,
+      pointerEvents: 'none',
+      transformOrigin: 'left',
+    })
+    aside.appendChild(veil)
+    veil.animate([{ transform: 'scaleX(1)' }, { transform: 'scaleX(0)' }], timing).onfinish = () => veil.remove()
+  }
+}
 
 function readStoredCollapsed(): boolean {
   try {
@@ -49,6 +88,14 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
   // En móvil el menú desplegable siempre se ve completo (no tiene sentido contraerlo).
   const collapsed = storedCollapsed && !isMobile
   const routerNavigate = useNavigate()
+  const asideRef = useRef<HTMLElement>(null)
+  // Medidas justo antes de abrir o contraer, para animar desde ahí (ver animateToggle).
+  const beforeToggle = useRef<{ asideWidth: number; columnLeft: number } | null>(null)
+  useLayoutEffect(() => {
+    const previous = beforeToggle.current
+    beforeToggle.current = null
+    if (previous && asideRef.current) animateToggle(asideRef.current, previous)
+  }, [collapsed])
   const location = useLocation()
 
   // Al elegir una sección en móvil, el menú se cierra solo.
@@ -67,6 +114,9 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
   }, [mobileOpen, onMobileClose])
 
   function toggleCollapsed() {
+    const aside = asideRef.current
+    const column = aside?.nextElementSibling
+    if (aside && column) beforeToggle.current = { asideWidth: aside.getBoundingClientRect().width, columnLeft: column.getBoundingClientRect().left }
     setCollapsed((current) => {
       const next = !current
       try {
@@ -85,7 +135,8 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
     )}
     <aside
       id="app-sidebar"
-      className={`app-sidebar relative flex shrink-0 flex-col gap-1 border-r border-border bg-bg p-4 transition-[width,transform] duration-200 ease-out max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-50 max-md:w-[min(300px,85vw)] max-md:overflow-y-auto ${
+      ref={asideRef}
+      className={`app-sidebar relative flex shrink-0 flex-col gap-1 border-r border-border bg-bg p-4 transition-transform duration-200 ease-out max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-50 max-md:w-[min(300px,85vw)] max-md:overflow-y-auto ${
         collapsed ? 'is-collapsed w-[76px]' : 'w-[240px]'
       } ${mobileOpen ? '' : 'max-md:-translate-x-full max-md:invisible'}`}
       aria-label="Menú"
@@ -144,65 +195,53 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
       <nav data-tour="navigation" className="scroll-fade flex flex-1 flex-col gap-1 overflow-y-auto" aria-label="Navegación principal">
         <SidebarItem
           tourTarget="nav-home"
-          emoji="🗡️"
           label="Inicio"
           collapsed={collapsed}
           active={location.pathname === '/'}
           onClick={() => navigate('/')}
-          icon={<House className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />}
         />
 
         <SidebarSectionLabel collapsed={collapsed}>Explorar</SidebarSectionLabel>
         <SidebarItem
           tourTarget="nav-subjects"
-          emoji="📕"
           label="Áreas"
           collapsed={collapsed}
           active={location.pathname.startsWith('/areas')}
           onClick={() => navigate('/areas')}
-          icon={<BookOpen className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />}
         />
         <SidebarItem
           tourTarget="nav-community"
-          emoji="🧑‍🤝‍🧑"
           label="Comunidad"
           collapsed={collapsed}
           active={location.pathname.startsWith('/comunidad')}
           onClick={() => navigate('/comunidad')}
-          icon={<Globe className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />}
         />
 
         <SidebarSectionLabel collapsed={collapsed}>Mi espacio</SidebarSectionLabel>
         {userRole.toUpperCase() === 'TEACHER' && (
           <SidebarItem
             tourTarget="nav-classes"
-            emoji="🏫"
             label="Mis clases"
             collapsed={collapsed}
             active={location.pathname.startsWith('/mis-clases')}
             onClick={() => navigate('/mis-clases')}
-            icon={<GraduationCap className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />}
           />
         )}
         {userRole.toUpperCase() === 'STUDENT' && (
           <SidebarItem
             tourTarget="nav-my-metrics"
-            emoji="📊"
             label="Mis métricas"
             collapsed={collapsed}
             active={location.pathname.startsWith('/mis-metricas')}
             onClick={() => navigate('/mis-metricas')}
-            icon={<BarChart3 className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />}
           />
         )}
         <SidebarItem
           tourTarget="nav-own-games"
-          emoji="🔒"
           label="Mis juegos"
           collapsed={collapsed}
           active={location.pathname.startsWith('/mis-juegos')}
           onClick={() => navigate('/mis-juegos')}
-          icon={<FolderOpen className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />}
         />
         {(canManageUsers || canAccessOrganization) && (
           <>
@@ -210,45 +249,37 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
             {canManageUsers && (
               <SidebarItem
                 tourTarget="nav-users"
-                emoji="🧑‍💼"
                 label="Usuarios"
                 collapsed={collapsed}
                 active={location.pathname === '/usuarios'}
                 onClick={() => navigate('/usuarios')}
-                icon={<Users className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />}
               />
             )}
             {canManageUsers && (
               <SidebarItem
                 tourTarget="nav-edition"
-                emoji="✏️"
                 label="Edición"
                 collapsed={collapsed}
                 active={location.pathname.startsWith('/edicion')}
                 onClick={() => navigate('/edicion')}
-                icon={<SquarePen className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />}
               />
             )}
             {canManageUsers && (
               <SidebarItem
                 tourTarget="nav-ai-providers"
-                emoji="🤖"
                 label="Proveedores de IA"
                 collapsed={collapsed}
                 active={location.pathname === '/ia'}
                 onClick={() => navigate('/ia')}
-                icon={<Bot className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />}
               />
             )}
             {canAccessOrganization && (
               <SidebarItem
                 tourTarget="nav-organization"
-                emoji="🏰"
                 label="Organización"
                 collapsed={collapsed}
                 active={location.pathname === '/organizacion'}
                 onClick={() => navigate('/organizacion')}
-                icon={<Building2 className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />}
               />
             )}
           </>
@@ -271,22 +302,19 @@ function SidebarSectionLabel({ collapsed, children }: { collapsed: boolean; chil
 
 function SidebarItem({
   tourTarget,
-  emoji,
   label,
   active,
   collapsed,
   onClick,
-  icon,
 }: {
   tourTarget: string
-  /** Ícono a color del tema Fantasía (en los demás temas se ve el ícono de línea). */
-  emoji: string
   label: string
   active: boolean
   collapsed: boolean
   onClick: () => void
-  icon: ReactNode
 }) {
+  const { theme } = useTheme()
+  const entry = NAV_ICONS[tourTarget]
   return (
     <button
       type="button"
@@ -298,8 +326,12 @@ function SidebarItem({
       aria-current={active ? 'page' : undefined}
       onClick={onClick}
     >
-      <span className="fx-line-icon flex shrink-0">{icon}</span>
-      <span className="fx-emoji sidebar-emoji" aria-hidden="true">{emoji}</span>
+      <span
+        className="sidebar-icon-tile flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px]"
+        style={navTileStyle(theme)}
+      >
+        {navIcon(entry)}
+      </span>
       {!collapsed && <span className="truncate">{label}</span>}
     </button>
   )

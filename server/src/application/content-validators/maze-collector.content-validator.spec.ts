@@ -89,6 +89,33 @@ describe('MazeCollectorContentValidator', () => {
     });
   });
 
+  describe('validateConfig: preguntas de opción múltiple (#103)', () => {
+    const question = { question: '¿De qué color es la caneca de lo aprovechable?', options: ['Blanca', 'Negra', 'Verde'], correctIndex: 0 };
+
+    it('las preguntas son opcionales: sin ellas no se agregan', () => {
+      expect(validator.validateConfig(validConfig())).not.toHaveProperty('questions');
+    });
+
+    it('acepta preguntas válidas y recorta los textos', () => {
+      const result = validator.validateConfig(validConfig({ questions: [{ ...question, question: '  ¿Hola?  ', options: [' Sí ', 'No'] }] }));
+      expect(result.questions).toEqual([{ question: '¿Hola?', options: ['Sí', 'No'], correctIndex: 0 }]);
+    });
+
+    it('rechaza menos de 2 o más de 4 respuestas', () => {
+      expect(() => validator.validateConfig(validConfig({ questions: [{ ...question, options: ['Solo una'] }] }))).toThrow(InvalidGameContentError);
+      expect(() => validator.validateConfig(validConfig({ questions: [{ ...question, options: ['a', 'b', 'c', 'd', 'e'] }] }))).toThrow(InvalidGameContentError);
+    });
+
+    it('rechaza una respuesta correcta que no existe', () => {
+      expect(() => validator.validateConfig(validConfig({ questions: [{ ...question, correctIndex: 3 }] }))).toThrow(InvalidGameContentError);
+    });
+
+    it('rechaza una pregunta o una respuesta vacía', () => {
+      expect(() => validator.validateConfig(validConfig({ questions: [{ ...question, question: '  ' }] }))).toThrow(InvalidGameContentError);
+      expect(() => validator.validateConfig(validConfig({ questions: [{ ...question, options: ['Blanca', ''] }] }))).toThrow(InvalidGameContentError);
+    });
+  });
+
   describe('validateContent', () => {
     it('rechaza menos de 4 objetos', () => {
       expect(() => validator.validateContent(fourItems().slice(0, 3))).toThrow(InvalidGameContentError);

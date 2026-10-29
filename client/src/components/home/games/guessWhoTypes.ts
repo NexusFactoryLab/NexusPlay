@@ -1,3 +1,5 @@
+import type { AwaitingPlayerView } from './playerWait'
+
 /** Rasgo verificable de una tarjeta: de él sale una pregunta guiada de Sí/No (issue #58). */
 export type GuessWhoTrait = { id: string; question: string; category?: string }
 
@@ -62,6 +64,8 @@ export type RoomStateView = GuidedChatState & {
   activePlayerUserId: string | null
   /** Timestamp (epoch ms) en el que vence el turno actual, para dibujar el countdown. */
   turnDeadline: number | null
+  /** Jugadores desconectados a los que se espera: mientras haya alguno, la partida está en pausa (issue #120). */
+  awaiting?: AwaitingPlayerView[]
   players: RoomPlayerView[]
 }
 
@@ -154,6 +158,7 @@ export type TournamentMatchStateView = GuidedChatState & {
   winnerUserId: string | null
   activePlayerUserId: string | null
   turnDeadline: number | null
+  awaiting?: AwaitingPlayerView[]
   players: RoomPlayerView[]
 }
 

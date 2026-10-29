@@ -8,10 +8,9 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
-  Footprints,
+  CloudFog,
   Heart,
   Lightbulb,
-  Maximize,
   Pause,
   Route,
   Snail,
@@ -21,6 +20,8 @@ import {
 import { FitScale } from './true-false-maze/FitScale'
 import { SpriteStrip, mazeSpriteUrl } from './mazeSpriteStrip'
 import { COMBO_POINTS, POINTS_BONUS, POINTS_PET, POWER_MODE_MS } from './mazeEngine'
+import { POINTS_ANSWER, QUESTION_TIME_MS } from './useMazeCollectorGame'
+import { ArtTruckQuestion } from './tutorial/tutorialArt'
 import './true-false-maze/trueFalseMazeGuide.css'
 import './mazeCollectorGuide.css'
 
@@ -372,132 +373,106 @@ function CloudName({ strip, children }: { strip: string; children: ReactNode }) 
 const STEPS: Step[] = [
   {
     id: 'mision',
-    title: 'Misión: ¡limpia la ciudad!',
+    title: '¡Limpia la ciudad!',
     art: <SceneMission />,
     body: (
       <>
-        <p>
-          Conduces el <b className="text-emerald-300">camión reciclador</b> por las calles de la Ciudad Sostenible. Recoge todas las{' '}
-          <b className="text-sky-300">botellas PET</b> y esquiva las <b className="text-rose-300">nubes de contaminación</b>.
-        </p>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-emerald-300/25 bg-emerald-400/[0.07] p-3">
+        <p className="text-[1.15em] text-white">Recoge las botellas, responde y esquiva las nubes.</p>
+        <div className="flex items-center gap-3">
           <ArrowKeys size="clamp(1.9rem, 5.2dvh, 2.7rem)" />
-          <div className="min-w-0 flex-1 basis-[9rem]">
-            <p className="font-bold text-white">Muévete con las flechas del teclado</p>
-            <p className="text-slate-300">
-              También sirven <b className="text-white">W A S D</b>. En el celular, usa la cruceta de la pantalla.
-            </p>
-          </div>
+          <span className="font-bold text-white">Muévete con las flechas</span>
         </div>
-        <p className="flex items-center gap-2">
-          <span className="flex h-7 shrink-0 items-center gap-1 rounded-lg border border-emerald-300/50 bg-emerald-500/20 px-2 text-[0.8em] font-bold text-white">
-            <Pause className="h-3.5 w-3.5" fill="currentColor" strokeWidth={1.5} /> Pausa
-          </span>
-          <span>
-            ¿Necesitas un respiro? Toca <b className="text-white">Pausa</b>, arriba a la izquierda, o presiona{' '}
-            <b className="text-white">Esc</b> o <b className="text-white">P</b>.
-          </span>
-        </p>
-        {/* En celular horizontal no cabe otro renglón sin encoger el texto: ahí la pantalla completa se ofrece al empezar. */}
-        <p className="flex items-center gap-2 [@media(orientation:landscape)_and_(max-height:520px)]:hidden">
-          <span className="flex h-7 shrink-0 items-center gap-1 rounded-lg border border-white/25 bg-white/10 px-2 text-[0.8em] font-bold text-white">
-            <Maximize className="h-3.5 w-3.5" /> Completa
-          </span>
-          <span>
-            Para ver <b className="text-white">toda la ciudad</b> en grande, juega en <b className="text-white">pantalla completa</b>: se activa al empezar
-            (o con la tecla <b className="text-white">F</b>).
-          </span>
-        </p>
+        <ul className="flex flex-col gap-2">
+          <Item icon={<Pause className="h-4 w-4" fill="currentColor" strokeWidth={1.5} />} tone="emerald">
+            Pausa: <b className="text-white">Esc</b> o <b className="text-white">P</b>
+          </Item>
+        </ul>
       </>
     ),
   },
   {
     id: 'recoger',
-    title: 'Recoge las botellas PET',
+    title: 'Recoge las botellas',
     art: <SceneCollect />,
     body: (
       <ul className="flex flex-col gap-2.5">
-        <Item icon={<Footprints className="h-4 w-4" />} tone="emerald">
-          <b className="text-white">Elige una dirección con las flechas.</b> El camión sigue avanzando solo hasta que gires o choques con una manzana.
-        </Item>
         <Item icon={<span className="text-[12px] font-bold">PET</span>} tone="sky">
-          <b className="text-white">Pasa por encima de las botellas</b> para recogerlas: +{POINTS_PET} puntos cada una.
+          Pásales por encima: <b className="text-white">+{POINTS_PET}</b>
         </Item>
         <Item icon={<Check className="h-4 w-4" strokeWidth={3} />} tone="teal">
-          <b className="text-white">Cuando no quede ninguna, subes de nivel</b> y la ciudad se llena otra vez… con nubes más rápidas.
+          <b className="text-white">Todas</b> = ronda superada
+        </Item>
+      </ul>
+    ),
+  },
+  {
+    id: 'preguntas',
+    title: 'Maneja hasta la respuesta',
+    art: <ArtTruckQuestion />,
+    body: (
+      <ul className="flex flex-col gap-2.5">
+        <Item icon={<Check className="h-4 w-4" strokeWidth={3} />} tone="emerald">
+          Correcta: <b className="text-white">+{POINTS_ANSWER}</b>
+        </Item>
+        <Item icon={<Heart className="h-4 w-4" />} tone="rose">
+          Incorrecta o <b className="text-white">{QUESTION_TIME_MS / 1000} s</b>: −1 vida
+        </Item>
+        <Item icon={<CloudFog className="h-4 w-4" />} tone="amber">
+          Si tardas, llegan <b className="text-white">más nubes</b>
         </Item>
       </ul>
     ),
   },
   {
     id: 'nubes',
-    title: 'Esquiva las nubes de contaminación',
+    title: 'Esquiva las nubes',
     art: <SceneClouds />,
     body: (
       <>
-        <p>
-          Si una nube te toca, <b className="text-white">pierdes una vida</b> <Heart className="inline h-4 w-4 text-emerald-300" />. Sin vidas, la partida termina. Cada
-          nube tiene su propia forma de perseguirte:
+        <p className="text-[1.15em] text-white">
+          Si te tocan, pierdes una vida <Heart className="inline h-4 w-4 text-emerald-300" />
         </p>
-        <ul className="flex flex-col gap-1.5">
-          <CloudName strip="cloud-chaser">
-            <b className="text-white">Smog Gris</b> te persigue directo.
-          </CloudName>
-          <CloudName strip="cloud-ambusher">
-            <b className="text-white">Gas Tóxico</b> se adelanta para cerrarte el paso.
-          </CloudName>
-          <CloudName strip="cloud-patroller">
-            <b className="text-white">Polución Industrial</b> vigila su zona y ataca si te acercas.
-          </CloudName>
-          <CloudName strip="cloud-random">
-            <b className="text-white">Lluvia Ácida</b> se mueve sin rumbo fijo.
-          </CloudName>
+        <ul className="grid grid-cols-2 gap-1.5">
+          <CloudName strip="cloud-chaser">Persigue</CloudName>
+          <CloudName strip="cloud-ambusher">Te cierra</CloudName>
+          <CloudName strip="cloud-patroller">Vigila</CloudName>
+          <CloudName strip="cloud-random">Al azar</CloudName>
         </ul>
       </>
     ),
   },
   {
     id: 'caneca',
-    title: 'Caneca de Energía',
+    title: 'Caneca de energía',
     art: <ScenePower />,
     body: (
-      <>
-        <p>
-          Las <b className="text-emerald-300">canecas con un rayo</b> encienden el <b className="text-white">purificador</b> durante {POWER_MODE_MS / 1000} segundos: el
-          camión brilla y las nubes se asustan y se ponen azules.
-        </p>
-        <ul className="flex flex-col gap-2.5">
-          <Item icon={<Zap className="h-4 w-4" />} tone="emerald">
-            ¡Atrápalas asustadas para ganar{' '}
-            <b className="text-white">
-              +{COMBO_POINTS.slice(0, 3).join(', +')}…
-            </b>{' '}
-            puntos seguidos!
-          </Item>
-          <Item icon={<span className="text-[13px] font-bold">!</span>} tone="amber">
-            Cuando parpadean en blanco, el purificador está por acabarse: aléjate.
-          </Item>
-          <Item icon={<span className="text-[15px] font-bold leading-none">👀</span>} tone="sky">
-            Una nube atrapada vuelve a su esquina como dos ojitos y regresa a perseguirte.
-          </Item>
-        </ul>
-      </>
+      <ul className="flex flex-col gap-2.5">
+        <Item icon={<Zap className="h-4 w-4" />} tone="emerald">
+          Las nubes se asustan <b className="text-white">{POWER_MODE_MS / 1000} s</b>
+        </Item>
+        <Item icon={<Check className="h-4 w-4" strokeWidth={3} />} tone="sky">
+          ¡Atrápalas! <b className="text-white">+{COMBO_POINTS[0]}</b>
+        </Item>
+        <Item icon={<span className="text-[13px] font-bold">!</span>} tone="amber">
+          Parpadean: <b className="text-white">aléjate</b>
+        </Item>
+      </ul>
     ),
   },
   {
     id: 'sorpresas',
-    title: 'Atajos y sorpresas',
+    title: 'Sorpresas',
     art: <SceneExtras />,
     body: (
       <ul className="flex flex-col gap-2.5">
         <Item icon={<Snail className="h-4 w-4" />} tone="amber">
-          <b className="text-white">Bolsa negra:</b> si la pisas, el camión va más lento por un momento. ¡Esquívala!
+          Bolsa negra: <b className="text-white">más lento</b>
         </Item>
         <Item icon={<Lightbulb className="h-4 w-4" />} tone="sky">
-          <b className="text-white">Celular e-waste:</b> aparece de vez en cuando en el centro. Recógelo rápido para ganar +{POINTS_BONUS} y un dato curioso.
+          Celular: <b className="text-white">+{POINTS_BONUS}</b>
         </Item>
         <Item icon={<Route className="h-4 w-4" />} tone="emerald">
-          <b className="text-white">Túneles:</b> en las avenidas, sal por un borde de la ciudad y apareces por el otro. ¡Ideal para escapar!
+          Túneles: <b className="text-white">sales por el otro lado</b>
         </Item>
       </ul>
     ),
@@ -568,7 +543,7 @@ export function MazeCollectorGuide({ onClose, onTutorial }: MazeCollectorGuidePr
 
         <div
           key={step.id}
-          className="tfg-step-in grid min-h-0 flex-1 grid-rows-[minmax(0,38%)_minmax(0,1fr)] gap-3 px-4 py-3 sm:px-6 landscape:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] landscape:grid-rows-1 landscape:gap-6"
+          className="tfg-step-in grid min-h-0 flex-1 grid-rows-[minmax(0,52%)_minmax(0,1fr)] gap-3 px-4 py-3 sm:px-6 landscape:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] landscape:grid-rows-1 landscape:gap-6"
         >
           <div className="min-h-0 min-w-0">{step.art}</div>
           {/* El texto se ajusta solo al espacio: en pantallas chicas se reduce en vez de recortarse o hacer scroll. */}
@@ -576,7 +551,7 @@ export function MazeCollectorGuide({ onClose, onTutorial }: MazeCollectorGuidePr
             className="h-full"
             fitKey={step.id}
             minScale={0.55}
-            contentClassName="flex flex-col gap-3 text-[clamp(0.8rem,1.9dvh+0.25vw,1.02rem)] leading-snug text-slate-300"
+            contentClassName="flex flex-col gap-3 text-[clamp(0.95rem,2.4dvh+0.3vw,1.25rem)] leading-snug text-slate-300"
           >
             <h2 className="font-heading text-[clamp(1.15rem,3.4dvh+0.6vw,1.9rem)] font-bold leading-tight tracking-tight text-white">{step.title}</h2>
             {step.body}

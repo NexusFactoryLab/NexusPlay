@@ -36,6 +36,8 @@ import {
 } from './dominoBoardCamera'
 import { DealCountdownOverlay, TurnBanner, TurnPopBanner, useCountdown } from './MatchBoard'
 import { Modal } from './Modal'
+import { PlayerWaitOverlay } from './PlayerWaitOverlay'
+import { usePlayerWait } from './playerWait'
 import { DominoScenery, dominoSceneForTheme } from './DominoScenery'
 import { DominoInfoCloud } from './DominoInfoCloud'
 import { useTheme } from '../../../hooks/useTheme'
@@ -190,6 +192,8 @@ function DominoRoomPageSession() {
     joinRoom(code)
   }
 
+  // Se cortó la conexión del rival: la partida espera (issue #120).
+  const playerWait = usePlayerWait(room?.awaiting, user?.id)
   const self = room?.players.find((p) => p.isSelf)
   const opponent = room?.players.find((p) => !p.isSelf)
   const isMyTurn = room?.phase === 'PLAYING' && room.activePlayerUserId === user?.id
@@ -512,6 +516,7 @@ function DominoRoomPageSession() {
     <div className={`domino-premium-room domino-room--${scene} fixed inset-0 z-50 overflow-y-auto bg-[#080F24]`}>
       <DominoScenery scene={scene} />
       {dealCountdownMs !== null && <DealCountdownOverlay remainingMs={dealCountdownMs} />}
+      {playerWait && room?.phase === 'PLAYING' && <PlayerWaitOverlay wait={playerWait} onLeave={handleExit} />}
 
       {room?.phase === 'PLAYING' && questionConcept && questionToShow && (
         <DominoQuestionModal

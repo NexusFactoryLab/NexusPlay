@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react'
-import { Brain, Check, CircleHelp, Clock, Crown, Eye, Layers, MessageCircleQuestion, Shuffle, Sparkles, Target, Timer, Trophy, X } from 'lucide-react'
-import { At, Floor, Item, Scene, Tag, strong } from '../true-false-maze/TrueFalseMazeGuide'
+import { Brain, Check, CircleHelp, Clock, Crown, Eye, Layers, Shuffle, Sparkles, Timer, Trophy, X } from 'lucide-react'
+import { At, Floor, Item, Scene, Tag } from '../true-false-maze/TrueFalseMazeGuide'
 import type { GuideStep } from './GameGuide'
 import { AvatarBuddy, GuideAvatarCircle } from './guideAvatars'
 import './gameGuides.css'
@@ -199,22 +199,17 @@ export function guessWhoGuideSteps(): GuideStep[] {
   return [
     {
       id: 'mision',
-      title: 'Misión: ¡adivina la tarjeta secreta!',
+      title: '¡Adivina la tarjeta secreta!',
       art: <SceneSecret />,
       body: (
         <>
-          <p>
-            Cada jugador recibe una <b className={strong('text-fuchsia-300')}>tarjeta secreta</b>. La tuya aparece en <b className="text-white">«Tú eres…»</b>: tu rival tiene que adivinarla.
-          </p>
+          <p className="text-[1.15em] text-white">Descubre la tarjeta de tu rival antes que él la tuya.</p>
           <ul className="flex flex-col gap-2.5">
             <Item icon={<Eye className="h-4 w-4" />} tone="violet">
-              Tu tarjeta solo la ves tú.
-            </Item>
-            <Item icon={<Target className="h-4 w-4" />} tone="rose">
-              Tu meta: descubrir <b className="text-white">la de tu rival</b> antes que él descubra la tuya.
+              Tu tarjeta: <b className="text-white">«Tú eres…»</b>
             </Item>
             <Item icon={<Timer className="h-4 w-4" />} tone="amber">
-              Los turnos tienen tiempo: en tu turno puedes preguntar, descartar o adivinar.
+              Turnos con <b className="text-white">tiempo</b>
             </Item>
           </ul>
         </>
@@ -222,19 +217,16 @@ export function guessWhoGuideSteps(): GuideStep[] {
     },
     {
       id: 'preguntar',
-      title: 'En tu turno, haz una pregunta',
+      title: 'Pregunta',
       art: <SceneAsk />,
       body: (
         <>
-          <p>
-            Elige una <b className={strong('text-violet-300')}>pregunta sugerida</b> en el chat (o escribe la tuya con «¿ ?»). Tu rival responde <b className="text-emerald-300">Sí</b> o <b className="text-rose-300">No</b>.
+          <p className="text-[1.15em] text-white">
+            Elige una pregunta en el chat: te responden <b className="text-emerald-300">Sí</b> o <b className="text-rose-300">No</b>.
           </p>
           <ul className="flex flex-col gap-2.5">
-            <Item icon={<MessageCircleQuestion className="h-4 w-4" />} tone="violet">
-              Cada respuesta es una <b className="text-white">pista</b> sobre su tarjeta.
-            </Item>
             <Item icon={<Brain className="h-4 w-4" />} tone="cyan">
-              Piensa: una buena pregunta deja fuera <b className="text-white">muchas tarjetas</b> a la vez.
+              Mejor si descarta <b className="text-white">muchas</b>
             </Item>
           </ul>
         </>
@@ -242,19 +234,14 @@ export function guessWhoGuideSteps(): GuideStep[] {
     },
     {
       id: 'descartar',
-      title: 'Descarta las que no encajan',
+      title: 'Descarta',
       art: <SceneDiscard />,
       body: (
         <>
-          <p>
-            Con la respuesta, toca en tu tablero las tarjetas que <b className={strong('text-rose-300')}>ya no pueden ser</b>: se apagan. Si te equivocas, tócalas otra vez para volver a encenderlas.
-          </p>
+          <p className="text-[1.15em] text-white">Toca las tarjetas que ya no pueden ser.</p>
           <ul className="flex flex-col gap-2.5">
             <Item icon={<X className="h-4 w-4" />} tone="rose">
-              Descartar no cuesta nada: ¡ordena tu tablero cuando quieras!
-            </Item>
-            <Item icon={<Layers className="h-4 w-4" />} tone="amber">
-              Cada vez quedan <b className="text-white">menos tarjetas</b>.
+              Otro toque la <b className="text-white">devuelve</b>
             </Item>
           </ul>
         </>
@@ -262,19 +249,16 @@ export function guessWhoGuideSteps(): GuideStep[] {
     },
     {
       id: 'responder',
-      title: 'Cuando pregunta tu rival, responde',
+      title: 'Responde',
       art: <SceneAnswer />,
       body: (
         <>
-          <p>
-            En su turno, tu rival te pregunta a ti. Mira tu tarjeta en <b className="text-white">«Tú eres…»</b> y toca <b className="text-emerald-300">Sí</b> o <b className="text-rose-300">No</b>.
+          <p className="text-[1.15em] text-white">
+            Mira tu tarjeta y toca <b className="text-emerald-300">Sí</b> o <b className="text-rose-300">No</b>.
           </p>
           <ul className="flex flex-col gap-2.5">
             <Item icon={<Check className="h-4 w-4" />} tone="emerald">
-              Responde con la <b className="text-white">verdad</b>: el juego te avisa si algo no coincide con tu tarjeta.
-            </Item>
-            <Item icon={<Clock className="h-4 w-4" />} tone="amber">
-              Mientras esperas, puedes seguir descartando en tu tablero.
+              Siempre con la <b className="text-white">verdad</b>
             </Item>
           </ul>
         </>
@@ -282,19 +266,19 @@ export function guessWhoGuideSteps(): GuideStep[] {
     },
     {
       id: 'adivinar',
-      title: 'Cuando estés seguro, ¡adivina!',
+      title: '¡Adivina!',
       art: <SceneGuess />,
       body: (
         <>
-          <p>
-            Descarta al menos <b className={strong('text-fuchsia-300')}>3 tarjetas</b> y, en tu turno, toca <b className="text-white">«¡Creo que es esta!»</b>. Elige la tarjeta de tu rival y confirma.
+          <p className="text-[1.15em] text-white">
+            Toca <b className="text-white">«¡Creo que es esta!»</b>, elige y confirma.
           </p>
           <ul className="flex flex-col gap-2.5">
             <Item icon={<Trophy className="h-4 w-4" />} tone="emerald">
-              Si aciertas, <b className="text-white">ganas la partida</b>.
+              Aciertas: <b className="text-white">ganas</b>
             </Item>
             <Item icon={<CircleHelp className="h-4 w-4" />} tone="rose">
-              Si fallas, pierdes el turno: adivina cuando solo queden pocas opciones.
+              Fallas: <b className="text-white">pierdes el turno</b>
             </Item>
           </ul>
         </>
@@ -408,19 +392,19 @@ export function tournamentGuideSteps(): GuideStep[] {
       id: 'torneo',
       title: 'Suma puntos ronda a ronda',
       art: <SceneScoreboard />,
-      body: <p>Todos juegan todas las rondas. Ganar una da 1 punto.</p>,
+      body: <p className="text-[1.15em] text-white">Todos juegan todas las rondas. Ganar una da 1 punto.</p>,
     },
     {
       id: 'sorpresa',
       title: 'Cada ronda, una sorpresa',
       art: <SceneRandomGame />,
-      body: <p>El juego de cada ronda se sortea al azar.</p>,
+      body: <p className="text-[1.15em] text-white">El juego de cada ronda se sortea al azar.</p>,
     },
     {
       id: 'campeon',
       title: 'Gana quien más puntos tenga',
       art: <ScenePodium />,
-      body: <p>Al final se muestra el podio.</p>,
+      body: <p className="text-[1.15em] text-white">Al final se muestra el podio.</p>,
     },
   ]
 }
@@ -560,47 +544,20 @@ export function memoryGuideSteps(opposites: boolean): GuideStep[] {
   return [
     {
       id: 'mision',
-      title: opposites ? 'Misión: ¡une cada opuesto!' : 'Misión: ¡encuentra las parejas!',
+      title: opposites ? '¡Une cada opuesto!' : '¡Encuentra las parejas!',
       art: <SceneMemoryMission opposites={opposites} />,
-      body: (
-        <>
-          <p>
-            {opposites ? (
-              <>
-                Las cartas esconden <b className={strong('text-violet-300')}>conceptos contrarios</b> (como Día y Noche). Destapa dos cartas y únelas con su <b className="text-white">opuesto</b>.
-              </>
-            ) : (
-              <>
-                Hay <b className={strong('text-violet-300')}>imágenes</b> y cartas con su <b className="text-white">nombre</b>. Destapa dos cartas y une cada imagen con su nombre.
-              </>
-            )}
-          </p>
-          <ul className="flex flex-col gap-2.5">
-            <Item icon={<Target className="h-4 w-4" />} tone="violet">
-              Tu meta: <b className="text-white">encontrar todas las parejas</b> de cada zona.
-            </Item>
-            <Item icon={<Brain className="h-4 w-4" />} tone="amber">
-              ¡La memoria es tu mejor aliada!
-            </Item>
-          </ul>
-        </>
-      ),
+      body: <p className="text-[1.15em] text-white">{opposites ? 'Une cada carta con su contrario.' : 'Une cada imagen con su nombre.'}</p>,
     },
     {
       id: 'memorizar',
-      title: 'Primero, memoriza',
+      title: 'Memoriza',
       art: <SceneMemorize />,
       body: (
         <>
-          <p>
-            Al empezar cada zona ves <b className={strong('text-violet-300')}>todas las cartas destapadas</b> unos segundos. Después se tapan.
-          </p>
+          <p className="text-[1.15em] text-white">Las cartas se ven unos segundos y luego se tapan.</p>
           <ul className="flex flex-col gap-2.5">
-            <Item icon={<Eye className="h-4 w-4" />} tone="violet">
-              Fíjate <b className="text-white">dónde está cada una</b>.
-            </Item>
             <Item icon={<Timer className="h-4 w-4" />} tone="cyan">
-              ¿Ya te las sabes? Toca <b className="text-white">«¡Ya, a jugar!»</b> para empezar antes.
+              ¿Listo? <b className="text-white">«¡Ya, a jugar!»</b>
             </Item>
           </ul>
         </>
@@ -611,19 +568,14 @@ export function memoryGuideSteps(opposites: boolean): GuideStep[] {
       title: 'Destapa de a dos',
       art: <SceneFlipTwo opposites={opposites} />,
       body: (
-        <>
-          <p>
-            Toca una carta para destaparla y luego otra. Si <b className={strong('text-emerald-300')}>hacen pareja</b>, se quedan arriba. Si no, ¡se vuelven a tapar!
-          </p>
-          <ul className="flex flex-col gap-2.5">
-            <Item icon={<Check className="h-4 w-4" />} tone="emerald">
-              Una pareja suma <b className="text-white">puntos</b> (y más si encadenas racha).
-            </Item>
-            <Item icon={<X className="h-4 w-4" />} tone="rose">
-              Una equivocación rompe tu racha: recuerda dónde estaba cada carta.
-            </Item>
-          </ul>
-        </>
+        <ul className="flex flex-col gap-2.5">
+          <Item icon={<Check className="h-4 w-4" />} tone="emerald">
+            Pareja: <b className="text-white">se queda</b>
+          </Item>
+          <Item icon={<X className="h-4 w-4" />} tone="rose">
+            No es: <b className="text-white">se tapan</b>
+          </Item>
+        </ul>
       ),
     },
     {
@@ -631,19 +583,14 @@ export function memoryGuideSteps(opposites: boolean): GuideStep[] {
       title: 'Zonas y reloj',
       art: <SceneZones />,
       body: (
-        <>
-          <p>
-            El juego se divide en <b className={strong('text-violet-300')}>zonas</b>. Cada una tiene su reloj: completa todas sus parejas antes de que llegue a cero.
-          </p>
-          <ul className="flex flex-col gap-2.5">
-            <Item icon={<Layers className="h-4 w-4" />} tone="violet">
-              Al terminar una zona pasas a la siguiente.
-            </Item>
-            <Item icon={<Clock className="h-4 w-4" />} tone="rose">
-              Si se acaba el tiempo, puedes <b className="text-white">reintentar</b> la zona.
-            </Item>
-          </ul>
-        </>
+        <ul className="flex flex-col gap-2.5">
+          <Item icon={<Clock className="h-4 w-4" />} tone="violet">
+            Termina la zona <b className="text-white">a tiempo</b>
+          </Item>
+          <Item icon={<Layers className="h-4 w-4" />} tone="rose">
+            Si no, <b className="text-white">reintenta</b>
+          </Item>
+        </ul>
       ),
     },
   ]

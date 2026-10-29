@@ -10,7 +10,6 @@ import { InMemoryRoomStore } from './in-memory-room.store.js';
 import { InMemoryTournamentStore } from './in-memory-tournament.store.js';
 import { InMemoryDominoRoomStore } from './in-memory-domino-room.store.js';
 import { InMemorySnakesLaddersRoomStore } from './in-memory-snakes-ladders-room.store.js';
-import { InMemoryDualQuestRoomStore } from './in-memory-dual-quest-room.store.js';
 
 type Client = Parameters<RoomsGateway['handleStart']>[0];
 function client(id: string): Client {
@@ -55,16 +54,6 @@ const modes = [
     store: 'snakes',
     delay: false,
   },
-  {
-    name: 'dual-quest',
-    type: 'DUAL_QUEST',
-    create: 'handleDualQuestCreate',
-    join: 'handleDualQuestJoin',
-    ready: 'handleDualQuestReady',
-    start: 'handleDualQuestStart',
-    store: 'dual',
-    delay: false,
-  },
 ] as const;
 type Mode = (typeof modes)[number];
 
@@ -73,7 +62,6 @@ async function setup(mode: Mode, count = 2) {
     room: new InMemoryRoomStore(),
     domino: new InMemoryDominoRoomStore(),
     snakes: new InMemorySnakesLaddersRoomStore(),
-    dual: new InMemoryDualQuestRoomStore(),
     tournament: new InMemoryTournamentStore(),
   };
   const game = {
@@ -114,7 +102,6 @@ async function setup(mode: Mode, count = 2) {
     stores.tournament,
     stores.domino,
     stores.snakes,
-    stores.dual,
     {
       track: vi.fn().mockResolvedValue(undefined),
     } as unknown as AnalyticsTrackerService,
@@ -299,17 +286,6 @@ describe.each([modes[0], modes[1], modes[2]])(
   },
 );
 
-it('Dúo reinicia en lobby y requiere confirmación de ambos', async () => {
-  const h = await setup(modes[3]);
-  h.room.phase = 'FINISHED';
-  h.gateway.handleDualQuestRestart(h.sockets[0]);
-  expect(h.room.phase).toBe('WAITING');
-  h.ready(0);
-  expect(h.room.phase).toBe('WAITING');
-  h.ready(1);
-  expect(h.room.phase).toBe('PLAYING');
-});
-
 describe.each(modes.slice(0, 3))(
   '$name: conserva la revancha por unanimidad',
   (mode) => {
@@ -336,7 +312,6 @@ const chatHandlers = {
   room: 'handleChat',
   domino: 'handleDominoChat',
   'snakes-ladders': 'handleSnakesLaddersChat',
-  'dual-quest': 'handleDualQuestChat',
 } as const;
 describe.each(modes)('$name: chat compartido', (mode) => {
   it('entrega texto solo a los participantes actuales con identidad del servidor', async () => {

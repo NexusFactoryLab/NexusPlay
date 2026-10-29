@@ -34,12 +34,13 @@ export function useGuessWhoTournament(token: string | null) {
 
     socket.on('connect', () => {
       setConnecting(false)
-      // Reingresar al lobby tras reconectar; el servidor exige confirmar de nuevo.
+      // Volver a la sala tras reconectar: en la espera el servidor exige confirmar
+      // de nuevo; con el torneo en marcha, la partida propia sigue (issue #120).
       if (waitingCodeRef.current) socket.emit('tournament:join', { code: waitingCodeRef.current })
     })
     socket.on('disconnect', () => setConnecting(true))
     socket.on('tournament:state', (state: TournamentStateView) => {
-      waitingCodeRef.current = state.phase === 'WAITING' ? state.code : null
+      waitingCodeRef.current = state.phase === 'FINISHED' ? null : state.code
       setTournament(state)
       setError(null)
     })

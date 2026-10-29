@@ -53,18 +53,6 @@ import type {
   SnakesLaddersQuestion,
   SnakesLaddersTriggerType,
 } from '../../application/content-validators/snakes-ladders.content-validator.js';
-import {
-  DUAL_QUEST_ROOM_STORE,
-  type DualQuestRoomStore,
-  type DualQuestRoomState,
-  type DualQuestDirection,
-} from '../../domain/ports/dual-quest-room-store.port.js';
-import type {
-  DualQuestCellPosition,
-  DualQuestFragmentGem,
-  DualQuestRole,
-  DualQuestTrigger,
-} from '../../application/content-validators/dual-quest.content-validator.js';
 import { AnalyticsTrackerService } from '../../application/services/analytics-tracker.service.js';
 import { WsExceptionFilter } from './ws-exception.filter.js';
 import { allLobbyReady, recordLobbyReady, resetLobbyReady } from './lobby-ready.js';
@@ -79,6 +67,18 @@ import {
 } from '../../domain/ports/guess-who-bot-policy.port.js';
 import { HeuristicGuessWhoBotPolicy } from '../../application/bots/heuristic-guess-who-bot.policy.js';
 import { GuessWhoBotRunner } from '../bots/guess-who-bot-runner.js';
+import {
+  assertNotPaused,
+  awaitingView,
+  clearWaiting,
+  expiredWaits,
+  isWaitingSocketId,
+  nextWaitDeadline,
+  startWaiting,
+  stopWaiting,
+  waitingSocketId,
+  type PausableGame,
+} from '../../domain/services/player-wait.js';
 
 /**
  * Segundos por turno con los que arranca una sala de Identidad Oculta (issue #80).
@@ -95,7 +95,7 @@ interface AuthenticatedSocket extends Socket {
 }
 
 /** El `kind` que le dice al cliente a qué pantalla enrutar tras resolver un código. */
-type RoomKind = 'room' | 'tournament' | 'domino' | 'snakes-ladders' | 'dual-quest';
+export type RoomKind = 'room' | 'tournament' | 'domino' | 'snakes-ladders' | 'duo-logico';
 
 /**
  * Las 5 salas (1v1 de "¿Quién Es?", torneo, dominó, escaleras y serpientes,
@@ -106,11 +106,11 @@ type RoomKind = 'room' | 'tournament' | 'domino' | 'snakes-ladders' | 'dual-ques
  * entrada a `roomRegistry` (constructor) en vez de tocar `handleResolveCode`
  * y el generador de código a mano.
  */
-interface MinimalRoomStore {
+export interface MinimalRoomStore {
   get(code: string): { gameId: string; gameTitle: string } | undefined;
 }
 
-interface RoomRegistryEntry {
+export interface RoomRegistryEntry {
   kind: RoomKind;
   store: MinimalRoomStore;
 }
@@ -135,14 +135,6 @@ function shuffle<T>(items: T[]): T[] {
 
 /** Cuenta regresiva antes de repartir cartas (3-2-1), igual para el inicio y cada revancha. */
 const DEAL_COUNTDOWN_MS = 3_000;
-
-/** Deltas de movimiento para el tick de Dúo Lógico. */
-const DUAL_QUEST_DIRECTION_DELTAS: Record<DualQuestDirection, DualQuestCellPosition> = {
-  UP: { row: -1, col: 0 },
-  DOWN: { row: 1, col: 0 },
-  LEFT: { row: 0, col: -1 },
-  RIGHT: { row: 0, col: 1 },
-};
 
 /** Largo máximo de un mensaje de chat de sala; se recorta, no se rechaza. */
 const MAX_CHAT_MESSAGE_LENGTH = 500;
@@ -207,6 +199,18 @@ function currentRoundGameOf(tournament: TournamentState) {
     level: match.level ?? ('MEDIUM' as TournamentLevel),
     gameType: match.gameType ?? 'GUESS_WHO',
   };
+}
+
+/**
+ * Hay alguien más en la partida (no un bot), conectado o al que también se
+ * espera: vale la pena esperar a quien se desconectó (issue #120).
+ */
+function hasOtherHuman(players: ReadonlyArray<{ userId: string; bot?: unknown }>, player: { userId: string; bot?: unknown }): boolean {
+  return !player.bot && players.some((p) => p.userId !== player.userId && !p.bot);
+}
+
+function playerName(players: ReadonlyArray<{ userId: string; displayName: string }>, userId: string): string {
+  return players.find((p) => p.userId === userId)?.displayName ?? 'tu compañero';
 }
 
 /** Vista pública del torneo que se envía a un participante dado. */
@@ -343,6 +347,12 @@ function toMatchClientView(match: TournamentMatch, tournament: TournamentState, 
     winnerUserId: match.winnerUserId,
     activePlayerUserId: match.activePlayerUserId,
     turnDeadline: match.turnDeadline,
+    // A quién se espera porque se desconectó (issue #120): mientras tanto, la partida está en pausa.
+    awaiting: awaitingView(
+      match,
+      match.players.map((p) => ({ userId: p.userId, displayName: playerName(tournament.participants, p.userId) })),
+      Date.now(),
+    ),
     players: match.players.map((player) => {
       const participant = tournament.participants.find((p) => p.userId === player.userId);
       return {
@@ -483,6 +493,7 @@ export function toDominoClientView(room: DominoRoomState, forSocketId: string) {
     endedByBlock: room.endedByBlock,
     activePlayerUserId: room.activePlayerUserId,
     turnDeadline: room.turnDeadline,
+    awaiting: awaitingView(room, room.players, Date.now()),
     players: room.players.map((player) => ({
       userId: player.userId,
       displayName: player.displayName,
@@ -520,6 +531,7 @@ function toSnakesLaddersClientView(room: SnakesLaddersRoomState, forSocketId: st
     winnerUserId: room.winnerUserId,
     activePlayerUserId: room.activePlayerUserId,
     turnDeadline: room.turnDeadline,
+    awaiting: awaitingView(room, room.players, Date.now()),
     lastRoll: room.lastRoll,
     pendingChallenge:
       room.pendingChallenge && pendingQuestion
@@ -544,70 +556,6 @@ function toSnakesLaddersClientView(room: SnakesLaddersRoomState, forSocketId: st
   };
 }
 
-/**
- * Vista pública de una sala de Dúo Lógico: nunca incluye
- * `correctOptionIndex` de los triggers QUESTION (solo vive en
- * `room.triggers`, del lado del servidor) — si hay una pregunta pendiente,
- * se manda su prompt/opciones pero jamás la respuesta correcta.
- */
-function toDualQuestClientView(room: DualQuestRoomState, forSocketId: string) {
-  const pendingTrigger = room.pendingQuestion
-    ? room.triggers.find((t) => t.triggerId === room.pendingQuestion!.triggerId)
-    : undefined;
-
-  return {
-    code: room.code,
-    gameTitle: room.gameTitle,
-    coreQuestion: room.coreQuestion,
-    gridCols: room.gridCols,
-    gridRows: room.gridRows,
-    grid: room.grid,
-    corePosition: room.corePosition,
-    gates: room.gates,
-    // Metadata segura de cada interruptor: dónde está y quién lo activa —
-    // nunca `prompt`/`options`/`correctOptionIndex` (eso solo se revela vía
-    // `pendingQuestion`, una vez que alguien lo activa de verdad).
-    triggers: room.triggers.map((trigger) => ({
-      triggerId: trigger.triggerId,
-      kind: trigger.kind,
-      activatedByRole: trigger.activatedByRole,
-      switchPosition: trigger.switchPosition,
-      gateId: trigger.gateId,
-    })),
-    phase: room.phase,
-    bothAtCore: room.bothAtCore,
-    collectedGemIds: room.collectedGemIds,
-    // Nunca se manda `order` (la secuencia correcta) — solo lo necesario
-    // para que el cliente sepa qué buscar y qué ya se recolectó.
-    gems: room.fragmentGems.map((gem) => ({
-      gemId: gem.gemId,
-      role: gem.role,
-      label: gem.label,
-      position: gem.position,
-      collected: room.collectedGemIds.includes(gem.gemId),
-    })),
-    canAssemble: room.bothAtCore && room.collectedGemIds.length === room.fragmentGems.length,
-    pendingQuestion:
-      room.pendingQuestion && pendingTrigger
-        ? {
-            triggerId: room.pendingQuestion.triggerId,
-            forRole: room.pendingQuestion.forRole,
-            prompt: pendingTrigger.prompt,
-            options: pendingTrigger.options,
-          }
-        : null,
-    players: room.players.map((player) => ({
-      userId: player.userId,
-      displayName: player.displayName,
-      ready: player.ready === true,
-      role: player.role,
-      position: player.position,
-      isSelf: player.socketId === forSocketId,
-      isHost: player.userId === room.hostUserId,
-    })),
-  };
-}
-
 /** Vista pública de la sala que se envía a un jugador dado: oculta la carta secreta ajena. */
 export function toClientView(room: RoomState, forSocketId: string) {
   return {
@@ -622,6 +570,7 @@ export function toClientView(room: RoomState, forSocketId: string) {
     winnerUserId: room.winnerUserId,
     activePlayerUserId: room.activePlayerUserId,
     turnDeadline: room.turnDeadline,
+    awaiting: awaitingView(room, room.players, Date.now()),
     players: room.players.map((player) => ({
       userId: player.userId,
       displayName: player.displayName,
@@ -695,15 +644,10 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
    */
   private readonly snakesLaddersTurnTimers = new Map<string, NodeJS.Timeout>();
 
-  /**
-   * Dúo Lógico no tiene turnos: los dos jugadores se mueven a la vez, en
-   * tiempo real. Este mapa guarda el `setInterval` de "tick de movimiento"
-   * de cada sala activa (uno cada ~150ms mientras `phase === 'PLAYING'`),
-   * no un timeout de espera como los demás juegos.
-   */
-  private readonly dualQuestMovementTicks = new Map<string, NodeJS.Timeout>();
-
   private readonly dealTimers = new Map<string, NodeJS.Timeout>();
+
+  /** Fin de la espera a jugadores desconectados (issue #120): uno por sala o partida de torneo. */
+  private readonly waitTimers = new Map<string, NodeJS.Timeout>();
 
   /** Construido una vez en el constructor a partir de los stores inyectados — ver RoomRegistryEntry. */
   private readonly roomRegistry: RoomRegistryEntry[];
@@ -728,7 +672,6 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     @Inject(TOURNAMENT_STORE) private readonly tournamentStore: TournamentStore,
     @Inject(DOMINO_ROOM_STORE) private readonly dominoRoomStore: DominoRoomStore,
     @Inject(SNAKES_LADDERS_ROOM_STORE) private readonly snakesLaddersRoomStore: SnakesLaddersRoomStore,
-    @Inject(DUAL_QUEST_ROOM_STORE) private readonly dualQuestRoomStore: DualQuestRoomStore,
     private readonly analyticsTracker: AnalyticsTrackerService,
     @Optional() @Inject(GUESS_WHO_BOT_POLICY) botPolicy: GuessWhoBotPolicy = new HeuristicGuessWhoBotPolicy(),
     @Optional() @Inject(GUESS_WHO_FREE_ANSWERER) freeAnswerer?: GuessWhoFreeAnswerer,
@@ -806,8 +749,15 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       { kind: 'tournament', store: this.tournamentStore },
       { kind: 'domino', store: this.dominoRoomStore },
       { kind: 'snakes-ladders', store: this.snakesLaddersRoomStore },
-      { kind: 'dual-quest', store: this.dualQuestRoomStore },
     ];
+  }
+
+  /**
+   * Para los gateways de juegos que viven aparte (DuoLogicoGateway): suman su
+   * store al registro, así sus códigos se resuelven y no se repiten.
+   */
+  registerRoomStore(entry: RoomRegistryEntry) {
+    this.roomRegistry.push(entry);
   }
 
   /**
@@ -818,9 +768,9 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
    * el alfabeto de 32 símbolos eso es poco probable pero no imposible, y de
    * pasar, `handleResolveCode` resolvía silenciosamente al primer tipo que
    * encontrara en su orden de chequeo, mandando al jugador a la sala
-   * equivocada.
+   * equivocada. Público: DuoLogicoGateway también lo usa.
    */
-  private generateUniqueRoomCode(): string {
+  generateUniqueRoomCode(): string {
     let code = generateRoomCode();
     while (this.roomRegistry.some((entry) => entry.store.get(code))) {
       code = generateRoomCode();
@@ -869,35 +819,31 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   }
 
   handleDisconnect(socket: AuthenticatedSocket) {
+    this.dropSocket(socket, true);
+  }
+
+  /**
+   * Saca a un socket de sus salas. `wait`: se cortó la conexión (no salió a
+   * propósito). En plena partida con otras personas no se lo saca: la partida
+   * queda en pausa y se lo espera (issue #120); al volver a unirse sigue
+   * donde iba. Si no vuelve a tiempo, o si salió a propósito, sale como siempre.
+   */
+  private dropSocket(socket: AuthenticatedSocket, wait: boolean) {
     const room = this.roomStore.findBySocketId(socket.id);
     if (room) {
-      const wasWaiting = room.phase === 'WAITING';
-      this.cancelDealCountdown('room:' + room.code);
-      this.clearTurnTimer(room.code);
-      room.players = room.players.filter((player) => player.socketId !== socket.id);
-
-      // Partida en solitario: sin el jugador, el bot no tiene con quién jugar.
-      if (room.players.every((player) => player.bot)) {
-        this.roomStore.delete(room.code);
-        this.botRunner.forget(room.code);
-      } else {
-        if (!wasWaiting) resetLobbyReady(room.players);
-        if (!room.players.some((p) => p.userId === room.hostUserId)) room.hostUserId = room.players[0].userId;
-        room.phase = room.phase === 'FINISHED' ? room.phase : 'WAITING';
-        room.activePlayerUserId = null;
-        room.turnDeadline = null;
-        this.roomStore.set(room);
-        this.broadcastState(room);
-        if (wasWaiting) this.tryStartRoom(room);
-      }
+      const player = room.players.find((p) => p.socketId === socket.id);
+      if (wait && player && room.phase === 'PLAYING' && hasOtherHuman(room.players, player)) this.waitForRoomPlayer(room, player);
+      else this.removeFromRoom(room, socket.id);
     }
 
     // En espera solo cuentan los conectados; durante el torneo se conserva
-    // el participante para no alterar partidas ni ranking por un corte de red.
+    // el participante para no alterar partidas ni ranking por un corte de red
+    // (y su partida lo espera).
     const tournament = this.tournamentStore.findBySocketId(socket.id);
     if (tournament?.phase === 'WAITING') {
       this.handleTournamentLeave(socket);
     } else if (tournament) {
+      if (wait) this.waitForTournamentParticipant(tournament, socket.id);
       this.tournamentStore.set(tournament);
     }
 
@@ -909,66 +855,207 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       if (leaving) leaving.socketId = `pending:${leaving.userId}`;
       this.dominoRoomStore.set(dominoRoom);
     } else if (dominoRoom) {
-      const wasWaiting = dominoRoom.phase === 'WAITING';
-      this.cancelDealCountdown('domino:' + dominoRoom.code);
-      this.clearDominoTurnTimer(dominoRoom.code);
-      dominoRoom.players = dominoRoom.players.filter((player) => player.socketId !== socket.id);
-
-      if (dominoRoom.players.length === 0) {
-        this.dominoRoomStore.delete(dominoRoom.code);
-      } else {
-        if (!wasWaiting) resetLobbyReady(dominoRoom.players);
-        if (!dominoRoom.players.some((p) => p.userId === dominoRoom.hostUserId)) dominoRoom.hostUserId = dominoRoom.players[0].userId;
-        dominoRoom.phase = dominoRoom.phase === 'FINISHED' ? dominoRoom.phase : 'WAITING';
-        dominoRoom.activePlayerUserId = null;
-        dominoRoom.turnDeadline = null;
-        dominoRoom.pendingQuestion = null;
-        this.dominoRoomStore.set(dominoRoom);
-        this.broadcastDominoState(dominoRoom);
-        if (wasWaiting) this.tryStartDomino(dominoRoom);
-      }
+      const player = dominoRoom.players.find((p) => p.socketId === socket.id);
+      if (wait && player && dominoRoom.phase === 'PLAYING' && hasOtherHuman(dominoRoom.players, player)) this.waitForDominoPlayer(dominoRoom, player);
+      else this.removeFromDomino(dominoRoom, socket.id);
     }
 
     const snakesLaddersRoom = this.snakesLaddersRoomStore.findBySocketId(socket.id);
     if (snakesLaddersRoom) {
-      const wasWaiting = snakesLaddersRoom.phase === 'WAITING';
-      this.cancelDealCountdown('snakes-ladders:' + snakesLaddersRoom.code);
-      this.clearSnakesLaddersTurnTimer(snakesLaddersRoom.code);
-      snakesLaddersRoom.players = snakesLaddersRoom.players.filter((player) => player.socketId !== socket.id);
-
-      if (snakesLaddersRoom.players.length === 0) {
-        this.snakesLaddersRoomStore.delete(snakesLaddersRoom.code);
-      } else {
-        if (!wasWaiting) resetLobbyReady(snakesLaddersRoom.players);
-        if (!snakesLaddersRoom.players.some((p) => p.userId === snakesLaddersRoom.hostUserId)) snakesLaddersRoom.hostUserId = snakesLaddersRoom.players[0].userId;
-        snakesLaddersRoom.phase = snakesLaddersRoom.phase === 'FINISHED' ? snakesLaddersRoom.phase : 'WAITING';
-        snakesLaddersRoom.activePlayerUserId = null;
-        snakesLaddersRoom.turnDeadline = null;
-        snakesLaddersRoom.pendingChallenge = null;
-        this.snakesLaddersRoomStore.set(snakesLaddersRoom);
-        this.broadcastSnakesLaddersState(snakesLaddersRoom);
-        if (wasWaiting) this.tryStartSnakesLadders(snakesLaddersRoom);
-      }
+      const player = snakesLaddersRoom.players.find((p) => p.socketId === socket.id);
+      if (wait && player && snakesLaddersRoom.phase === 'PLAYING' && hasOtherHuman(snakesLaddersRoom.players, player)) {
+        this.waitForSnakesLaddersPlayer(snakesLaddersRoom, player);
+      } else this.removeFromSnakesLadders(snakesLaddersRoom, socket.id);
     }
+  }
 
-    const dualQuestRoom = this.dualQuestRoomStore.findBySocketId(socket.id);
-    if (dualQuestRoom) {
-      const wasWaiting = dualQuestRoom.phase === 'WAITING';
-      this.cancelDealCountdown('dual-quest:' + dualQuestRoom.code);
-      this.clearDualQuestMovementTick(dualQuestRoom.code);
-      dualQuestRoom.players = dualQuestRoom.players.filter((player) => player.socketId !== socket.id);
+  /** (Re)programa el fin de la próxima espera de `game`; sin nadie a quien esperar, la cancela. */
+  private scheduleWait(key: string, game: PausableGame, onExpire: () => void) {
+    this.clearWait(key);
+    const next = nextWaitDeadline(game);
+    if (next === null) return;
+    const timer = setTimeout(() => {
+      this.waitTimers.delete(key);
+      onExpire();
+    }, Math.max(0, next - Date.now()));
+    this.waitTimers.set(key, timer);
+  }
 
-      if (dualQuestRoom.players.length === 0) {
-        this.dualQuestRoomStore.delete(dualQuestRoom.code);
-      } else {
-        if (!wasWaiting) resetLobbyReady(dualQuestRoom.players);
-        if (!dualQuestRoom.players.some((p) => p.userId === dualQuestRoom.hostUserId)) dualQuestRoom.hostUserId = dualQuestRoom.players[0].userId;
-        dualQuestRoom.phase = dualQuestRoom.phase === 'FINISHED' ? dualQuestRoom.phase : 'WAITING';
-        dualQuestRoom.pendingQuestion = null;
-        this.dualQuestRoomStore.set(dualQuestRoom);
-        this.broadcastDualQuestState(dualQuestRoom);
-        if (wasWaiting) this.tryStartDualQuest(dualQuestRoom);
-      }
+  private clearWait(key: string) {
+    clearTimeout(this.waitTimers.get(key));
+    this.waitTimers.delete(key);
+  }
+
+  /**
+   * Sale de la sala (o no volvió a tiempo): como siempre, la partida vuelve a
+   * la sala de espera. Con él salen quienes se esperaban: la partida ya no sigue.
+   */
+  private removeFromRoom(room: RoomState, socketId: string) {
+    const wasWaiting = room.phase === 'WAITING';
+    this.cancelDealCountdown('room:' + room.code);
+    this.clearTurnTimer(room.code);
+    this.clearWait('room:' + room.code);
+    clearWaiting(room);
+    room.players = room.players.filter((player) => player.socketId !== socketId && !isWaitingSocketId(player.socketId));
+
+    // Partida en solitario: sin el jugador, el bot no tiene con quién jugar.
+    if (room.players.every((player) => player.bot)) {
+      this.roomStore.delete(room.code);
+      this.botRunner.forget(room.code);
+      return;
+    }
+    if (!wasWaiting) resetLobbyReady(room.players);
+    if (!room.players.some((p) => p.userId === room.hostUserId)) room.hostUserId = room.players[0].userId;
+    room.phase = room.phase === 'FINISHED' ? room.phase : 'WAITING';
+    room.activePlayerUserId = null;
+    room.turnDeadline = null;
+    this.roomStore.set(room);
+    this.broadcastState(room);
+    if (wasWaiting) this.tryStartRoom(room);
+  }
+
+  /** Se cortó su conexión en plena partida: pausa (el reloj del turno se congela) y se lo espera. */
+  private waitForRoomPlayer(room: RoomState, player: RoomState['players'][number]) {
+    if (startWaiting(room, player.userId, Date.now(), room.turnDeadline)) {
+      this.clearTurnTimer(room.code);
+      room.turnDeadline = null;
+    }
+    player.socketId = waitingSocketId(player.userId);
+    this.roomStore.set(room);
+    this.broadcastState(room);
+    this.scheduleWait('room:' + room.code, room, () => this.expireRoomWaits(room.code));
+  }
+
+  private expireRoomWaits(code: string) {
+    const room = this.roomStore.get(code);
+    if (!room) return;
+    const [late] = expiredWaits(room, Date.now());
+    if (late) this.removeFromRoom(room, waitingSocketId(late));
+    else this.scheduleWait('room:' + code, room, () => this.expireRoomWaits(code));
+  }
+
+  /** Volvió quien se esperaba: si ya no falta nadie, el turno sigue con el tiempo que le quedaba. */
+  private resumeRoomPlayer(room: RoomState, userId: string) {
+    const back = stopWaiting(room, userId);
+    if (!back) return;
+    if (!back.resumed) return this.scheduleWait('room:' + room.code, room, () => this.expireRoomWaits(room.code));
+    this.clearWait('room:' + room.code);
+    if (room.phase !== 'PLAYING' || !room.activePlayerUserId) return;
+    const ms = back.remainingMs ?? room.turnDurationSeconds * 1000;
+    room.turnDeadline = Date.now() + ms;
+    this.armTurnTimer(room, room.activePlayerUserId, ms);
+  }
+
+  private removeFromDomino(room: DominoRoomState, socketId: string) {
+    const wasWaiting = room.phase === 'WAITING';
+    this.cancelDealCountdown('domino:' + room.code);
+    this.clearDominoTurnTimer(room.code);
+    this.clearWait('domino:' + room.code);
+    clearWaiting(room);
+    room.players = room.players.filter((player) => player.socketId !== socketId && !isWaitingSocketId(player.socketId));
+
+    if (room.players.length === 0) {
+      this.dominoRoomStore.delete(room.code);
+      return;
+    }
+    if (!wasWaiting) resetLobbyReady(room.players);
+    if (!room.players.some((p) => p.userId === room.hostUserId)) room.hostUserId = room.players[0].userId;
+    room.phase = room.phase === 'FINISHED' ? room.phase : 'WAITING';
+    room.activePlayerUserId = null;
+    room.turnDeadline = null;
+    room.pendingQuestion = null;
+    this.dominoRoomStore.set(room);
+    this.broadcastDominoState(room);
+    if (wasWaiting) this.tryStartDomino(room);
+  }
+
+  private waitForDominoPlayer(room: DominoRoomState, player: DominoRoomState['players'][number]) {
+    if (startWaiting(room, player.userId, Date.now(), room.turnDeadline)) {
+      this.clearDominoTurnTimer(room.code);
+      room.turnDeadline = null;
+    }
+    player.socketId = waitingSocketId(player.userId);
+    this.dominoRoomStore.set(room);
+    this.broadcastDominoState(room);
+    this.scheduleWait('domino:' + room.code, room, () => this.expireDominoWaits(room.code));
+  }
+
+  private expireDominoWaits(code: string) {
+    const room = this.dominoRoomStore.get(code);
+    if (!room) return;
+    const [late] = expiredWaits(room, Date.now());
+    if (late) this.removeFromDomino(room, waitingSocketId(late));
+    else this.scheduleWait('domino:' + code, room, () => this.expireDominoWaits(code));
+  }
+
+  private resumeDominoPlayer(room: DominoRoomState, userId: string) {
+    const back = stopWaiting(room, userId);
+    if (!back) return;
+    if (!back.resumed) return this.scheduleWait('domino:' + room.code, room, () => this.expireDominoWaits(room.code));
+    this.clearWait('domino:' + room.code);
+    if (room.phase !== 'PLAYING' || !room.activePlayerUserId) return;
+    const ms = back.remainingMs ?? room.turnDurationSeconds * 1000;
+    room.turnDeadline = Date.now() + ms;
+    this.startDominoTurnTimer(room, room.activePlayerUserId, ms);
+  }
+
+  private removeFromSnakesLadders(room: SnakesLaddersRoomState, socketId: string) {
+    const wasWaiting = room.phase === 'WAITING';
+    this.cancelDealCountdown('snakes-ladders:' + room.code);
+    this.clearSnakesLaddersTurnTimer(room.code);
+    this.clearWait('snakes-ladders:' + room.code);
+    clearWaiting(room);
+    room.players = room.players.filter((player) => player.socketId !== socketId && !isWaitingSocketId(player.socketId));
+
+    if (room.players.length === 0) {
+      this.snakesLaddersRoomStore.delete(room.code);
+      return;
+    }
+    if (!wasWaiting) resetLobbyReady(room.players);
+    if (!room.players.some((p) => p.userId === room.hostUserId)) room.hostUserId = room.players[0].userId;
+    room.phase = room.phase === 'FINISHED' ? room.phase : 'WAITING';
+    room.activePlayerUserId = null;
+    room.turnDeadline = null;
+    room.pendingChallenge = null;
+    this.snakesLaddersRoomStore.set(room);
+    this.broadcastSnakesLaddersState(room);
+    if (wasWaiting) this.tryStartSnakesLadders(room);
+  }
+
+  /** Con un reto pendiente, lo que se congela es el reloj del reto (no el de la tirada). */
+  private waitForSnakesLaddersPlayer(room: SnakesLaddersRoomState, player: SnakesLaddersRoomState['players'][number]) {
+    const deadline = room.pendingChallenge ? room.pendingChallenge.deadlineTs : room.turnDeadline;
+    if (startWaiting(room, player.userId, Date.now(), deadline)) {
+      this.clearSnakesLaddersTurnTimer(room.code);
+      room.turnDeadline = null;
+    }
+    player.socketId = waitingSocketId(player.userId);
+    this.snakesLaddersRoomStore.set(room);
+    this.broadcastSnakesLaddersState(room);
+    this.scheduleWait('snakes-ladders:' + room.code, room, () => this.expireSnakesLaddersWaits(room.code));
+  }
+
+  private expireSnakesLaddersWaits(code: string) {
+    const room = this.snakesLaddersRoomStore.get(code);
+    if (!room) return;
+    const [late] = expiredWaits(room, Date.now());
+    if (late) this.removeFromSnakesLadders(room, waitingSocketId(late));
+    else this.scheduleWait('snakes-ladders:' + code, room, () => this.expireSnakesLaddersWaits(code));
+  }
+
+  private resumeSnakesLaddersPlayer(room: SnakesLaddersRoomState, userId: string) {
+    const back = stopWaiting(room, userId);
+    if (!back) return;
+    if (!back.resumed) return this.scheduleWait('snakes-ladders:' + room.code, room, () => this.expireSnakesLaddersWaits(room.code));
+    this.clearWait('snakes-ladders:' + room.code);
+    if (room.phase !== 'PLAYING' || !room.activePlayerUserId) return;
+    const ms = back.remainingMs ?? room.turnDurationSeconds * 1000;
+    if (room.pendingChallenge) {
+      room.pendingChallenge.deadlineTs = Date.now() + ms;
+      this.armSnakesLaddersChallengeTimer(room, ms);
+    } else {
+      room.turnDeadline = Date.now() + ms;
+      this.armSnakesLaddersTurnTimer(room, room.activePlayerUserId, ms);
     }
   }
 
@@ -1130,6 +1217,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
         this.cancelDealCountdown('room:' + room.code);
       }
       existing.socketId = socket.id;
+      this.resumeRoomPlayer(room, existing.userId);
     } else {
       if (room.phase !== 'WAITING') throw new Error('La partida ya inició.');
       room.players.push({
@@ -1247,6 +1335,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   handleQuestion(@ConnectedSocket() socket: AuthenticatedSocket, @MessageBody() body: { questionId: string }) {
     const room = this.roomStore.findBySocketId(socket.id);
     if (!room) throw new Error('No estás en ninguna sala.');
+    assertNotPaused(room, (id) => playerName(room.players, id));
     this.askInRoom(room, socket.data.userId, socket.data.displayName, body?.questionId);
   }
 
@@ -1255,6 +1344,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   handleFreeQuestion(@ConnectedSocket() socket: AuthenticatedSocket, @MessageBody() body: { text: string }) {
     const room = this.roomStore.findBySocketId(socket.id);
     if (!room) throw new Error('No estás en ninguna sala.');
+    assertNotPaused(room, (id) => playerName(room.players, id));
     askFreeQuestion(room, socket.data.userId, socket.data.displayName, body?.text);
     this.roomStore.set(room);
     this.broadcastState(room);
@@ -1264,6 +1354,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   handleAnswer(@ConnectedSocket() socket: AuthenticatedSocket, @MessageBody() body: { requestId: string; answer: boolean }) {
     const room = this.roomStore.findBySocketId(socket.id);
     if (!room) throw new Error('No estás en ninguna sala.');
+    assertNotPaused(room, (id) => playerName(room.players, id));
     this.answerInRoom(room, socket.data.userId, socket.data.displayName, body?.requestId, body?.answer);
   }
 
@@ -1277,7 +1368,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
 
   @SubscribeMessage('tournament:match-question')
   handleMatchQuestion(@ConnectedSocket() socket: AuthenticatedSocket, @MessageBody() body: { questionId: string }) {
-    const { tournament, match } = this.requireActiveTournamentMatch(socket);
+    const { tournament, match } = this.requirePlayableTournamentMatch(socket);
     askGuidedQuestion(match, socket.data.userId, socket.data.displayName, body?.questionId);
     const asker = tournament.participants.find((p) => p.userId === socket.data.userId);
     if (asker) asker.questionsAsked = (asker.questionsAsked ?? 0) + 1;
@@ -1287,7 +1378,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
 
   @SubscribeMessage('tournament:match-answer')
   handleMatchAnswer(@ConnectedSocket() socket: AuthenticatedSocket, @MessageBody() body: { requestId: string; answer: boolean }) {
-    const { tournament, match } = this.requireActiveTournamentMatch(socket);
+    const { tournament, match } = this.requirePlayableTournamentMatch(socket);
     answerGuidedQuestion(match, socket.data.userId, socket.data.displayName, body?.requestId, body?.answer);
     // Una pregunta por turno, intercalada (issue #64).
     this.advanceTournamentMatchTurn(tournament, match);
@@ -1305,13 +1396,6 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     const room = this.snakesLaddersRoomStore.findBySocketId(socket.id);
     if (!room) throw new Error('No estás en ninguna sala.');
     this.relayLobbyChat(socket, body, room.players, 'snakes-ladders:chat-message');
-  }
-
-  @SubscribeMessage('dual-quest:chat')
-  handleDualQuestChat(@ConnectedSocket() socket: AuthenticatedSocket, @MessageBody() body: { text: string }) {
-    const room = this.dualQuestRoomStore.findBySocketId(socket.id);
-    if (!room) throw new Error('No estás en ninguna sala.');
-    this.relayLobbyChat(socket, body, room.players, 'dual-quest:chat-message');
   }
 
   @SubscribeMessage('tournament:chat')
@@ -1458,6 +1542,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   private requirePlayingRoom(socket: AuthenticatedSocket): RoomState {
     const room = this.roomStore.findBySocketId(socket.id);
     if (!room || room.phase !== 'PLAYING') throw new Error('La partida no está en curso.');
+    assertNotPaused(room, (id) => playerName(room.players, id));
     return room;
   }
 
@@ -1523,7 +1608,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
 
   @SubscribeMessage('room:leave')
   handleLeave(@ConnectedSocket() socket: AuthenticatedSocket) {
-    this.handleDisconnect(socket);
+    this.dropSocket(socket, false);
     socket.disconnect();
   }
 
@@ -1536,12 +1621,17 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     this.roomStore.set(room);
     this.broadcastState(room);
 
+    this.armTurnTimer(room, userId, room.turnDurationSeconds * 1000);
+  }
+
+  /** Programa el auto-pase del turno de `userId` en `delayMs` (todo el turno, o lo que le quedaba al reanudar). */
+  private armTurnTimer(room: RoomState, userId: string, delayMs: number) {
     this.clearTurnTimer(room.code);
     const timer = setTimeout(() => {
       const current = this.roomStore.get(room.code);
       if (!current || current.phase !== 'PLAYING' || current.activePlayerUserId !== userId) return;
       this.advanceTurn(current);
-    }, room.turnDurationSeconds * 1000);
+    }, delayMs);
     this.turnTimers.set(room.code, timer);
   }
 
@@ -1677,7 +1767,9 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     if (tournament.phase !== 'WAITING' && !existing) throw new Error('El torneo ya inició.');
 
     if (existing) {
+      if (tournament.phase === 'WAITING' && existing.socketId !== socket.id) existing.ready = false;
       existing.socketId = socket.id;
+      if (tournament.phase === 'RUNNING') this.resumeTournamentParticipant(tournament, existing.userId);
     } else {
       if (tournament.participants.length >= tournament.maxParticipants) {
         throw new Error('La sala ya alcanzó su cupo máximo.');
@@ -2325,6 +2417,10 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     this.tournamentStore.set(tournament);
     this.broadcastMatchState(tournament, match);
 
+    this.armTournamentTurnTimer(tournament, match, userId, turnSeconds * 1000);
+  }
+
+  private armTournamentTurnTimer(tournament: TournamentState, match: TournamentMatch, userId: string, delayMs: number) {
     this.clearTournamentTurnTimer(match.matchCode);
     const timer = setTimeout(() => {
       const current = this.tournamentStore.get(tournament.code);
@@ -2333,8 +2429,61 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
         return;
       }
       this.advanceTournamentMatchTurn(current, currentMatch);
-    }, turnSeconds * 1000);
+    }, delayMs);
     this.tournamentTurnTimers.set(match.matchCode, timer);
+  }
+
+  /** La partida en curso de un participante en la ronda actual, si tiene una. */
+  private playingTournamentMatch(tournament: TournamentState, userId: string): TournamentMatch | undefined {
+    return tournament.matches.find((m) => m.round === tournament.currentRound && m.phase === 'PLAYING' && m.playerUserIds.includes(userId));
+  }
+
+  /** Se cortó la conexión de un participante: si estaba jugando su partida, se pausa y se lo espera (issue #120). */
+  private waitForTournamentParticipant(tournament: TournamentState, socketId: string) {
+    const participant = tournament.participants.find((p) => p.socketId === socketId);
+    const match = participant && this.playingTournamentMatch(tournament, participant.userId);
+    if (!participant || !match) return;
+    if (startWaiting(match, participant.userId, Date.now(), match.turnDeadline)) {
+      this.clearTournamentTurnTimer(match.matchCode);
+      match.turnDeadline = null;
+    }
+    participant.socketId = waitingSocketId(participant.userId);
+    this.broadcastMatchState(tournament, match);
+    this.scheduleWait('tournament:' + match.matchCode, match, () => this.expireTournamentWaits(tournament.code, match.matchCode));
+  }
+
+  /**
+   * No volvió a tiempo: como antes de esta espera, la partida sigue y su turno
+   * pasa solo al vencer (el torneo conserva al participante para el ranking).
+   */
+  private expireTournamentWaits(code: string, matchCode: string) {
+    const tournament = this.tournamentStore.get(code);
+    const match = tournament?.matches.find((m) => m.matchCode === matchCode);
+    if (!tournament || !match) return;
+    let back: ReturnType<typeof stopWaiting> = null;
+    for (const userId of expiredWaits(match, Date.now())) back = stopWaiting(match, userId) ?? back;
+    if (back?.resumed) this.resumeTournamentMatch(tournament, match, back.remainingMs);
+    else this.scheduleWait('tournament:' + matchCode, match, () => this.expireTournamentWaits(code, matchCode));
+    this.tournamentStore.set(tournament);
+    this.broadcastMatchState(tournament, match);
+  }
+
+  private resumeTournamentMatch(tournament: TournamentState, match: TournamentMatch, remainingMs: number | null) {
+    this.clearWait('tournament:' + match.matchCode);
+    if (match.phase !== 'PLAYING' || !match.activePlayerUserId) return;
+    const ms = remainingMs ?? tournament.turnDurationSeconds * 1000;
+    match.turnDeadline = Date.now() + ms;
+    this.armTournamentTurnTimer(tournament, match, match.activePlayerUserId, ms);
+  }
+
+  /** Volvió un participante: si su partida lo esperaba, sigue. */
+  private resumeTournamentParticipant(tournament: TournamentState, userId: string) {
+    const match = this.playingTournamentMatch(tournament, userId);
+    const back = match && stopWaiting(match, userId);
+    if (!match || !back) return;
+    if (back.resumed) this.resumeTournamentMatch(tournament, match, back.remainingMs);
+    else this.scheduleWait('tournament:' + match.matchCode, match, () => this.expireTournamentWaits(tournament.code, match.matchCode));
+    this.broadcastMatchState(tournament, match);
   }
 
   private advanceTournamentMatchTurn(tournament: TournamentState, match: TournamentMatch) {
@@ -2353,7 +2502,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
 
   @SubscribeMessage('tournament:match-pass-turn')
   handleTournamentMatchPassTurn(@ConnectedSocket() socket: AuthenticatedSocket) {
-    const { tournament, match } = this.requireActiveTournamentMatch(socket);
+    const { tournament, match } = this.requirePlayableTournamentMatch(socket);
     assertCanPassTurn(match, socket.data.userId);
     this.advanceTournamentMatchTurn(tournament, match);
   }
@@ -2363,7 +2512,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     @ConnectedSocket() socket: AuthenticatedSocket,
     @MessageBody() body: { cardId: string },
   ) {
-    const { tournament, match } = this.requireActiveTournamentMatch(socket);
+    const { tournament, match } = this.requirePlayableTournamentMatch(socket);
     toggleDiscard(match, socket.data.userId, body?.cardId);
     this.tournamentStore.set(tournament);
     this.broadcastMatchState(tournament, match);
@@ -2374,7 +2523,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     @ConnectedSocket() socket: AuthenticatedSocket,
     @MessageBody() body: { cardId: string },
   ) {
-    const { tournament, match } = this.requireActiveTournamentMatch(socket);
+    const { tournament, match } = this.requirePlayableTournamentMatch(socket);
     this.accuseInTournamentMatch(tournament, match, socket.data.userId, body?.cardId);
   }
 
@@ -2445,6 +2594,13 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
 
     // Nadie queda eliminado: todos vuelven a emparejarse al azar para la siguiente ronda.
     this.startTournamentRound(tournament, tournament.participants.map((p) => p.userId));
+  }
+
+  /** Como requireActiveTournamentMatch, pero la partida además no puede estar en pausa (issue #120). */
+  private requirePlayableTournamentMatch(socket: AuthenticatedSocket) {
+    const found = this.requireActiveTournamentMatch(socket);
+    assertNotPaused(found.match, (id) => playerName(found.tournament.participants, id));
+    return found;
   }
 
   private requireActiveTournamentMatch(socket: AuthenticatedSocket): {
@@ -2581,6 +2737,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
         this.cancelDealCountdown('domino:' + room.code);
       }
       existing.socketId = socket.id;
+      this.resumeDominoPlayer(room, existing.userId);
     } else {
       if (room.phase !== 'WAITING') throw new Error('La partida ya inició.');
       room.players.push({
@@ -2730,6 +2887,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   ) {
     const room = this.dominoRoomStore.findBySocketId(socket.id);
     if (!room || room.phase !== 'PLAYING') throw new Error('La partida no está en curso.');
+    assertNotPaused(room, (id) => playerName(room.players, id));
 
     const player = room.players.find((p) => p.socketId === socket.id);
     if (!player) throw new Error('No estás en esta sala.');
@@ -2780,6 +2938,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   handleDominoAnswer(@ConnectedSocket() socket: AuthenticatedSocket, @MessageBody() body: { optionIndex: number }) {
     const room = this.dominoRoomStore.findBySocketId(socket.id);
     if (!room || room.phase !== 'PLAYING') throw new Error('La partida no está en curso.');
+    assertNotPaused(room, (id) => playerName(room.players, id));
 
     const player = room.players.find((p) => p.socketId === socket.id);
     if (!player) throw new Error('No estás en esta sala.');
@@ -2867,6 +3026,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   handleDominoDraw(@ConnectedSocket() socket: AuthenticatedSocket) {
     const room = this.dominoRoomStore.findBySocketId(socket.id);
     if (!room || room.phase !== 'PLAYING') throw new Error('La partida no está en curso.');
+    assertNotPaused(room, (id) => playerName(room.players, id));
 
     const player = room.players.find((p) => p.socketId === socket.id);
     if (!player) throw new Error('No estás en esta sala.');
@@ -2890,6 +3050,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   handleDominoPass(@ConnectedSocket() socket: AuthenticatedSocket) {
     const room = this.dominoRoomStore.findBySocketId(socket.id);
     if (!room || room.phase !== 'PLAYING') throw new Error('La partida no está en curso.');
+    assertNotPaused(room, (id) => playerName(room.players, id));
 
     const player = room.players.find((p) => p.socketId === socket.id);
     if (!player) throw new Error('No estás en esta sala.');
@@ -2965,7 +3126,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
         });
       }
     }
-    this.handleDisconnect(socket);
+    this.dropSocket(socket, false);
     socket.disconnect();
   }
 
@@ -2998,7 +3159,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   }
 
   /** (Re)inicia el reloj del turno de `userId`; al vencer, el servidor decide por el jugador inactivo. */
-  private startDominoTurnTimer(room: DominoRoomState, userId: string) {
+  private startDominoTurnTimer(room: DominoRoomState, userId: string, delayMs = room.turnDurationSeconds * 1000) {
     this.clearDominoTurnTimer(room.code);
     const timer = setTimeout(() => {
       const current = this.dominoRoomStore.get(room.code);
@@ -3020,7 +3181,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
         this.broadcastDominoState(current);
       }
       this.advanceDominoTurn(current);
-    }, room.turnDurationSeconds * 1000);
+    }, delayMs);
     this.dominoTurnTimers.set(room.code, timer);
   }
 
@@ -3128,6 +3289,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
         this.cancelDealCountdown('snakes-ladders:' + room.code);
       }
       existing.socketId = socket.id;
+      this.resumeSnakesLaddersPlayer(room, existing.userId);
     } else {
       if (room.phase !== 'WAITING') throw new Error('La partida ya inició.');
       room.players.push({
@@ -3201,6 +3363,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   handleSnakesLaddersRoll(@ConnectedSocket() socket: AuthenticatedSocket) {
     const room = this.snakesLaddersRoomStore.findBySocketId(socket.id);
     if (!room || room.phase !== 'PLAYING') throw new Error('La partida no está en curso.');
+    assertNotPaused(room, (id) => playerName(room.players, id));
 
     const player = room.players.find((p) => p.socketId === socket.id);
     if (!player) throw new Error('No estás en esta sala.');
@@ -3256,6 +3419,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     if (!room || room.phase !== 'PLAYING' || !room.pendingChallenge) {
       throw new Error('No hay ningún reto pendiente.');
     }
+    assertNotPaused(room, (id) => playerName(room.players, id));
     if (room.pendingChallenge.forUserId !== socket.data.userId) {
       throw new Error('Este reto no es tuyo.');
     }
@@ -3359,7 +3523,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
 
   @SubscribeMessage('snakes-ladders:leave')
   handleSnakesLaddersLeave(@ConnectedSocket() socket: AuthenticatedSocket) {
-    this.handleDisconnect(socket);
+    this.dropSocket(socket, false);
     socket.disconnect();
   }
 
@@ -3385,6 +3549,11 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     this.snakesLaddersRoomStore.set(room);
     this.broadcastSnakesLaddersState(room);
 
+    this.armSnakesLaddersTurnTimer(room, userId, room.turnDurationSeconds * 1000);
+  }
+
+  /** Timer de "no tiró a tiempo" en `delayMs` (todo el turno, o lo que le quedaba al reanudar). */
+  private armSnakesLaddersTurnTimer(room: SnakesLaddersRoomState, userId: string, delayMs: number) {
     this.clearSnakesLaddersTurnTimer(room.code);
     const timer = setTimeout(() => {
       const current = this.snakesLaddersRoomStore.get(room.code);
@@ -3393,18 +3562,18 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       // Nadie tiró a tiempo: el servidor pasa el turno sin mover a nadie,
       // para que la partida nunca quede colgada.
       this.advanceSnakesLaddersTurn(current);
-    }, room.turnDurationSeconds * 1000);
+    }, delayMs);
     this.snakesLaddersTurnTimers.set(room.code, timer);
   }
 
   /** Arma el timer de "esperando respuesta al reto" — si vence, cuenta como fallo automático (mismo criterio que Dominó: el servidor nunca deja la partida colgada). */
-  private armSnakesLaddersChallengeTimer(room: SnakesLaddersRoomState) {
+  private armSnakesLaddersChallengeTimer(room: SnakesLaddersRoomState, delayMs = room.turnDurationSeconds * 1000) {
     this.clearSnakesLaddersTurnTimer(room.code);
     const timer = setTimeout(() => {
       const current = this.snakesLaddersRoomStore.get(room.code);
       if (!current || current.phase !== 'PLAYING' || !current.pendingChallenge) return;
       this.resolveSnakesLaddersChallenge(current, null);
-    }, room.turnDurationSeconds * 1000);
+    }, delayMs);
     this.snakesLaddersTurnTimers.set(room.code, timer);
   }
 
@@ -3430,394 +3599,6 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       this.server
         .to(player.socketId)
         .emit('snakes-ladders:state', toSnakesLaddersClientView(room, player.socketId));
-    }
-  }
-
-  // ---------------------------------------------------------------------
-  // Dúo Lógico: sala cooperativa de exactamente 2 jugadores (FIRE y WATER)
-  // moviéndose en tiempo real sobre una cuadrícula compartida — a
-  // diferencia de todos los juegos anteriores (por turnos), acá el
-  // servidor corre un tick continuo por sala que mueve a ambos jugadores
-  // a la vez. La Fase 3 agrega la recolección de gemas y el ensamblaje
-  // final sobre esta misma sala.
-  // ---------------------------------------------------------------------
-
-  private static readonly DUAL_QUEST_TICK_MS = 150;
-
-  @SubscribeMessage('dual-quest:create')
-  async handleDualQuestCreate(
-    @ConnectedSocket() socket: AuthenticatedSocket,
-    @MessageBody() body: { gameId: string; role?: DualQuestRole },
-  ) {
-    const game = await this.gameRepository.findById(body.gameId);
-    if (!game || game.gameType.getName() !== 'DUAL_QUEST') {
-      throw new Error('Juego no encontrado o no es de tipo Dúo Lógico.');
-    }
-
-    const code = this.generateUniqueRoomCode();
-
-    const role: DualQuestRole = body.role === 'WATER' ? 'WATER' : 'FIRE';
-    const startPosition = role === 'FIRE' ? (game.config.fireStart as DualQuestCellPosition) : (game.config.waterStart as DualQuestCellPosition);
-
-    const room: DualQuestRoomState = {
-      code,
-      gameId: game.id,
-      gameTitle: game.title,
-      coreQuestion: game.config.coreQuestion as string,
-      gridCols: game.config.gridCols as number,
-      gridRows: game.config.gridRows as number,
-      grid: game.config.grid as number[][],
-      fireStart: game.config.fireStart as DualQuestCellPosition,
-      waterStart: game.config.waterStart as DualQuestCellPosition,
-      corePosition: game.config.corePosition as DualQuestCellPosition,
-      gates: (game.config.gates as Array<{ gateId: string; position: DualQuestCellPosition }>).map((gate) => ({
-        ...gate,
-        open: false,
-      })),
-      triggers: game.config.triggers as DualQuestTrigger[],
-      fragmentGems: game.content as DualQuestFragmentGem[],
-      collectedGemIds: [],
-      hostUserId: socket.data.userId,
-      phase: 'WAITING',
-      players: [
-        {
-          socketId: socket.id,
-          userId: socket.data.userId,
-          displayName: socket.data.displayName,
-          ready: false,
-          role,
-          position: startPosition,
-          desiredDirection: null,
-        },
-      ],
-      pendingQuestion: null,
-      bothAtCore: false,
-      createdAt: Date.now(),
-    };
-
-    this.dualQuestRoomStore.create(room);
-    socket.join(`dual-quest:${code}`);
-    socket.emit('dual-quest:state', toDualQuestClientView(room, socket.id));
-
-    void this.analyticsTracker.track({
-      type: 'room_created',
-      userId: socket.data.userId,
-      gameId: game.id,
-      metadata: { mode: 'dual-quest', role },
-    });
-  }
-
-  @SubscribeMessage('dual-quest:join')
-  handleDualQuestJoin(@ConnectedSocket() socket: AuthenticatedSocket, @MessageBody() body: { code: string }) {
-    const code = body.code?.trim().toUpperCase();
-    const room = this.dualQuestRoomStore.get(code);
-
-    if (!room) throw new Error('No existe una sala de Dúo Lógico con ese código.');
-
-    const existing = room.players.find((player) => player.userId === socket.data.userId);
-    if (existing) {
-      if (room.phase === 'WAITING' && existing.socketId !== socket.id) {
-        existing.ready = false;
-        this.cancelDealCountdown('dual-quest:' + room.code);
-      }
-      existing.socketId = socket.id;
-    } else {
-      if (room.phase !== 'WAITING') throw new Error('La partida ya inició.');
-      if (room.players.length >= 2) throw new Error('La sala ya está llena.');
-      // El segundo jugador siempre recibe el rol que falta — Dúo Lógico
-      // necesita exactamente un FIRE y un WATER, nunca dos del mismo.
-      const takenRole = room.players[0]?.role;
-      const role: DualQuestRole = takenRole === 'FIRE' ? 'WATER' : 'FIRE';
-      const startPosition = role === 'FIRE' ? room.fireStart : room.waterStart;
-      room.players.push({
-        socketId: socket.id,
-        userId: socket.data.userId,
-        displayName: socket.data.displayName,
-        ready: false,
-        role,
-        position: startPosition,
-        desiredDirection: null,
-      });
-    }
-
-    this.dualQuestRoomStore.set(room);
-    socket.join(`dual-quest:${code}`);
-    this.broadcastDualQuestState(room);
-  }
-
-  /** Compatibilidad: Iniciar solo confirma al emisor, nunca a toda la sala. */
-  @SubscribeMessage('dual-quest:start')
-  handleDualQuestStart(@ConnectedSocket() socket: AuthenticatedSocket) {
-    this.handleDualQuestReady(socket, { ready: true });
-  }
-
-  @SubscribeMessage('dual-quest:ready')
-  handleDualQuestReady(@ConnectedSocket() socket: AuthenticatedSocket, @MessageBody() body: { ready: boolean }) {
-    const room = this.dualQuestRoomStore.findBySocketId(socket.id);
-    if (!room) throw new Error('No estás en ninguna sala.');
-    // Una retransmisión del último Listo no inicia otra partida ni produce un error tardío.
-    if (room.phase !== 'WAITING' && body?.ready === true && room.players.some(
-      (p) => p.socketId === socket.id && p.userId === socket.data.userId && p.ready === true,
-    )) return;
-    if (room.phase !== 'WAITING') throw new Error('La sala ya no está esperando jugadores.');
-    if (!recordLobbyReady(room.players, socket, body?.ready)) return;
-    this.cancelDealCountdown('dual-quest:' + room.code);
-    this.dualQuestRoomStore.set(room);
-    this.broadcastDualQuestState(room);
-    this.tryStartDualQuest(room);
-  }
-
-  private tryStartDualQuest(room: DualQuestRoomState) {
-    if (room.phase !== 'WAITING' || !allLobbyReady(room.players)) return;
-    room.phase = 'PLAYING';
-    room.bothAtCore = false;
-    room.pendingQuestion = null;
-    this.dualQuestRoomStore.set(room);
-    this.broadcastDualQuestState(room);
-    this.startDualQuestMovementTick(room.code);
-  }
-
-  /** El jugador solo manda su dirección deseada — el tick del servidor decide si de verdad se mueve. */
-  @SubscribeMessage('dual-quest:move')
-  handleDualQuestMove(
-    @ConnectedSocket() socket: AuthenticatedSocket,
-    @MessageBody() body: { direction: DualQuestDirection | null },
-  ) {
-    const room = this.dualQuestRoomStore.findBySocketId(socket.id);
-    if (!room || room.phase !== 'PLAYING') return;
-
-    const player = room.players.find((p) => p.socketId === socket.id);
-    if (!player) return;
-
-    player.desiredDirection = body.direction ?? null;
-    this.dualQuestRoomStore.set(room);
-  }
-
-  @SubscribeMessage('dual-quest:activate-trigger')
-  handleDualQuestActivateTrigger(
-    @ConnectedSocket() socket: AuthenticatedSocket,
-    @MessageBody() body: { triggerId: string },
-  ) {
-    const room = this.dualQuestRoomStore.findBySocketId(socket.id);
-    if (!room || room.phase !== 'PLAYING') throw new Error('La partida no está en curso.');
-
-    const player = room.players.find((p) => p.socketId === socket.id);
-    if (!player) throw new Error('No estás en esta sala.');
-
-    const trigger = room.triggers.find((t) => t.triggerId === body.triggerId);
-    if (!trigger) throw new Error('Ese trigger no existe.');
-    if (trigger.activatedByRole !== player.role) {
-      throw new Error(`Ese trigger solo lo puede activar el rol ${trigger.activatedByRole}.`);
-    }
-    if (player.position.row !== trigger.switchPosition.row || player.position.col !== trigger.switchPosition.col) {
-      throw new Error('Tienes que estar parado sobre el interruptor para activarlo.');
-    }
-
-    if (trigger.kind === 'SWITCH') {
-      this.openDualQuestGate(room, trigger.gateId);
-      return;
-    }
-
-    // QUESTION: se guarda como pendiente y se emite sin la respuesta correcta.
-    room.pendingQuestion = { triggerId: trigger.triggerId, forRole: player.role };
-    this.dualQuestRoomStore.set(room);
-    this.broadcastDualQuestState(room);
-  }
-
-  @SubscribeMessage('dual-quest:answer-trigger')
-  handleDualQuestAnswerTrigger(
-    @ConnectedSocket() socket: AuthenticatedSocket,
-    @MessageBody() body: { triggerId: string; optionIndex: number },
-  ) {
-    const room = this.dualQuestRoomStore.findBySocketId(socket.id);
-    if (!room || room.phase !== 'PLAYING' || !room.pendingQuestion) {
-      throw new Error('No hay ninguna pregunta pendiente.');
-    }
-    if (room.pendingQuestion.triggerId !== body.triggerId) {
-      throw new Error('Esa pregunta ya no está activa.');
-    }
-
-    const player = room.players.find((p) => p.socketId === socket.id);
-    if (!player || player.role !== room.pendingQuestion.forRole) {
-      throw new Error('Esta pregunta no es tuya.');
-    }
-
-    const trigger = room.triggers.find((t) => t.triggerId === body.triggerId);
-    const correct = trigger !== undefined && body.optionIndex === trigger.correctOptionIndex;
-
-    room.pendingQuestion = null;
-
-    this.server.to(`dual-quest:${room.code}`).emit('dual-quest:trigger-result', {
-      triggerId: body.triggerId,
-      role: player.role,
-      correct,
-    });
-
-    if (correct && trigger) {
-      this.openDualQuestGate(room, trigger.gateId);
-      return;
-    }
-
-    // Incorrecto: no hay castigo duro, solo no se abre — el jugador puede
-    // volver a pararse en el interruptor e intentar de nuevo.
-    this.dualQuestRoomStore.set(room);
-    this.broadcastDualQuestState(room);
-  }
-
-  private openDualQuestGate(room: DualQuestRoomState, gateId: string) {
-    const gate = room.gates.find((g) => g.gateId === gateId);
-    if (gate) gate.open = true;
-    this.dualQuestRoomStore.set(room);
-    this.broadcastDualQuestState(room);
-  }
-
-  /**
-   * Arma la Gema Núcleo: el cliente manda TODAS las gemas recolectadas en
-   * el orden que cree correcto. El servidor la corrige contra el `order`
-   * real de `room.fragmentGems` (nunca contra algo que mande el cliente) —
-   * coincide exacto y en secuencia, o no cuenta. Reintentos ilimitados: una
-   * respuesta incorrecta no penaliza, solo no termina la partida.
-   */
-  @SubscribeMessage('dual-quest:submit-assembly')
-  handleDualQuestSubmitAssembly(
-    @ConnectedSocket() socket: AuthenticatedSocket,
-    @MessageBody() body: { orderedGemIds: string[] },
-  ) {
-    const room = this.dualQuestRoomStore.findBySocketId(socket.id);
-    if (!room || room.phase !== 'PLAYING') throw new Error('La partida no está en curso.');
-    if (!room.bothAtCore) throw new Error('Ambos jugadores deben estar en la Gema Núcleo para ensamblar.');
-    if (room.collectedGemIds.length !== room.fragmentGems.length) {
-      throw new Error('Todavía faltan gemas por recolectar.');
-    }
-
-    const submitted = Array.isArray(body.orderedGemIds) ? body.orderedGemIds : [];
-    const sameSet =
-      submitted.length === room.collectedGemIds.length &&
-      room.collectedGemIds.every((id) => submitted.includes(id));
-    if (!sameSet) {
-      throw new Error('El arreglo enviado no contiene exactamente las gemas recolectadas.');
-    }
-
-    const correctSequence = [...room.fragmentGems].sort((a, b) => a.order - b.order).map((g) => g.gemId);
-    const correct = submitted.every((gemId, index) => gemId === correctSequence[index]);
-
-    this.server.to(`dual-quest:${room.code}`).emit('dual-quest:assembly-result', { correct });
-
-    if (correct) {
-      this.clearDualQuestMovementTick(room.code);
-      room.phase = 'FINISHED';
-      this.dualQuestRoomStore.set(room);
-      this.broadcastDualQuestState(room);
-    }
-  }
-
-  /** Solo el anfitrión, y solo con la partida terminada — reinicia posiciones, compuertas y gemas para volver a jugar sin recrear la sala. */
-  @SubscribeMessage('dual-quest:restart')
-  handleDualQuestRestart(@ConnectedSocket() socket: AuthenticatedSocket) {
-    const room = this.dualQuestRoomStore.findBySocketId(socket.id);
-    if (!room) throw new Error('No estás en ninguna sala.');
-    if (room.phase !== 'FINISHED') throw new Error('La partida no ha terminado.');
-    if (socket.data.userId !== room.hostUserId) throw new Error('Solo quien creó la sala puede reiniciar.');
-
-    for (const player of room.players) {
-      player.position = player.role === 'FIRE' ? room.fireStart : room.waterStart;
-      player.desiredDirection = null;
-    }
-    for (const gate of room.gates) gate.open = false;
-    room.collectedGemIds = [];
-    room.pendingQuestion = null;
-    room.bothAtCore = false;
-    room.phase = 'WAITING';
-    resetLobbyReady(room.players);
-
-    this.dualQuestRoomStore.set(room);
-    this.broadcastDualQuestState(room);
-  }
-
-  @SubscribeMessage('dual-quest:leave')
-  handleDualQuestLeave(@ConnectedSocket() socket: AuthenticatedSocket) {
-    this.handleDisconnect(socket);
-    socket.disconnect();
-  }
-
-  private startDualQuestMovementTick(code: string) {
-    this.clearDualQuestMovementTick(code);
-    const timer = setInterval(() => {
-      const room = this.dualQuestRoomStore.get(code);
-      if (!room || room.phase !== 'PLAYING') {
-        this.clearDualQuestMovementTick(code);
-        return;
-      }
-      this.tickDualQuestMovement(room);
-    }, RoomsGateway.DUAL_QUEST_TICK_MS);
-    this.dualQuestMovementTicks.set(code, timer);
-  }
-
-  private clearDualQuestMovementTick(code: string) {
-    const timer = this.dualQuestMovementTicks.get(code);
-    if (timer) {
-      clearInterval(timer);
-      this.dualQuestMovementTicks.delete(code);
-    }
-  }
-
-  private isDualQuestPassable(room: DualQuestRoomState, position: DualQuestCellPosition, role: DualQuestRole): boolean {
-    const cell = room.grid[position.row]?.[position.col];
-    if (cell === undefined) return false;
-    const gate = room.gates.find((g) => g.position.row === position.row && g.position.col === position.col);
-    if (gate && !gate.open) return false;
-    if (cell === 1) return false;
-    if (cell === 2) return role === 'FIRE';
-    if (cell === 3) return role === 'WATER';
-    return true;
-  }
-
-  private tickDualQuestMovement(room: DualQuestRoomState) {
-    let moved = false;
-    let collected = false;
-
-    for (const player of room.players) {
-      if (!player.desiredDirection) continue;
-      const delta = DUAL_QUEST_DIRECTION_DELTAS[player.desiredDirection];
-      const next: DualQuestCellPosition = { row: player.position.row + delta.row, col: player.position.col + delta.col };
-      if (this.isDualQuestPassable(room, next, player.role)) {
-        player.position = next;
-        moved = true;
-      }
-    }
-
-    // Auto-recolección: cada jugador solo puede recoger gemas de SU rol,
-    // mismo criterio que Maze Collector (caer en la celda ya las agrega).
-    if (moved) {
-      for (const player of room.players) {
-        const gem = room.fragmentGems.find(
-          (g) =>
-            g.role === player.role &&
-            g.position.row === player.position.row &&
-            g.position.col === player.position.col &&
-            !room.collectedGemIds.includes(g.gemId),
-        );
-        if (gem) {
-          room.collectedGemIds = [...room.collectedGemIds, gem.gemId];
-          collected = true;
-        }
-      }
-    }
-
-    const wasBothAtCore = room.bothAtCore;
-    room.bothAtCore =
-      room.players.length === 2 &&
-      room.players.every((p) => p.position.row === room.corePosition.row && p.position.col === room.corePosition.col);
-
-    if (moved || collected || room.bothAtCore !== wasBothAtCore) {
-      this.dualQuestRoomStore.set(room);
-      this.broadcastDualQuestState(room);
-    }
-  }
-
-  private broadcastDualQuestState(room: DualQuestRoomState) {
-    for (const player of room.players) {
-      this.server.to(player.socketId).emit('dual-quest:state', toDualQuestClientView(room, player.socketId));
     }
   }
 }

@@ -38,6 +38,7 @@ import { useInTournamentPlay } from '../tournamentPlay'
 import { TrueFalseMazeTutorial } from '../tutorial/TrueFalseMazeTutorial'
 import { useTrueFalseMazeSession, type TrueFalseMazeHud } from './useTrueFalseMazeSession'
 import type { TrueFalseMazeConfig, TrueFalseMazeQuestion } from './trueFalseMazeTypes'
+import { ArrowKeysInline } from '../tutorial/ArrowKeysInline'
 
 /** Una parte del tutorial jugable (issue #93): la nave real con una pregunta de práctica. */
 export type TrueFalseMazeTutorialPart = {
@@ -1054,7 +1055,7 @@ function ReadyOverlay({
         </h2>
         <p className="mx-auto mt-1.5 max-w-[420px] text-[13.5px] leading-relaxed text-slate-300">
           Son <b className="text-white">{total} afirmaciones</b> y tienes <b className="text-white">{lives}</b>{' '}
-          {lives === 1 ? 'batería' : 'baterías'}. {touch ? (<>Muévete con la <b className="text-white">cruceta</b> o <b className="text-white">deslizando el dedo</b>.</>) : (<>Muévete con las <b className="text-white">flechas del teclado</b> (o W A S D).</>)}
+          {lives === 1 ? 'batería' : 'baterías'}. {touch ? (<>Muévete con la <b className="text-white">cruceta</b> o <b className="text-white">deslizando el dedo</b>.</>) : (<>Muévete con las <b className="text-white">flechas del teclado</b> <ArrowKeysInline />.</>)}
         </p>
         {tournament && (
           <p className="mx-auto mt-2 max-w-[420px] rounded-xl border border-amber-300/30 bg-amber-400/10 px-3 py-2 text-[12.5px] leading-snug text-amber-100">

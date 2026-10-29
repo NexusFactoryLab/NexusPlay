@@ -24,17 +24,17 @@ import { GuessWhoGameFormPage } from './components/home/games/create/GuessWhoGam
 import { DominoGameFormPage } from './components/home/games/create/DominoGameFormPage'
 import { MazeCollectorGameFormPage } from './components/home/games/create/MazeCollectorGameFormPage'
 import { SnakesLaddersGameFormPage } from './components/home/games/create/SnakesLaddersGameFormPage'
-import { DualQuestGameFormPage } from './components/home/games/create/DualQuestGameFormPage'
+import { DuoLogicoGameFormPage } from './components/home/games/create/DuoLogicoGameFormPage'
 import { TrueFalseMazeGameFormPage } from './components/home/games/create/TrueFalseMazeGameFormPage'
 import { DominoRoomPage } from './components/home/games/DominoRoomPage'
 import { SnakesLaddersRoomPage } from './components/home/games/SnakesLaddersRoomPage'
-import { DualQuestRoomPage } from './components/home/games/DualQuestRoomPage'
 import { MemoryMatchPlayPage } from './components/home/games/MemoryMatchPlayPage'
 import { MazeCollectorPlayPage } from './components/home/games/MazeCollectorPlayPage'
 import { GuessWhoRoomPage } from './components/home/games/GuessWhoRoomPage'
 import { TournamentRoomPage } from './components/home/games/TournamentRoomPage'
 import { RoleSelectionPage } from './components/RoleSelectionPage'
 import { AvatarEditorPage } from './components/avatar/AvatarEditorPage'
+import { AvatarOnboardingGate } from './components/avatar/AvatarOnboardingGate'
 import { PublicHomePage } from './components/legal/PublicHomePage'
 import { PrivacyPolicyPage } from './components/legal/PrivacyPolicyPage'
 import { TermsOfServicePage } from './components/legal/TermsOfServicePage'
@@ -43,13 +43,10 @@ import { TourReturnBar } from './components/home/TourReturnBar'
 import { welcomeStorageKey } from './components/home/welcomeTourSteps'
 import { invitationAuthPath, invitationDestination } from './utils/invitationDestination'
 
-// PixiJS + Matter.js solo se descargan si alguien entra a esta ruta —
-// van cargados de fábrica (~700 KB) y nadie más en el sitio los necesita.
-const DualQuestPixiDemoPage = lazy(() =>
-  import('./components/home/games/DualQuestPixiDemoPage').then((m) => ({ default: m.DualQuestPixiDemoPage })),
-)
-const DualQuestPixiPlayPage = lazy(() =>
-  import('./components/home/games/DualQuestPixiPlayPage').then((m) => ({ default: m.DualQuestPixiPlayPage })),
+// Dúo Lógico con sprites (issue #105): PixiJS y los sprites solo se
+// descargan si alguien entra a jugarlo.
+const DuoLogicoPage = lazy(() =>
+  import('./components/home/games/duo-logico/DuoLogicoPage').then((m) => ({ default: m.DuoLogicoPage })),
 )
 // Laberinto Verdadero o Falso: motor + renderer en canvas y ~60 sprites; se
 // descarga solo al entrar a jugarlo.
@@ -118,7 +115,7 @@ function App() {
   }
 
   return (
-    <>
+    <AvatarOnboardingGate user={user}>
     {/* Recorrido interactivo: si un paso lo llevó a otra página, la barra lo obliga a volver a la guía. */}
     <TourReturnBar owner={welcomeStorageKey(user.id, user.role)} />
     <Routes>
@@ -136,12 +133,11 @@ function App() {
         <Route path="domino" element={<DominoGameFormPage />} />
         <Route path="laberinto" element={<MazeCollectorGameFormPage />} />
         <Route path="escaleras-serpientes" element={<SnakesLaddersGameFormPage />} />
-        <Route path="dual-quest" element={<DualQuestGameFormPage />} />
+        <Route path="duo-logico" element={<DuoLogicoGameFormPage />} />
         <Route path="laberinto-vf" element={<TrueFalseMazeGameFormPage />} />
       </Route>
       <Route path="/domino/sala/:code?" element={<DominoRoomPage />} />
       <Route path="/escaleras-serpientes/sala/:code?" element={<SnakesLaddersRoomPage />} />
-      <Route path="/dual-quest/sala/:code?" element={<DualQuestRoomPage />} />
       <Route path="/jugar/memoria/:slug" element={<MemoryMatchPlayPage />} />
       <Route path="/jugar/laberinto/:slug" element={<MazeCollectorPlayPage />} />
       <Route
@@ -172,18 +168,18 @@ function App() {
       <Route path="/quien-es/sala/:code?" element={<GuessWhoRoomPage />} />
       <Route path="/quien-es/torneo/:code?" element={<TournamentRoomPage />} />
       <Route
-        path="/dual-quest/pixi-demo"
+        path="/dual-quest-pixi/sala/:code"
         element={
-          <Suspense fallback={<main className="flex flex-1 items-center justify-center">Cargando motor del juego…</main>}>
-            <DualQuestPixiDemoPage />
+          <Suspense fallback={<main className="flex flex-1 items-center justify-center">Cargando Dúo Lógico…</main>}>
+            <DuoLogicoPage />
           </Suspense>
         }
       />
       <Route
         path="/dual-quest-pixi/:slug"
         element={
-          <Suspense fallback={<main className="flex flex-1 items-center justify-center">Cargando motor del juego…</main>}>
-            <DualQuestPixiPlayPage />
+          <Suspense fallback={<main className="flex flex-1 items-center justify-center">Cargando Dúo Lógico…</main>}>
+            <DuoLogicoPage />
           </Suspense>
         }
       />
@@ -211,7 +207,7 @@ function App() {
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
-    </>
+    </AvatarOnboardingGate>
   )
 }
 

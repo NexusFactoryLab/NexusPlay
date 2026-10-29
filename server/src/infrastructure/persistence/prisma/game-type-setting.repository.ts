@@ -4,6 +4,11 @@ import type { GameTypeSetting } from '../../../domain/entities/game-type-setting
 import type { GameTypeName } from '../../../domain/value-objects/game-type.vo.js';
 import { PrismaService } from './prisma.service.js';
 import { GameTypeSettingMapper } from './game-type-setting.mapper.js';
+import { TtlCache } from '../../cache/ttl-cache.js';
+
+/** Se consulta en cada listado de juegos/áreas de un no-admin y casi nunca cambia. */
+const ARCHIVED_TYPES_CACHE_TTL_MS = 60_000;
+const archivedTypesCache = new TtlCache<GameTypeName[]>(ARCHIVED_TYPES_CACHE_TTL_MS, 1);
 
 @Injectable()
 export class PrismaGameTypeSettingRepository implements GameTypeSettingRepository {
@@ -24,11 +29,15 @@ export class PrismaGameTypeSettingRepository implements GameTypeSettingRepositor
   }
 
   async findArchivedGameTypes(): Promise<GameTypeName[]> {
-    const records = await this.prisma.gameTypeSettingModel.findMany({
-      where: { status: 'ARCHIVED' },
-      select: { gameType: true },
+    const archived = await archivedTypesCache.getOrLoad('archived', async () => {
+      const records = await this.prisma.gameTypeSettingModel.findMany({
+        where: { status: 'ARCHIVED' },
+        select: { gameType: true },
+      });
+      return records.map((record) => record.gameType as GameTypeName);
     });
-    return records.map((record) => record.gameType as GameTypeName);
+    // Copia: el llamador no debe poder mutar el arreglo compartido.
+    return [...archived];
   }
 
   async save(setting: GameTypeSetting): Promise<void> {
@@ -39,5 +48,6 @@ export class PrismaGameTypeSettingRepository implements GameTypeSettingRepositor
       create: data,
       update: data,
     });
+    archivedTypesCache.clear();
   }
 }

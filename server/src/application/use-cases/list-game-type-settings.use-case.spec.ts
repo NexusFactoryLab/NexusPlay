@@ -28,7 +28,7 @@ describe('ListGameTypeSettingsUseCase', () => {
         ['MEMORY_MATCH', 'MatchMente'],
         ['GUESS_WHO', 'Identidad Oculta'],
         ['DOMINO', 'Dominexo'],
-        ['DUAL_QUEST_PIXI', 'Dúo Lógico Pixi'],
+        ['DUAL_QUEST_PIXI', 'Dúo Lógico'],
       ]),
     );
     expect(result.items.some((item) => item.displayName === item.gameType)).toBe(false);

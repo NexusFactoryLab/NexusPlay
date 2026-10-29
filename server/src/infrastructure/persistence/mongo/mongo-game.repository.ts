@@ -11,10 +11,20 @@ import { GameVersionConflictError } from '../../../domain/errors/game.errors.js'
 import { MongoService } from './mongo.service.js';
 import { GameMapper, type GameDocument } from './game.mapper.js';
 import { GAMES_COLLECTION_JSON_SCHEMA } from './games.collection-schema.js';
+import { TtlCache } from '../../cache/ttl-cache.js';
 
 const DUPLICATE_KEY_ERROR_CODE = 11000;
 
 const COLLECTION = 'games';
+
+/**
+ * Conteo de juegos publicados por área (`GET /subjects`): una agregación
+ * sobre toda la colección en cada listado. Se invalida en cada escritura
+ * que pueda cambiarlo (guardar, insertar en lote, borrar, publicar en
+ * cascada); el TTL cubre cambios hechos por fuera de la app.
+ */
+const PUBLISHED_COUNTS_TTL_MS = 30_000;
+const publishedCountsCache = new TtlCache<Array<[string, number]>>(PUBLISHED_COUNTS_TTL_MS, 50);
 
 /**
  * `search` viaja tal cual del cliente al `$regex` de Mongo — sin escapar,
@@ -90,6 +100,8 @@ export class MongoGameRepository implements GameRepository, OnModuleInit {
         { upsert: expectedVersion === undefined },
       );
 
+      publishedCountsCache.clear();
+
       if (expectedVersion !== undefined && result.matchedCount === 0) {
         const stillExists = await this.collection.countDocuments({ _id: doc._id }, { limit: 1 });
         if (stillExists) throw new GameVersionConflictError(doc._id);
@@ -116,6 +128,7 @@ export class MongoGameRepository implements GameRepository, OnModuleInit {
 
     try {
       await this.collection.insertMany(docs, { session: session as ClientSession | undefined });
+      publishedCountsCache.clear();
     } catch (error) {
       if (error instanceof MongoServerError && error.code === DUPLICATE_KEY_ERROR_CODE) {
         throw new GameSlugAlreadyTakenError('uno o más juegos del lote');
@@ -174,6 +187,10 @@ export class MongoGameRepository implements GameRepository, OnModuleInit {
     const [docs, total] = await Promise.all([
       this.collection
         .find(query)
+        // Los listados solo muestran el resumen: `content` (todas las
+        // preguntas/tarjetas) y `config` son lo más pesado del documento y
+        // no se usan ahí. Se rellenan vacíos para poder armar la entidad.
+        .project<GameDocument>({ content: 0, config: 0 })
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(filter.pageSize)
@@ -182,7 +199,7 @@ export class MongoGameRepository implements GameRepository, OnModuleInit {
     ]);
 
     return {
-      items: docs.map(GameMapper.toDomain),
+      items: docs.map((doc) => GameMapper.toDomain({ ...doc, content: [], config: {} })),
       total,
       page: filter.page,
       pageSize: filter.pageSize,
@@ -191,21 +208,23 @@ export class MongoGameRepository implements GameRepository, OnModuleInit {
 
   async delete(id: string): Promise<void> {
     await this.collection.deleteOne({ _id: id });
+    publishedCountsCache.clear();
   }
 
   async countPublishedByCategory(excludeGameTypes?: string[]): Promise<Map<string, number>> {
-    const match: Record<string, unknown> = { status: 'PUBLISHED' };
-    if (excludeGameTypes && excludeGameTypes.length > 0) {
-      match.gameType = { $nin: excludeGameTypes };
-    }
-    const results = await this.collection
-      .aggregate<{ _id: string; count: number }>([
-        { $match: match },
-        { $group: { _id: '$categoryId', count: { $sum: 1 } } },
-      ])
-      .toArray();
-
-    return new Map(results.map((row) => [row._id, row.count]));
+    const excluded = [...(excludeGameTypes ?? [])].sort();
+    const counts = await publishedCountsCache.getOrLoad(excluded.join(','), async () => {
+      const match: Record<string, unknown> = { status: 'PUBLISHED' };
+      if (excluded.length > 0) match.gameType = { $nin: excluded };
+      const results = await this.collection
+        .aggregate<{ _id: string; count: number }>([
+          { $match: match },
+          { $group: { _id: '$categoryId', count: { $sum: 1 } } },
+        ])
+        .toArray();
+      return results.map((row) => [row._id, row.count] as [string, number]);
+    });
+    return new Map(counts);
   }
 
   async publishAllDraftsByCategory(categoryId: string): Promise<number> {
@@ -213,6 +232,7 @@ export class MongoGameRepository implements GameRepository, OnModuleInit {
       { categoryId, status: 'DRAFT' },
       { $set: { status: 'PUBLISHED', updatedAt: new Date() }, $inc: { version: 1 } },
     );
+    publishedCountsCache.clear();
     return result.modifiedCount;
   }
 

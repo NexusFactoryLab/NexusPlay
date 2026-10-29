@@ -194,7 +194,7 @@ const ROUTE_BY_GAME_TYPE: Record<string, string> = {
   DOMINO: '/juegos/crear/domino',
   MAZE_COLLECTOR: '/juegos/crear/laberinto',
   SNAKES_LADDERS: '/juegos/crear/escaleras-serpientes',
-  DUAL_QUEST: '/juegos/crear/dual-quest',
+  DUAL_QUEST_PIXI: '/juegos/crear/duo-logico',
   TRUE_FALSE_MAZE: '/juegos/crear/laberinto-vf',
 }
 
@@ -204,7 +204,7 @@ export const GAME_TYPE_LABEL: Record<string, string> = {
   DOMINO: 'Dominó',
   MAZE_COLLECTOR: 'Laberinto coleccionista',
   SNAKES_LADDERS: 'Escaleras y serpientes',
-  DUAL_QUEST: 'Dúo Lógico',
+  DUAL_QUEST_PIXI: 'Dúo Lógico',
   TRUE_FALSE_MAZE: 'Laberinto V/F',
 }
 

@@ -11,7 +11,6 @@ import { InMemoryRoomStore } from './in-memory-room.store.js';
 import { InMemoryTournamentStore } from './in-memory-tournament.store.js';
 import { InMemoryDominoRoomStore } from './in-memory-domino-room.store.js';
 import { InMemorySnakesLaddersRoomStore } from './in-memory-snakes-ladders-room.store.js';
-import { InMemoryDualQuestRoomStore } from './in-memory-dual-quest-room.store.js';
 
 type Client = Parameters<RoomsGateway['handleTournamentStart']>[0];
 const client = (id: string) =>
@@ -53,7 +52,6 @@ function setup(level: 'EASY' | 'MEDIUM' | 'HARD' = 'EASY') {
     tournaments,
     domino,
     new InMemorySnakesLaddersRoomStore(),
-    new InMemoryDualQuestRoomStore(),
     { track: async () => {} } as unknown as AnalyticsTrackerService,
     undefined,
     undefined,

@@ -230,3 +230,7 @@ export function hasGreetedThisSession(key: string) {
 export function markGreetedThisSession(key: string) {
   greetedThisSession.add(key)
 }
+/** Para que la tarjeta de bienvenida salga al terminar el onboarding de avatar aunque ya se hubiera cerrado antes en esta sesión. */
+export function resetGreetedThisSession(key: string) {
+  greetedThisSession.delete(key)
+}

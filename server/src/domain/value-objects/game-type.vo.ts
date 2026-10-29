@@ -13,7 +13,6 @@ export type GameTypeName =
   | 'DOMINO'
   | 'MAZE_COLLECTOR'
   | 'SNAKES_LADDERS'
-  | 'DUAL_QUEST'
   | 'DUAL_QUEST_PIXI'
   | 'TRUE_FALSE_MAZE';
 
@@ -31,7 +30,6 @@ export const VALID_GAME_TYPES: readonly GameTypeName[] = [
   'DOMINO',
   'MAZE_COLLECTOR',
   'SNAKES_LADDERS',
-  'DUAL_QUEST',
   'DUAL_QUEST_PIXI',
   'TRUE_FALSE_MAZE',
 ];
@@ -48,8 +46,7 @@ export const GAME_TYPE_PUBLIC_NAMES: Readonly<Record<GameTypeName, string>> = {
   DOMINO: 'Dominexo',
   MAZE_COLLECTOR: 'Laberinto recolector',
   SNAKES_LADDERS: 'Escaleras y serpientes',
-  DUAL_QUEST: 'Dúo Lógico',
-  DUAL_QUEST_PIXI: 'Dúo Lógico Pixi',
+  DUAL_QUEST_PIXI: 'Dúo Lógico',
   TRUE_FALSE_MAZE: 'Laberinto Verdadero o Falso',
 };
 
@@ -103,9 +100,6 @@ export class GameType {
     return GameType.create('SNAKES_LADDERS');
   }
 
-  static dualQuest(): GameType {
-    return GameType.create('DUAL_QUEST');
-  }
 
   static dualQuestPixi(): GameType {
     return GameType.create('DUAL_QUEST_PIXI');

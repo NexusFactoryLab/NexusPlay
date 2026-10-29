@@ -3,7 +3,7 @@ const assert = require('node:assert/strict')
 const { mkdirSync } = require('node:fs')
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright')
 const base = process.env.QR_TEST_URL || 'http://127.0.0.1:5180'
-const paths = ['/quien-es/sala/ABC234','/quien-es/torneo/ABC234','/domino/sala/ABC234','/escaleras-serpientes/sala/ABC234','/dual-quest/sala/ABC234']
+const paths = ['/quien-es/sala/ABC234','/quien-es/torneo/ABC234','/domino/sala/ABC234','/escaleras-serpientes/sala/ABC234','/dual-quest-pixi/sala/ABC234']
 const html = path => `<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><div id="root"></div><script type="module">
 import RefreshRuntime from '/@react-refresh'; RefreshRuntime.injectIntoGlobalHook(window); window.$RefreshReg$=()=>{}; window.$RefreshSig$=()=>type=>type; window.__vite_plugin_react_preamble_installed__=true;
 const r=await import('/node_modules/.vite/deps/react.js'); const React=r.default??r;

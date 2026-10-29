@@ -1,3 +1,5 @@
+import { InMemoryDuoRoomStore } from './in-memory-duo-room.store.js';
+import { createDuoRoom } from '../../domain/duo-logico/duo-room.js';
 import 'reflect-metadata';
 import { describe, expect, it, vi } from 'vitest';
 import { JwtService } from '@nestjs/jwt';
@@ -10,7 +12,6 @@ import { InMemoryRoomStore } from './in-memory-room.store.js';
 import { InMemoryTournamentStore } from './in-memory-tournament.store.js';
 import { InMemoryDominoRoomStore } from './in-memory-domino-room.store.js';
 import { InMemorySnakesLaddersRoomStore } from './in-memory-snakes-ladders-room.store.js';
-import { InMemoryDualQuestRoomStore } from './in-memory-dual-quest-room.store.js';
 
 type Client = Parameters<RoomsGateway['handleCreate']>[0];
 function client(id: string): Client {
@@ -29,7 +30,7 @@ function client(id: string): Client {
  * home, y por el campo de código de cada juego) tenía 5 chequeos
  * hand-escritos, uno por store — ahora es un solo loop sobre
  * `roomRegistry`. Este spec confirma que sigue reconociendo los 5 tipos de
- * sala existentes (room, tournament, domino, snakes-ladders, dual-quest) y
+ * sala existentes (room, tournament, domino, snakes-ladders y, por registro, duo-logico) y
  * que un código inexistente sigue rechazándose igual que antes.
  */
 describe('RoomsGateway room code registry', () => {
@@ -39,7 +40,6 @@ describe('RoomsGateway room code registry', () => {
       tournament: new InMemoryTournamentStore(),
       domino: new InMemoryDominoRoomStore(),
       snakes: new InMemorySnakesLaddersRoomStore(),
-      dual: new InMemoryDualQuestRoomStore(),
     };
     const gameByType: Record<string, unknown> = {
       GUESS_WHO: {
@@ -69,27 +69,6 @@ describe('RoomsGateway room code registry', () => {
         config: { boardSize: 30, ladders: [], snakes: [] },
         content: [],
       },
-      DUAL_QUEST: {
-        id: 'game-dual-quest',
-        title: 'Dúo Lógico Demo',
-        gameType: { getName: () => 'DUAL_QUEST' },
-        config: {
-          gridCols: 3,
-          gridRows: 3,
-          grid: [
-            [0, 0, 0],
-            [0, 0, 0],
-            [0, 0, 0],
-          ],
-          fireStart: { row: 0, col: 0 },
-          waterStart: { row: 0, col: 1 },
-          corePosition: { row: 2, col: 2 },
-          gates: [],
-          triggers: [],
-          coreQuestion: 'Pregunta',
-        },
-        content: [],
-      },
     };
 
     const gameRepository = {
@@ -107,7 +86,6 @@ describe('RoomsGateway room code registry', () => {
       stores.tournament,
       stores.domino,
       stores.snakes,
-      stores.dual,
       { track: vi.fn().mockResolvedValue(undefined) } as unknown as AnalyticsTrackerService,
       undefined,
       undefined,
@@ -161,15 +139,13 @@ describe('RoomsGateway room code registry', () => {
     expect(resolved).toEqual({ kind: 'snakes-ladders', gameId: 'game-snakes', gameTitle: 'Escaleras Demo' });
   });
 
-  it('resuelve una sala de Dúo Lógico con kind "dual-quest"', async () => {
-    const { gateway, gameByType } = buildGateway();
-    const socket = client('u1');
-    await gateway.handleDualQuestCreate(socket, { gameId: (gameByType.DUAL_QUEST as { id: string }).id });
-    const code = (socket.emit as ReturnType<typeof vi.fn>).mock.calls[0][1].code as string;
+  it('resuelve una sala de Dúo Lógico (registrada por su gateway) con kind "duo-logico"', () => {
+    const { gateway } = buildGateway();
+    const duoStore = new InMemoryDuoRoomStore();
+    gateway.registerRoomStore({ kind: 'duo-logico', store: duoStore });
+    duoStore.create(createDuoRoom({ code: 'DUO123', gameId: 'game-duo', gameTitle: 'Dúo Lógico Demo', user: { userId: 'u1', displayName: 'U', socketId: 's1' }, role: 'FIRE', now: 0 }));
 
-    const resolved = gateway.handleResolveCode({ code });
-
-    expect(resolved).toEqual({ kind: 'dual-quest', gameId: 'game-dual-quest', gameTitle: 'Dúo Lógico Demo' });
+    expect(gateway.handleResolveCode({ code: 'duo123' })).toEqual({ kind: 'duo-logico', gameId: 'game-duo', gameTitle: 'Dúo Lógico Demo' });
   });
 
   it('resuelve un torneo con kind "tournament"', async () => {

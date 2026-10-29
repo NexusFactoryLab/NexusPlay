@@ -11,7 +11,6 @@ import {
   ChevronRight,
   Footprints,
   LightbulbOff,
-  Maximize,
   Pause,
   Rocket,
   Shuffle,
@@ -440,43 +439,22 @@ export const strong = (color: string) => `font-bold ${color}`
 const STEPS: Step[] = [
   {
     id: 'mision',
-    title: 'Misión: ¡llega a la sala correcta!',
+    title: '¡Llega a la sala correcta!',
     art: <SceneMission />,
     body: (
       <>
-        <p>
-          Eres un robot en una nave espacial. En cada ronda aparece una afirmación: decide si es{' '}
-          <b className={strong('text-emerald-300')}>verdadera</b> o <b className={strong('text-rose-300')}>falsa</b> y corre a la sala{' '}
-          <b className={strong('text-emerald-300')}>VERDADERO</b> o <b className={strong('text-rose-300')}>FALSO</b>. ¡Y cuidado con las medusas galácticas!
+        <p className="text-[1.15em] text-white">
+          ¿La afirmación es <b className={strong('text-emerald-300')}>verdadera</b> o <b className={strong('text-rose-300')}>falsa</b>? Corre a esa sala.
         </p>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-cyan-300/25 bg-cyan-400/[0.07] p-3">
+        <div className="flex items-center gap-3">
           <ArrowKeys size="clamp(1.9rem, 5.2dvh, 2.7rem)" />
-          <div className="min-w-0 flex-1 basis-[9rem]">
-            <p className="font-bold text-white">Muévete con las flechas del teclado</p>
-            <p className="text-slate-300">
-              También sirven <b className="text-white">W A S D</b>. En el celular, desliza el dedo sobre la nave o usa la cruceta.
-            </p>
-          </div>
+          <span className="font-bold text-white">Muévete con las flechas</span>
         </div>
-        <p className="flex items-center gap-2">
-          <span className="flex h-7 shrink-0 items-center gap-1 rounded-lg border border-cyan-300/50 bg-cyan-500/20 px-2 text-[0.8em] font-bold text-white">
-            <Pause className="h-3.5 w-3.5" fill="currentColor" strokeWidth={1.5} /> Pausa
-          </span>
-          <span>
-            ¿Necesitas un respiro? Toca <b className="text-white">Pausa</b>, arriba a la izquierda, o presiona{' '}
-            <b className="text-white">Esc</b> o <b className="text-white">P</b>.
-          </span>
-        </p>
-        {/* En celular horizontal no cabe otro renglón sin encoger el texto: ahí la pantalla completa se ofrece al despegar. */}
-        <p className="flex items-center gap-2 [@media(orientation:landscape)_and_(max-height:520px)]:hidden">
-          <span className="flex h-7 shrink-0 items-center gap-1 rounded-lg border border-white/25 bg-white/10 px-2 text-[0.8em] font-bold text-white">
-            <Maximize className="h-3.5 w-3.5" /> Completa
-          </span>
-          <span>
-            Para ver <b className="text-white">toda la nave</b>, juega en <b className="text-white">pantalla completa</b>: se activa al despegar (o con la
-            tecla <b className="text-white">F</b>).
-          </span>
-        </p>
+        <ul className="flex flex-col gap-2">
+          <Item icon={<Pause className="h-4 w-4" fill="currentColor" strokeWidth={1.5} />} tone="cyan">
+            Pausa: <b className="text-white">Esc</b> o <b className="text-white">P</b>
+          </Item>
+        </ul>
       </>
     ),
   },
@@ -487,17 +465,14 @@ const STEPS: Step[] = [
     body: (
       <ul className="flex flex-col gap-2.5">
         <Item icon={<span className="text-[13px] font-bold">1</span>} tone="violet">
-          <b className="text-white">Lee la afirmación</b> en el panel de arriba.
+          Lee la afirmación
         </Item>
         <Item icon={<Footprints className="h-4 w-4" />} tone="cyan">
-          <b className="text-white">Mueve al robot con las flechas.</b> Sigue caminando solo hasta que cambies de dirección.
+          Mueve al robot
         </Item>
         <Item icon={<Check className="h-4 w-4" strokeWidth={3} />} tone="emerald">
-          <b className="text-white">Entra a la sala correcta.</b> Cuanto más rápido llegues, más puntos ganas.
+          Entra a la sala: <b className="text-white">más rápido, más puntos</b>
         </Item>
-        <li className="rounded-xl bg-white/[0.06] px-3 py-2 text-slate-300">
-          Si te equivocas pierdes una batería, pero verás la explicación para aprender.
-        </li>
       </ul>
     ),
   },
@@ -506,19 +481,14 @@ const STEPS: Step[] = [
     title: 'Esquiva a las medusas',
     art: <SceneJelly />,
     body: (
-      <>
-        <p>
-          Las <b className="text-white">medusas galácticas</b> salen del reactor y te persiguen, cada una a su manera. No te quedes quieto.
-        </p>
-        <ul className="flex flex-col gap-2.5">
-          <Item icon={<BatteryFull className="h-4 w-4" />} tone="rose">
-            Si una te toca, <b className="text-white">pierdes una batería</b>. Responder mal también cuesta una.
-          </Item>
-          <Item icon={<X className="h-4 w-4" strokeWidth={3} />} tone="amber">
-            Sin baterías, la misión termina. Al reaparecer tienes un instante de escudo.
-          </Item>
-        </ul>
-      </>
+      <ul className="flex flex-col gap-2.5">
+        <Item icon={<BatteryFull className="h-4 w-4" />} tone="rose">
+          Te tocan o fallas: <b className="text-white">−1 batería</b>
+        </Item>
+        <Item icon={<X className="h-4 w-4" strokeWidth={3} />} tone="amber">
+          Sin baterías, <b className="text-white">fin de la misión</b>
+        </Item>
+      </ul>
     ),
   },
   {
@@ -526,39 +496,30 @@ const STEPS: Step[] = [
     title: 'Núcleos de energía',
     art: <SceneCore />,
     body: (
-      <>
-        <p>
-          Los <b className="text-cyan-300">núcleos brillantes</b> de las esquinas lanzan un <b className="text-white">pulso EMP</b> de 7 segundos: las medusas se aturden y se ponen azules.
-        </p>
-        <ul className="flex flex-col gap-2.5">
-          <Item icon={<Zap className="h-4 w-4" />} tone="cyan">
-            ¡Atrápalas aturdidas para ganar <b className="text-white">+200, +400, +800…</b> puntos!
-          </Item>
-          <Item icon={<Check className="h-4 w-4" strokeWidth={3} />} tone="emerald">
-            <b className="text-white">Las salas siguen abiertas durante el pulso:</b> puedes responder cuando quieras. El pulso no detiene la pregunta ni el
-            reloj, y con las medusas aturdidas es el momento más seguro para ir a una sala.
-          </Item>
-          <Item icon={<span className="text-[15px] font-bold leading-none">·</span>} tone="violet">
-            Los puntitos de luz del camino suman 10 puntos cada uno.
-          </Item>
-        </ul>
-      </>
+      <ul className="flex flex-col gap-2.5">
+        <Item icon={<Zap className="h-4 w-4" />} tone="cyan">
+          Aturden a las medusas <b className="text-white">7 s</b>
+        </Item>
+        <Item icon={<Check className="h-4 w-4" strokeWidth={3} />} tone="emerald">
+          ¡Atrápalas! <b className="text-white">+200</b>
+        </Item>
+      </ul>
     ),
   },
   {
     id: 'extras',
-    title: 'Atajos y sorpresas',
+    title: 'Sorpresas',
     art: <SceneExtras />,
     body: (
       <ul className="flex flex-col gap-2.5">
         <Item icon={<Rocket className="h-4 w-4" />} tone="cyan">
-          <b className="text-white">Rejillas:</b> entras por una y sales por su pareja, al otro lado de la nave. ¡Ideal para escapar!
+          Rejillas: <b className="text-white">sales al otro lado</b>
         </Item>
         <Item icon={<Shuffle className="h-4 w-4" />} tone="violet">
-          <b className="text-white">Salas viajeras:</b> VERDADERO y FALSO cambian de lugar en cada pregunta (y cada cierto tiempo). No memorices el mapa.
+          Las salas <b className="text-white">cambian de lugar</b>
         </Item>
         <Item icon={<LightbulbOff className="h-4 w-4" />} tone="amber">
-          <b className="text-white">Sabotaje:</b> a veces se apagan las luces y solo ves alrededor del robot.
+          Apagón: <b className="text-white">solo ves cerca</b>
         </Item>
       </ul>
     ),
@@ -626,7 +587,7 @@ export function TrueFalseMazeGuide({ onClose, onTutorial }: TrueFalseMazeGuidePr
 
         <div
           key={step.id}
-          className="tfg-step-in grid min-h-0 flex-1 grid-rows-[minmax(0,38%)_minmax(0,1fr)] gap-3 px-4 py-3 sm:px-6 landscape:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] landscape:grid-rows-1 landscape:gap-6"
+          className="tfg-step-in grid min-h-0 flex-1 grid-rows-[minmax(0,52%)_minmax(0,1fr)] gap-3 px-4 py-3 sm:px-6 landscape:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] landscape:grid-rows-1 landscape:gap-6"
         >
           <div className="min-h-0 min-w-0">{step.art}</div>
           {/* El texto se ajusta solo al espacio: en pantallas chicas se reduce en vez de recortarse o hacer scroll. */}
@@ -634,7 +595,7 @@ export function TrueFalseMazeGuide({ onClose, onTutorial }: TrueFalseMazeGuidePr
             className="h-full"
             fitKey={step.id}
             minScale={0.55}
-            contentClassName="flex flex-col gap-3 text-[clamp(0.8rem,1.9dvh+0.25vw,1.02rem)] leading-snug text-slate-300"
+            contentClassName="flex flex-col gap-3 text-[clamp(0.95rem,2.4dvh+0.3vw,1.25rem)] leading-snug text-slate-300"
           >
             <h2 className="font-heading text-[clamp(1.15rem,3.4dvh+0.6vw,1.9rem)] font-bold leading-tight tracking-tight text-white">{step.title}</h2>
             {step.body}

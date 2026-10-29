@@ -2,7 +2,7 @@ import { io } from 'socket.io-client'
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:3000'
 
-export type ResolvedRoomKind = 'room' | 'tournament' | 'domino' | 'snakes-ladders' | 'dual-quest'
+export type ResolvedRoomKind = 'room' | 'tournament' | 'domino' | 'snakes-ladders' | 'duo-logico'
 
 export type ResolvedRoom = {
   kind: ResolvedRoomKind
@@ -21,7 +21,7 @@ export const LIVE_ROOM_ROUTES: Partial<Record<ResolvedRoomKind, (code: string) =
   tournament: (code) => `/quien-es/torneo/${code}`,
   domino: (code) => `/domino/sala/${code}`,
   'snakes-ladders': (code) => `/escaleras-serpientes/sala/${code}`,
-  'dual-quest': (code) => `/dual-quest/sala/${code}`,
+  'duo-logico': (code) => `/dual-quest-pixi/sala/${code}`,
 }
 
 /**
@@ -33,7 +33,7 @@ export const LIVE_ROOM_ROUTES: Partial<Record<ResolvedRoomKind, (code: string) =
  * #202). Agregar un juego nuevo con sala en vivo es agregar su `gameType`
  * acá (y una entrada en LIVE_ROOM_ROUTES si tiene página propia).
  */
-export const LIVE_ROOM_GAME_TYPES: readonly string[] = ['GUESS_WHO', 'DOMINO', 'SNAKES_LADDERS', 'DUAL_QUEST']
+export const LIVE_ROOM_GAME_TYPES: readonly string[] = ['GUESS_WHO', 'DOMINO', 'SNAKES_LADDERS', 'DUAL_QUEST_PIXI']
 
 /**
  * Resuelve un código de sala contra el gateway (revisa salas 1v1 de "¿Quién

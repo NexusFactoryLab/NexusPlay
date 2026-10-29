@@ -11,7 +11,7 @@ export type GameTypeChoice =
   | 'DOMINO'
   | 'MAZE_COLLECTOR'
   | 'SNAKES_LADDERS'
-  | 'DUAL_QUEST'
+  | 'DUAL_QUEST_PIXI'
   | 'TRUE_FALSE_MAZE'
 
 type GameTypePickerProps = {
@@ -69,9 +69,9 @@ const TYPE_OPTIONS: Array<{
     icon: Dices,
   },
   {
-    choice: 'DUAL_QUEST',
+    choice: 'DUAL_QUEST_PIXI',
     description:
-      'Cooperativo de 2 jugadores en tiempo real: Fuego y Agua recorren el mismo mapa, cada uno bloqueado por casillas del otro, y arman juntos un concepto al final.',
+      'Cooperativo en línea para 2: Lumen (fuego) y Gota (agua) superan escenarios con obstáculos que exigen ayudarse y solo avanzan si los dos responden bien en cada Puerta del Saber.',
     icon: Flame,
   },
   {

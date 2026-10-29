@@ -1,4 +1,5 @@
 import { useTheme } from '../../../hooks/useTheme'
+import type { Theme } from '../../../hooks/useTheme'
 import { FantasyCloudBank, MeadowScenery } from '../FantasyDecor'
 
 /** Una pincelada: un trazo ancho de bordes redondos, difuminado, que da color sin distraer. */
@@ -27,8 +28,10 @@ function Strokes({ colors }: { colors: [string, string, string, string] }) {
  * Claro y Oscuro, un fondo liso con pinceladas de color para que no se vea
  * plano. Va detrás de todo (no recibe toques).
  */
-export function GameThemeBackdrop() {
-  const { theme } = useTheme()
+/** `theme` fija el fondo a un tema concreto (para fundir entre dos fondos); sin él sigue al tema activo. */
+export function GameThemeBackdrop({ theme: forcedTheme }: { theme?: Theme } = {}) {
+  const current = useTheme().theme
+  const theme = forcedTheme ?? current
   return (
     <div className="pointer-events-none fixed inset-0 -z-10 isolate overflow-hidden [transform:translateZ(0)]" aria-hidden="true" data-game-backdrop={theme}>
       {theme === 'meadow' ? (

@@ -82,18 +82,21 @@ const THEME_OPTIONS: ThemeOption[] = [
  * acá. Una cuenta infantil real siempre ve "Kids" sin importar lo que elija
  * aquí; para cualquier otra cuenta, elegirlo es puramente estético.
  */
-export function ThemesSection() {
+/** `compact`: versión sin texto largo y de tarjetas bajas, para verla completa sin scroll (primer inicio de sesión). */
+export function ThemesSection({ compact = false }: { compact?: boolean } = {}) {
   const { theme, setTheme } = useTheme()
 
   return (
     <section className="flex flex-col gap-4">
-      <p className="text-[13px] text-text">
-        Elige cómo se ve toda la página. El cambio aplica de inmediato y se recuerda en este
-        dispositivo.
-      </p>
+      {!compact && (
+        <p className="text-[13px] text-text">
+          Elige cómo se ve toda la página. El cambio aplica de inmediato y se recuerda en este
+          dispositivo.
+        </p>
+      )}
 
       {/* El panel de esta pantalla es más ancho que el resto (ver SettingsPanel): las 4 opciones van en 2×2. */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className={compact ? 'grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5' : 'grid grid-cols-1 gap-4 sm:grid-cols-2'}>
         {THEME_OPTIONS.map((option) => {
           const Icon = option.icon
           const active = theme === option.value
@@ -107,13 +110,19 @@ export function ThemesSection() {
               // que WelcomeCard: fondo recortado al padding + degradado al
               // borde) en vez del borde plano gris de antes — cada tarjeta luce
               // sus propios colores siempre, no solo cuando está activa.
-              className="group flex flex-col overflow-hidden rounded-2xl border-[3px] border-transparent text-left transition-transform hover:-translate-y-0.5"
+              className={`group flex flex-col overflow-hidden rounded-2xl border-[3px] border-transparent text-left transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5${compact ? ' ts-card' : ''}`}
               style={{
                 background: `linear-gradient(${option.preview.surface}, ${option.preview.surface}) padding-box, linear-gradient(120deg, ${option.preview.accent2}, ${option.preview.accent}) border-box`,
-                boxShadow: active ? `0 12px 28px -12px ${option.preview.accent}` : undefined,
+                boxShadow: compact
+                  ? active
+                    ? `0 0 0 2px ${option.preview.accent2}, 0 0 14px ${option.preview.accent2}, 0 0 34px ${option.preview.accent}, 0 0 64px ${option.preview.accent}99`
+                    : `0 0 12px ${option.preview.accent}88, 0 0 26px ${option.preview.accent}44`
+                  : active
+                    ? `0 12px 28px -12px ${option.preview.accent}`
+                    : undefined,
               }}
             >
-              <div className="relative h-32" style={{ background: option.preview.bg }}>
+              <div className={`relative ${compact ? 'h-20 sm:h-28' : 'h-32'}`} style={{ background: option.preview.bg }}>
                 {option.previewImage ? (
                   <img
                     src={option.previewImage}
@@ -166,7 +175,9 @@ export function ThemesSection() {
                   <Icon className="h-[15px] w-[15px] shrink-0" strokeWidth={2} style={{ color: option.preview.accent }} aria-hidden="true" />
                   {option.label}
                 </p>
-                <p className="text-[12.5px] leading-relaxed" style={{ color: option.preview.text, opacity: 0.75 }}>{option.description}</p>
+                {!compact && (
+                  <p className="text-[12.5px] leading-relaxed" style={{ color: option.preview.text, opacity: 0.75 }}>{option.description}</p>
+                )}
               </div>
             </button>
           )

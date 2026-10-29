@@ -9,6 +9,8 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Bot, Crown, LogOut, Swords, Trophy } from 'lucide-react'
 import { useAuth } from '../../../hooks/useAuth'
 import { useGuessWhoTournament } from './useGuessWhoTournament'
+import { PlayerWaitOverlay } from './PlayerWaitOverlay'
+import { usePlayerWait } from './playerWait'
 import { Modal } from './Modal'
 import { MatchBoard } from './MatchBoard'
 import { AvatarCircle } from '../../avatar/AvatarCircle'
@@ -112,6 +114,8 @@ function TournamentSession() {
     passMatchTurn,
   } = useGuessWhoTournament(token)
 
+  // Se cortó la conexión del rival de la partida propia: la partida espera (issue #120).
+  const playerWait = usePlayerWait(tournament?.myMatch?.awaiting, user?.id)
   const startedRef = useRef(false)
   const [joinCodeInput, setJoinCodeInput] = useState('')
   const [showPairingOverlay, setShowPairingOverlay] = useState(false)
@@ -345,6 +349,7 @@ function TournamentSession() {
           durationMs={MATCH_ENTRY_DELAY_MS}
         />
       )}
+      {playerWait && tournament.myMatch?.phase === 'PLAYING' && <PlayerWaitOverlay wait={playerWait} onLeave={handleExit} />}
       {mazeMatch && <MazeRoundAnnouncement round={mazeMatch.round} title={mazeMatch.gameTitle} />}
       {showStandings && (
         <StandingsOverlay participants={tournament.participants} selfUserId={user?.id ?? null} round={Math.max(tournament.currentRound - (tournament.myMatch ? 1 : 0), 1)} />

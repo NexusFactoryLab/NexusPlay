@@ -37,10 +37,7 @@ export function playTargetFor(game: PlayableGame): PlayTarget {
     // Sala en tiempo real de 2 a 4 jugadores.
     case 'SNAKES_LADDERS':
       return { kind: 'navigate', path: `/escaleras-serpientes/sala?gameId=${id}` }
-    // Sala en tiempo real de exactamente 2 jugadores (Fuego/Agua).
-    case 'DUAL_QUEST':
-      return { kind: 'navigate', path: `/dual-quest/sala?gameId=${id}` }
-    // Motor físico en el navegador, carga el nivel por slug (ver DualQuestPixiPlayPage).
+    // Sala en vivo de 2 (Lumen y Gota) con el motor de plataformas (ver duo-logico/DuoLogicoPage).
     case 'DUAL_QUEST_PIXI':
       return { kind: 'navigate', path: `/dual-quest-pixi/${slug}` }
     // Memoria (Parejas/Opuestos), con el popup de opciones antes de arrancar.
