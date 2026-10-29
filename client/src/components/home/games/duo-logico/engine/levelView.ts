@@ -16,6 +16,7 @@ import {
 import { isConditionMet, litMirrorCount } from '../shared/duoWorld'
 import type { DuoRole, DuoWorldState } from '../shared/duoTypes'
 import type { DuoAssets, DuoThemeAssets } from './duoAssets'
+import { CoopView } from './coopView'
 import type { Fx } from './fx'
 
 interface Run {
@@ -124,6 +125,8 @@ export class LevelView {
   private liquidAt = 0
   /** Lo que se ve en pantalla (coordenadas del mundo), para soltar el ambiente donde se mira. */
   private view = { x: 0, y: 0, w: 1280, h: 720 }
+  /** Gemas, llaves, candados, barreras, hongos, banderas y básculas (issue #128). */
+  private readonly coop: CoopView
 
   private readonly assets: DuoAssets
   private readonly theme: DuoThemeAssets
@@ -370,8 +373,12 @@ export class LevelView {
       this.back.addChild(s)
     }
 
+    this.coop = new CoopView(assets, theme, level, fx, onShake)
+    this.back.addChild(this.coop.back)
+
     for (const c of def.crates) {
-      const s = new Sprite(o.crate)
+      // La caja de metal (la empujan los dos) se ve de metal.
+      const s = new Sprite(c.heavy ? (o['crate-metal'] ?? o.crate) : o.crate)
       s.anchor.set(0)
       s.width = CRATE_SIZE
       s.height = CRATE_SIZE
@@ -427,7 +434,12 @@ export class LevelView {
     } else {
       liquidFront.addChild(this.water)
     }
-    this.front.addChild(liquidFront)
+    this.front.addChild(liquidFront, this.coop.front)
+  }
+
+  /** Alguien rebotó en un hongo cerca de (x, y). */
+  springBounce(x: number, y: number): void {
+    this.coop.springBounce(x, y, performance.now())
   }
 
   /** Lo que se ve en pantalla (coordenadas del mundo), para soltar el ambiente cerca de la cámara. */
@@ -512,6 +524,7 @@ export class LevelView {
     now: number,
     time: number,
     dtMs = 16,
+    bodies: Partial<Record<DuoRole, { x: number; y: number }>> = {},
   ): void {
     const o = this.assets.objects.textures
     const so = this.theme.objects?.textures ?? {}
@@ -694,6 +707,7 @@ export class LevelView {
       }
     }
 
+    this.coop.update(world, bodies, now, dtMs)
     this.updateAmbient(now)
   }
 

@@ -1,5 +1,5 @@
-import { TILE, isLiquidTile, isSolidTile, moverRect, tileAt, type DuoLevel, type TileKind } from './duoLevel.js';
-import { PLAYER_H, PLAYER_W, crateRect, dynamicSolids, playerRect, type DynamicSolids } from './duoWorld.js';
+import { TILE, crateSpawn, isLiquidTile, isSolidTile, moverRect, scaleSideId, tileAt, type DuoLevel, type TileKind } from './duoLevel.js';
+import { PLAYER_H, PLAYER_W, crateRect, dynamicSolids, playerRect, scaleSideOf, scaleSides, touchesActiveBarrier, type DynamicSolids } from './duoWorld.js';
 import type { DuoAnim, DuoInput, DuoPlayerNet, DuoRole, DuoWorldState, Rect } from './duoTypes.js';
 
 /** Paso fijo de la simulación (s). El cliente corre varios por cuadro si hace falta. */
@@ -29,9 +29,13 @@ export const PHYS = {
   swimStroke: 560,
   respawnDelay: 1.1,
   dropThrough: 0.25,
+  /** Rebote del hongo saltarín: sube ~5 celdas. */
+  springSpeed: 1250,
+  /** Una caja de metal empujada por los dos (px/s). */
+  heavyPushSpeed: 110,
 } as const;
 
-export type DeathCause = 'lava' | 'water' | 'sludge' | 'thorns' | 'fall';
+export type DeathCause = 'lava' | 'water' | 'sludge' | 'thorns' | 'fall' | 'electric';
 
 export interface PlayerSim {
   role: DuoRole;
@@ -54,6 +58,8 @@ export interface PlayerSim {
   standingOn: string | null;
   /** Distancia desde el borde izquierdo de esa plataforma. */
   moverDx: number;
+  /** Lo lanzó un hongo saltarín: su subida no se corta al soltar el salto. */
+  boosted: boolean;
 }
 
 export interface CrateSim {
@@ -78,7 +84,7 @@ export interface StepContext {
   time?: number;
 }
 
-export type StepEvent = { kind: 'died'; cause: DeathCause } | { kind: 'respawned' } | null;
+export type StepEvent = { kind: 'died'; cause: DeathCause } | { kind: 'respawned' } | { kind: 'bounced' } | null;
 
 export function createPlayer(role: DuoRole, at: { x: number; y: number }): PlayerSim {
   return {
@@ -100,6 +106,7 @@ export function createPlayer(role: DuoRole, at: { x: number; y: number }): Playe
     cheering: false,
     standingOn: null,
     moverDx: 0,
+    boosted: false,
   };
 }
 
@@ -153,11 +160,16 @@ function oneWayTops(level: DuoLevel, dyn: DynamicSolids, x: number, w: number, f
       if (fromY <= top + EPS && toY > top && (best === null || top < best)) best = top;
     }
   }
+  // Puentes, plataformas móviles y básculas se mueven: si en este paso subieron
+  // unos píxeles por encima de los pies de quien cae, igual lo atajan.
   for (const r of dyn.oneWay) {
-    if (x < r.x + r.w && x + w > r.x && fromY <= r.y + EPS && toY > r.y && (best === null || r.y < best)) best = r.y;
+    if (x < r.x + r.w && x + w > r.x && fromY <= r.y + MOVING_CATCH && toY > r.y && (best === null || r.y < best)) best = r.y;
   }
   return best;
 }
+
+/** Margen (px) con el que una superficie que se mueve ataja a quien cae sobre ella. */
+const MOVING_CATCH = 6;
 
 /** Mueve una caja en x lo que pueda (sin atravesar nada). Devuelve lo que se movió. */
 function pushCrateX(level: DuoLevel, dyn: DynamicSolids, crates: CrateSim[], crate: CrateSim, dx: number): number {
@@ -233,15 +245,28 @@ function kill(p: PlayerSim, cause: DeathCause): StepEvent {
   return { kind: 'died', cause };
 }
 
-/** Anota si quedó parado sobre una plataforma móvil (y dónde), para que el compañero lo dibuje pegado a ella. */
-function noteMover(level: DuoLevel, p: PlayerSim, time: number): void {
+/**
+ * Anota si quedó parado sobre una plataforma móvil o una báscula (y dónde):
+ * el compañero lo dibuja pegado a ella y el servidor cuenta su peso en la báscula.
+ */
+function noteMover(level: DuoLevel, world: DuoWorldState, p: PlayerSim, time: number): void {
   p.standingOn = null;
   if (!p.grounded) return;
+  const on = (r: Rect) => Math.abs(p.y - r.y) < 1 && p.x + PLAYER_W / 2 > r.x && p.x - PLAYER_W / 2 < r.x + r.w;
   for (const mover of level.def.movers ?? []) {
     const r = moverRect(mover, time);
-    if (Math.abs(p.y - r.y) < 1 && p.x + PLAYER_W / 2 > r.x && p.x - PLAYER_W / 2 < r.x + r.w) {
+    if (on(r)) {
       p.standingOn = mover.id;
       p.moverDx = p.x - r.x;
+      return;
+    }
+  }
+  for (const scale of level.def.scales ?? []) {
+    const sides = scaleSides(scale, world);
+    for (const side of ['left', 'right'] as const) {
+      if (!on(sides[side])) continue;
+      p.standingOn = scaleSideId(scale.id, side);
+      p.moverDx = p.x - sides[side].x;
       return;
     }
   }
@@ -263,6 +288,10 @@ export function stepPlayer(p: PlayerSim, input: DuoInput, ctx: StepContext, dt: 
   }
   const time = ctx.time ?? 0;
   const dyn = dynamicSolids(level, ctx.world, time);
+
+  // --- Báscula: quien va parado en un lado sube o baja con él ---
+  const riding = p.grounded ? scaleSideOf(level, p.standingOn ?? undefined) : null;
+  if (riding) p.y = scaleSides(riding.scale, ctx.world)[riding.side].y;
 
   // --- Plataformas móviles: quien está parado encima viaja con ellas ---
   if (p.grounded) {
@@ -297,7 +326,8 @@ export function stepPlayer(p: PlayerSim, input: DuoInput, ctx: StepContext, dt: 
     p.coyote = 0;
     p.grounded = false;
   }
-  if (!p.swimming && !input.jump && p.vy < -PHYS.jumpCut) p.vy = -PHYS.jumpCut;
+  if (p.vy >= 0 || p.grounded) p.boosted = false;
+  if (!p.swimming && !input.jump && !p.boosted && p.vy < -PHYS.jumpCut) p.vy = -PHYS.jumpCut;
 
   // --- Gravedad ---
   if (p.swimming) p.vy = Math.min(p.vy + PHYS.swimGravity * dt, PHYS.swimMaxSink);
@@ -316,6 +346,8 @@ export function stepPlayer(p: PlayerSim, input: DuoInput, ctx: StepContext, dt: 
     let blockers = blockersFor(level, dyn, ctx.crates, next);
     for (const b of blockers) {
       if (!b.crate || !p.grounded || !ctx.canPush(b.crate.id)) continue;
+      // La caja de metal no se mueve con uno solo: la arrastra el servidor cuando empujan los dos.
+      if (level.def.crates.find((c) => c.id === b.crate!.id)?.heavy) continue;
       if (!crateResting(level, dyn, ctx.crates, b.crate)) continue;
       const overlap = dx > 0 ? next.x + next.w - b.rect.x : next.x - (b.rect.x + b.rect.w);
       const moved = pushCrateX(level, dyn, ctx.crates, b.crate, overlap);
@@ -336,6 +368,7 @@ export function stepPlayer(p: PlayerSim, input: DuoInput, ctx: StepContext, dt: 
   }
 
   // --- Mover en y ---
+  let bounced = false;
   const dy = p.vy * dt;
   const wasGrounded = p.grounded;
   p.grounded = false;
@@ -345,12 +378,30 @@ export function stepPlayer(p: PlayerSim, input: DuoInput, ctx: StepContext, dt: 
     const blockers = blockersFor(level, dyn, ctx.crates, next);
     if (dy > 0) {
       let land: number | null = null;
-      for (const b of blockers) land = land === null ? b.rect.y : Math.min(land, b.rect.y);
+      let landRect: Rect | null = null;
+      for (const b of blockers) {
+        if (land === null || b.rect.y < land) {
+          land = b.rect.y;
+          landRect = b.rect;
+        }
+      }
       if (p.dropTimer <= 0) {
         const top = oneWayTops(level, dyn, rect.x, rect.w, p.y, p.y + dy);
-        if (top !== null && (land === null || top < land)) land = top;
+        if (top !== null && (land === null || top < land)) {
+          land = top;
+          landRect = null;
+        }
       }
-      if (land !== null) {
+      if (land !== null && landRect && dyn.springs.includes(landRect)) {
+        // Cayó sobre un hongo saltarín: sale disparado hacia arriba.
+        p.y = land;
+        p.vy = -PHYS.springSpeed;
+        p.grounded = false;
+        p.coyote = 0;
+        p.jumpBuffer = 0;
+        p.boosted = true;
+        bounced = true;
+      } else if (land !== null) {
         p.y = land;
         p.vy = 0;
         p.grounded = true;
@@ -373,14 +424,64 @@ export function stepPlayer(p: PlayerSim, input: DuoInput, ctx: StepContext, dt: 
   // --- Bordes del mundo ---
   p.x = Math.max(PLAYER_W / 2, Math.min(level.widthPx - PLAYER_W / 2, p.x));
   if (p.y - PLAYER_H > level.heightPx) return kill(p, 'fall');
-  noteMover(level, p, time);
+  noteMover(level, ctx.world, p, time);
 
   // --- Líquidos y peligros ---
   const hazard = hazardUnder(level, p);
   const ownLiquid = (p.role === 'FIRE' && hazard === 'lava') || (p.role === 'WATER' && hazard === 'water');
   p.swimming = ownLiquid;
   if (hazard && !ownLiquid) return kill(p, hazard as DeathCause);
-  return null;
+  if (touchesActiveBarrier(level, ctx.world, playerRect(p))) return kill(p, 'electric');
+  return bounced ? { kind: 'bounced' } : null;
+}
+
+/**
+ * De qué lado empuja un personaje una caja: está pegado a ella, con los pies a
+ * su altura, mirándola y en pose de empujar. 1 = hacia la derecha, −1 = hacia
+ * la izquierda, 0 = no la empuja. La tolerancia cubre el atraso con que cada
+ * uno ve la caja que mueve el servidor.
+ */
+export function pushingDirection(crate: Rect, p: DuoPlayerNet): 1 | -1 | 0 {
+  if (p.dead || p.anim !== 'push' || Math.abs(p.y - (crate.y + crate.h)) > 10) return 0;
+  const right = p.x + PLAYER_W / 2;
+  const left = p.x - PLAYER_W / 2;
+  if (p.facing === 1 && right >= crate.x - 22 && right <= crate.x + 10) return 1;
+  if (p.facing === -1 && left <= crate.x + crate.w + 22 && left >= crate.x + crate.w - 10) return -1;
+  return 0;
+}
+
+/**
+ * Cajas de metal (servidor): avanzan solo si los dos las empujan hacia el mismo
+ * lado; además caen si se quedan sin piso (y vuelven a su lugar si caen a un
+ * líquido). `fall` guarda la velocidad de caída de cada una entre ticks.
+ */
+export function stepHeavyCrates(
+  level: DuoLevel,
+  world: DuoWorldState,
+  players: Partial<Record<DuoRole, DuoPlayerNet>>,
+  dt: number,
+  time: number,
+  fall: Record<string, number>,
+): void {
+  const heavy = level.def.crates.filter((c) => c.heavy);
+  if (heavy.length === 0) return;
+  const dyn = dynamicSolids(level, world, time);
+  const sims: CrateSim[] = world.crates.map((c) => ({ id: c.id, x: c.x, y: c.y, vy: fall[c.id] ?? 0 }));
+  for (const def of heavy) {
+    const sim = sims.find((s) => s.id === def.id);
+    const crate = world.crates.find((c) => c.id === def.id);
+    if (!sim || !crate) continue;
+    const rect = crateRect(sim);
+    const fire = players.FIRE ? pushingDirection(rect, players.FIRE) : 0;
+    const water = players.WATER ? pushingDirection(rect, players.WATER) : 0;
+    if (fire !== 0 && fire === water && crateResting(level, dyn, sims, sim)) {
+      pushCrateX(level, dyn, sims, sim, fire * PHYS.heavyPushSpeed * dt);
+    }
+    if (!stepCrate(level, world, sims, sim, dt, time)) Object.assign(sim, crateSpawn(def), { vy: 0 });
+    fall[def.id] = sim.vy;
+    crate.x = sim.x;
+    crate.y = sim.y;
+  }
 }
 
 /** Animación que corresponde al estado físico. */

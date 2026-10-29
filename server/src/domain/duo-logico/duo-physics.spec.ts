@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BOSQUE } from './shared/levels/bosque.js';
-import { TILE, parseLevel, standPoint, type DuoLevelDef } from './shared/duoLevel.js';
-import { STEP, createPlayer, stepPlayer, type CrateSim, type PlayerSim, type StepEvent } from './shared/duoPhysics.js';
+import { CRATE_SIZE, TILE, parseLevel, standPoint, type DuoLevelDef } from './shared/duoLevel.js';
+import { STEP, createPlayer, stepHeavyCrates, stepPlayer, type CrateSim, type PlayerSim, type StepEvent } from './shared/duoPhysics.js';
 import { createWorldState, gateWithBothOnPedestals, updateSwitches } from './shared/duoWorld.js';
 import { NO_INPUT, type DuoInput, type DuoRole, type DuoWorldState } from './shared/duoTypes.js';
 import type { DuoLevel } from './shared/duoLevel.js';
@@ -99,18 +99,22 @@ describe('física de Dúo Lógico', () => {
     expect(water.dead).toBe(false);
   });
 
-  it('empujar la caja hasta el muro permite trepar al nivel alto', () => {
+  it('la caja de metal, empujada por los dos hasta el muro, sirve de escalón al nivel alto', () => {
     const env = setup();
-    const p = place('WATER', 52, 9);
-    const crate = env.crates[0];
-    // Empuja la caja hasta el muro (col 57).
-    run(p, env, { right: true }, 3);
-    expect(crate.x + 58).toBeCloseTo(57 * TILE, 0);
-    expect(p.y).toBe(10 * TILE);
-    // Retrocede, sube a la caja y salta al nivel alto.
-    run(p, env, { left: true }, 0.35);
-    run(p, env, (q, i) => ({ right: true, jump: (i > 10 && i < 30) || (q.y < 10 * TILE - 30 && q.y > 7 * TILE + 1 && (q.grounded || q.vy < 0)) }), 2);
+    const crate = env.world.crates.find((c) => c.id === 'caja-metal')!;
+    const fall: Record<string, number> = {};
+    // Los dos la empujan desde la izquierda hasta el muro (col 85).
+    for (let i = 0; i < 200 && crate.x + CRATE_SIZE < 85 * TILE - 0.5; i++) {
+      const pusher = { x: crate.x - 18, y: 10 * TILE, vx: 110, vy: 0, facing: 1 as const, anim: 'push' as const, dead: false };
+      stepHeavyCrates(env.level, env.world, { FIRE: pusher, WATER: pusher }, 1 / 30, i / 30, fall);
+    }
+    expect(crate.x + CRATE_SIZE).toBeCloseTo(85 * TILE, 0);
+    // Uno sube a la caja y salta al nivel alto.
+    const crates: CrateSim[] = [{ id: crate.id, x: crate.x, y: crate.y, vy: 0 }];
+    const p = place('WATER', 82, 9);
+    run(p, { ...env, crates }, (q, i) => ({ right: true, jump: (i > 10 && i < 30) || (q.y < 10 * TILE - 30 && q.y > 7 * TILE + 1 && (q.grounded || q.vy < 0)) }), 2.5);
     expect(p.y).toBe(7 * TILE);
+    expect(p.x).toBeGreaterThan(85 * TILE);
   });
 
   it('la palanca queda activa al tocarla y tiende el puente', () => {

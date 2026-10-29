@@ -1,7 +1,7 @@
 import { Application, Container, Graphics, TilingSprite } from 'pixi.js'
 import { crateSpawn, mirrorRect, moverRect, standPoint, type DuoLevel } from '../shared/duoLevel'
 import { STEP, createPlayer, stepCrate, stepPlayer, toNet, type CrateSim, type DeathCause, type PlayerSim } from '../shared/duoPhysics'
-import { checkpointFor, collectCoins, isOnPedestal, litMirrorCount, updateSwitches } from '../shared/duoWorld'
+import { checkpointFor, collectCoins, collectGems, isOnPedestal, litMirrorCount, updateSwitches } from '../shared/duoWorld'
 import { otherRole, type DuoEmote, type DuoPeerState, type DuoPlayerNet, type DuoRole, type DuoSnapshot, type DuoWorldState } from '../shared/duoTypes'
 import type { DuoPhase } from '../shared/duoProtocol'
 import { CharacterView, isAirborne } from './characterView'
@@ -98,6 +98,8 @@ export class DuoGame {
   private crates: CrateSim[]
   /** Cajas que mueve el compañero (o nadie): se interpolan igual que su personaje. */
   private crateTracks = new Map<string, SnapshotBuffer<{ x: number; y: number }>>()
+  /** Básculas: su desplazamiento se interpola con el reloj del compañero (sin saltos de 30 por segundo). */
+  private scaleTracks = new Map<string, SnapshotBuffer<{ x: number; y: number }>>()
   private ownedUntil = new Map<string, number>()
   /** Cajas que acabo de soltar (hora local de cuando las solté). */
   private releasedAt = new Map<string, number>()
@@ -153,8 +155,10 @@ export class DuoGame {
     const switches: Record<string, boolean> = {}
     for (const b of this.level.def.buttons) switches[b.id] = false
     for (const l of this.level.def.levers) switches[l.id] = false
+    for (const l of this.level.def.latches ?? []) switches[l.id] = false
     const mirrors = Object.fromEntries((this.level.def.mirrors ?? []).map((m) => [m.id, m.start]))
-    return { switches, crates: this.crates.map((c) => ({ id: c.id, x: c.x, y: c.y, owner: null })), coins: {}, gates: {}, mirrors }
+    const scales = Object.fromEntries((this.level.def.scales ?? []).map((s) => [s.id, 0]))
+    return { switches, crates: this.crates.map((c) => ({ id: c.id, x: c.x, y: c.y, owner: null })), coins: {}, gates: {}, mirrors, gems: {}, keys: {}, locks: {}, flags: {}, scales }
   }
 
   private freshCrates(): CrateSim[] {
@@ -216,6 +220,7 @@ export class DuoGame {
       this.crates = this.freshCrates()
       this.prevCrates.clear()
       this.crateTracks.clear()
+      this.scaleTracks.clear()
       this.ownedUntil.clear()
       this.releasedAt.clear()
       this.lastSentCrates.clear()
@@ -249,6 +254,14 @@ export class DuoGame {
     if (partner) this.takePartner(partner, snapshot.t, snapshot.at?.[other] ?? snapshot.t, receivedAt)
     for (const crate of snapshot.world.crates) {
       this.takeCrate(crate.id, crate.x, crate.y, crate.owner, snapshot.t, crate.at ?? snapshot.t, receivedAt)
+    }
+    for (const [id, offset] of Object.entries(snapshot.world.scales ?? {})) {
+      let track = this.scaleTracks.get(id)
+      if (!track) {
+        track = new SnapshotBuffer<{ x: number; y: number }>(this.partner.clock)
+        this.scaleTracks.set(id, track)
+      }
+      track.push(snapshot.t, { x: 0, y: offset }, receivedAt)
     }
   }
 
@@ -437,6 +450,10 @@ export class DuoGame {
     }
     const event = stepPlayer(this.me, this.input.read(), ctx, STEP)
     if (event?.kind === 'died') this.options.onFainted?.(this.role, event.cause)
+    if (event?.kind === 'bounced') {
+      this.views[this.role]?.stretch()
+      this.levelView?.springBounce(this.me.x, this.me.y)
+    }
     for (const crate of this.crates) {
       if ((this.ownedUntil.get(crate.id) ?? 0) <= now) continue
       if (!stepCrate(this.level, this.localWorld, this.crates, crate, STEP, time)) {
@@ -456,15 +473,32 @@ export class DuoGame {
       coins: { ...this.serverWorld.coins },
       gates: { ...this.serverWorld.gates },
       mirrors: { ...this.serverWorld.mirrors },
+      gems: { ...this.serverWorld.gems },
+      keys: { ...this.serverWorld.keys },
+      locks: { ...this.serverWorld.locks },
+      flags: { ...this.serverWorld.flags },
+      scales: this.drawnScales(),
     }
     const bodies = { [this.role]: toNet(this.me), [otherRole(this.role)]: this.partnerDrawn ?? undefined }
     updateSwitches(this.level, world, bodies)
-    // Las palancas no se desactivan: lo que el servidor ya activó sigue activo.
+    // Las palancas y los cerrojos no se desactivan: lo que el servidor ya activó sigue activo.
+    const permanent = new Set([...this.level.def.levers.map((l) => l.id), ...(this.level.def.latches ?? []).map((l) => l.id)])
     for (const [id, on] of Object.entries(this.serverWorld.switches)) {
-      if (on && this.level.def.levers.some((l) => l.id === id)) world.switches[id] = true
+      if (on && permanent.has(id)) world.switches[id] = true
     }
     collectCoins(this.level, world, { [this.role]: toNet(this.me) })
+    collectGems(this.level, world, { [this.role]: toNet(this.me) })
     return world
+  }
+
+  /** Desplazamiento de cada báscula tal como se dibuja (interpolado con el reloj del compañero). */
+  private drawnScales(): Record<string, number> {
+    const out: Record<string, number> = {}
+    const now = Date.now()
+    for (const scale of this.level.def.scales ?? []) {
+      out[scale.id] = this.scaleTracks.get(scale.id)?.sample(now)?.y ?? this.serverWorld.scales?.[scale.id] ?? 0
+    }
+    return out
   }
 
   private render(now: number, deltaMs: number, alpha: number, drawTime: number): void {
@@ -503,7 +537,7 @@ export class DuoGame {
       const prev = this.prevCrates.get(c.id)
       return prev ? { id: c.id, x: smooth(prev.x, c.x), y: smooth(prev.y, c.y) } : c
     })
-    this.levelView.update(this.localWorld, crates, onPedestal, now, drawTime, deltaMs)
+    this.levelView.update(this.localWorld, crates, onPedestal, now, drawTime, deltaMs, { [this.role]: mine, [other]: partner })
 
     // --- Cámara ---
     const sw = app.screen.width
@@ -551,6 +585,11 @@ export class DuoGame {
     const fx = this.fx
     const colors = ELEMENT_COLORS[role]
     const grounded = (a: DuoPlayerNet) => !a.dead && !isAirborne(a.anim) && a.anim !== 'swim'
+    // Lanzado por un hongo (el compañero: se ve por el salto repentino).
+    if (role !== this.role && prev.vy > 200 && s.vy < -900) {
+      view.stretch()
+      this.levelView.springBounce(s.x, s.y)
+    }
     if (grounded(prev) && s.anim === 'rise') {
       view.stretch()
       fx.burst({ x: s.x, y: s.y - 2, count: 6, texture: 'soft', tint: DUST_COLORS, speed: [40, 110], angle: [-Math.PI, 0], life: [300, 500], scale: [0.35, 0.8], alpha: [0.6, 0], drag: 4, spread: [24, 2] })

@@ -1,6 +1,7 @@
-import { DoorOpen, Heart, LogOut, RotateCcw, Sparkles, Timer } from 'lucide-react'
+import { DoorOpen, Gem, Heart, LogOut, RotateCcw, Sparkles, Star, Timer } from 'lucide-react'
 import { CHARACTERS } from './duoCharacters'
 import type { DuoRoomView } from './shared/duoProtocol'
+import { duoStars } from './duoStars'
 
 function formatDuration(ms: number): string {
   const total = Math.round(ms / 1000)
@@ -14,6 +15,7 @@ export function DuoEndScreen({ room, onRetry, onExit }: { room: DuoRoomView; onR
   const voted = !!room.you && room.retryVotes.includes(room.you)
   const partnerVoted = room.retryVotes.some((r) => r !== room.you)
   const duration = room.startedAt && room.finishedAt ? formatDuration(room.finishedAt - room.startedAt) : null
+  const stars = won ? duoStars(room) : 0
 
   return (
     <div className="absolute inset-0 z-40 flex overflow-y-auto bg-slate-950/75 p-4" role="dialog" aria-label="Fin de la partida" data-testid="duo-end">
@@ -35,10 +37,31 @@ export function DuoEndScreen({ room, onRetry, onExit }: { room: DuoRoomView; onR
               : 'Repasen las pistas y vuelvan a intentarlo: cada puerta les enseña algo nuevo.'}
         </p>
 
+        {won && (
+          <div className="mt-3 flex justify-center gap-1.5" role="img" aria-label={`${stars} de 3 estrellas`} data-testid="duo-stars" data-stars={stars}>
+            {[0, 1, 2].map((i) => (
+              <Star
+                key={i}
+                className={`h-10 w-10 ${i < stars ? 'animate-[duo-star-pop_0.5s_cubic-bezier(0.34,1.56,0.64,1)_both] fill-amber-400 text-amber-500' : 'text-slate-300'}`}
+                style={{ animationDelay: `${300 + i * 220}ms` }}
+                strokeWidth={2}
+              />
+            ))}
+          </div>
+        )}
+        {won && stars < 3 && (
+          <p className="mt-1 text-[13px] text-slate-500">
+            {room.gemsCollected < room.gemsTotal ? 'Junten todas las gemas' : ''}
+            {room.gemsCollected < room.gemsTotal && room.hearts < room.maxHearts ? ' y ' : ''}
+            {room.hearts < room.maxHearts ? 'no pierdan corazones' : ''} para ganar más estrellas.
+          </p>
+        )}
+
         {!abandoned && (
-          <dl className="mt-4 grid grid-cols-2 gap-2 text-left sm:grid-cols-4">
+          <dl className="mt-4 grid grid-cols-2 gap-2 text-left sm:grid-cols-3">
             <Stat icon={<DoorOpen className="h-4 w-4 text-violet-600" />} label="Puertas" value={`${room.gatesOpened}/${room.gatesTotal}`} />
             <Stat icon={<Sparkles className="h-4 w-4 text-amber-500" />} label="Fichas" value={`${room.coinsCollected}/${room.coinsTotal}`} />
+            {room.gemsTotal > 0 && <Stat icon={<Gem className="h-4 w-4 text-emerald-600" />} label="Gemas" value={`${room.gemsCollected}/${room.gemsTotal}`} />}
             <Stat icon={<Heart className="h-4 w-4 text-rose-500" />} label="Corazones" value={`${room.hearts}/${room.maxHearts}`} />
             {duration && <Stat icon={<Timer className="h-4 w-4 text-sky-600" />} label="Tiempo" value={duration} />}
           </dl>

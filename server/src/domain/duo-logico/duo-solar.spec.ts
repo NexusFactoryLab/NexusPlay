@@ -79,12 +79,12 @@ describe('Planta solar', () => {
     const lift = SOLAR.movers![1];
     expect(moverRect(lift, 0).y).toBe(10 * TILE);
     expect(moverRect(lift, lift.period / 2).y).toBe(5 * TILE);
-    const p = createPlayer('FIRE', standPoint({ col: 47, row: 9 }));
+    const p = createPlayer('FIRE', standPoint({ col: lift.col, row: 9 }));
     // Empujando hacia el mirador mientras sube: el muro lo frena hasta que asoma por arriba.
     const up = run(p, () => ({ right: true }), lift.period / 2 + 0.5, 0);
     expect(up.events).toHaveLength(0);
     expect(p.y).toBe(5 * TILE);
-    expect(p.x).toBeGreaterThan(49 * TILE);
+    expect(p.x).toBeGreaterThan((lift.col + lift.width) * TILE);
   });
 
   it('con los dos espejos bien orientados se enciende el receptor y el puente', () => {
@@ -100,7 +100,7 @@ describe('Planta solar', () => {
 
   it('Gota sostiene el botón del fondo del tanque de agua', () => {
     const world = createWorldState(solar);
-    const button = SOLAR.buttons[0];
+    const button = SOLAR.buttons.find((b) => b.id === 'boton-fondo')!;
     updateSwitches(solar, world, { WATER: net(standPoint(button)) });
     expect(world.switches['boton-fondo']).toBe(true);
   });

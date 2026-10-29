@@ -3,10 +3,16 @@ import { MIRROR_ANGLES, TILE, mirrorRect, type DuoGateDef, type DuoLevel } from 
 import {
   coinsForGate,
   collectCoins,
+  collectGems,
   createWorldState,
   gateWithBothOnPedestals,
+  scaleSideOf,
+  updateFlags,
+  updateKeys,
+  updateScales,
   updateSwitches,
 } from './shared/duoWorld.js';
+import { stepHeavyCrates } from './shared/duoPhysics.js';
 import {
   DUO_EMOTES,
   DUO_ROLES,
@@ -95,6 +101,10 @@ export interface DuoRoomState {
   revealEndsAt: number | null;
   waitingPartnerUntil: number | null;
   crateLeases: Record<string, number>;
+  /** Velocidad de caída de cada caja de metal (las mueve el servidor). */
+  heavyFall: Record<string, number>;
+  /** Hora del último tick en juego (para el paso de las cajas de metal y las básculas). */
+  lastTickAt: number | null;
   usedQuestionIds: string[];
   retryVotes: DuoRole[];
   startedAt: number | null;
@@ -140,6 +150,8 @@ export function createDuoRoom(input: {
     revealEndsAt: null,
     waitingPartnerUntil: null,
     crateLeases: {},
+    heavyFall: {},
+    lastTickAt: null,
     usedQuestionIds: [],
     retryVotes: [],
     startedAt: null,
@@ -247,6 +259,8 @@ function startRun(room: DuoRoomState, now: number): void {
   room.reveal = null;
   room.revealEndsAt = null;
   room.crateLeases = {};
+  room.heavyFall = {};
+  room.lastTickAt = null;
   room.usedQuestionIds = [];
   room.retryVotes = [];
   room.startedAt = null;
@@ -281,9 +295,12 @@ export function applyClientState(room: DuoRoomState, userId: string, state: DuoC
     dead: s.dead === true,
   };
   const riding = s.mover && typeof s.mover === 'object' ? s.mover : null;
-  const mover = riding ? level.def.movers?.find((m) => m.id === riding.id) : undefined;
-  if (riding && mover && finite(riding.dx)) {
-    player.state.mover = { id: mover.id, dx: Math.max(-TILE, Math.min((mover.width + 1) * TILE, riding.dx)) };
+  if (riding && typeof riding.id === 'string' && finite(riding.dx)) {
+    // Plataforma móvil o un lado de báscula que existan en el escenario.
+    const mover = level.def.movers?.find((m) => m.id === riding.id);
+    const side = scaleSideOf(level, riding.id);
+    const width = mover ? mover.width : side ? side.scale[side.side].width : null;
+    if (width !== null) player.state.mover = { id: riding.id, dx: Math.max(-TILE, Math.min((width + 1) * TILE, riding.dx)) };
   }
   player.stateAt = now;
   const peer: DuoPeerState = { role: player.role, at: now, player: player.state, crates: [] };
@@ -291,6 +308,8 @@ export function applyClientState(room: DuoRoomState, userId: string, state: DuoC
   for (const update of state.crates.slice(0, room.world.crates.length)) {
     const crate = room.world.crates.find((c) => c.id === update?.id);
     if (!crate || !finite(update.x) || !finite(update.y)) continue;
+    // La caja de metal la mueve el servidor (cuando la empujan los dos).
+    if (level.def.crates.find((c) => c.id === crate.id)?.heavy) continue;
     const leaseOver = (room.crateLeases[crate.id] ?? 0) < now;
     if (crate.owner && crate.owner !== player.role && !leaseOver) continue;
     crate.x = Math.max(0, Math.min(level.widthPx, update.x));
@@ -394,18 +413,31 @@ export function tickDuoRoom(room: DuoRoomState, now: number, rng: () => number =
   }
 
   if (room.phase === 'PLAYING') {
+    const dt = room.lastTickAt === null ? 0 : Math.min(0.1, Math.max(0, (now - room.lastTickAt) / 1000));
+    room.lastTickAt = now;
     for (const crate of room.world.crates) {
       if (crate.owner && (room.crateLeases[crate.id] ?? 0) < now) crate.owner = null;
     }
     const bodies: Partial<Record<DuoRole, DuoPlayerNet>> = {};
     for (const p of room.players) if (p.state) bodies[p.role] = p.state;
+    stepHeavyCrates(level, room.world, bodies, dt, now / 1000, room.heavyFall);
+    updateScales(level, room.world, bodies, dt);
     updateSwitches(level, room.world, bodies);
     for (const coin of collectCoins(level, room.world, bodies)) {
       const def = level.def.coins.find((c) => c.id === coin.id);
       notices.push({ kind: 'coin', by: coin.by, hintsForGate: def ? coinsForGate(level, room.world, def.gate) : 0 });
     }
+    for (const gem of collectGems(level, room.world, bodies)) notices.push({ kind: 'gem', by: gem.by });
+    for (const event of updateKeys(level, room.world, bodies)) {
+      if (event.kind === 'key-taken') notices.push({ kind: 'key', by: event.by });
+      else if (event.kind === 'lock-opened') notices.push({ kind: 'lock', by: event.by });
+      else notices.push({ kind: 'key-lost' });
+    }
+    if (updateFlags(level, room.world, bodies).length > 0) notices.push({ kind: 'flag' });
     const gate = gateWithBothOnPedestals(level, room.world, bodies);
     if (gate) startQuestion(room, gate, rng);
+  } else {
+    room.lastTickAt = null;
   }
 
   if (room.phase === 'REVEAL' && room.revealEndsAt !== null && now >= room.revealEndsAt && room.reveal && room.question) {
@@ -542,6 +574,8 @@ export function toDuoRoomView(room: DuoRoomState, userId: string, now: number): 
     gatesTotal: level.def.gates.length,
     coinsCollected: Object.keys(room.world.coins).length,
     coinsTotal: level.def.coins.length,
+    gemsCollected: Object.keys(room.world.gems).length,
+    gemsTotal: level.def.gems?.length ?? 0,
     retryVotes: room.retryVotes,
     startedAt: room.startedAt,
     finishedAt: room.finishedAt,

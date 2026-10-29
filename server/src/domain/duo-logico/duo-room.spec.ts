@@ -199,7 +199,28 @@ describe('sala de Dúo Lógico', () => {
     expect(toDuoRoomView(room, 'luis', now).question?.hints).toHaveLength(2);
   });
 
-  it('una caja es de quien la empuja; el otro no la mueve hasta que se suelta', () => {
+  /** Ningún escenario trae hoy cajas livianas: se prueba con la del bosque como si lo fuera. */
+  function withLightCrate(test: () => void) {
+    const def = BOSQUE.crates[0];
+    const heavy = def.heavy;
+    def.heavy = false;
+    try {
+      test();
+    } finally {
+      def.heavy = heavy;
+    }
+  }
+
+  it('la caja de metal no la mueve ningún jugador por su cuenta (la arrastra el servidor)', () => {
+    const { room, now } = playingRoom();
+    const crate = room.world.crates[0];
+    const x = crate.x;
+    applyClientState(room, 'ana', { player: body(100, 640), crates: [{ id: crate.id, x: x + 40, y: crate.y }] }, now);
+    expect(crate.x).toBe(x);
+    expect(crate.owner).toBeNull();
+  });
+
+  it('una caja liviana es de quien la empuja; el otro no la mueve hasta que se suelta', () => withLightCrate(() => {
     const { room, now } = playingRoom();
     const crate = room.world.crates[0];
     applyClientState(room, 'ana', { player: body(100, 640), crates: [{ id: crate.id, x: crate.x + 10, y: crate.y }] }, now);
@@ -212,9 +233,9 @@ describe('sala de Dúo Lógico', () => {
     applyClientState(room, 'luis', { player: body(200, 640), crates: [{ id: crate.id, x: x + 50, y: crate.y }] }, now + DUO_CRATE_LEASE_MS + 30);
     expect(crate.owner).toBe('WATER');
     expect(crate.x).toBe(x + 50);
-  });
+  }));
 
-  it('la instantánea dice cuándo llegó cada posición, para no repetir una vieja como nueva', () => {
+  it('la instantánea dice cuándo llegó cada posición, para no repetir una vieja como nueva', () => withLightCrate(() => {
     const { room, now } = playingRoom();
     const crate = room.world.crates[0];
     applyClientState(room, 'ana', { player: body(100, 640), crates: [{ id: crate.id, x: crate.x + 10, y: crate.y }] }, now);
@@ -223,6 +244,41 @@ describe('sala de Dúo Lógico', () => {
     expect(later.t).toBe(now + 50);
     expect(later.at).toEqual({ FIRE: now, WATER: now + 30 });
     expect(later.world.crates[0].at).toBe(now);
+  }));
+
+  it('las gemas, la llave, el candado y las banderas se avisan, y las gemas se cuentan en la vista', () => {
+    const { room, now } = playingRoom();
+    const tick = (t: number) => tickDuoRoom(room, t, rng);
+    expect(toDuoRoomView(room, 'ana', now)).toMatchObject({ gemsCollected: 0, gemsTotal: BOSQUE.gems!.length });
+    // Lumen, sobre la isla, toma su gema.
+    applyClientState(room, 'ana', { player: body(5 * 64 + 32, 7 * 64), crates: [] }, now);
+    expect(tick(now + 10)).toContainEqual({ kind: 'gem', by: 'FIRE' });
+    expect(toDuoRoomView(room, 'ana', now + 10).gemsCollected).toBe(1);
+    // Gota toca la bandera de los pozos.
+    applyClientState(room, 'luis', { player: body(46 * 64 + 32, 10 * 64), crates: [] }, now + 20);
+    expect(tick(now + 30)).toContainEqual({ kind: 'flag' });
+    // Gota toma la llave de la repisa y abre la puerta con candado.
+    applyClientState(room, 'luis', { player: body(66 * 64 + 32, 6 * 64), crates: [] }, now + 40);
+    expect(tick(now + 50)).toContainEqual({ kind: 'key', by: 'WATER' });
+    applyClientState(room, 'luis', { player: body(69 * 64 - 10, 10 * 64), crates: [] }, now + 60);
+    expect(tick(now + 70)).toContainEqual({ kind: 'lock', by: 'WATER' });
+    expect(room.world.locks.candado).toBe(true);
+  });
+
+  it('acepta que un jugador cuente que va sobre un lado de la báscula', () => {
+    const { room, now } = playingRoom();
+    applyClientState(room, 'ana', { player: { ...body(58 * 64 + 30, 10 * 64), mover: { id: 'scale:bascula:left', dx: 30 } }, crates: [] }, now);
+    expect(room.players[0].state?.mover).toEqual({ id: 'scale:bascula:left', dx: 30 });
+    applyClientState(room, 'ana', { player: { ...body(58 * 64 + 30, 10 * 64), mover: { id: 'scale:otra:left', dx: 30 } }, crates: [] }, now + 1);
+    expect(room.players[0].state?.mover).toBeUndefined();
+    // Con su peso, el plato izquierdo baja.
+    tickDuoRoom(room, now + 10, rng);
+    tickDuoRoom(room, now + 500, rng);
+    expect(room.world.scales.bascula).toBe(0);
+    applyClientState(room, 'ana', { player: { ...body(58 * 64 + 30, 10 * 64), mover: { id: 'scale:bascula:left', dx: 30 } }, crates: [] }, now + 510);
+    tickDuoRoom(room, now + 520, rng);
+    tickDuoRoom(room, now + 620, rng);
+    expect(room.world.scales.bascula).toBeGreaterThan(0);
   });
 
   it('ignora posiciones mal formadas', () => {
@@ -230,7 +286,7 @@ describe('sala de Dúo Lógico', () => {
     applyClientState(room, 'ana', { player: { ...body(100, 100), x: Number.NaN }, crates: [] }, now);
     expect(room.players[0].state).toBeNull();
     applyClientState(room, 'ana', { player: body(1e9, 100), crates: [] }, now);
-    expect(room.players[0].state?.x).toBe(72 * 64);
+    expect(room.players[0].state?.x).toBe(BOSQUE.map[0].length * 64);
   });
 
   it('si alguien se desconecta en plena partida se le espera; si vuelve, sigue', () => {

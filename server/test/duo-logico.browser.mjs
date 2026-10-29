@@ -94,6 +94,8 @@ try {
     await page.addInitScript((user) => {
       localStorage.setItem('nexusplay-theme', 'dark');
       localStorage.setItem(`nexusplay-welcome-v1:${user}:STUDENT`, 'seen');
+      // El paso de elegir avatar del primer inicio (sin avatar en el mock) se da por saltado.
+      localStorage.setItem(`nexusplay-avatar-onboarding-v1:${user}`, 'skipped');
     }, id);
     await page.route('**/*', (route) => {
       const url = new URL(route.request().url());
@@ -133,7 +135,7 @@ try {
   const guide = ana.locator('[data-game-guide="DUAL_QUEST_PIXI"]');
   await guide.waitFor();
   await ana.screenshot({ path: '.scratch/duo-guia-desktop.png' });
-  for (let i = 0; i < 5; i++) await guide.getByRole('button', { name: 'Siguiente' }).click();
+  for (let i = 0; i < 6; i++) await guide.getByRole('button', { name: 'Siguiente' }).click();
   await guide.getByText('Corazones y pistas').waitFor();
   await ana.screenshot({ path: '.scratch/duo-guia-final-desktop.png' });
   await guide.getByRole('button', { name: '¡A jugar!' }).click();
