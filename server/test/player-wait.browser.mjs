@@ -114,6 +114,8 @@ try {
     await page.addInitScript((user) => {
       localStorage.setItem('nexusplay-theme', 'dark');
       localStorage.setItem(`nexusplay-welcome-v1:${user}:STUDENT`, 'seen');
+      // El paso de elegir avatar del primer inicio (sin avatar en el mock) se da por saltado.
+      localStorage.setItem(`nexusplay-avatar-onboarding-v1:${user}`, 'skipped');
     }, id);
     await page.route('**/*', (route) => {
       const url = new URL(route.request().url());

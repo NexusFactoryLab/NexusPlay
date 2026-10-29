@@ -37,7 +37,7 @@ window.place = (col, row) => {
 window.partnerAt = (col, row, anim) => {
   partner = { x: col * 64 + 32, y: (row + 1) * 64, vx: 0, vy: 0, facing: -1, anim, dead: false };
 };
-window.setWorld = (patch) => { Object.assign(world.switches, patch.switches || {}); Object.assign(world.gates, patch.gates || {}); Object.assign(world.coins, patch.coins || {}); Object.assign(world.mirrors, patch.mirrors || {}); };
+window.setWorld = (patch) => { for (const k of ['switches', 'gates', 'coins', 'mirrors', 'scales', 'keys', 'locks', 'flags', 'gems']) Object.assign(world[k], patch[k] || {}); };
 // El "servidor" de mentira reparte el mundo y la posición del compañero.
 setInterval(() => {
   if (!game || !world) return;
@@ -67,10 +67,20 @@ async function main() {
         { level: 'bosque', me: [33, 11], partner: [41, 11, 'swim'], world: { switches: { 'palanca-lumen': true } }, name: 'bosque-pozos' },
         { level: 'bosque', me: [24, 9], partner: [22, 9, 'idle'], world: { gates: { 'puerta-1': true } }, name: 'bosque-puerta' },
         { level: 'bosque', me: [66, 6], partner: [68, 6, 'idle'], world: { gates: { 'puerta-1': true, 'puerta-2': true } }, name: 'bosque-portal' },
+        // Retos en pareja (issue #128).
+        { level: 'bosque', me: [49, 9], partner: [47, 9, 'idle'], world: {}, name: 'bosque-zarzas' },
+        { level: 'bosque', me: [53, 9], partner: [48, 9, 'idle'], world: { switches: { 'boton-zarzas-a': true } }, name: 'bosque-zarzas-abiertas' },
+        { level: 'bosque', me: [62, 7], partner: [58, 11, 'idle'], world: { scales: { bascula: 128 }, flags: { 'bandera-pozos': true } }, name: 'bosque-bascula' },
+        { level: 'bosque', me: [68, 9], partner: [64, 9, 'idle'], world: { keys: { llave: 'FIRE' } }, name: 'bosque-llave' },
+        { level: 'bosque', me: [79, 9], partner: [80, 9, 'push'], world: { gates: { 'puerta-2': true } }, name: 'bosque-caja-metal' },
+        { level: 'bosque', me: [94, 6], partner: [97, 1, 'idle'], world: { gates: { 'puerta-2': true }, flags: { 'bandera-muro': true } }, name: 'bosque-hongo-ramas' },
         // Planta solar: espejos con la luz, tanques de agua y sales, portal.
         { level: 'solar', me: [30, 9], partner: [26, 9, 'idle'], world: { mirrors: { 'espejo-1': 2, 'espejo-2': 1 } }, name: 'solar-espejos' },
         { level: 'solar', me: [69, 11], partner: [62, 11, 'swim'], world: { gates: { 'puerta-1': true, 'puerta-2': true }, switches: { 'boton-fondo': true } }, name: 'solar-tanques' },
         { level: 'solar', me: [74, 9], partner: [72, 9, 'idle'], world: { gates: { 'puerta-1': true, 'puerta-2': true } }, name: 'solar-portal' },
+        { level: 'solar', me: [47, 9], partner: [44, 9, 'idle'], world: {}, name: 'solar-rayo' },
+        { level: 'solar', me: [64, 9], partner: [65, 9, 'idle'], world: { gates: { 'puerta-2': true } }, name: 'solar-caja-placa' },
+        { level: 'solar', me: [103, 7], partner: [99, 11, 'idle'], world: { scales: { bascula: 128 }, locks: { candado: true }, keys: { llave: 'used' } }, name: 'solar-bascula' },
       ]
       let level = null
       for (const shot of shots) {
@@ -78,12 +88,14 @@ async function main() {
           await page.evaluate((id) => window.start(id), shot.level)
           level = shot.level
         }
+        // Primero el mundo (la báscula se acomoda) y después los personajes.
+        await page.evaluate((s) => window.setWorld(s.world), shot)
+        await page.waitForTimeout(450)
         await page.evaluate((s) => {
-          window.setWorld(s.world)
           window.place(s.me[0], s.me[1])
           window.partnerAt(s.partner[0], s.partner[1], s.partner[2])
         }, shot)
-        await page.waitForTimeout(1600)
+        await page.waitForTimeout(1400)
         await page.screenshot({ path: `.scratch/duo-visual-${shot.name}-${view.tag}.png` })
         assert.ok((await page.evaluate(() => window.liveParticles())) > 0, `${shot.name}: hay partículas vivas`)
       }

@@ -108,12 +108,26 @@ export interface DuoRoomView {
   gatesTotal: number;
   coinsCollected: number;
   coinsTotal: number;
+  /** Gemas de color recogidas (rojas de Lumen, azules de Gota, verdes de cualquiera). */
+  gemsCollected: number;
+  gemsTotal: number;
   retryVotes: DuoRole[];
   startedAt: number | null;
   finishedAt: number | null;
 }
 
-export type DuoNotice = { kind: 'coin'; by: DuoRole; hintsForGate: number } | { kind: 'gate-opened'; gateId: string };
+export type DuoNotice =
+  | { kind: 'coin'; by: DuoRole; hintsForGate: number }
+  | { kind: 'gate-opened'; gateId: string }
+  | { kind: 'gem'; by: DuoRole }
+  /** Alguien tomó una llave. */
+  | { kind: 'key'; by: DuoRole }
+  /** Quien la llevaba se apagó: la llave volvió a su lugar. */
+  | { kind: 'key-lost' }
+  /** Una puerta con candado se abrió. */
+  | { kind: 'lock'; by: DuoRole }
+  /** Tocaron una bandera de control. */
+  | { kind: 'flag' };
 
 export type DuoClientMessages = {
   'duo:create': { gameId: string; role: DuoRole };

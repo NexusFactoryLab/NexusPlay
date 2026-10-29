@@ -79,6 +79,46 @@ export interface DuoMoverDef extends Cell {
   period: number;
 }
 
+/** Gema de color: la roja solo la toma Lumen, la azul solo Gota, la verde cualquiera. */
+export interface DuoGemDef extends Cell {
+  id: string;
+  color: DuoRole | 'BOTH';
+}
+
+/** Llave: quien la toca la lleva; al llegar con ella a su puerta con candado, la abre. */
+export interface DuoKeyDef extends Cell {
+  id: string;
+  lock: string;
+}
+
+/** Puerta con candado: un muro de `height` celdas (de su celda hacia abajo) hasta que llega su llave. */
+export interface DuoLockDef extends Cell {
+  id: string;
+  height: number;
+}
+
+/**
+ * Barrera: un muro de `height` celdas (de su celda hacia abajo) que apaga a
+ * quien la toca, salvo mientras se cumple `off` (por ejemplo, mientras el
+ * compañero pisa un botón). Eléctrica en la planta solar, de espinas en el bosque.
+ */
+export interface DuoBarrierDef extends Cell {
+  id: string;
+  height: number;
+  off: DuoCondition;
+}
+
+/**
+ * Báscula: dos plataformas unidas. El lado con más peso (personajes o cajas)
+ * baja y el otro sube, hasta `travel` celdas; con el mismo peso quedan parejas.
+ */
+export interface DuoScaleDef {
+  id: string;
+  left: Cell & { width: number };
+  right: Cell & { width: number };
+  travel: number;
+}
+
 export interface DuoLevelDef {
   id: string;
   title: string;
@@ -89,8 +129,23 @@ export interface DuoLevelDef {
   spawns: Record<DuoRole, Cell>;
   buttons: Array<Cell & { id: string }>;
   levers: Array<Cell & { id: string; role?: DuoRole }>;
+  /**
+   * Cerrojos: interruptores que quedan activos para siempre cuando se cumple
+   * su condición; por ejemplo, dos botones lejanos pisados a la vez.
+   */
+  latches?: Array<{ id: string; when: DuoCondition }>;
   bridges: Array<Cell & { id: string; width: number; when: DuoCondition }>;
-  crates: Array<Cell & { id: string }>;
+  /** `heavy`: caja de metal, solo se mueve si la empujan los dos a la vez. */
+  crates: Array<Cell & { id: string; heavy?: boolean }>;
+  gems?: DuoGemDef[];
+  keys?: DuoKeyDef[];
+  locks?: DuoLockDef[];
+  barriers?: DuoBarrierDef[];
+  /** Hongos saltarines: quien cae encima sale disparado hacia arriba. */
+  springs?: Array<Cell & { id: string }>;
+  /** Banderas de control: al tocarlas, los dos reaparecen ahí si se apagan. */
+  flags?: Array<Cell & { id: string }>;
+  scales?: DuoScaleDef[];
   coins: Array<Cell & { id: string; gate: string }>;
   gates: DuoGateDef[];
   mirrors?: DuoMirrorDef[];
@@ -200,6 +255,49 @@ export function moverOffset(mover: DuoMoverDef, t: number): { dx: number; dy: nu
 export function moverRect(mover: DuoMoverDef, t: number): Rect {
   const { dx, dy } = moverOffset(mover, t);
   return { x: mover.col * TILE + dx, y: mover.row * TILE + dy, w: mover.width * TILE, h: BRIDGE_H };
+}
+
+export const GEM_SIZE = 32;
+export const KEY_SIZE = 36;
+export const LOCK_W = 44;
+export const BARRIER_W = 20;
+export const SPRING_W = 46;
+export const SPRING_H = 30;
+
+export function gemRect(cell: Cell): Rect {
+  return { x: cell.col * TILE + (TILE - GEM_SIZE) / 2, y: cell.row * TILE + (TILE - GEM_SIZE) / 2, w: GEM_SIZE, h: GEM_SIZE };
+}
+
+export function keyRect(cell: Cell): Rect {
+  return { x: cell.col * TILE + (TILE - KEY_SIZE) / 2, y: cell.row * TILE + (TILE - KEY_SIZE) / 2, w: KEY_SIZE, h: KEY_SIZE };
+}
+
+export function lockRect(lock: Cell & { height: number }): Rect {
+  return { x: lock.col * TILE + (TILE - LOCK_W) / 2, y: lock.row * TILE, w: LOCK_W, h: lock.height * TILE };
+}
+
+export function barrierRect(barrier: Cell & { height: number }): Rect {
+  return { x: barrier.col * TILE + (TILE - BARRIER_W) / 2, y: barrier.row * TILE, w: BARRIER_W, h: barrier.height * TILE };
+}
+
+/** El hongo saltarín: su sombrero es lo que se pisa. */
+export function springRect(cell: Cell): Rect {
+  return { x: cell.col * TILE + (TILE - SPRING_W) / 2, y: (cell.row + 1) * TILE - SPRING_H, w: SPRING_W, h: SPRING_H };
+}
+
+/** La bandera se toca en cualquier punto del asta (dos celdas de alto). */
+export function flagRect(cell: Cell): Rect {
+  return { x: cell.col * TILE + 12, y: (cell.row - 1) * TILE, w: TILE - 24, h: 2 * TILE };
+}
+
+/** Un lado de la báscula, desplazado `offset` px hacia abajo (negativo: hacia arriba). */
+export function scaleSideRect(side: Cell & { width: number }, offset: number): Rect {
+  return { x: side.col * TILE, y: side.row * TILE + offset, w: side.width * TILE, h: BRIDGE_H };
+}
+
+/** Id con el que un personaje cuenta que va parado en un lado de una báscula (en `DuoPlayerNet.mover`). */
+export function scaleSideId(scaleId: string, side: 'left' | 'right'): string {
+  return `scale:${scaleId}:${side}`;
 }
 
 export function crateSpawn(cell: Cell): { x: number; y: number } {

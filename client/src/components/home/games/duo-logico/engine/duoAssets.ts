@@ -12,6 +12,8 @@ const BASE = `${import.meta.env.BASE_URL}assets/duo-logico/`
 export interface DuoAssets {
   characters: Record<DuoRole, Spritesheet>
   objects: Spritesheet
+  /** Llaves, puerta con candado, gemas, banderas y hongo saltarín (issue #128). */
+  general: Spritesheet | null
   terrain: Spritesheet
   dirt: Texture
   grass: Texture
@@ -33,6 +35,7 @@ export function loadDuoAssets(): Promise<DuoAssets> {
     const [lumen, gota, objects, terrain] = await Promise.all(
       ['lumen.json', 'gota.json', 'objects.json', 'terrain.json'].map((f) => Assets.load<Spritesheet>(BASE + f)),
     )
+    const general = await Assets.load<Spritesheet>(BASE + 'general.json').catch(() => null)
     const tex = (name: string) => Assets.load<Texture>(BASE + name + '.webp')
     const [dirt, grass, lava, sludge, thorns, background, ...tops] = await Promise.all([
       tex('dirt'),
@@ -49,6 +52,7 @@ export function loadDuoAssets(): Promise<DuoAssets> {
     return {
       characters: { FIRE: lumen, WATER: gota },
       objects,
+      general,
       terrain,
       dirt,
       grass,

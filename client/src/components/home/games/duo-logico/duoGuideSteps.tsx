@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react'
-import { Hand, Heart, Keyboard, Lock, MessageCircle, Smartphone, Sparkles, Sun, Users } from 'lucide-react'
+import { Gem, Hand, Heart, Keyboard, KeyRound, Lock, MessageCircle, Scale, Smartphone, Sparkles, Sun, Users } from 'lucide-react'
 import { At, Item, Scene, Tag } from '../true-false-maze/TrueFalseMazeGuide'
 import { loop } from '../tutorial/guideSteps'
 import type { GuideStep } from '../tutorial/GameGuide'
@@ -161,6 +161,62 @@ function SceneCooperate() {
   )
 }
 
+/** Tabla de la báscula colgada de su cuerda (`top` en %, la cuerda sube hasta la viga). */
+function Plate({ left, top }: { left: number; top: number }) {
+  return (
+    <>
+      <At style={{ left: `${left + 8}%`, top: '15%', width: '0.5cqw', height: `${top - 15}%`, background: '#a8a29e' }} />
+      <At style={{ left: `${left}%`, top: `${top}%`, width: '17%', height: '2.4cqw', borderRadius: '0.8cqw', background: 'linear-gradient(#b45309, #78350f)', border: '0.3cqw solid #451a03' }} />
+    </>
+  )
+}
+
+function SceneTeamwork() {
+  return (
+    <Scene>
+      <Backdrop />
+      <Ground top={82} />
+      {/* Báscula: Lumen baja su tabla y Gota sube hasta la llave. */}
+      <At style={{ left: '8%', width: '35%', top: '13%', height: '1.6cqw', borderRadius: '1cqw', background: '#57340f' }} />
+      <At
+        style={{
+          left: '23%',
+          top: '7%',
+          width: '5.5cqw',
+          aspectRatio: '1',
+          borderRadius: '50%',
+          background: 'repeating-conic-gradient(#a16207 0 30deg, #713f12 30deg 60deg)',
+          border: '0.4cqw solid #451a03',
+          ...loop('gg-clock', 6),
+        }}
+      />
+      <Plate left={6} top={72} />
+      <Plate left={28} top={50} />
+      <Img src={`${G}lumen-walk-1.webp`} style={{ left: '7%', top: '47%', width: '15%' }} />
+      <Img src={`${G}gota-rise-2.webp`} style={{ left: '29%', top: '25%', width: '15%' }} />
+      <Img src={`${G}key-gold.webp`} style={{ left: '44%', top: '20%', width: '7%', ...loop('gg-bob', 1.8) }} />
+      {/* La llave abre la puerta con candado. */}
+      <Img src={`${G}door-wood.webp`} style={{ left: '80%', top: '59%', width: '13%' }} />
+      <span className="tfg-abs" style={{ left: '84.5%', top: '66%', fontSize: '4.5cqw', ...loop('gg-pulse', 1.6) }}>
+        🔒
+      </span>
+      <Chip tone="amber" style={{ left: '55%', top: '44%' }}>
+        🔑 → 🔒
+      </Chip>
+      {/* Gemas de cada color. */}
+      <Img src={`${G}gem-fire.webp`} style={{ left: '60%', top: '7%', width: '6%', ...loop('gg-bob', 2) }} />
+      <Img src={`${G}gem-water.webp`} style={{ left: '68%', top: '7%', width: '6%', ...loop('gg-bob', 2, 0.3) }} />
+      <Img src={`${G}gem-both.webp`} style={{ left: '76%', top: '7%', width: '6%', ...loop('gg-bob', 2, 0.6) }} />
+      <Chip tone="emerald" style={{ left: '62%', top: '21%' }}>
+        💎 = ⭐
+      </Chip>
+      <Chip tone="violet" style={{ left: '4%', top: '86%' }}>
+        ⚖️ Uno baja, el otro sube
+      </Chip>
+    </Scene>
+  )
+}
+
 function SceneGate() {
   return (
     <Scene>
@@ -268,6 +324,24 @@ export function duoGuideSteps(): GuideStep[] {
           </Item>
           <Item icon={<Sun className="h-4 w-4" />} tone="amber">
             Gira los <b className="text-white">espejos</b> con <b className="text-white">E</b>
+          </Item>
+        </ul>
+      ),
+    },
+    {
+      id: 'retos',
+      title: 'Retos en pareja',
+      art: <SceneTeamwork />,
+      body: (
+        <ul className="flex flex-col gap-2.5">
+          <Item icon={<Scale className="h-4 w-4" />} tone="violet">
+            <b className="text-white">Básculas</b> y <b className="text-white">cajas de metal</b>: se necesitan los dos
+          </Item>
+          <Item icon={<KeyRound className="h-4 w-4" />} tone="amber">
+            Lleva la <b className="text-white">llave</b> a su <b className="text-white">candado</b>
+          </Item>
+          <Item icon={<Gem className="h-4 w-4" />} tone="emerald">
+            <b className="text-white">Gemas</b> de tu color: más <b className="text-white">estrellas</b>
           </Item>
         </ul>
       ),

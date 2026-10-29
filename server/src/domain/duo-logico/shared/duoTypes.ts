@@ -89,6 +89,16 @@ export interface DuoWorldState {
   gates: Record<string, boolean>;
   /** Ángulo actual de cada espejo (0 a MIRROR_ANGLES - 1). */
   mirrors: Record<string, number>;
+  /** Gemas de color ya recogidas, con quién las tomó. */
+  gems: Record<string, DuoRole>;
+  /** Llaves: quién la lleva, o 'used' si ya abrió su puerta (sin entrada: en su lugar). */
+  keys: Record<string, DuoRole | 'used'>;
+  /** Puertas con candado ya abiertas. */
+  locks: Record<string, boolean>;
+  /** Banderas de control ya tocadas. */
+  flags: Record<string, boolean>;
+  /** Desplazamiento de cada báscula (px; positivo = el lado izquierdo bajó). */
+  scales: Record<string, number>;
 }
 
 export interface DuoSnapshot {

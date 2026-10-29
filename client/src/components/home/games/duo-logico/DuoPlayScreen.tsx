@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CircleHelp, DoorOpen, Heart, LogOut, MessageCircle, Smile, Sparkles } from 'lucide-react'
+import { CircleHelp, DoorOpen, Gem, Heart, LogOut, MessageCircle, Smile, Sparkles } from 'lucide-react'
 import { GameGuide } from '../tutorial/GameGuide'
 import { duoGuideSteps } from './duoGuideSteps'
 import { ChatPanel } from '../ChatPanel'
@@ -22,6 +22,7 @@ const CAUSE_TEXT: Record<DeathCause, string> = {
   water: 'en el agua',
   sludge: 'en el lodo tóxico',
   thorns: 'en las espinas',
+  electric: 'en la barrera',
   fall: 'al caer',
 }
 
@@ -134,7 +135,7 @@ export function DuoPlayScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [level])
 
-  // Avisos del servidor (fichas, puertas) como mensajes cortos.
+  // Avisos del servidor (fichas, puertas, gemas, llaves, banderas) como mensajes cortos.
   const seenNotices = useRef(new Set<number>())
   useEffect(() => {
     for (const n of duo.notices) {
@@ -145,6 +146,16 @@ export function DuoPlayScreen({
         toast(`✨ ${who} una ficha: +1 pista para la próxima Puerta del Saber`, 'good')
       } else if (n.kind === 'gate-opened') {
         toast('🚪 ¡La Puerta del Saber se abrió! Sigan adelante', 'good')
+      } else if (n.kind === 'gem') {
+        toast(`💎 ${n.by === me ? 'Encontraste' : `${CHARACTERS[n.by].name} encontró`} una gema`, 'good')
+      } else if (n.kind === 'key') {
+        toast(`🔑 ${n.by === me ? 'Tienes la llave: llévala a su puerta' : `${CHARACTERS[n.by].name} tiene la llave`}`, 'info')
+      } else if (n.kind === 'key-lost') {
+        toast('🔑 La llave volvió a su lugar', 'bad')
+      } else if (n.kind === 'lock') {
+        toast('🔓 ¡La puerta con candado se abrió!', 'good')
+      } else if (n.kind === 'flag') {
+        toast('🚩 Punto de control: si se apagan, vuelven aquí', 'info')
       }
     }
   }, [duo.notices, me, toast])
@@ -207,6 +218,11 @@ export function DuoPlayScreen({
           <span className="flex items-center gap-1 text-[13px] font-semibold" title="Fichas de pista">
             <Sparkles className="h-4 w-4 text-amber-300" /> {room.coinsCollected}/{room.coinsTotal}
           </span>
+          {room.gemsTotal > 0 && (
+            <span className="flex items-center gap-1 text-[13px] font-semibold" title="Gemas (rojas de Lumen, azules de Gota, verdes de los dos)" data-testid="duo-gems">
+              <Gem className="h-4 w-4 text-emerald-300" /> {room.gemsCollected}/{room.gemsTotal}
+            </span>
+          )}
         </div>
 
         <div className="pointer-events-auto flex items-center gap-1.5">

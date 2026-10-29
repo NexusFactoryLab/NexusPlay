@@ -457,6 +457,34 @@ bgimg.save(os.path.join(OUT, 'bosque.webp'), 'WEBP', quality=86, method=6)
 print('bosque', bgimg.size)
 
 
+# ---------- Objetos generales (issue #128) ----------
+# Llaves, puerta con candado, gemas de color, banderas y hongo saltarín (Drive:
+# objetos-generales, fondo blanco liso). Salida: general.json/webp
+GENERAL = {
+    'key-gold': ((48, 170, 883, 1001), (0.5, 0.5)),
+    'key-bronze': ((48, 170, 1027, 1144), (0.5, 0.5)),
+    'door-wood': ((367, 551, 57, 226), (0.5, 1)),
+    'flag-red': ((372, 552, 773, 912), (0.15, 1)),
+    'flag-checkered': ((372, 552, 1007, 1143), (0.15, 1)),
+    'gem-fire': ((579, 682, 663, 775), (0.5, 0.5)),
+    'gem-water': ((579, 682, 847, 959), (0.5, 0.5)),
+    'gem-both': ((579, 682, 1031, 1143), (0.5, 0.5)),
+    'spring': ((708, 871, 698, 843), (0.5, 1)),
+    'chest-closed': ((46, 182, 56, 224), (0.5, 1)),
+    'chest-open': ((27, 187, 666, 840), (0.5, 1)),
+    'star': ((573, 687, 470, 589), (0.5, 0.5)),
+}
+if os.path.exists(os.path.join(SRC, 'objetos-generales.png')):
+    gen = load('objetos-generales')
+    gen_bg = sheet_background('objetos-generales', gen)
+    general = Atlas(width=1400)
+    for name, ((gy0, gy1, gx0, gx1), anchor) in GENERAL.items():
+        im = clean_cut(gen, gen_bg, (gx0 - 4, gy0 - 4, gx1 + 4, gy1 + 4))
+        general.add(name, trim(keep_main(im, min_sat=0)), anchor)
+    # Al 80 %: la puerta con candado se dibuja de 3 celdas de alto y no debe verse borrosa.
+    general.save('general', scale=0.8)
+
+
 # ---------- Escenarios nuevos (fase 2 en adelante) ----------
 # Cada escenario trae su tileset, su fondo y su hoja de objetos (Drive:
 # tiles-<id>, fondo-<id>, objetos-<id>, ya limpios como PNG). Salida:
