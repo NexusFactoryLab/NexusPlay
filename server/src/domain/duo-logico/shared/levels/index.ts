@@ -1,9 +1,12 @@
 import { parseLevel, type DuoLevel, type DuoLevelDef } from '../duoLevel.js';
 import { BOSQUE } from './bosque.js';
+import { CIUDAD } from './ciudad.js';
+import { RECICLAJE } from './reciclaje.js';
+import { RIO } from './rio.js';
 import { SOLAR } from './solar.js';
 
 /** Los escenarios de la campaña, en el orden en que se juegan. */
-export const DUO_LEVEL_DEFS: readonly DuoLevelDef[] = [BOSQUE, SOLAR];
+export const DUO_LEVEL_DEFS: readonly DuoLevelDef[] = [BOSQUE, SOLAR, RIO, RECICLAJE, CIUDAD];
 
 const PARSED = new Map<string, DuoLevel>(DUO_LEVEL_DEFS.map((def) => [def.id, parseLevel(def)]));
 

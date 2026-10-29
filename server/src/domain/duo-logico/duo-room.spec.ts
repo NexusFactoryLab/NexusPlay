@@ -18,9 +18,10 @@ import {
   voteDuoRetry,
   type DuoRoomState,
 } from './duo-room.js';
-import { DUO_QUESTION_BANK, optionsFor } from './duo-questions.js';
+import { DUO_QUESTION_BANK, optionsFor, type DuoQuestion } from './duo-questions.js';
 import { standPoint } from './shared/duoLevel.js';
 import { BOSQUE } from './shared/levels/bosque.js';
+import { RIO } from './shared/levels/rio.js';
 import { pedestalRect } from './shared/duoLevel.js';
 import type { DuoPlayerNet, DuoRole } from './shared/duoTypes.js';
 
@@ -317,5 +318,44 @@ describe('sala de Dúo Lógico', () => {
       }
       expect(q.hints.length).toBeGreaterThanOrEqual(2);
     }
+  });
+});
+
+describe('preguntas propias del profesor', () => {
+  const own = (id: string, level: string): DuoQuestion => ({
+    id,
+    level,
+    concept: 'Propia',
+    parts: { FIRE: { prompt: '¿Uno?', options: ['a', 'b', 'c', 'd'] }, WATER: { prompt: '¿Dos?', options: ['a', 'b', 'c', 'd'] } },
+    hints: [],
+    explanation: '',
+  });
+
+  /** Una partida en el Río con esas preguntas propias, con los dos en los pedestales de la primera puerta. */
+  function firstQuestion(customQuestions: DuoQuestion[]): string | undefined {
+    const room = createDuoRoom({ code: 'R', gameId: 'g', gameTitle: 't', user: ANA, role: 'FIRE', now: 0, campaign: ['rio'], customQuestions });
+    joinDuoRoom(room, LUIS);
+    setDuoReady(room, 'ana', true, 0);
+    setDuoReady(room, 'luis', true, 0);
+    tickDuoRoom(room, DUO_COUNTDOWN_MS, rng);
+    const on = (role: DuoRole) => {
+      const top = pedestalRect(RIO.gates[0].pedestals[role]);
+      return body(top.x + top.w / 2, top.y);
+    };
+    applyClientState(room, 'ana', { player: on('FIRE'), crates: [] }, DUO_COUNTDOWN_MS);
+    applyClientState(room, 'luis', { player: on('WATER'), crates: [] }, DUO_COUNTDOWN_MS);
+    tickDuoRoom(room, DUO_COUNTDOWN_MS, rng);
+    return room.question?.question.id;
+  }
+
+  it('se usan en todos los escenarios: primero las escritas para este y, si no hay, las de los demás', () => {
+    expect(firstQuestion([own('propia-1', 'bosque')])).toBe('propia-1');
+    expect(firstQuestion([own('propia-1', 'bosque'), own('propia-2', 'rio')])).toBe('propia-2');
+  });
+
+  it('sin preguntas propias, cada escenario saca las de su banco', () => {
+    const rio = DUO_QUESTION_BANK.filter((q) => q.level === 'rio').map((q) => q.id);
+    expect(rio.length).toBeGreaterThanOrEqual(3);
+    expect(rio).toContain(firstQuestion([]));
   });
 });

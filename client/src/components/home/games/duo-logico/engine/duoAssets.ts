@@ -89,6 +89,10 @@ export interface DuoThemeAssets {
 const THEME_FILES: Record<DuoTheme, { fill: string; top: string; terrain: string; thinPrefix: string; background: string; objects: string | null; hazard: 'thorns' | 'electric' }> = {
   bosque: { fill: 'dirt', top: 'grass', terrain: 'terrain', thinPrefix: 'branch', background: 'bosque', objects: null, hazard: 'thorns' },
   solar: { fill: 'solar-fill', top: 'solar-top', terrain: 'solar-terrain', thinPrefix: 'thin', background: 'solar-bg', objects: 'solar-objects', hazard: 'electric' },
+  // El río usa el suelo del bosque (Drive no trae uno propio) con su fondo y sus objetos.
+  rio: { fill: 'dirt', top: 'grass', terrain: 'terrain', thinPrefix: 'branch', background: 'rio-bg', objects: 'rio-objects', hazard: 'thorns' },
+  reciclaje: { fill: 'reciclaje-fill', top: 'reciclaje-top', terrain: 'reciclaje-terrain', thinPrefix: 'thin', background: 'reciclaje-bg', objects: 'reciclaje-objects', hazard: 'electric' },
+  ciudad: { fill: 'ciudad-fill', top: 'ciudad-top', terrain: 'ciudad-terrain', thinPrefix: 'thin', background: 'ciudad-bg', objects: 'ciudad-objects', hazard: 'electric' },
 }
 
 const themeCache = new Map<DuoTheme, Promise<DuoThemeAssets>>()

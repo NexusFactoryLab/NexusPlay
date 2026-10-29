@@ -37,7 +37,11 @@ window.place = (col, row) => {
 window.partnerAt = (col, row, anim) => {
   partner = { x: col * 64 + 32, y: (row + 1) * 64, vx: 0, vy: 0, facing: -1, anim, dead: false };
 };
-window.setWorld = (patch) => { for (const k of ['switches', 'gates', 'coins', 'mirrors', 'scales', 'keys', 'locks', 'flags', 'gems']) Object.assign(world[k], patch[k] || {}); };
+window.setWorld = (patch) => {
+  for (const k of ['switches', 'gates', 'coins', 'mirrors', 'scales', 'keys', 'locks', 'flags', 'gems', 'pools']) Object.assign(world[k], patch[k] || {});
+  // Cajas: { id: [x, y] } en píxeles.
+  for (const [id, [x, y]] of Object.entries(patch.crates || {})) Object.assign(world.crates.find((c) => c.id === id), { x, y });
+};
 // El "servidor" de mentira reparte el mundo y la posición del compañero.
 setInterval(() => {
   if (!game || !world) return;
@@ -81,6 +85,29 @@ async function main() {
         { level: 'solar', me: [47, 9], partner: [44, 9, 'idle'], world: {}, name: 'solar-rayo' },
         { level: 'solar', me: [64, 9], partner: [65, 9, 'idle'], world: { gates: { 'puerta-2': true } }, name: 'solar-caja-placa' },
         { level: 'solar', me: [103, 7], partner: [99, 11, 'idle'], world: { scales: { bascula: 128 }, locks: { candado: true }, keys: { llave: 'used' } }, name: 'solar-bascula' },
+        // Río (issue #132): canal con válvula y troncos, túnel con corriente, pozo de la llave, vasos comunicantes, mirador.
+        { level: 'rio', me: [5, 9], partner: [8, 9, 'idle'], world: {}, name: 'rio-canal-bajo' },
+        { level: 'rio', me: [11, 9], partner: [7, 9, 'idle'], world: { switches: { 'valvula-a': true }, pools: { canal: 192 } }, name: 'rio-canal-lleno' },
+        { level: 'rio', me: [36, 9], partner: [35, 12, 'swim'], world: { switches: { 'valvula-a': false }, pools: { canal: 64 }, gates: { 'puerta-1': true } }, name: 'rio-tunel-corriente' },
+        { level: 'rio', me: [30, 9], partner: [42, 12, 'swim'], world: { switches: { compuerta: true }, gates: { 'puerta-1': true } }, name: 'rio-tunel-compuerta' },
+        { level: 'rio', me: [54, 9], partner: [55, 11, 'swim'], world: { switches: { compuerta: false, 'palanca-zarzas': true, 'valvula-pozo': true }, pools: { pozo: 120 }, keys: { llave: 'WATER' }, flags: { 'bandera-tunel': true } }, name: 'rio-pozo' },
+        { level: 'rio', me: [77, 9], partner: [80, 9, 'idle'], world: { switches: { 'valvula-pozo': false, 'valvula-media': true }, pools: { pozo: 0, 'vaso-1': 0, 'vaso-2': 192 }, keys: { llave: 'used' }, locks: { 'compuerta-llave': true }, gates: { 'puerta-2': true } }, name: 'rio-vasos' },
+        { level: 'rio', me: [90, 5], partner: [95, 12, 'swim'], world: { switches: { 'valvula-media': false }, pools: { 'vaso-1': 192, 'vaso-2': 0 }, flags: { 'bandera-vasos': true } }, name: 'rio-mirador' },
+        // Reciclaje: cinta y prensas, báscula con el cubo, pasillo de prensas, estante de la llave y cintas del final.
+        { level: 'reciclaje', me: [9, 9], partner: [4, 9, 'idle'], world: { switches: { 'boton-cinta-a': true } }, name: 'reciclaje-cinta' },
+        { level: 'reciclaje', me: [28, 7], partner: [24, 11, 'idle'], world: { switches: { 'boton-cinta-a': false }, scales: { bascula: 128 }, crates: { 'cubo-carton': [1585, 710] } }, name: 'reciclaje-bascula' },
+        { level: 'reciclaje', me: [47, 9], partner: [51, 9, 'walk'], world: { switches: { 'freno-a': true }, gates: { 'puerta-1': true } }, name: 'reciclaje-prensas' },
+        { level: 'reciclaje', me: [52, 9], partner: [47, 9, 'idle'], world: { switches: { 'freno-a': false } }, name: 'reciclaje-prensas-andando' },
+        { level: 'reciclaje', me: [60, 9], partner: [64, 5, 'idle'], world: { switches: { 'boton-repisa': true }, keys: { llave: 'WATER' } }, name: 'reciclaje-estante' },
+        { level: 'reciclaje', me: [93, 6], partner: [98, 6, 'walk'], world: { switches: { 'boton-repisa': false, cerrojo: true }, keys: { llave: 'used' }, locks: { 'puerta-llave': true }, gates: { 'puerta-2': true }, flags: { 'bandera-cubo': true } }, name: 'reciclaje-final' },
+        // Ciudad: semáforos (en rojo y con el pulsador), teleférico, azotea de la llave, puerta de arco y terraza.
+        { level: 'ciudad', me: [6, 9], partner: [3, 9, 'idle'], world: {}, name: 'ciudad-semaforos' },
+        { level: 'ciudad', me: [14, 9], partner: [5, 9, 'idle'], world: { switches: { 'pulsador-a': true } }, name: 'ciudad-semaforos-verde' },
+        { level: 'ciudad', me: [22, 9], partner: [36, 9, 'idle'], world: { switches: { 'pulsador-a': false } }, name: 'ciudad-teleferico' },
+        { level: 'ciudad', me: [54, 3], partner: [45, 11, 'idle'], world: { scales: { bascula: 128 }, keys: { llave: 'FIRE' }, gates: { 'puerta-1': true }, crates: { 'caja-carga': [2915, 710] } }, name: 'ciudad-azotea' },
+        { level: 'ciudad', me: [59, 9], partner: [57, 9, 'idle'], world: { scales: { bascula: 0 }, keys: { llave: 'FIRE' }, flags: { 'farol-1': true } }, name: 'ciudad-puerta' },
+        { level: 'ciudad', me: [64, 9], partner: [60, 9, 'idle'], world: { keys: { llave: 'used' }, locks: { 'puerta-arco': true } }, name: 'ciudad-puerta-abierta' },
+        { level: 'ciudad', me: [90, 5], partner: [80, 9, 'idle'], world: { gates: { 'puerta-2': true }, flags: { 'farol-2': true } }, name: 'ciudad-terraza' },
       ]
       let level = null
       for (const shot of shots) {

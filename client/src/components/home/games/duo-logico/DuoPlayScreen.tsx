@@ -23,6 +23,7 @@ const CAUSE_TEXT: Record<DeathCause, string> = {
   sludge: 'en el lodo tóxico',
   thorns: 'en las espinas',
   electric: 'en la barrera',
+  press: 'en la prensa',
   fall: 'al caer',
 }
 

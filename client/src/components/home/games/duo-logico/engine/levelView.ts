@@ -8,15 +8,17 @@ import {
   gateWallRect,
   isSolidTile,
   moverRect,
+  poolWaterRect,
   standPoint,
   tileAt,
   type DuoLevel,
   type TileKind,
 } from '../shared/duoLevel'
-import { isConditionMet, litMirrorCount } from '../shared/duoWorld'
+import { isConditionMet, litMirrorCount, poolLevel } from '../shared/duoWorld'
 import type { DuoRole, DuoWorldState } from '../shared/duoTypes'
 import type { DuoAssets, DuoThemeAssets } from './duoAssets'
 import { CoopView } from './coopView'
+import { EnvView } from './envView'
 import type { Fx } from './fx'
 
 interface Run {
@@ -89,6 +91,19 @@ interface Firefly {
   speed: number
 }
 
+/** Un pez que salta del agua en el río: sale, describe un arco y vuelve a caer. */
+interface FishJump {
+  sprite: Sprite
+  x0: number
+  x1: number
+  y: number
+  startAt: number
+  splashed: boolean
+}
+
+/** Lo que dura el salto de un pez (ms). */
+const FISH_JUMP_MS = 1000
+
 /**
  * Dibuja el escenario: el terreno queda fijo; botones, palancas, puentes,
  * puertas, fichas, cajas y portal se actualizan con el estado del mundo y se
@@ -117,7 +132,9 @@ export class LevelView {
   private readonly mirrors = new Map<string, { sprite: Sprite; angle: number | null }>()
   private readonly receivers = new Map<string, { sprite: Sprite; on: boolean | null; baseScale: number }>()
   private readonly beam = new Graphics()
-  private readonly movers = new Map<string, Sprite>()
+  private readonly movers = new Map<string, Container>()
+  /** Cable del teleférico (Ciudad), de punta a punta del recorrido. */
+  private readonly cables = new Graphics()
   private readonly sparks = new Graphics()
   private readonly sparkRuns: Run[] = []
   private readonly fireflies: Firefly[] = []
@@ -127,6 +144,10 @@ export class LevelView {
   private view = { x: 0, y: 0, w: 1280, h: 720 }
   /** Gemas, llaves, candados, barreras, hongos, banderas y básculas (issue #128). */
   private readonly coop: CoopView
+  /** Estanques, troncos, corrientes, cintas y prensas (issue #132). */
+  private readonly env: EnvView
+  private fish: FishJump | null = null
+  private fishAt = 0
 
   private readonly assets: DuoAssets
   private readonly theme: DuoThemeAssets
@@ -149,6 +170,17 @@ export class LevelView {
     this.waterRuns = runs(level, (k) => k === 'water')
     this.lavaRuns = runs(level, (k) => k === 'lava')
     this.sludgeRuns = runs(level, (k) => k === 'sludge')
+    // Líquido bajo techo (un túnel inundado): detrás, roca oscura en vez del paisaje.
+    const covered = (col: number, row: number) => {
+      let r = row
+      while (r > 0 && tileAt(level, col, r - 1) === tileAt(level, col, row)) r -= 1
+      return isSolidTile(tileAt(level, col, r - 1))
+    }
+    const cave = new Graphics()
+    for (const run of runs(level, (k, col, row) => (k === 'water' || k === 'lava' || k === 'sludge') && covered(col, row))) {
+      cave.rect(run.c0 * TILE, run.row * TILE, (run.c1 - run.c0 + 1) * TILE, TILE).fill({ color: theme.thinPrefix === 'branch' ? 0x2a1a0e : 0x1e293b, alpha: 0.9 })
+    }
+    liquidBack.addChild(cave)
     for (const kind of ['lava', 'sludge'] as const) {
       const fill = kind === 'lava' ? assets.lava : assets.sludge
       const tops = kind === 'lava' ? assets.lavaTop : assets.sludgeTop
@@ -240,10 +272,16 @@ export class LevelView {
     }
     this.back.addChild(this.sparks)
 
-    // --- Decoración ---
-    const decorHeight: Record<string, number> = { flowers: 40, bush: 44, fern: 48, mushroom: 34, rock: 26, panel: 44, sign: 30, battery: 36, valve: 34, beacon: 28 }
+    // --- Decoración (del tileset o de la hoja de objetos del escenario) ---
+    const decorHeight: Record<string, number> = {
+      flowers: 40, bush: 44, fern: 48, mushroom: 34, rock: 26, panel: 44, sign: 30, battery: 36, valve: 34, beacon: 28,
+      'purifier-clean': 92, 'purifier-dirty': 92, 'sign-recycle': 60, bin: 44, hose: 30, bucket: 38, toolbox: 30, boxes: 50,
+      trash: 34, cardboard: 40, 'box-bottles': 52, 'scale-full': 46, bench: 46, bikes: 46, tree: 120, 'solar-lamp': 110,
+      'smart-bin': 48, 'flowers-big': 56, 'flower-pot': 44, books: 30,
+    }
+    const decorObjects = theme.objects?.textures ?? {}
     for (const d of def.decor) {
-      const texture = t[d.kind]
+      const texture = t[d.kind] ?? decorObjects[d.kind]
       if (!texture) continue
       const s = sized(texture, decorHeight[d.kind] ?? 40)
       s.anchor.set(0.5, 1)
@@ -364,21 +402,56 @@ export class LevelView {
       this.receivers.set(r.id, { sprite: s, on: null, baseScale: s.scale.x })
       this.back.addChild(s)
     }
-    // --- Plataformas móviles ---
+    // --- Plataformas móviles (en la Ciudad, cabinas del teleférico colgadas de su cable) ---
+    if (so['cablecar']) this.back.addChild(this.cables)
     for (const m of def.movers ?? []) {
-      const s = new Sprite(so['mover'] ?? o['crate'])
-      s.width = m.width * TILE
-      s.height = 30
-      this.movers.set(m.id, s)
-      this.back.addChild(s)
+      const c = new Container()
+      if (so['cablecar']) {
+        // La cabina cuelga del cable; su piso es la plataforma (los personajes van adentro).
+        const cabin = new Sprite(so['cablecar'])
+        cabin.anchor.set(0.5, 1)
+        cabin.scale.set((m.width * TILE + 24) / so['cablecar'].frame.width)
+        cabin.position.set((m.width * TILE) / 2, 16)
+        c.addChild(cabin)
+        const r0 = moverRect(m, 0)
+        const x0 = r0.x + r0.w / 2
+        const x1 = x0 + m.path.dx * TILE
+        const y0 = r0.y + 16 - cabin.height + 6
+        const y1 = y0 + m.path.dy * TILE
+        const ext = 40
+        const ux = (x1 - x0) / Math.max(1, Math.hypot(x1 - x0, y1 - y0))
+        const uy = (y1 - y0) / Math.max(1, Math.hypot(x1 - x0, y1 - y0))
+        this.cables
+          .moveTo(x0 - ux * ext, y0 - uy * ext)
+          .lineTo(x1 + ux * ext, y1 + uy * ext)
+          .stroke({ color: 0x334155, width: 4 })
+          .circle(x0 - ux * ext, y0 - uy * ext, 9)
+          .fill({ color: 0x64748b })
+          .stroke({ color: 0x1e293b, width: 3 })
+          .circle(x1 + ux * ext, y1 + uy * ext, 9)
+          .fill({ color: 0x64748b })
+          .stroke({ color: 0x1e293b, width: 3 })
+      } else {
+        const s = new Sprite(so['mover'] ?? o['crate'])
+        s.width = m.width * TILE
+        s.height = 30
+        s.y = -6
+        c.addChild(s)
+      }
+      this.movers.set(m.id, c)
+      this.back.addChild(c)
     }
 
+    this.env = new EnvView(assets, theme, level, fx, onShake)
+    this.back.addChild(this.env.back)
     this.coop = new CoopView(assets, theme, level, fx, onShake)
     this.back.addChild(this.coop.back)
 
     for (const c of def.crates) {
-      // La caja de metal (la empujan los dos) se ve de metal.
-      const s = new Sprite(c.heavy ? (o['crate-metal'] ?? o.crate) : o.crate)
+      // La caja de metal (la empujan los dos) se ve de metal; en Reciclaje son cubos compactados.
+      const light = so['cube-cardboard'] ?? o.crate
+      const heavy = so['cube-plastic'] ?? o['crate-metal'] ?? o.crate
+      const s = new Sprite(c.heavy ? heavy : light)
       s.anchor.set(0)
       s.width = CRATE_SIZE
       s.height = CRATE_SIZE
@@ -434,7 +507,7 @@ export class LevelView {
     } else {
       liquidFront.addChild(this.water)
     }
-    this.front.addChild(liquidFront, this.coop.front)
+    this.front.addChild(liquidFront, this.env.front, this.coop.front)
   }
 
   /** Alguien rebotó en un hongo cerca de (x, y). */
@@ -530,7 +603,7 @@ export class LevelView {
     const so = this.theme.objects?.textures ?? {}
     for (const m of this.level.def.movers ?? []) {
       const r = moverRect(m, time)
-      this.movers.get(m.id)?.position.set(r.x, r.y - 6)
+      this.movers.get(m.id)?.position.set(r.x, r.y)
     }
     for (const m of this.level.def.mirrors ?? []) {
       const angle = world.mirrors[m.id] ?? 0
@@ -707,8 +780,65 @@ export class LevelView {
       }
     }
 
-    this.coop.update(world, bodies, now, dtMs)
+    this.env.update(world, now, time, dtMs)
+    this.coop.update(world, bodies, now, dtMs, time)
+    this.updateFish(world, now)
     this.updateAmbient(now)
+  }
+
+  /** En el río, de vez en cuando un pez salta del agua que se ve (y salpica al salir y al caer). */
+  private updateFish(world: DuoWorldState, now: number): void {
+    const texture = this.theme.objects?.textures['fish']
+    if (!texture || this.level.def.theme !== 'rio') return
+    const jump = this.fish
+    if (jump) {
+      const k = (now - jump.startAt) / FISH_JUMP_MS
+      if (k >= 1) {
+        this.fx.burst({ x: jump.x1, y: jump.y, count: 10, texture: 'dot', tint: [0xe0f2fe, 0x7dd3fc, 0xffffff], speed: [60, 160], angle: [-Math.PI * 0.85, -Math.PI * 0.15], life: [300, 520], scale: [0.6, 0.2], gravity: 520 })
+        jump.sprite.destroy()
+        this.fish = null
+        this.fishAt = now + 2500 + Math.random() * 3500
+        return
+      }
+      if (!jump.splashed) {
+        jump.splashed = true
+        this.fx.burst({ x: jump.x0, y: jump.y, count: 8, texture: 'dot', tint: [0xe0f2fe, 0x7dd3fc], speed: [50, 140], angle: [-Math.PI * 0.85, -Math.PI * 0.15], life: [280, 460], scale: [0.5, 0.2], gravity: 520 })
+      }
+      const x = jump.x0 + (jump.x1 - jump.x0) * k
+      const y = jump.y - Math.sin(k * Math.PI) * 120
+      jump.sprite.position.set(x, y)
+      // Mira hacia donde va: sube de cabeza y cae de cabeza.
+      jump.sprite.rotation = (jump.x1 > jump.x0 ? 1 : -1) * (k - 0.5) * 1.6
+      return
+    }
+    if (now < this.fishAt) return
+    // Superficies de agua a la vista: las fijas y las de los estanques con agua.
+    const surfaces: Array<{ x0: number; x1: number; y: number }> = []
+    for (const run of this.waterRuns) {
+      if (tileAt(this.level, run.c0, run.row - 1) === 'water' || run.c1 - run.c0 < 2) continue
+      surfaces.push({ x0: run.c0 * TILE, x1: (run.c1 + 1) * TILE, y: run.row * TILE + 6 })
+    }
+    for (const pool of this.level.def.pools ?? []) {
+      const r = poolWaterRect(pool, poolLevel(world, pool))
+      if (r.h > 60 && pool.width >= 3) surfaces.push({ x0: r.x, x1: r.x + r.w, y: r.y + 4 })
+    }
+    const v = this.view
+    const seen = surfaces.filter((s) => s.x1 > v.x + 40 && s.x0 < v.x + v.w - 40)
+    if (seen.length === 0) {
+      this.fishAt = now + 1500
+      return
+    }
+    const s = seen[Math.floor(Math.random() * seen.length)]
+    const dir = Math.random() < 0.5 ? 1 : -1
+    const span = Math.min(150, s.x1 - s.x0 - 40)
+    const x0 = s.x0 + 20 + Math.random() * Math.max(1, s.x1 - s.x0 - 40 - span) + (dir < 0 ? span : 0)
+    const sprite = new Sprite(texture)
+    sprite.anchor.set(0.5)
+    sprite.scale.set(34 / texture.frame.height)
+    if (dir < 0) sprite.scale.x *= -1
+    // Detrás del agua de adelante: entra y sale "de adentro".
+    this.back.addChild(sprite)
+    this.fish = { sprite, x0, x1: x0 + dir * span, y: s.y + 10, startAt: now, splashed: false }
   }
 
   /** Puente de luz: brilla, tiene un reflejo que corre y se forma desde la izquierda. */
@@ -805,7 +935,7 @@ export class LevelView {
     }
     if (now < this.ambientAt || this.fx.count > 280) return
     const v = this.view
-    if (this.level.def.theme === 'bosque') {
+    if (this.level.def.theme === 'bosque' || this.level.def.theme === 'rio') {
       this.ambientAt = now + 900 + Math.random() * 900
       // Una hoja que cae meciéndose desde arriba de lo que se ve.
       this.fx.burst({ x: v.x + Math.random() * v.w, y: v.y - 20, count: 1, texture: 'leaf', tint: [0x84cc16, 0x65a30d, 0xa3e635, 0xeab308], speed: [20, 50], angle: [Math.PI * 0.3, Math.PI * 0.7], life: [5000, 7500], scale: [0.9, 0.8], alpha: [0.95, 0.6], gravity: 6, spin: [-1.6, 1.6], sway: 40 })

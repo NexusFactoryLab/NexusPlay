@@ -368,7 +368,7 @@ export function DuoLogicoGameForm({ onClose, onCreated, onBack, onCategoryCreate
             <div data-nx-wide className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Origen de las preguntas">
               {[
                 { own: false, title: 'Usar el banco de preguntas', text: 'Preguntas listas sobre ciudades sostenibles en Colombia, distintas por escenario.' },
-                { own: true, title: 'Escribir mis preguntas', text: 'Las puertas que dejes vacías usarán el banco.' },
+                { own: true, title: 'Escribir mis preguntas', text: 'Se usan en todos los escenarios: las puertas que dejes vacías toman otra de tus preguntas.' },
               ].map((choice) => (
                 <button
                   key={String(choice.own)}
@@ -406,7 +406,7 @@ export function DuoLogicoGameForm({ onClose, onCreated, onBack, onCategoryCreate
                                 <span className="text-[14px] font-semibold text-text-h">{slot.concept.trim() || 'Sin concepto'}</span>
                               </span>
                               <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${started ? 'bg-accent/15 text-accent' : 'bg-border/60 text-text'}`}>
-                                {started ? 'Propia' : 'Del banco'}
+                                {started ? 'Propia' : filled.length > 0 ? 'Otra tuya' : 'Del banco'}
                               </span>
                             </button>
                             {open && <SlotEditor slot={slot} disabled={submitting} onChange={(next) => updateSlot(key, () => next)} />}

@@ -49,7 +49,7 @@ export interface DuoGateDef {
 }
 
 /** Escenarios con su propio arte (tileset, fondo y objetos). */
-export type DuoTheme = 'bosque' | 'solar';
+export type DuoTheme = 'bosque' | 'solar' | 'rio' | 'reciclaje' | 'ciudad';
 
 /** Cuántas posiciones tiene un espejo: se gira una al tocarlo. */
 export const MIRROR_ANGLES = 4;
@@ -106,6 +106,71 @@ export interface DuoBarrierDef extends Cell {
   id: string;
   height: number;
   off: DuoCondition;
+  /**
+   * Semáforo (Ciudad): además se apaga sola parte del tiempo. Cada `period`
+   * segundos del reloj del servidor está en rojo (encendida) los primeros `red`.
+   */
+  cycle?: { period: number; red: number; offset?: number };
+}
+
+/**
+ * Estanque de nivel variable (Río): el agua ocupa de abajo hacia arriba las
+ * `depth` filas que empiezan en `row`. Sube hasta `high` filas mientras se
+ * cumple `when` (alguien abre la válvula) y baja hasta `low` cuando no. Gota
+ * nada en ella; a Lumen lo apaga.
+ */
+export interface DuoPoolDef extends Cell {
+  id: string;
+  width: number;
+  depth: number;
+  low: number;
+  high: number;
+  when: DuoCondition;
+  /** Dónde se dibuja la rueda de la válvula (gira mientras el agua cambia). */
+  valve?: Cell;
+}
+
+/** Tronco o nenúfar: flota en su estanque y sube y baja con el agua. */
+export interface DuoFloaterDef {
+  id: string;
+  pool: string;
+  col: number;
+  width: number;
+  kind: 'log' | 'lily';
+}
+
+/**
+ * Corriente (en el agua) o cinta transportadora (sobre el suelo): arrastra
+ * hacia `dir` a quien nada en su zona o va parado encima. Mientras se cumple
+ * `reverse` va al revés; mientras se cumple `stop`, se detiene.
+ */
+export interface DuoFlowDef extends Cell {
+  id: string;
+  kind: 'current' | 'belt';
+  width: number;
+  /** Solo corrientes: filas de agua que cubre desde `row`. La cinta es la superficie de las celdas de `row`. */
+  height?: number;
+  dir: 1 | -1;
+  reverse?: DuoCondition;
+  stop?: DuoCondition;
+  /** Solo se dibuja: la compuerta de donde sale la corriente (abierta mientras corre). */
+  gate?: Cell;
+}
+
+/**
+ * Prensa hidráulica (Reciclaje): su cabezal (una fila de alto) descansa en
+ * `row`, baja `drop` filas y vuelve a subir cada `period` segundos del reloj
+ * del servidor. Mientras baja o está abajo apaga a quien toca (arriba, no);
+ * mientras se cumple `stop`, se queda arriba.
+ */
+export interface DuoPressDef extends Cell {
+  id: string;
+  width: number;
+  drop: number;
+  period: number;
+  /** Desfase (s), para que dos prensas no bajen a la vez. */
+  offset?: number;
+  stop?: DuoCondition;
 }
 
 /**
@@ -146,6 +211,10 @@ export interface DuoLevelDef {
   /** Banderas de control: al tocarlas, los dos reaparecen ahí si se apagan. */
   flags?: Array<Cell & { id: string }>;
   scales?: DuoScaleDef[];
+  pools?: DuoPoolDef[];
+  floaters?: DuoFloaterDef[];
+  flows?: DuoFlowDef[];
+  presses?: DuoPressDef[];
   coins: Array<Cell & { id: string; gate: string }>;
   gates: DuoGateDef[];
   mirrors?: DuoMirrorDef[];
@@ -298,6 +367,66 @@ export function scaleSideRect(side: Cell & { width: number }, offset: number): R
 /** Id con el que un personaje cuenta que va parado en un lado de una báscula (en `DuoPlayerNet.mover`). */
 export function scaleSideId(scaleId: string, side: 'left' | 'right'): string {
   return `scale:${scaleId}:${side}`;
+}
+
+/** Velocidad con la que sube o baja el agua de un estanque (px/s). */
+export const POOL_SPEED = 80;
+/**
+ * Lo que asoma la superficie de un tronco o nenúfar sobre el agua (px). En 0,
+ * con el estanque lleno hasta la orilla, el tronco queda al ras y se pasa
+ * caminando de la orilla al tronco.
+ */
+export const FLOAT_RISE = 0;
+
+/** El agua de un estanque con `level` px de alto (desde su fondo). */
+export function poolWaterRect(pool: DuoPoolDef, level: number): Rect {
+  const bottom = (pool.row + pool.depth) * TILE;
+  return { x: pool.col * TILE, y: bottom - level, w: pool.width * TILE, h: level };
+}
+
+/** La superficie que se pisa de un tronco o nenúfar con el agua de su estanque a `level` px. */
+export function floaterRect(floater: DuoFloaterDef, pool: DuoPoolDef, level: number): Rect {
+  const surface = (pool.row + pool.depth) * TILE - level;
+  return { x: floater.col * TILE + 4, y: surface - FLOAT_RISE, w: floater.width * TILE - 8, h: BRIDGE_H };
+}
+
+/** Id con el que un personaje cuenta que va parado en un tronco (en `DuoPlayerNet.mover`). */
+export function floaterMoverId(floaterId: string): string {
+  return `float:${floaterId}`;
+}
+
+/** Arrastre de una corriente (px/s): Gota nada a 190, así que contra ella no avanza. */
+export const CURRENT_SPEED = 200;
+/** Arrastre de una cinta transportadora (px/s); se camina a 290. */
+export const BELT_SPEED = 140;
+
+/** La zona de agua de una corriente. */
+export function currentRect(flow: DuoFlowDef): Rect {
+  return { x: flow.col * TILE, y: flow.row * TILE, w: flow.width * TILE, h: (flow.height ?? 1) * TILE };
+}
+
+/** El cabezal de una prensa bajado `k` (0 = arriba, 1 = abajo del todo). */
+export function pressHeadRect(press: DuoPressDef, k: number): Rect {
+  return { x: press.col * TILE + 4, y: (press.row + press.drop * k) * TILE, w: press.width * TILE - 8, h: TILE };
+}
+
+/**
+ * Cuánto bajó el cabezal de una prensa a la hora `t` (segundos del servidor):
+ * arriba quieta, baja de golpe, se queda abajo un instante y sube despacio.
+ */
+export function pressDrop(press: DuoPressDef, t: number): number {
+  const phase = ((((t + (press.offset ?? 0)) % press.period) + press.period) % press.period) / press.period;
+  if (phase < 0.5) return 0;
+  if (phase < 0.6) return ((phase - 0.5) / 0.1) ** 2;
+  if (phase < 0.72) return 1;
+  return 1 - (phase - 0.72) / 0.28;
+}
+
+/** ¿El semáforo de esta barrera está en rojo a la hora `t`? (sin ciclo: siempre) */
+export function cycleRed(cycle: DuoBarrierDef['cycle'], t: number): boolean {
+  if (!cycle) return true;
+  const phase = (((t + (cycle.offset ?? 0)) % cycle.period) + cycle.period) % cycle.period;
+  return phase < cycle.red;
 }
 
 export function crateSpawn(cell: Cell): { x: number; y: number } {
