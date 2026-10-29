@@ -168,3 +168,75 @@ describe('torneo con Dominó', () => {
     expect(botActed || room.phase === 'FINISHED').toBe(true);
   });
 });
+
+describe('torneo con Dominó: desconexiones (fusión con la espera de #120)', () => {
+  it('cerrar el socket del torneo al entrar a la sala no rompe la partida de dominó', async () => {
+    const { tournament, domino, gateway } = await start(2);
+    vi.advanceTimersByTime(3000);
+    const room = domino.get(tournament.matches[0].dominoRoomCode!)!;
+    const dom = client('conn-1');
+    dom.data.userId = 'p0';
+    gateway.handleDominoJoin(dom, { code: room.code });
+    expect(() => gateway.handleDisconnect(client('p0'))).not.toThrow();
+    expect(domino.get(room.code)!.phase).toBe('PLAYING');
+    expect(domino.get(room.code)!.players).toHaveLength(2);
+    expect(domino.get(room.code)!.players.find((p) => p.userId === 'p0')!.socketId).toBe('conn-1');
+  });
+
+  it('un corte de red en plena partida no desarma la sala ni siquiera tras la espera', async () => {
+    const { tournament, domino, gateway } = await start(2);
+    vi.advanceTimersByTime(3000);
+    const room = domino.get(tournament.matches[0].dominoRoomCode!)!;
+    const a = client('conn-a');
+    a.data.userId = 'p0';
+    const b = client('conn-b');
+    b.data.userId = 'p1';
+    gateway.handleDominoJoin(a, { code: room.code });
+    gateway.handleDominoJoin(b, { code: room.code });
+    gateway.handleDisconnect(a);
+    vi.advanceTimersByTime(95_000);
+    const after = domino.get(room.code)!;
+    expect(after).toBeDefined();
+    expect(after.phase).toBe('PLAYING');
+    expect(after.players).toHaveLength(2);
+    const again = client('conn-a2');
+    again.data.userId = 'p0';
+    gateway.handleDominoJoin(again, { code: room.code });
+    expect(domino.get(room.code)!.players.find((p) => p.userId === 'p0')!.socketId).toBe('conn-a2');
+    expect(Object.keys(domino.get(room.code)!.awaiting ?? {})).toHaveLength(0);
+  });
+});
+
+describe('torneo con Dominó: la espera del torneo (#120) y volver a la sala del torneo', () => {
+  it('cerrar el socket del torneo y que pase la espera no toca la sala; al volver al torneo se reanuda', async () => {
+    const { tournament, domino, gateway } = await start(2);
+    vi.advanceTimersByTime(3000);
+    const match = tournament.matches[0];
+    const room = domino.get(match.dominoRoomCode!)!;
+    const dom = client('conn-1');
+    dom.data.userId = 'p0';
+    gateway.handleDominoJoin(dom, { code: room.code });
+    gateway.handleDisconnect(client('p0'));
+    expect(() => vi.advanceTimersByTime(95_000)).not.toThrow();
+    expect(domino.get(room.code)!.phase).toBe('PLAYING');
+    expect(domino.get(room.code)!.players).toHaveLength(2);
+    expect(match.phase).toBe('PLAYING');
+    const back = client('p0-nuevo');
+    back.data.userId = 'p0';
+    expect(() => gateway.handleTournamentJoin(back, { code: tournament.code })).not.toThrow();
+    expect(tournament.participants.find((p) => p.userId === 'p0')!.socketId).toBe('p0-nuevo');
+    expect(Object.keys(match.awaiting ?? {})).toHaveLength(0);
+  });
+
+  it('terminar la partida con el torneo en espera suma el punto y cierra la ronda', async () => {
+    const { tournament, domino, gateway } = await start(2);
+    vi.advanceTimersByTime(3000);
+    const match = tournament.matches[0];
+    const room = domino.get(match.dominoRoomCode!)!;
+    gateway.handleDisconnect(client('p0'));
+    (gateway as unknown as { finishDominoGame: FinishFn }).finishDominoGame(room, 'p1', false);
+    expect(match.phase).toBe('FINISHED');
+    expect(tournament.participants.find((p) => p.userId === 'p1')!.points).toBe(1);
+    expect(tournament.phase).toBe('FINISHED');
+  });
+});
