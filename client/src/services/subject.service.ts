@@ -1,4 +1,5 @@
 import { request } from '../utils/http'
+import { cacheScopeFromToken, createSwrCache } from '../utils/swr-cache'
 
 export type Subject = {
   id: string
@@ -16,7 +17,19 @@ export type SubjectWithGameCount = Subject & {
 
 /** GET /subjects — áreas públicas + las privadas propias, con conteo de juegos publicados. */
 export function listSubjects(token: string): Promise<SubjectWithGameCount[]> {
-  return request<SubjectWithGameCount[]>('/subjects', { token })
+  return subjectsCache.get(cacheScopeFromToken(token), () => fetchSubjects(token))
+}
+
+const subjectsCache = createSwrCache<SubjectWithGameCount[]>({ ttlMs: 30_000, maxEntries: 5 })
+const fetchSubjects = (token: string) => request<SubjectWithGameCount[]>('/subjects', { token })
+
+/** Entrega las áreas conocidas al instante (aunque vencidas) y las frescas al llegar. Devuelve la función que cancela. */
+export function loadSubjects(
+  token: string,
+  onData: (items: SubjectWithGameCount[]) => void,
+  onError?: (error: unknown) => void,
+): () => void {
+  return subjectsCache.load(cacheScopeFromToken(token), () => fetchSubjects(token), onData, onError)
 }
 
 /** POST /subjects — crea una sub-área bajo `parentSubjectId`; nace privada. */

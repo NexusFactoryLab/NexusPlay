@@ -1,4 +1,5 @@
 import { request } from '../utils/http'
+import { cacheScopeFromToken, createSwrCache } from '../utils/swr-cache'
 
 export type GameTheme = {
   primaryColor: string
@@ -58,6 +59,25 @@ export type ListGamesParams = {
 
 /** GET /games — catálogo paginado; sin filtro solo trae juegos publicados. */
 export function listGames(token: string, params: ListGamesParams = {}): Promise<PaginatedGames> {
+  const path = gamesPath(params)
+  return gamesCache.get(gamesKey(token, path), () => request<PaginatedGames>(path, { token }))
+}
+
+const gamesCache = createSwrCache<PaginatedGames>({ ttlMs: 20_000, maxEntries: 60 })
+const gamesKey = (token: string, path: string) => `${cacheScopeFromToken(token)}|${path}`
+
+/** Entrega el listado conocido al instante (aunque vencido) y el fresco al llegar. Devuelve la función que cancela. */
+export function loadGames(
+  token: string,
+  params: ListGamesParams,
+  onData: (result: PaginatedGames) => void,
+  onError?: (error: unknown) => void,
+): () => void {
+  const path = gamesPath(params)
+  return gamesCache.load(gamesKey(token, path), () => request<PaginatedGames>(path, { token }), onData, onError)
+}
+
+function gamesPath(params: ListGamesParams): string {
   const query = new URLSearchParams()
   if (params.page) query.set('page', String(params.page))
   if (params.pageSize) query.set('pageSize', String(params.pageSize))
@@ -71,7 +91,7 @@ export function listGames(token: string, params: ListGamesParams = {}): Promise<
   if (params.organizationId) query.set('organizationId', params.organizationId)
 
   const queryString = query.toString()
-  return request<PaginatedGames>(`/games${queryString ? `?${queryString}` : ''}`, { token })
+  return `/games${queryString ? `?${queryString}` : ''}`
 }
 
 /** GET /games/slug/:slug — detalle por URL amigable, para la pantalla de descripción. */
@@ -365,7 +385,21 @@ export function listGameTypeSettings(
  * datos de usuario.
  */
 export function listAllGameTypeSettings(token: string): Promise<GameTypeSetting[]> {
-  return listGameTypeSettings(token, { pageSize: 100 }).then((result) => result.items)
+  return gameTypesCache.get(cacheScopeFromToken(token), () => fetchAllGameTypeSettings(token))
+}
+
+// Los tipos casi nunca cambian y se pedían en tres pantallas distintas.
+const gameTypesCache = createSwrCache<GameTypeSetting[]>({ ttlMs: 60_000, maxEntries: 5 })
+const fetchAllGameTypeSettings = (token: string) =>
+  listGameTypeSettings(token, { pageSize: 100 }).then((result) => result.items)
+
+/** Entrega los tipos conocidos al instante (aunque vencidos) y los frescos al llegar. Devuelve la función que cancela. */
+export function loadAllGameTypeSettings(
+  token: string,
+  onData: (items: GameTypeSetting[]) => void,
+  onError?: (error: unknown) => void,
+): () => void {
+  return gameTypesCache.load(cacheScopeFromToken(token), () => fetchAllGameTypeSettings(token), onData, onError)
 }
 
 /** PATCH /game-types/:gameType/archive — solo ADMIN. */
