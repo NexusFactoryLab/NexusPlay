@@ -72,8 +72,8 @@ describe('UpdateUserAvatarUseCase (issue #77)', () => {
     teacher.changeRole(Role.create('TEACHER'));
     const { useCase } = setup(teacher);
 
-    const result = await useCase.execute({ userId: 'user-1', avatar: { ...AVATAR, top: 'cap' } });
+    const result = await useCase.execute({ userId: 'user-1', avatar: { ...AVATAR, top: 'afro', hat: 'cap' } });
 
-    expect(result.avatarConfig?.top).toBe('cap');
+    expect(result.avatarConfig).toMatchObject({ top: 'afro', hat: 'cap' });
   });
 });
