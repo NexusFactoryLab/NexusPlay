@@ -21,6 +21,7 @@ export function useGuessWhoTournament(token: string | null) {
   const [pairingAnnouncement, setPairingAnnouncement] = useState<TournamentPairingAnnouncement | null>(null)
   const [closed, setClosed] = useState(false)
   const [matchAccusationFailedMessage, setMatchAccusationFailedMessage] = useState<string | null>(null)
+  const [matchAbandonedMessage, setMatchAbandonedMessage] = useState<string | null>(null)
 
   useEffect(() => {
     if (!token) return
@@ -71,6 +72,8 @@ export function useGuessWhoTournament(token: string | null) {
         setMatchAccusationFailedMessage('Bandera equivocada.')
       },
     )
+    // El rival abandonó el duelo (issue #131): la partida ya cerró y la ganó quien se queda.
+    socket.on('tournament:match-abandoned', (payload: { matchCode: string; message: string }) => setMatchAbandonedMessage(payload.message))
 
     return () => {
       socket.disconnect()
@@ -165,6 +168,8 @@ export function useGuessWhoTournament(token: string | null) {
     clearPairingAnnouncement: () => setPairingAnnouncement(null),
     matchAccusationFailedMessage,
     clearMatchAccusationFailedMessage: () => setMatchAccusationFailedMessage(null),
+    matchAbandonedMessage,
+    clearMatchAbandonedMessage: () => setMatchAbandonedMessage(null),
     createTournament,
     sendMazeAnswer,
     sendMazeFinish,

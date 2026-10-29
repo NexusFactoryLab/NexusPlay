@@ -1931,7 +1931,12 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     }
     // Si el torneo ya está RUNNING o FINISHED, no se elimina al participante
     // del estado (para no romper el ranking histórico); simplemente deja de
-    // recibir eventos porque salió del room de socket.io.
+    // recibir eventos porque salió del room de socket.io. Si estaba en pleno
+    // duelo, lo abandona: lo pierde y su rival no se queda esperándolo.
+    if (tournament.phase === 'RUNNING') {
+      const leaving = tournament.participants.find((p) => p.socketId === socket.id);
+      if (leaving) this.forfeitParticipantMatches(tournament, leaving.userId);
+    }
   }
 
   /**
@@ -2471,7 +2476,8 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   private waitForTournamentParticipant(tournament: TournamentState, socketId: string) {
     const participant = tournament.participants.find((p) => p.socketId === socketId);
     const match = participant && this.playingTournamentMatch(tournament, participant.userId);
-    if (!participant || !match) return;
+    // Dominó tiene su propia sala (y su espera) y el Laberinto es solitario: salir de esta pantalla no las pausa.
+    if (!participant || !match || !this.isGuessWhoTournamentMatch(match)) return;
     if (startWaiting(match, participant.userId, Date.now(), match.turnDeadline)) {
       this.clearTournamentTurnTimer(match.matchCode);
       match.turnDeadline = null;
@@ -2482,15 +2488,19 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   }
 
   /**
-   * No volvió a tiempo: como antes de esta espera, la partida sigue y su turno
-   * pasa solo al vencer (el torneo conserva al participante para el ranking).
+   * No volvió a tiempo: contra otra persona abandona la partida (la gana quien se queda);
+   * contra el bot, la partida sigue y su turno pasa solo (el torneo conserva al participante para el ranking).
    */
   private expireTournamentWaits(code: string, matchCode: string) {
     const tournament = this.tournamentStore.get(code);
     const match = tournament?.matches.find((m) => m.matchCode === matchCode);
     if (!tournament || !match) return;
     let back: ReturnType<typeof stopWaiting> = null;
-    for (const userId of expiredWaits(match, Date.now())) back = stopWaiting(match, userId) ?? back;
+    for (const userId of expiredWaits(match, Date.now())) {
+      // Contra otra persona, no volver a tiempo es abandonar (issue #131); contra el bot, la partida sigue.
+      if (!match.vsBot) return this.forfeitTournamentMatch(tournament, match, userId);
+      back = stopWaiting(match, userId) ?? back;
+    }
     if (back?.resumed) this.resumeTournamentMatch(tournament, match, back.remainingMs);
     else this.scheduleWait('tournament:' + matchCode, match, () => this.expireTournamentWaits(code, matchCode));
     this.tournamentStore.set(tournament);
@@ -2574,16 +2584,20 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       return;
     }
 
+    this.finishTournamentMatch(tournament, match, accuser.userId, opponent.userId);
+  }
+
+  /** Cierra un duelo de torneo: gana `winnerUserId`. Torneo por puntos: ganar suma, perder no elimina (contra el bot también cuenta). */
+  private finishTournamentMatch(tournament: TournamentState, match: TournamentMatch, winnerUserId: string, loserUserId: string) {
     this.clearTournamentTurnTimer(match.matchCode);
     this.tournamentBotRunner.forget(match.matchCode);
     match.phase = 'FINISHED';
-    match.winnerUserId = accuser.userId;
+    match.winnerUserId = winnerUserId;
     match.activePlayerUserId = null;
     match.turnDeadline = null;
 
-    // Torneo por puntos: ganar suma, perder no elimina. Contra el bot también cuenta.
-    const winner = tournament.participants.find((p) => p.userId === accuser.userId);
-    const loser = tournament.participants.find((p) => p.userId === opponent.userId);
+    const winner = tournament.participants.find((p) => p.userId === winnerUserId);
+    const loser = tournament.participants.find((p) => p.userId === loserUserId);
     if (winner) {
       winner.points += 1;
       winner.wins = (winner.wins ?? 0) + 1;
@@ -2595,6 +2609,44 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     this.broadcastTournamentState(tournament);
 
     this.maybeAdvanceTournamentRound(tournament);
+  }
+
+  /**
+   * Alguien abandona un duelo de torneo (salió, o no volvió a tiempo): la partida no sigue sola ni se desarma.
+   * Termina, la gana quien se queda (issue #131) y a esa persona se le avisa «ha abandonado la partida».
+   */
+  private forfeitTournamentMatch(tournament: TournamentState, match: TournamentMatch, leavingUserId: string) {
+    if (match.phase !== 'PLAYING') return;
+    const stayedId = match.playerUserIds.find((id) => id !== leavingUserId);
+    if (!stayedId) return;
+    this.clearWait('tournament:' + match.matchCode);
+    clearWaiting(match);
+    const leaving = tournament.participants.find((p) => p.userId === leavingUserId);
+    const stayed = tournament.participants.find((p) => p.userId === stayedId);
+    if (stayed) {
+      this.server.to(stayed.socketId).emit('tournament:match-abandoned', {
+        matchCode: match.matchCode,
+        message: `${leaving?.displayName ?? 'Tu rival'} ha abandonado la partida.`,
+      });
+    }
+    this.finishTournamentMatch(tournament, match, stayedId, leavingUserId);
+  }
+
+  /** Los duelos entre personas (y contra el bot) de Identidad Oculta viven en el match del torneo; Dominó, en su sala; el Laberinto es solitario. */
+  private isGuessWhoTournamentMatch(match: TournamentMatch) {
+    return (match.gameType ?? 'GUESS_WHO') === 'GUESS_WHO';
+  }
+
+  /** Salió a propósito del torneo en plena ronda: pierde su duelo, sea del juego que sea. */
+  private forfeitParticipantMatches(tournament: TournamentState, userId: string) {
+    const match = this.playingTournamentMatch(tournament, userId);
+    if (!match) return;
+    if (this.isGuessWhoTournamentMatch(match)) {
+      this.forfeitTournamentMatch(tournament, match, userId);
+    } else if (match.gameType === 'DOMINO' && match.dominoRoomCode) {
+      const room = this.dominoRoomStore.get(match.dominoRoomCode);
+      if (room) this.forfeitTournamentDomino(room, userId);
+    }
   }
 
   /**

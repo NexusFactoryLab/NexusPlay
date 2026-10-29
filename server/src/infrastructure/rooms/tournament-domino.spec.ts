@@ -188,7 +188,7 @@ describe('torneo con Dominó: desconexiones (fusión con la espera de #120)', ()
     vi.advanceTimersByTime(3000);
     const match = h.tournament.matches.find((m) => !m.vsBot)!;
     const room = h.domino.get(match.dominoRoomCode!)!;
-    const [first, second] = match.playerUserIds;
+    const [first, second] = match.playerUserIds as [string, string];
     const a = client('conn-a');
     a.data.userId = first;
     const b = client('conn-b');
@@ -241,6 +241,16 @@ describe('torneo con Dominó: desconexiones (fusión con la espera de #120)', ()
     // Ya terminada, salir de la sala (p. ej. al volver al torneo) no abandona nada más.
     gateway.handleDominoLeave(client('conn-b'));
     expect(domino.get(room.code)!.abandonedByUserId).toBe(first);
+  });
+
+  it('salir del torneo (botón «Salir») con una partida de dominó en curso la pierde sin desarmar la sala', async () => {
+    const { tournament, domino, room, first, second, gateway } = await playing();
+    const tournamentSocket = tournament.participants.find((p) => p.userId === first)!.socketId;
+    gateway.handleTournamentLeave(client(tournamentSocket));
+    const after = domino.get(room.code)!;
+    expect(after.phase).toBe('FINISHED');
+    expect(after.abandonedByUserId).toBe(first);
+    expect(after.winnerUserId).toBe(second);
   });
 
   it('contra el bot, un corte de red no cierra la partida: se la puede retomar', async () => {

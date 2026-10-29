@@ -99,6 +99,8 @@ function TournamentSession() {
     clearPairingAnnouncement,
     matchAccusationFailedMessage,
     clearMatchAccusationFailedMessage,
+    matchAbandonedMessage,
+    clearMatchAbandonedMessage,
     createTournament,
     joinTournament,
     startTournament,
@@ -204,6 +206,12 @@ function TournamentSession() {
     const timeout = setTimeout(clearMatchAccusationFailedMessage, 3500)
     return () => clearTimeout(timeout)
   }, [matchAccusationFailedMessage, clearMatchAccusationFailedMessage])
+
+  useEffect(() => {
+    if (!matchAbandonedMessage) return
+    const timeout = setTimeout(clearMatchAbandonedMessage, 8000)
+    return () => clearTimeout(timeout)
+  }, [matchAbandonedMessage, clearMatchAbandonedMessage])
 
   function handleExit() {
     leaveTournament()
@@ -397,6 +405,15 @@ function TournamentSession() {
             role="alert"
           >
             {error}
+          </p>
+        )}
+
+        {matchAbandonedMessage && (
+          <p
+            className="mb-4 rounded-lg border border-accent/35 bg-accent/10 px-[13px] py-[11px] text-sm leading-snug text-text-h animate-[fade-in-up_0.2s_ease-out]"
+            role="status"
+          >
+            {matchAbandonedMessage} ¡Ganaste esta ronda!
           </p>
         )}
 
