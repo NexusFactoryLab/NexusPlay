@@ -6,6 +6,8 @@ type AvatarPortraitProps = {
   className?: string
   /** Qué parte del cuerpo se acerca: la cabeza (foto redonda), el torso o las piernas (miniaturas del editor). */
   focus?: keyof typeof BOXES
+  /** Dibujarla por turnos (miniaturas del editor): ver AvatarFigure. */
+  deferred?: boolean
 }
 
 /**
@@ -23,12 +25,13 @@ const CANVAS = 128
  * Foto redonda del avatar (barra lateral, menú, salas de espera). Llena a su
  * contenedor, que pone el círculo, el tamaño y el fondo.
  */
-export function AvatarPortrait({ config, className = '', focus = 'head' }: AvatarPortraitProps) {
+export function AvatarPortrait({ config, className = '', focus = 'head', deferred }: AvatarPortraitProps) {
   const BOX = BOXES[focus]
   return (
     <span className={`pointer-events-none relative block h-full w-full overflow-hidden ${className}`} aria-hidden="true">
       <AvatarFigure
         config={config}
+        deferred={deferred}
         className="absolute"
         style={{
           width: `${(CANVAS / BOX.size) * 100}%`,

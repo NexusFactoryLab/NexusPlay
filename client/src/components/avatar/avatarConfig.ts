@@ -323,16 +323,34 @@ export function toDiceBearOptions(config: AvatarConfig): Record<string, unknown>
 }
 
 const cache = new Map<string, string>()
+const CACHE_LIMIT = 400
 
-/** SVG del avatar como data URI (con caché: el mismo avatar se pinta en varios lugares). */
+/** Clave de caché de un avatar (los campos siempre en el mismo orden). */
+export function avatarKey(config: AvatarConfig): string {
+  return (Object.keys(DEFAULT_AVATAR) as (keyof AvatarConfig)[]).map((field) => config[field] ?? '').join('|')
+}
+
+/** El avatar ya dibujado, si está en caché (no dibuja nada). */
+export function cachedAvatarUri(config: AvatarConfig): string | undefined {
+  return cache.get(avatarKey(config))
+}
+
+/**
+ * SVG del avatar como data URI (con caché: el mismo avatar se pinta en varios
+ * lugares). Al llenarse la caché se olvida lo más viejo, no todo de golpe
+ * (issue #140: vaciarla entera obligaba a redibujar todas las miniaturas).
+ */
 export function avatarDataUri(config: AvatarConfig): string {
-  const key = JSON.stringify(config)
+  const key = avatarKey(config)
   let uri = cache.get(key)
-  if (!uri) {
+  if (uri) {
+    // Lo usado hace poco pasa al final: lo que se olvida es lo que nadie mira.
+    cache.delete(key)
+  } else {
     const svg = new Avatar(style, toDiceBearOptions(config) as never).toString()
     uri = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
-    if (cache.size > 300) cache.clear()
-    cache.set(key, uri)
+    if (cache.size >= CACHE_LIMIT) cache.delete(cache.keys().next().value as string)
   }
+  cache.set(key, uri)
   return uri
 }

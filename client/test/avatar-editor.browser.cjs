@@ -1,5 +1,6 @@
-// Editor de avatar (issue #138): sin scroll de página, barra de categorías con
-// scroll propio visible y flechas Atrás / Adelante sobre el historial.
+// Editor de avatar (issues #138 y #140): sin scroll de página, barra de
+// categorías con scroll propio visible y fluido, y flechas Atrás / Adelante
+// sobre el historial.
 //   1. Vite local: cd client && npx vite --port 5175
 //   2. node client/test/avatar-editor.browser.cjs
 // Todas las respuestas de API son simuladas. PLAYWRIGHT_MODULE permite usar
@@ -72,7 +73,37 @@ async function run() {
     const rail = page.locator('.avatar-rail')
     const railTop = () => rail.evaluate((element) => element.scrollTop)
 
-    // 2. Scroll propio visible: hay barrita, arrastrarla baja la barra, y la flecha "más" también.
+    // Las miniaturas se dibujan por turnos (issue #140): al poco rato todas tienen imagen.
+    await page.waitForFunction(() => [...document.querySelectorAll('.avatar-tile > span')].every((span) => span.classList.contains('avatar-tile-none') || span.querySelector('img')))
+
+    // 2a. Desplazar la barra no toca nada fuera de ella (issue #140: antes se
+    //     redibujaba todo el editor en cada movimiento) ni deja tareas largas.
+    const outside = await page.evaluate(async () => {
+      const rail = document.querySelector('.avatar-rail')
+      const wrap = document.querySelector('.avatar-rail-wrap')
+      const changes = []
+      const observer = new MutationObserver((records) => {
+        for (const record of records) if (!wrap.contains(record.target)) changes.push(record.target.className || record.target.nodeName)
+      })
+      observer.observe(document.querySelector('.avatar-board'), { subtree: true, childList: true, attributes: true, characterData: true })
+      let longest = 0
+      const longTasks = new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) longest = Math.max(longest, entry.duration)
+      })
+      longTasks.observe({ type: 'longtask' })
+      for (let step = 0; step < 30; step += 1) {
+        rail.scrollTop = step < 15 ? step * 20 : (30 - step) * 20
+        await new Promise((resolve) => requestAnimationFrame(resolve))
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      observer.disconnect()
+      longTasks.disconnect()
+      return { changes, longest }
+    })
+    assert.deepEqual(outside.changes, [], 'El scroll de la barra cambió cosas fuera de ella')
+    assert.ok(outside.longest < 150, `El scroll de la barra dejó una tarea de ${outside.longest} ms`)
+
+    // 2b. Scroll propio visible: hay barrita, arrastrarla baja la barra, y la flecha "más" también.
     const thumb = page.locator('.avatar-rail-thumb')
     await thumb.waitFor()
     const thumbBox = await thumb.boundingBox()

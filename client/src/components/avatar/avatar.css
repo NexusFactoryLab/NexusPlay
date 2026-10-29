@@ -194,12 +194,14 @@
     radial-gradient(1.6px 1.6px at 70% 64%, #fff 50%, transparent 51%),
     radial-gradient(1.2px 1.2px at 8% 60%, #fff 50%, transparent 51%),
     radial-gradient(1.4px 1.4px at 94% 80%, #fff 50%, transparent 51%);
+  /* Titilar con opacidad (no con filter, issue #140): la mueve la tarjeta gráfica sin repintar. */
   animation: avatar-twinkle 5s ease-in-out infinite alternate;
+  will-change: opacity;
 }
 
 @keyframes avatar-twinkle {
-  from { filter: brightness(0.75); }
-  to { filter: brightness(1.25); }
+  from { opacity: calc(var(--av-stars) * 0.55); }
+  to { opacity: var(--av-stars); }
 }
 
 .avatar-cloud {
@@ -208,8 +210,9 @@
   height: 46px;
   border-radius: 999px;
   background: var(--av-cloud);
-  filter: blur(0.3px);
+  /* Solo transform (sin filter, issue #140): la nube se mueve en su propia capa sin repintar. */
   animation: avatar-cloud-drift 38s ease-in-out infinite alternate;
+  will-change: transform;
 }
 
 .avatar-cloud::before,
@@ -353,6 +356,8 @@
 }
 
 .avatar-panel-body {
+  /* Lo de adentro no obliga a recalcular el resto de la página (issue #140). */
+  contain: layout paint;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -387,6 +392,9 @@
 }
 
 .avatar-tile {
+  /* Las miniaturas fuera de la vista no se dibujan hasta que se ve su parte del panel (issue #140). */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 80px;
   position: relative;
   display: flex;
   aspect-ratio: 1;
@@ -535,6 +543,7 @@
 /* ---------------------------------------------------------------- categorías (estilo Roblox) */
 
 .avatar-rail {
+  contain: layout paint;
   display: flex;
   min-height: 0;
   flex-direction: column;
