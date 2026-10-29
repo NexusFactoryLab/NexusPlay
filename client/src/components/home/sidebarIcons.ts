@@ -1,20 +1,21 @@
 import { createElement } from 'react'
-import { Bot, Building2, ChartColumn, Gamepad2, GraduationCap, House, LibraryBig, SquarePen, Users, UserRoundCog } from 'lucide-react'
+import { BookOpen, Bot, Building2, ChartColumn, FolderOpen, Globe, GraduationCap, House, SquarePen, Users } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { Theme } from '../../hooks/useTheme'
 
 /**
  * Icono de cada opción del menú: es el mismo en todos los temas (métricas siempre
- * es una gráfica, juegos siempre un control) y lo que cambia con el tema es la ficha.
+ * es una gráfica) y lo que cambia con el tema es la ficha. Son los iconos de antes de
+ * las fichas (#142): libro para Áreas, globo para Comunidad, carpeta para Mis juegos.
  */
 export const NAV_ICONS: Record<string, LucideIcon> = {
   'nav-home': House,
-  'nav-subjects': LibraryBig,
-  'nav-community': Users,
+  'nav-subjects': BookOpen,
+  'nav-community': Globe,
   'nav-classes': GraduationCap,
   'nav-my-metrics': ChartColumn,
-  'nav-own-games': Gamepad2,
-  'nav-users': UserRoundCog,
+  'nav-own-games': FolderOpen,
+  'nav-users': Users,
   'nav-edition': SquarePen,
   'nav-ai-providers': Bot,
   'nav-organization': Building2,
