@@ -99,6 +99,8 @@ export interface DuoWorldState {
   flags: Record<string, boolean>;
   /** Desplazamiento de cada báscula (px; positivo = el lado izquierdo bajó). */
   scales: Record<string, number>;
+  /** Alto del agua de cada estanque (px desde su fondo). */
+  pools: Record<string, number>;
 }
 
 export interface DuoSnapshot {

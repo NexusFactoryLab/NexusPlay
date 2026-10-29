@@ -1,12 +1,17 @@
 import {
   CRATE_SIZE,
+  POOL_SPEED,
   TILE,
   barrierRect,
   bridgeRect,
   buttonRect,
   coinRect,
   crateSpawn,
+  currentRect,
+  cycleRed,
   flagRect,
+  floaterMoverId,
+  floaterRect,
   gateWallRect,
   gemRect,
   keyRect,
@@ -16,13 +21,20 @@ import {
   moverRect,
   overlaps,
   pedestalRect,
+  poolWaterRect,
+  pressDrop,
   scaleSideId,
   scaleSideRect,
   springRect,
   type Cell,
+  type DuoBarrierDef,
   type DuoCondition,
+  type DuoFloaterDef,
+  type DuoFlowDef,
   type DuoGateDef,
   type DuoLevel,
+  type DuoPoolDef,
+  type DuoPressDef,
   type DuoScaleDef,
 } from './duoLevel.js';
 import type { DuoCrateState, DuoPlayerNet, DuoRole, DuoWorldState, Rect } from './duoTypes.js';
@@ -55,6 +67,7 @@ export function createWorldState(level: DuoLevel): DuoWorldState {
     locks: {},
     flags: {},
     scales: Object.fromEntries((level.def.scales ?? []).map((s) => [s.id, 0])),
+    pools: Object.fromEntries((level.def.pools ?? []).map((p) => [p.id, p.low * TILE])),
   };
 }
 
@@ -73,7 +86,7 @@ export function isBridgeOn(level: DuoLevel, world: DuoWorldState, bridgeId: stri
 export interface DynamicSolids {
   /** Bloquean por todos lados. */
   solid: Rect[];
-  /** Solo se pisan desde arriba (puentes de luz, plataformas móviles y básculas). */
+  /** Solo se pisan desde arriba (puentes de luz, plataformas móviles, básculas y troncos). */
   oneWay: Rect[];
   /** Hongos saltarines (también bloquean): quien cae encima rebota. */
   springs: Rect[];
@@ -97,18 +110,85 @@ export function dynamicSolids(level: DuoLevel, world: DuoWorldState, time = 0): 
     const offset = world.scales?.[scale.id] ?? 0;
     oneWay.push(scaleSideRect(scale.left, offset), scaleSideRect(scale.right, -offset));
   }
+  for (const floater of floaterSurfaces(level, world)) oneWay.push(floater.rect);
   return { solid, oneWay, springs };
 }
 
-/** La barrera apaga a quien la toca (está encendida) salvo mientras se cumple su condición. */
-export function isBarrierActive(level: DuoLevel, world: DuoWorldState, barrierId: string): boolean {
+/**
+ * La barrera apaga a quien la toca (está encendida) salvo mientras se cumple
+ * su condición; la de semáforo, además, solo mientras está en rojo.
+ */
+export function barrierActive(barrier: DuoBarrierDef, switches: Record<string, boolean>, time: number): boolean {
+  return !isConditionMet(barrier.off, switches) && cycleRed(barrier.cycle, time);
+}
+
+export function isBarrierActive(level: DuoLevel, world: DuoWorldState, barrierId: string, time = 0): boolean {
   const barrier = (level.def.barriers ?? []).find((b) => b.id === barrierId);
-  return !!barrier && !isConditionMet(barrier.off, world.switches);
+  return !!barrier && barrierActive(barrier, world.switches, time);
 }
 
 /** Las barreras encendidas que toca un rectángulo. */
-export function touchesActiveBarrier(level: DuoLevel, world: DuoWorldState, rect: Rect): boolean {
-  return (level.def.barriers ?? []).some((b) => !isConditionMet(b.off, world.switches) && overlaps(barrierRect(b), rect));
+export function touchesActiveBarrier(level: DuoLevel, world: DuoWorldState, rect: Rect, time = 0): boolean {
+  return (level.def.barriers ?? []).some((b) => barrierActive(b, world.switches, time) && overlaps(barrierRect(b), rect));
+}
+
+// ---- Río: estanques, troncos y corrientes ----
+
+/** Alto actual del agua de un estanque (px). */
+export function poolLevel(world: DuoWorldState, pool: DuoPoolDef): number {
+  return world.pools?.[pool.id] ?? pool.low * TILE;
+}
+
+/** ¿El punto (x, y) está bajo el agua de algún estanque? */
+export function inPoolWater(level: DuoLevel, world: DuoWorldState, x: number, y: number): boolean {
+  for (const pool of level.def.pools ?? []) {
+    const r = poolWaterRect(pool, poolLevel(world, pool));
+    if (r.h > 0 && x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) return true;
+  }
+  return false;
+}
+
+/** La superficie de cada tronco o nenúfar, a la altura del agua de su estanque. */
+export function floaterSurfaces(level: DuoLevel, world: DuoWorldState): Array<{ floater: DuoFloaterDef; rect: Rect }> {
+  const out: Array<{ floater: DuoFloaterDef; rect: Rect }> = [];
+  for (const floater of level.def.floaters ?? []) {
+    const pool = (level.def.pools ?? []).find((p) => p.id === floater.pool);
+    if (pool) out.push({ floater, rect: floaterRect(floater, pool, poolLevel(world, pool)) });
+  }
+  return out;
+}
+
+/** El tronco al que corresponde un id de `DuoPlayerNet.mover` ("float:<id>"), si lo es. */
+export function floaterOf(level: DuoLevel, moverId: string | undefined): DuoFloaterDef | null {
+  if (!moverId?.startsWith('float:')) return null;
+  return (level.def.floaters ?? []).find((f) => floaterMoverId(f.id) === moverId) ?? null;
+}
+
+/** El agua de cada estanque sube o baja hacia su nivel (según su válvula). */
+export function updatePools(level: DuoLevel, world: DuoWorldState, dt: number): void {
+  for (const pool of level.def.pools ?? []) {
+    const target = (isConditionMet(pool.when, world.switches) ? pool.high : pool.low) * TILE;
+    const current = poolLevel(world, pool);
+    const step = POOL_SPEED * dt;
+    world.pools[pool.id] = Math.abs(target - current) <= step ? target : current + Math.sign(target - current) * step;
+  }
+}
+
+/** Hacia dónde arrastra ahora una corriente o cinta: 1, −1 o 0 (detenida). */
+export function flowDirection(flow: DuoFlowDef, switches: Record<string, boolean>): -1 | 0 | 1 {
+  if (flow.stop && isConditionMet(flow.stop, switches)) return 0;
+  return flow.reverse && isConditionMet(flow.reverse, switches) ? (-flow.dir as -1 | 1) : flow.dir;
+}
+
+/** ¿El punto (x, y) está en la zona de agua de esta corriente? */
+export function inCurrent(flow: DuoFlowDef, x: number, y: number): boolean {
+  const r = currentRect(flow);
+  return x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h;
+}
+
+/** Cuánto bajó ahora el cabezal de una prensa (0 arriba … 1 abajo); detenida, queda arriba. */
+export function pressK(press: DuoPressDef, world: DuoWorldState, time: number): number {
+  return press.stop && isConditionMet(press.stop, world.switches) ? 0 : pressDrop(press, time);
 }
 
 /** Rectángulo de cada lado de una báscula con el desplazamiento actual del mundo. */

@@ -56,7 +56,7 @@ export const gameInstructions: Record<InstructionKind, Instruction> = {
     caption: 'Llega a la sala correcta antes de quedarte sin baterías.',
   },
   DUAL_QUEST_PIXI: {
-    text: 'Juegan en pareja, cada uno desde su dispositivo: Lumen nada en la lava y Gota en el agua. Muévete con las flechas o A/D, salta con ↑, W o espacio (en celular, con los botones). Ayúdense con botones, palancas, cajas, básculas y llaves, y párense juntos en los pedestales de cada Puerta del Saber: solo pasan si los dos responden bien.',
+    text: 'Juegan en pareja, cada uno desde su dispositivo: Lumen nada en la lava y Gota en el agua. Muévete con las flechas o A/D, salta con ↑, W o espacio (en celular, con los botones). Ayúdense con botones, palancas, cajas, básculas, válvulas y llaves, y párense juntos en los pedestales de cada Puerta del Saber: solo pasan si los dos responden bien.',
     exampleTitle: 'Ejemplo de cooperación', labels: ['Muévete', 'Salta', 'Coopera', 'Respondan'],
     icons: [Footprints, ArrowUp, Handshake, DoorOpen],
     caption: 'Tres Puertas del Saber, gemas y tres corazones compartidos.',

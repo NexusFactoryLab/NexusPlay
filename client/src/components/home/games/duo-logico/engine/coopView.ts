@@ -1,6 +1,6 @@
 import { Container, Graphics, Sprite, TilingSprite, type Texture } from 'pixi.js'
-import { TILE, barrierRect, lockRect, scaleSideRect, standPoint, type DuoLevel } from '../shared/duoLevel'
-import { isConditionMet } from '../shared/duoWorld'
+import { TILE, barrierRect, cycleRed, lockRect, scaleSideRect, standPoint, type DuoBarrierDef, type DuoLevel } from '../shared/duoLevel'
+import { barrierActive, isConditionMet } from '../shared/duoWorld'
 import type { DuoRole, DuoWorldState } from '../shared/duoTypes'
 import type { DuoAssets, DuoThemeAssets } from './duoAssets'
 import type { Fx } from './fx'
@@ -23,13 +23,19 @@ function sized(texture: Texture, height: number): Sprite {
 }
 
 interface BarrierView {
+  def: DuoBarrierDef
   gfx: Graphics
   thorns: TilingSprite | null
+  /** Semáforo (barrera con ciclo): la luz arriba del poste. */
+  light: Sprite | null
   /** 0 = retirada, 1 = encendida; se acerca con el tiempo. */
   level: number
   active: boolean | null
   rect: { x: number; y: number; w: number; h: number }
 }
+
+/** Antes de ponerse en rojo, el semáforo pasa este tiempo en amarillo (s). */
+const YELLOW_S = 1
 
 /**
  * Lo que hay que hacer entre los dos (issue #128): gemas de color, llaves y
@@ -44,16 +50,17 @@ export class CoopView {
   readonly front = new Container()
   private readonly gems = new Map<string, { sprite: Sprite; baseY: number; baseScale: number; takenAt: number | null; glintAt: number; color: DuoRole | 'BOTH' }>()
   private readonly keys = new Map<string, { sprite: Sprite; glow: Sprite; home: { x: number; y: number }; baseScale: number; state: DuoRole | 'used' | null }>()
-  private readonly locks = new Map<string, { door: Sprite; padlock: Graphics; baseY: number; height: number; opened: boolean | null; openedAt: number }>()
+  private readonly locks = new Map<string, { door: Sprite; padlock: Graphics; baseY: number; height: number; opened: boolean | null; openedAt: number; arch: boolean }>()
   private readonly barriers = new Map<string, BarrierView>()
   private readonly springs: Array<{ sprite: Sprite; x: number; y: number; baseScaleY: number; bouncedAt: number }> = []
-  private readonly flags = new Map<string, { sprite: Sprite; baseScaleX: number; on: boolean | null }>()
+  private readonly flags = new Map<string, { sprite: Sprite; baseScaleX: number; on: boolean | null; lamp: Sprite | null }>()
   private readonly scales = new Map<string, { left: Container; right: Container; frame: Graphics }>()
 
   private readonly level: DuoLevel
   private readonly fx: Fx
   private readonly onShake: (power: number, ms: number) => void
   private readonly electric: boolean
+  private readonly so: Record<string, Texture>
 
   constructor(assets: DuoAssets, theme: DuoThemeAssets, level: DuoLevel, fx: Fx, onShake: (power: number, ms: number) => void) {
     this.level = level
@@ -64,6 +71,7 @@ export class CoopView {
     const g = assets.general?.textures ?? {}
     const o = assets.objects.textures
     const so = theme.objects?.textures ?? {}
+    this.so = so
 
     // --- Básculas: viga con su rueda, cuerdas y los dos platos ---
     for (const scale of def.scales ?? []) {
@@ -113,13 +121,26 @@ export class CoopView {
         this.back.addChild(thorns)
       }
       this.back.addChild(gfx)
-      this.barriers.set(b.id, { gfx, thorns, level: 1, active: null, rect })
+      let light: Sprite | null = null
+      if (b.cycle && so['light-red']) {
+        // Semáforo: la luz va arriba del poste, sobre la barrera.
+        light = sized(so['light-red'], 64)
+        light.anchor.set(0.5, 1)
+        light.position.set(rect.x + rect.w / 2, rect.y + 4)
+        this.back.addChild(light)
+      }
+      this.barriers.set(b.id, { def: b, gfx, thorns, light, level: 1, active: null, rect })
     }
 
     // --- Puertas con candado ---
     for (const lock of def.locks ?? []) {
       const r = lockRect(lock)
-      const door = sized(g['door-wood'] ?? o['door-closed'], lock.height * TILE + 8)
+      // En la Ciudad, una puerta de arco con su candado; en los demás, la puerta de madera.
+      const arch = !!so['door-locked']
+      const door = sized(so['door-locked'] ?? g['door-wood'] ?? o['door-closed'], lock.height * TILE + 8)
+      // Las puertas altas (4 celdas o más) no se ensanchan tanto como crecen.
+      if (arch) door.width = Math.min(door.width, 1.7 * TILE)
+      else if (lock.height >= 4) door.width = Math.min(door.width, 2.2 * TILE)
       door.anchor.set(0.5, 1)
       door.position.set(r.x + r.w / 2, r.y + r.h + 4)
       const padlock = new Graphics()
@@ -131,8 +152,9 @@ export class CoopView {
         .circle(0, 7, 3)
         .fill({ color: 0x713f12 })
       padlock.position.set(door.x, r.y + r.h / 2)
+      padlock.visible = !arch
       this.back.addChild(door, padlock)
-      this.locks.set(lock.id, { door, padlock, baseY: door.y, height: r.h, opened: null, openedAt: -Infinity })
+      this.locks.set(lock.id, { door, padlock, baseY: door.y, height: r.h, opened: null, openedAt: -Infinity, arch })
     }
 
     // --- Hongos saltarines ---
@@ -147,12 +169,21 @@ export class CoopView {
 
     // --- Banderas de control ---
     for (const f of def.flags ?? []) {
+      const p = standPoint(f)
+      if (so['lamp-off'] && so['lamp-on']) {
+        // En la Ciudad, los puntos de control son faroles que se encienden.
+        const lamp = sized(so['lamp-off'], 2 * TILE + 6)
+        lamp.anchor.set(0.5, 1)
+        lamp.position.set(p.x, p.y + 2)
+        this.back.addChild(lamp)
+        this.flags.set(f.id, { sprite: lamp, baseScaleX: lamp.scale.x, on: null, lamp })
+        continue
+      }
       const sprite = sized(g['flag-red'] ?? o['lever-off'], 2 * TILE + 10)
       sprite.anchor.set(0.15, 1)
-      const p = standPoint(f)
       sprite.position.set(p.x - 12, p.y + 2)
       this.back.addChild(sprite)
-      this.flags.set(f.id, { sprite, baseScaleX: sprite.scale.x, on: null })
+      this.flags.set(f.id, { sprite, baseScaleX: sprite.scale.x, on: null, lamp: null })
     }
 
     // --- Gemas ---
@@ -189,9 +220,10 @@ export class CoopView {
     this.fx.burst({ x: spring.x, y: spring.y - 40, count: 12, texture: 'dot', tint: [0xfca5a5, 0xffffff, 0xfde68a], speed: [80, 220], angle: [-Math.PI * 0.9, -Math.PI * 0.1], life: [380, 620], scale: [0.6, 0.15], gravity: 300 })
   }
 
-  update(world: DuoWorldState, bodies: Partial<Record<DuoRole, { x: number; y: number }>>, now: number, dtMs: number): void {
+  /** `time`: segundos del reloj del servidor (los semáforos cambian con él). */
+  update(world: DuoWorldState, bodies: Partial<Record<DuoRole, { x: number; y: number }>>, now: number, dtMs: number, time = 0): void {
     this.updateScales(world)
-    this.updateBarriers(world, now, dtMs)
+    this.updateBarriers(world, now, dtMs, time)
 
     for (const [id, lock] of this.locks) {
       const open = !!world.locks?.[id]
@@ -203,6 +235,14 @@ export class CoopView {
       }
       if (lock.opened === null && open) lock.openedAt = -Infinity
       lock.opened = open
+      if (lock.arch) {
+        // La puerta de arco se abre en su lugar (se ve la luz del otro lado).
+        const open2 = open && now - lock.openedAt > LOCK_OPEN_MS * 0.3
+        lock.door.texture = (open2 ? this.so['door-open'] : this.so['door-locked']) ?? lock.door.texture
+        lock.door.alpha = 1
+        lock.door.visible = true
+        continue
+      }
       // Abierta: la puerta sube y se desvanece; el candado salta.
       const k = open ? Math.min(1, (now - lock.openedAt) / LOCK_OPEN_MS) : 0
       lock.door.y = lock.baseY - lock.height * k * k
@@ -229,6 +269,13 @@ export class CoopView {
         this.fx.burst({ x: s.x + 30, y: s.y - 100, count: 1, texture: 'ring', tint: 0xfca5a5, speed: 0, angle: 0, life: 420, scale: [1, 5], alpha: [0.9, 0], glow: true })
       }
       view.on = on
+      if (view.lamp) {
+        // El farol se enciende y su luz late.
+        view.lamp.texture = (on ? this.so['lamp-on'] : this.so['lamp-off']) ?? view.lamp.texture
+        view.lamp.scale.set((2 * TILE + 6) / view.lamp.texture.frame.height)
+        view.lamp.alpha = on ? 0.92 + Math.sin(now / 240 + flag.col) * 0.08 : 1
+        continue
+      }
       // Gris hasta que alguien la toca; después ondea.
       view.sprite.tint = on ? 0xffffff : 0x9ca3af
       view.sprite.skew.y = on ? Math.sin(now / 220 + flag.col) * 0.07 : 0
@@ -306,11 +353,19 @@ export class CoopView {
     }
   }
 
-  private updateBarriers(world: DuoWorldState, now: number, dtMs: number): void {
+  private updateBarriers(world: DuoWorldState, now: number, dtMs: number, time: number): void {
     for (const b of this.level.def.barriers ?? []) {
       const view = this.barriers.get(b.id)
       if (!view) continue
-      const active = !isConditionMet(b.off, world.switches)
+      const active = barrierActive(b, world.switches, time)
+      if (view.light && b.cycle) {
+        // Rojo, verde, y amarillo el último segundo antes de volver a rojo.
+        // Con el pulsador pisado queda en verde.
+        const held = isConditionMet(b.off, world.switches)
+        const soon = !active && !held && cycleRed(b.cycle, time + YELLOW_S)
+        const color = active ? 'light-red' : soon ? 'light-yellow' : 'light-green'
+        view.light.texture = this.so[color] ?? view.light.texture
+      }
       if (view.active !== null && view.active !== active) {
         // Al apagarse (o volver): chispas o tierra.
         const r = view.rect
@@ -330,6 +385,21 @@ export class CoopView {
   private drawBarrier(view: BarrierView, active: boolean, now: number): void {
     const { x, y, w, h } = view.rect
     const g = view.gfx.clear()
+    if (view.light) {
+      // Semáforo: poste y, en rojo, una cortina de luz roja que no se puede cruzar.
+      const cx = x + w / 2
+      g.rect(cx - 4, y, 8, h).fill({ color: 0x475569 }).stroke({ color: 0x1e293b, width: 2 })
+      if (view.level > 0.02) {
+        g.rect(cx - 16, y + 6, 32, h - 6).fill({ color: 0xef4444, alpha: 0.16 * view.level })
+        for (const [color, width, alpha] of [[0xf87171, 10, 0.35], [0xfecaca, 3, 0.9]] as const) {
+          g.moveTo(cx, y + 6).lineTo(cx, y + h).stroke({ color, width: width * (0.85 + Math.sin(now / 70) * 0.15), alpha: alpha * view.level })
+        }
+        // Rayas que bajan por la cortina.
+        const off = (now / 12) % 24
+        for (let py = y + 6 + off; py < y + h; py += 24) g.rect(cx - 14, py, 28, 3).fill({ color: 0xfca5a5, alpha: 0.5 * view.level })
+      }
+      return
+    }
     if (view.thorns) {
       // Zarzas: salen de la tierra; retiradas, solo asoma un montículo.
       view.thorns.scale.x = 0.08 + 0.92 * view.level

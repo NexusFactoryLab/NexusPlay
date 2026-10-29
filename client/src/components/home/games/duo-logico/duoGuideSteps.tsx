@@ -76,7 +76,7 @@ function SceneMission() {
         Puerta del Saber
       </Tag>
       <Chip tone="emerald" style={{ left: '12%', top: '86%' }}>
-        Bosque → Planta solar
+        5 escenarios: bosque, sol, río, reciclaje y ciudad
       </Chip>
     </Scene>
   )

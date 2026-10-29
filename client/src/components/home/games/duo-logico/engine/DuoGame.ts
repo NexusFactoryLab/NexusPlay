@@ -1,5 +1,5 @@
 import { Application, Container, Graphics, TilingSprite } from 'pixi.js'
-import { crateSpawn, mirrorRect, moverRect, standPoint, type DuoLevel } from '../shared/duoLevel'
+import { TILE, crateSpawn, mirrorRect, moverRect, standPoint, type DuoLevel } from '../shared/duoLevel'
 import { STEP, createPlayer, stepCrate, stepPlayer, toNet, type CrateSim, type DeathCause, type PlayerSim } from '../shared/duoPhysics'
 import { checkpointFor, collectCoins, collectGems, isOnPedestal, litMirrorCount, updateSwitches } from '../shared/duoWorld'
 import { otherRole, type DuoEmote, type DuoPeerState, type DuoPlayerNet, type DuoRole, type DuoSnapshot, type DuoWorldState } from '../shared/duoTypes'
@@ -100,6 +100,8 @@ export class DuoGame {
   private crateTracks = new Map<string, SnapshotBuffer<{ x: number; y: number }>>()
   /** Básculas: su desplazamiento se interpola con el reloj del compañero (sin saltos de 30 por segundo). */
   private scaleTracks = new Map<string, SnapshotBuffer<{ x: number; y: number }>>()
+  /** Estanques (Río): el nivel del agua, igual que las básculas. */
+  private poolTracks = new Map<string, SnapshotBuffer<{ x: number; y: number }>>()
   private ownedUntil = new Map<string, number>()
   /** Cajas que acabo de soltar (hora local de cuando las solté). */
   private releasedAt = new Map<string, number>()
@@ -158,7 +160,8 @@ export class DuoGame {
     for (const l of this.level.def.latches ?? []) switches[l.id] = false
     const mirrors = Object.fromEntries((this.level.def.mirrors ?? []).map((m) => [m.id, m.start]))
     const scales = Object.fromEntries((this.level.def.scales ?? []).map((s) => [s.id, 0]))
-    return { switches, crates: this.crates.map((c) => ({ id: c.id, x: c.x, y: c.y, owner: null })), coins: {}, gates: {}, mirrors, gems: {}, keys: {}, locks: {}, flags: {}, scales }
+    const pools = Object.fromEntries((this.level.def.pools ?? []).map((p) => [p.id, p.low * TILE]))
+    return { switches, crates: this.crates.map((c) => ({ id: c.id, x: c.x, y: c.y, owner: null })), coins: {}, gates: {}, mirrors, gems: {}, keys: {}, locks: {}, flags: {}, scales, pools }
   }
 
   private freshCrates(): CrateSim[] {
@@ -221,6 +224,7 @@ export class DuoGame {
       this.prevCrates.clear()
       this.crateTracks.clear()
       this.scaleTracks.clear()
+      this.poolTracks.clear()
       this.ownedUntil.clear()
       this.releasedAt.clear()
       this.lastSentCrates.clear()
@@ -255,13 +259,18 @@ export class DuoGame {
     for (const crate of snapshot.world.crates) {
       this.takeCrate(crate.id, crate.x, crate.y, crate.owner, snapshot.t, crate.at ?? snapshot.t, receivedAt)
     }
-    for (const [id, offset] of Object.entries(snapshot.world.scales ?? {})) {
-      let track = this.scaleTracks.get(id)
-      if (!track) {
-        track = new SnapshotBuffer<{ x: number; y: number }>(this.partner.clock)
-        this.scaleTracks.set(id, track)
+    for (const [tracks, values] of [
+      [this.scaleTracks, snapshot.world.scales],
+      [this.poolTracks, snapshot.world.pools],
+    ] as const) {
+      for (const [id, value] of Object.entries(values ?? {})) {
+        let track = tracks.get(id)
+        if (!track) {
+          track = new SnapshotBuffer<{ x: number; y: number }>(this.partner.clock)
+          tracks.set(id, track)
+        }
+        track.push(snapshot.t, { x: 0, y: value }, receivedAt)
       }
-      track.push(snapshot.t, { x: 0, y: offset }, receivedAt)
     }
   }
 
@@ -478,6 +487,7 @@ export class DuoGame {
       locks: { ...this.serverWorld.locks },
       flags: { ...this.serverWorld.flags },
       scales: this.drawnScales(),
+      pools: this.drawnPools(),
     }
     const bodies = { [this.role]: toNet(this.me), [otherRole(this.role)]: this.partnerDrawn ?? undefined }
     updateSwitches(this.level, world, bodies)
@@ -497,6 +507,16 @@ export class DuoGame {
     const now = Date.now()
     for (const scale of this.level.def.scales ?? []) {
       out[scale.id] = this.scaleTracks.get(scale.id)?.sample(now)?.y ?? this.serverWorld.scales?.[scale.id] ?? 0
+    }
+    return out
+  }
+
+  /** Nivel del agua de cada estanque tal como se dibuja (como las básculas). */
+  private drawnPools(): Record<string, number> {
+    const out: Record<string, number> = {}
+    const now = Date.now()
+    for (const pool of this.level.def.pools ?? []) {
+      out[pool.id] = this.poolTracks.get(pool.id)?.sample(now)?.y ?? this.serverWorld.pools?.[pool.id] ?? pool.low * TILE
     }
     return out
   }
