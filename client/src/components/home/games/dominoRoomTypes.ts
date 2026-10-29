@@ -77,5 +77,7 @@ export type DominoRoomStateView = {
   turnDeadline: number | null
   /** Jugadores desconectados a los que se espera: mientras haya alguno, la partida está en pausa (issue #120). */
   awaiting?: AwaitingPlayerView[]
+  /** Quién abandonó la partida de torneo; null si nadie. */
+  abandonedBy?: { userId: string; displayName: string } | null
   players: DominoRoomPlayerView[]
 }

@@ -494,6 +494,10 @@ export function toDominoClientView(room: DominoRoomState, forSocketId: string) {
     activePlayerUserId: room.activePlayerUserId,
     turnDeadline: room.turnDeadline,
     awaiting: awaitingView(room, room.players, Date.now()),
+    // Quién abandonó la partida de torneo (para avisar «ha abandonado la partida»); null si nadie.
+    abandonedBy: room.abandonedByUserId
+      ? { userId: room.abandonedByUserId, displayName: room.players.find((p) => p.userId === room.abandonedByUserId)?.displayName ?? 'Tu rival' }
+      : null,
     players: room.players.map((player) => ({
       userId: player.userId,
       displayName: player.displayName,
@@ -849,11 +853,19 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
 
     const dominoRoom = this.dominoRoomStore.findBySocketId(socket.id);
     if (dominoRoom?.tournamentCode) {
-      // Partida de torneo: la persona puede volver (salió a la pantalla del torneo o se le cayó la red).
-      // La sala no se desarma; su turno, si le toca, lo resuelve el reloj.
+      // Partida de torneo (issue #131): la sala nunca se desarma, para no perjudicar a quien se queda.
       const leaving = dominoRoom.players.find((p) => p.socketId === socket.id);
-      if (leaving) leaving.socketId = `pending:${leaving.userId}`;
-      this.dominoRoomStore.set(dominoRoom);
+      if (leaving && dominoRoom.phase === 'PLAYING' && !wait) {
+        // Salió a propósito: pierde la partida y la gana quien se queda.
+        this.forfeitTournamentDomino(dominoRoom, leaving.userId);
+      } else if (leaving && dominoRoom.phase === 'PLAYING' && hasOtherHuman(dominoRoom.players, leaving)) {
+        // Se cortó la conexión: se la espera (#120); si no vuelve, pierde la partida.
+        this.waitForDominoPlayer(dominoRoom, leaving);
+      } else {
+        // Antes del reparto, ya terminada o contra el bot: puede volver; su turno, si le toca, lo resuelve el reloj.
+        if (leaving) leaving.socketId = `pending:${leaving.userId}`;
+        this.dominoRoomStore.set(dominoRoom);
+      }
     } else if (dominoRoom) {
       const player = dominoRoom.players.find((p) => p.socketId === socket.id);
       if (wait && player && dominoRoom.phase === 'PLAYING' && hasOtherHuman(dominoRoom.players, player)) this.waitForDominoPlayer(dominoRoom, player);
@@ -969,6 +981,22 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     if (wasWaiting) this.tryStartDomino(room);
   }
 
+  /**
+   * Alguien abandona una partida de Dominó de torneo (salió, o no volvió a tiempo): la sala no se desarma;
+   * la partida termina, la gana quien se queda y a todos les aparece «ha abandonado la partida».
+   */
+  private forfeitTournamentDomino(room: DominoRoomState, leavingUserId: string) {
+    if (room.phase !== 'PLAYING') return;
+    const leaving = room.players.find((p) => p.userId === leavingUserId);
+    if (!leaving) return;
+    this.clearWait('domino:' + room.code);
+    clearWaiting(room);
+    leaving.socketId = `pending:${leaving.userId}`;
+    room.abandonedByUserId = leavingUserId;
+    const stayed = room.players.find((p) => p.userId !== leavingUserId);
+    this.finishDominoGame(room, stayed?.userId ?? null, false);
+  }
+
   private waitForDominoPlayer(room: DominoRoomState, player: DominoRoomState['players'][number]) {
     if (startWaiting(room, player.userId, Date.now(), room.turnDeadline)) {
       this.clearDominoTurnTimer(room.code);
@@ -984,7 +1012,8 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     const room = this.dominoRoomStore.get(code);
     if (!room) return;
     const [late] = expiredWaits(room, Date.now());
-    if (late) this.removeFromDomino(room, waitingSocketId(late));
+    if (late && room.tournamentCode) this.forfeitTournamentDomino(room, late);
+    else if (late) this.removeFromDomino(room, waitingSocketId(late));
     else this.scheduleWait('domino:' + code, room, () => this.expireDominoWaits(code));
   }
 

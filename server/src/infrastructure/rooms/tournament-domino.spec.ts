@@ -6,7 +6,7 @@ import type { GameRepository } from '../../domain/ports/game.repository.port.js'
 import type { UserRepository } from '../../domain/ports/user.repository.port.js';
 import type { TournamentSettingsRepository } from '../../domain/ports/tournament-settings.repository.port.js';
 import type { AnalyticsTrackerService } from '../../application/services/analytics-tracker.service.js';
-import { RoomsGateway } from './rooms.gateway.js';
+import { RoomsGateway, toDominoClientView } from './rooms.gateway.js';
 import { InMemoryRoomStore } from './in-memory-room.store.js';
 import { InMemoryTournamentStore } from './in-memory-tournament.store.js';
 import { InMemoryDominoRoomStore } from './in-memory-domino-room.store.js';
@@ -183,27 +183,81 @@ describe('torneo con Dominó: desconexiones (fusión con la espera de #120)', ()
     expect(domino.get(room.code)!.players.find((p) => p.userId === 'p0')!.socketId).toBe('conn-1');
   });
 
-  it('un corte de red en plena partida no desarma la sala ni siquiera tras la espera', async () => {
-    const { tournament, domino, gateway } = await start(2);
+  async function playing() {
+    const h = await start(4);
     vi.advanceTimersByTime(3000);
-    const room = domino.get(tournament.matches[0].dominoRoomCode!)!;
+    const match = h.tournament.matches.find((m) => !m.vsBot)!;
+    const room = h.domino.get(match.dominoRoomCode!)!;
+    const [first, second] = match.playerUserIds;
     const a = client('conn-a');
-    a.data.userId = 'p0';
+    a.data.userId = first;
     const b = client('conn-b');
-    b.data.userId = 'p1';
-    gateway.handleDominoJoin(a, { code: room.code });
-    gateway.handleDominoJoin(b, { code: room.code });
+    b.data.userId = second;
+    h.gateway.handleDominoJoin(a, { code: room.code });
+    h.gateway.handleDominoJoin(b, { code: room.code });
+    return { ...h, match, room, a, b, first, second };
+  }
+
+  it('un corte de red se espera y, si la persona vuelve a tiempo, la partida sigue', async () => {
+    const { domino, gateway, room, a, first } = await playing();
+    gateway.handleDisconnect(a);
+    vi.advanceTimersByTime(30_000);
+    expect(domino.get(room.code)!.phase).toBe('PLAYING');
+    const again = client('conn-a2');
+    again.data.userId = first;
+    gateway.handleDominoJoin(again, { code: room.code });
+    expect(domino.get(room.code)!.players.find((p) => p.userId === first)!.socketId).toBe('conn-a2');
+    expect(Object.keys(domino.get(room.code)!.awaiting ?? {})).toHaveLength(0);
+    vi.advanceTimersByTime(95_000);
+    expect(domino.get(room.code)!.abandonedByUserId).toBeUndefined();
+  });
+
+  it('si no vuelve en la espera, abandona: la sala no se desarma y gana quien se queda', async () => {
+    const { tournament, domino, room, match, a, first, second, gateway } = await playing();
     gateway.handleDisconnect(a);
     vi.advanceTimersByTime(95_000);
     const after = domino.get(room.code)!;
     expect(after).toBeDefined();
-    expect(after.phase).toBe('PLAYING');
     expect(after.players).toHaveLength(2);
-    const again = client('conn-a2');
-    again.data.userId = 'p0';
-    gateway.handleDominoJoin(again, { code: room.code });
-    expect(domino.get(room.code)!.players.find((p) => p.userId === 'p0')!.socketId).toBe('conn-a2');
-    expect(Object.keys(domino.get(room.code)!.awaiting ?? {})).toHaveLength(0);
+    expect(after.phase).toBe('FINISHED');
+    expect(after.abandonedByUserId).toBe(first);
+    expect(after.winnerUserId).toBe(second);
+    expect(match.phase).toBe('FINISHED');
+    expect(match.winnerUserId).toBe(second);
+    expect(tournament.participants.find((p) => p.userId === second)!.points).toBe(1);
+    expect(tournament.participants.find((p) => p.userId === first)!.losses).toBe(1);
+    const view = toDominoClientView(after, 'conn-b');
+    expect(view.abandonedBy).toEqual({ userId: first, displayName: first });
+  });
+
+  it('salir a propósito en plena partida es abandonar al instante, sin desarmar la sala', async () => {
+    const { tournament, domino, room, a, first, second, gateway } = await playing();
+    gateway.handleDominoLeave(a);
+    const after = domino.get(room.code)!;
+    expect(after.phase).toBe('FINISHED');
+    expect(after.abandonedByUserId).toBe(first);
+    expect(after.winnerUserId).toBe(second);
+    expect(tournament.participants.find((p) => p.userId === second)!.points).toBe(1);
+    // Ya terminada, salir de la sala (p. ej. al volver al torneo) no abandona nada más.
+    gateway.handleDominoLeave(client('conn-b'));
+    expect(domino.get(room.code)!.abandonedByUserId).toBe(first);
+  });
+
+  it('contra el bot, un corte de red no cierra la partida: se la puede retomar', async () => {
+    const h = await start(3);
+    vi.advanceTimersByTime(3000);
+    const botMatch = h.tournament.matches.find((m) => m.vsBot)!;
+    const room = h.domino.get(botMatch.dominoRoomCode!)!;
+    const humanId = botMatch.playerUserIds.find((id) => !id.startsWith('bot:'))!;
+    const mine = client('conn-h');
+    mine.data.userId = humanId;
+    h.gateway.handleDominoJoin(mine, { code: room.code });
+    h.gateway.handleDisconnect(mine);
+    expect(h.domino.get(room.code)!.abandonedByUserId).toBeUndefined();
+    expect(h.domino.get(room.code)!.players).toHaveLength(2);
+    const again = client('conn-h2');
+    again.data.userId = humanId;
+    expect(() => h.gateway.handleDominoJoin(again, { code: room.code })).not.toThrow();
   });
 });
 

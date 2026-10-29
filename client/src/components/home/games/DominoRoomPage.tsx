@@ -886,9 +886,11 @@ function DominoRoomPageSession() {
                   : `Ganó ${opponent.displayName}`}
             </p>
             <p className="domino-premium-finish__detail text-[13px] animate-[fade-in-up_0.4s_ease-out_0.2s_backwards]">
-              {room.endedByBlock
-                ? 'La partida se bloqueó: nadie tenía jugada posible.'
-                : 'Se quedó sin fichas primero.'}
+              {room.abandonedBy
+                ? `${room.abandonedBy.userId === user?.id ? 'Abandonaste' : room.abandonedBy.displayName + ' ha abandonado'} la partida.`
+                : room.endedByBlock
+                  ? 'La partida se bloqueó: nadie tenía jugada posible.'
+                  : 'Se quedó sin fichas primero.'}
             </p>
 
             <DominoLearningSummary room={room} level={level} />
