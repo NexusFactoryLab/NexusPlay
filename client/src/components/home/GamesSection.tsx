@@ -138,6 +138,8 @@ export function GamesSection({
   const [activeAreaId, setActiveAreaId] = useState<string | null>(null)
 
   const [categories, setCategories] = useState<CategoryWithGameCount[]>([])
+  // Hasta que llega la primera respuesta, "sin áreas" no es una verdad sino un desconocido.
+  const [categoriesLoaded, setCategoriesLoaded] = useState(false)
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null)
   const [rootUnclassifiedGames, setRootUnclassifiedGames] = useState<GameSummary[]>([])
   const [loadingRootUnclassified, setLoadingRootUnclassified] = useState(false)
@@ -265,6 +267,7 @@ export function GamesSection({
     listCategories(token)
       .then((items) => setCategories(sortByGameCount(items)))
       .catch(() => {})
+      .finally(() => setCategoriesLoaded(true))
   }, [token])
 
   // Solo ADMIN necesita saber qué tipos están archivados (issue #156): el
@@ -621,7 +624,17 @@ export function GamesSection({
           </div>
         </div>
 
-        {categories.length === 0 ? (
+        {!categoriesLoaded ? (
+          <div
+            className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4"
+            role="status"
+            aria-label="Cargando áreas"
+          >
+            {Array.from({ length: 8 }, (_, i) => (
+              <div key={i} className="h-28 animate-pulse rounded-2xl border border-border bg-border/40" />
+            ))}
+          </div>
+        ) : categories.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-16 text-center">
             <span
               className="mb-3 flex h-12 w-12 items-center justify-center rounded-full text-white"

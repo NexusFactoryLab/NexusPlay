@@ -7,7 +7,18 @@ import type {
 import type { User } from '../../../domain/entities/user.entity.js';
 import type { Email } from '../../../domain/value-objects/email.vo.js';
 import { PrismaService } from './prisma.service.js';
-import { UserMapper } from './user.mapper.js';
+import { UserMapper, type UserModelWithRole } from './user.mapper.js';
+import { TtlCache } from '../../cache/ttl-cache.js';
+
+/**
+ * `findById` corre en cada petición autenticada (guard) y otra vez en los
+ * casos de uso que resuelven el rol. Se guarda el registro crudo —no la
+ * entidad, que es mutable— y se mapea a una entidad nueva en cada lectura.
+ * TTL corto + invalidación en `save`/`delete`: una desactivación o cambio de
+ * rol surte efecto de inmediato en este proceso.
+ */
+const USER_CACHE_TTL_MS = 15_000;
+const userByIdCache = new TtlCache<UserModelWithRole | null>(USER_CACHE_TTL_MS, 5000);
 
 @Injectable()
 export class PrismaUserRepository implements UserRepository {
@@ -23,13 +34,13 @@ export class PrismaUserRepository implements UserRepository {
       create: payload,
       update: payload,
     });
+    userByIdCache.invalidate(payload.id);
   }
 
   async findById(id: string): Promise<User | null> {
-    const record = await this.prisma.userModel.findUnique({
-      where: { id },
-      include: { role: true },
-    });
+    const record = await userByIdCache.getOrLoad(id, () =>
+      this.prisma.userModel.findUnique({ where: { id }, include: { role: true } }),
+    );
     return record ? UserMapper.toDomain(record) : null;
   }
 
@@ -92,5 +103,6 @@ export class PrismaUserRepository implements UserRepository {
 
   async delete(id: string): Promise<void> {
     await this.prisma.userModel.delete({ where: { id } });
+    userByIdCache.invalidate(id);
   }
 }
