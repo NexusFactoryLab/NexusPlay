@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
-import type { KeyboardEvent, ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { KeyboardEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, Check, Dices, Plus, RotateCcw, RotateCw, Undo2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight, Dices, Plus, Undo2 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
 import type { AvatarConfig } from '../../services/avatar.service'
@@ -27,6 +27,7 @@ import {
   type Option,
 } from './avatarConfig'
 import { AvatarFigure } from './AvatarFigure'
+import { canRedo, canUndo, createHistory, historyShortcut, pushHistory, redoHistory, undoHistory } from './avatarHistory'
 import { AvatarPortrait } from './AvatarPortrait'
 import './avatar.css'
 
@@ -55,8 +56,6 @@ const CATEGORIES: { id: Category; label: string; emoji: string; subs: { id: stri
   { id: 'accessories', label: 'Accesorios', emoji: '🕶️', subs: [{ id: 'glasses', label: 'Lentes' }, { id: 'beard', label: 'Barba' }] },
 ]
 
-const HISTORY_LIMIT = 50
-
 /** Los torsos con un segundo color (el de la chaqueta) y cómo se llama en cada uno. */
 const SECOND_COLOR: Record<string, string> = {
   jacket: 'Chaqueta',
@@ -74,20 +73,40 @@ const SECOND_COLOR: Record<string, string> = {
  * a la izquierda (Cabello, Gorros, Cara, Cuerpo, Torso, Pantalón, Calzado,
  * Accesorios), cada parte por su cuenta, las subcategorías como
  * botones arriba del panel y el avatar al lado. Los cambios son un borrador
- * hasta tocar Guardar; Deshacer recorre el historial.
+ * hasta tocar Guardar; las flechas junto al avatar, Deshacer y Ctrl+Z / Ctrl+Y
+ * recorren el historial (issue #138), así se puede volver a la prenda de antes
+ * o a un avatar de "Sorpresa".
  */
 export function AvatarEditorPage({ onSkip }: { onSkip?: () => void } = {}) {
   const { user, saveAvatar } = useAuth()
   const { showToast } = useToast()
   const navigate = useNavigate()
   const saved = useMemo(() => normalizeAvatar(user?.avatarConfig), [user?.avatarConfig])
-  const [draft, setDraft] = useState<AvatarConfig>(() => saved ?? DEFAULT_AVATAR)
-  const [history, setHistory] = useState<AvatarConfig[]>([])
+  const [history, setHistory] = useState(() => createHistory(saved ?? DEFAULT_AVATAR))
   const [category, setCategory] = useState<Category>('hair')
   const [subByCategory, setSubByCategory] = useState<Record<string, string>>({})
-  const [spin, setSpin] = useState<'left' | 'right' | null>(null)
   const [saving, setSaving] = useState(false)
+  const draft = history.present
   const dirty = !sameAvatar(draft, saved)
+  const undo = useCallback(() => setHistory(undoHistory), [])
+  const redo = useCallback(() => setHistory(redoHistory), [])
+
+  // Ctrl+Z / Ctrl+Y en toda la página, salvo mientras se escribe en un campo.
+  useEffect(() => {
+    function onKeyDown(event: globalThis.KeyboardEvent) {
+      const target = event.target as HTMLElement | null
+      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return
+      const action = historyShortcut(event)
+      if (!action) return
+      event.preventDefault()
+      if (action === 'undo') undo()
+      else redo()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [undo, redo])
+
+  const { ref: railRef, moreBelow, thumb, measure: measureRail, scrollDown, onTrackPointerDown, onThumbPointerDown } = useRailScroll(category)
 
   if (!user) return null
 
@@ -95,27 +114,17 @@ export function AvatarEditorPage({ onSkip }: { onSkip?: () => void } = {}) {
   const sub = subByCategory[current.id] ?? current.subs[0].id
 
   function update(next: AvatarConfig) {
-    if (sameAvatar(next, draft)) return
-    setHistory((past) => [...past.slice(-(HISTORY_LIMIT - 1)), draft])
-    setDraft(next)
+    setHistory((current) => pushHistory(current, next))
   }
 
   function set<K extends keyof AvatarConfig>(field: K, value: AvatarConfig[K]) {
     update({ ...draft, [field]: value })
   }
 
-  function undo() {
-    const previous = history[history.length - 1]
-    if (!previous) return
-    setHistory((past) => past.slice(0, -1))
-    setDraft(previous)
-  }
-
   async function save() {
     setSaving(true)
     try {
       await saveAvatar(draft)
-      setHistory([])
       showToast('¡Tu avatar quedó guardado!')
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'No se pudo guardar el avatar.', 'error')
@@ -271,12 +280,14 @@ export function AvatarEditorPage({ onSkip }: { onSkip?: () => void } = {}) {
           </button>
         )}
 
-        <nav className="avatar-rail avatar-area-rail" aria-label="Categorías del avatar">
+        <div className="avatar-rail-wrap avatar-area-rail">
+        <nav ref={railRef} className="avatar-rail" aria-label="Categorías del avatar" onScroll={measureRail}>
           {CATEGORIES.map((item) => (
             <button
               key={item.id}
               type="button"
               className="avatar-rail-btn"
+              data-category={item.id}
               aria-current={category === item.id ? 'true' : undefined}
               onClick={() => setCategory(item.id)}
             >
@@ -293,7 +304,22 @@ export function AvatarEditorPage({ onSkip }: { onSkip?: () => void } = {}) {
             </span>
             Sorpresa
           </button>
+          {moreBelow && (
+            <button type="button" className="avatar-rail-more" onClick={scrollDown} aria-label="Ver más categorías" title="Ver más categorías">
+              <ChevronDown className="h-5 w-5" strokeWidth={3} />
+            </button>
+          )}
         </nav>
+        {thumb && (
+          <div className="avatar-rail-track" aria-hidden="true" onPointerDown={onTrackPointerDown}>
+            <div
+              className="avatar-rail-thumb"
+              style={{ height: thumb.size, transform: `translateY(${thumb.offset}px)` }}
+              onPointerDown={onThumbPointerDown}
+            />
+          </div>
+        )}
+        </div>
 
         <section className="avatar-panel avatar-area-panel" aria-labelledby="avatar-panel-title">
           <h2 id="avatar-panel-title" className="avatar-panel-plaque">
@@ -331,17 +357,17 @@ export function AvatarEditorPage({ onSkip }: { onSkip?: () => void } = {}) {
         <div className="avatar-stage-col avatar-area-stage">
           <div className="avatar-stage">
             <span className="avatar-island" aria-hidden="true" />
-            <div className={`avatar-stage-figure ${spin ? `is-spinning-${spin}` : ''}`} onAnimationEnd={() => setSpin(null)}>
+            <div className="avatar-stage-figure">
               <AvatarFigure config={draft} label="Tu avatar" />
             </div>
           </div>
           <div className="avatar-turn">
-            <button type="button" className="avatar-turn-arrow" aria-label="Girar a la izquierda" title="Girar" onClick={() => setSpin((s) => s ?? 'left')}>
-              <RotateCcw className="h-5 w-5" strokeWidth={2.75} />
+            <button type="button" className="avatar-turn-arrow" aria-label="Atrás: volver al cambio anterior" title="Atrás (Ctrl+Z)" onClick={undo} disabled={!canUndo(history)}>
+              <ChevronLeft className="h-6 w-6" strokeWidth={3} />
             </button>
             <span className="avatar-pill">Mi Avatar</span>
-            <button type="button" className="avatar-turn-arrow" aria-label="Girar a la derecha" title="Girar" onClick={() => setSpin((s) => s ?? 'right')}>
-              <RotateCw className="h-5 w-5" strokeWidth={2.75} />
+            <button type="button" className="avatar-turn-arrow" aria-label="Adelante: rehacer el cambio" title="Adelante (Ctrl+Y)" onClick={redo} disabled={!canRedo(history)}>
+              <ChevronRight className="h-6 w-6" strokeWidth={3} />
             </button>
           </div>
         </div>
@@ -354,7 +380,7 @@ export function AvatarEditorPage({ onSkip }: { onSkip?: () => void } = {}) {
         </div>
 
         <div className="avatar-buttons avatar-area-buttons">
-          <button type="button" className="avatar-btn avatar-btn-undo" onClick={undo} disabled={history.length === 0}>
+          <button type="button" className="avatar-btn avatar-btn-undo" onClick={undo} disabled={!canUndo(history)}>
             <Undo2 className="h-5 w-5" strokeWidth={2.75} />
             Deshacer
           </button>
@@ -366,6 +392,107 @@ export function AvatarEditorPage({ onSkip }: { onSkip?: () => void } = {}) {
       </section>
     </div>
   )
+}
+
+/** Margen de la barra de scroll propia dentro de la barra de categorías (px, arriba y abajo). */
+const TRACK_INSET = 14
+const MIN_THUMB = 36
+
+/**
+ * Barra de categorías con scroll (issue #138). El scroll del sistema no siempre
+ * se ve (Mac y pantallas táctiles lo esconden), así que se dibuja uno propio,
+ * siempre visible, que se puede arrastrar o tocar; además una flecha avisa
+ * cuando quedan categorías abajo y la barra se desplaza sola a la elegida.
+ */
+function useRailScroll(category: string) {
+  const ref = useRef<HTMLElement>(null)
+  const [moreBelow, setMoreBelow] = useState(false)
+  const [thumb, setThumb] = useState<{ size: number; offset: number } | null>(null)
+
+  const measure = useCallback(() => {
+    const element = ref.current
+    if (!element) return
+    const { scrollTop, scrollHeight, clientHeight } = element
+    // En el celular la barra es una fila con scroll horizontal: ahí no aplica.
+    const overflow = scrollHeight - clientHeight
+    const vertical = overflow > 1 && getComputedStyle(element).flexDirection === 'column'
+    setMoreBelow(vertical && scrollTop < overflow - 4)
+    if (!vertical) {
+      setThumb(null)
+      return
+    }
+    const track = clientHeight - TRACK_INSET * 2
+    const size = Math.max(MIN_THUMB, Math.round((track * clientHeight) / scrollHeight))
+    const offset = Math.round(((track - size) * Math.min(Math.max(scrollTop, 0), overflow)) / overflow)
+    setThumb((previous) => (previous && previous.size === size && previous.offset === offset ? previous : { size, offset }))
+  }, [])
+
+  /** Cuántos píxeles de scroll equivale mover la barrita un píxel. */
+  const scrollPerPixel = useCallback(() => {
+    const element = ref.current
+    if (!element) return 0
+    const track = element.clientHeight - TRACK_INSET * 2
+    const size = Math.max(MIN_THUMB, (track * element.clientHeight) / element.scrollHeight)
+    return track > size ? (element.scrollHeight - element.clientHeight) / (track - size) : 0
+  }, [])
+
+  const onThumbPointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const element = ref.current
+      if (!element || event.button !== 0) return
+      event.preventDefault()
+      event.stopPropagation()
+      const handle = event.currentTarget
+      const startY = event.clientY
+      const startTop = element.scrollTop
+      const ratio = scrollPerPixel()
+      handle.setPointerCapture(event.pointerId)
+      handle.classList.add('is-dragging')
+      const move = (moveEvent: PointerEvent) => {
+        element.scrollTop = startTop + (moveEvent.clientY - startY) * ratio
+      }
+      const stop = () => {
+        handle.classList.remove('is-dragging')
+        handle.removeEventListener('pointermove', move)
+        handle.removeEventListener('pointerup', stop)
+        handle.removeEventListener('pointercancel', stop)
+      }
+      handle.addEventListener('pointermove', move)
+      handle.addEventListener('pointerup', stop)
+      handle.addEventListener('pointercancel', stop)
+    },
+    [scrollPerPixel],
+  )
+
+  /** Tocar el riel (fuera de la barrita) avanza una página hacia ese lado. */
+  const onTrackPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const element = ref.current
+    const handle = event.currentTarget.firstElementChild
+    if (!element || !handle || event.button !== 0) return
+    const above = event.clientY < handle.getBoundingClientRect().top
+    element.scrollBy({ top: (above ? -1 : 1) * element.clientHeight * 0.8, behavior: 'smooth' })
+  }, [])
+
+  useEffect(() => {
+    const element = ref.current
+    if (!element) return
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [measure])
+
+  useEffect(() => {
+    const button = ref.current?.querySelector<HTMLElement>(`[data-category="${category}"]`)
+    button?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [category])
+
+  const scrollDown = useCallback(() => {
+    const element = ref.current
+    element?.scrollBy({ top: element.clientHeight * 0.7, behavior: 'smooth' })
+  }, [])
+
+  return { ref, moreBelow, thumb, measure, scrollDown, onTrackPointerDown, onThumbPointerDown }
 }
 
 function NoneTile({ label, pressed, onClick }: { label: string; pressed: boolean; onClick: () => void }) {
