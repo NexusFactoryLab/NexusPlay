@@ -1,3 +1,5 @@
+import { clearAllSwrCaches } from './swr-cache'
+
 const API_URL =
   (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:3000'
 
@@ -131,6 +133,10 @@ export async function request<T>(
     }
     throw new ApiError(extractMessage(payload, response.status), response.status)
   }
+
+  // Cualquier escritura exitosa puede cambiar lo que las cachés de lectura
+  // guardan (áreas, conteos, juegos, tipos): se descartan todas.
+  if (method !== 'GET') clearAllSwrCaches()
 
   return payload as T
 }

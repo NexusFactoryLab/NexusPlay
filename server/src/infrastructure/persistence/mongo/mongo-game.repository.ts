@@ -187,6 +187,10 @@ export class MongoGameRepository implements GameRepository, OnModuleInit {
     const [docs, total] = await Promise.all([
       this.collection
         .find(query)
+        // Los listados solo muestran el resumen: `content` (todas las
+        // preguntas/tarjetas) y `config` son lo más pesado del documento y
+        // no se usan ahí. Se rellenan vacíos para poder armar la entidad.
+        .project<GameDocument>({ content: 0, config: 0 })
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(filter.pageSize)
@@ -195,7 +199,7 @@ export class MongoGameRepository implements GameRepository, OnModuleInit {
     ]);
 
     return {
-      items: docs.map(GameMapper.toDomain),
+      items: docs.map((doc) => GameMapper.toDomain({ ...doc, content: [], config: {} })),
       total,
       page: filter.page,
       pageSize: filter.pageSize,

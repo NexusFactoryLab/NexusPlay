@@ -7,14 +7,16 @@ import { useToast } from '../../hooks/useToast'
 import { DEFAULT_CATEGORY_COLOR, colorForCategory, iconForCategory } from './gamesCatalogVisuals'
 import {
   listGames,
+  loadGames,
   getGameBySlug,
   deleteGame,
-  listAllGameTypeSettings,
+  loadAllGameTypeSettings,
   type GameSummary,
   type GameDetail,
 } from '../../services/game.service'
 import {
   listSubjects as listCategories,
+  loadSubjects,
   createSubject,
   deleteSubject as deleteCategory,
   publishSubject,
@@ -213,7 +215,8 @@ export function GamesSection({
     if (!token || !shouldLoadGames || browsingHidden) return
     setLoading(true)
     setError(null)
-    listGames(token, {
+    // Si ya se conoce este listado se pinta al instante y se revalida detrás.
+    return loadGames(token, {
       search: searchQuery || undefined,
       categoryId: mode === 'categories' ? activeCategoryId ?? undefined : undefined,
       onlyMine: mode === 'my-games' || undefined,
@@ -222,12 +225,13 @@ export function GamesSection({
       // El Inicio solo muestra los destacados que fija un ADMIN; Comunidad lo muestra todo.
       featured: mode === 'all' || undefined,
       pageSize: 40,
+    }, (result) => {
+      setGames(result.items)
+      setLoading(false)
+    }, (err: unknown) => {
+      setError(err instanceof ApiError ? err.message : 'No se pudieron cargar los juegos.')
+      setLoading(false)
     })
-      .then((result) => setGames(result.items))
-      .catch((err: unknown) => {
-        setError(err instanceof ApiError ? err.message : 'No se pudieron cargar los juegos.')
-      })
-      .finally(() => setLoading(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     token,
@@ -239,9 +243,7 @@ export function GamesSection({
     browsingHidden,
   ])
 
-  useEffect(() => {
-    reload()
-  }, [reload])
+  useEffect(() => reload(), [reload])
 
   // Al entrar a un área raíz se muestran sus sub-áreas, no un catálogo
   // de juegos — pero la raíz puede tener juegos asignados directo a ella
@@ -264,40 +266,36 @@ export function GamesSection({
   // el área sin importar la sección activa (Home, Comunidad, Mis juegos).
   useEffect(() => {
     if (!token) return
-    listCategories(token)
-      .then((items) => setCategories(sortByGameCount(items)))
-      .catch(() => {})
-      .finally(() => setCategoriesLoaded(true))
+    // Al volver a esta pantalla las áreas ya conocidas salen al instante
+    // (sin esqueleto ni "sin áreas") y se refrescan en segundo plano.
+    return loadSubjects(
+      token,
+      (items) => {
+        setCategories(sortByGameCount(items))
+        setCategoriesLoaded(true)
+      },
+      () => setCategoriesLoaded(true),
+    )
   }, [token])
 
-  // Solo ADMIN necesita saber qué tipos están archivados (issue #156): el
-  // backend ya excluye esos juegos para no-admin, así que para el resto de
-  // roles esta llamada no aportaría nada.
-  useEffect(() => {
-    if (!token || !isAdmin) {
-      setArchivedGameTypes(new Set())
-      return
-    }
-    listAllGameTypeSettings(token)
-      .then((settings) => {
-        setArchivedGameTypes(new Set(settings.filter((s) => s.isArchived).map((s) => s.gameType)))
-      })
-      .catch(() => {})
-  }, [token, isAdmin])
-
-  // Nombres visibles por tipo, para las casillas del filtro (issue #216) —
-  // a diferencia del efecto de arriba, este corre para cualquier rol.
+  // Una sola consulta de tipos de juego para dos usos:
+  //  - nombres visibles por tipo, para las casillas del filtro (issue #216),
+  //    para cualquier rol;
+  //  - tipos archivados (issue #156), que solo necesita un ADMIN: el backend
+  //    ya excluye esos juegos para el resto de roles.
   useEffect(() => {
     if (!token) return
-    listAllGameTypeSettings(token)
-      .then((settings) => {
-        setGameTypeDisplayNames(new Map(settings.map((s) => [
-          s.gameType,
-          resolveGameTypeDisplayName(s.gameType, s.displayName),
-        ])))
-      })
-      .catch(() => {})
-  }, [token])
+    if (!isAdmin) setArchivedGameTypes(new Set())
+    return loadAllGameTypeSettings(token, (settings) => {
+      setGameTypeDisplayNames(new Map(settings.map((s) => [
+        s.gameType,
+        resolveGameTypeDisplayName(s.gameType, s.displayName),
+      ])))
+      if (isAdmin) {
+        setArchivedGameTypes(new Set(settings.filter((s) => s.isArchived).map((s) => s.gameType)))
+      }
+    })
+  }, [token, isAdmin])
 
   // Se reinicia el filtro al cambiar de sección/modo, para no dejar
   // aplicado sin que se vea (el panel no se muestra en 'categories').
