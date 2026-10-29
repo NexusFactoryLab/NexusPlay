@@ -433,7 +433,8 @@
 }
 
 .avatar-tile-portrait img,
-.avatar-tile-portrait > span {
+.avatar-tile-portrait > span,
+.avatar-tile-zoom > span {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -455,11 +456,6 @@
   font-size: 12.5px;
   font-weight: 800;
   color: var(--av-muted);
-}
-
-.avatar-tile img.avatar-tile-figure {
-  width: 100%;
-  height: 100%;
 }
 
 .avatar-swatch {
@@ -924,7 +920,8 @@
 }
 
 /* El acercamiento de la foto redonda manda su propio ancho; el alto sale del cuadrado. */
-.avatar-tile-portrait > span img {
+.avatar-tile-portrait > span img,
+.avatar-tile-zoom > span img {
   height: auto;
   object-fit: fill;
 }
