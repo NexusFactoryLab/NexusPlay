@@ -23,7 +23,18 @@ export function markAvatarOnboardingSkipped(userId: string) {
   try { localStorage.setItem(key, 'skipped') } catch { /* El paso funciona sin almacenamiento. */ }
 }
 
-/** Solo quien aún no tiene avatar y no saltó el paso; el ADMIN nunca pasa por aquí. */
+/**
+ * Las cuentas creadas antes de este instante ya existían cuando se estrenó el
+ * paso (2026-10-28 18:00 hora Colombia): no lo ven, solo las cuentas nuevas.
+ */
+const ONBOARDING_RELEASE_AT = Date.parse('2026-10-28T23:00:00Z')
+
+function isExistingAccount(user: AuthUser) {
+  const createdAt = Date.parse(user.createdAt)
+  return Number.isFinite(createdAt) && createdAt < ONBOARDING_RELEASE_AT
+}
+
+/** Solo cuentas nuevas sin avatar que no saltaron el paso; el ADMIN nunca pasa por aquí. */
 export function needsAvatarOnboarding(user: AuthUser, skipped: boolean) {
-  return user.role !== 'ADMIN' && !user.avatarConfig && !skipped
+  return user.role !== 'ADMIN' && !user.avatarConfig && !skipped && !isExistingAccount(user)
 }
