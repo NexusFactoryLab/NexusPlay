@@ -8,6 +8,7 @@ import { MazeCollectorContentValidator } from '../content-validators/maze-collec
 import { SnakesLaddersContentValidator } from '../content-validators/snakes-ladders.content-validator.js';
 import { DualQuestPixiContentValidator } from '../content-validators/dual-quest-pixi.content-validator.js';
 import { TrueFalseMazeContentValidator } from '../content-validators/true-false-maze.content-validator.js';
+import { BiodiverCiudadContentValidator } from '../content-validators/biodiverciudad.content-validator.js';
 import { normalizeDraft } from './draft-normalizers.js';
 import { resolveGamePromptSpec } from './game-prompt-catalog.js';
 
@@ -19,6 +20,7 @@ const registry = new ContentValidatorRegistry(
   new SnakesLaddersContentValidator(),
   new DualQuestPixiContentValidator(),
   new TrueFalseMazeContentValidator(),
+  new BiodiverCiudadContentValidator(),
 );
 
 const CASES: Array<{ name: string; gameType: GameTypeName; mode?: string }> = [

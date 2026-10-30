@@ -10,6 +10,7 @@ import { MazeCollectorContentValidator } from '../content-validators/maze-collec
 import { SnakesLaddersContentValidator } from '../content-validators/snakes-ladders.content-validator.js';
 import { DualQuestPixiContentValidator } from '../content-validators/dual-quest-pixi.content-validator.js';
 import { TrueFalseMazeContentValidator } from '../content-validators/true-false-maze.content-validator.js';
+import { BiodiverCiudadContentValidator } from '../content-validators/biodiverciudad.content-validator.js';
 import { ContentImageResolver } from '../services/content-image-resolver.service.js';
 import { FileTextExtractor } from '../../infrastructure/ai/file-text-extractor.js';
 import { GroqContentAssistant } from '../../infrastructure/ai/groq-content-assistant.adapter.js';
@@ -41,6 +42,7 @@ function buildRegistry(): ContentValidatorRegistry {
     new SnakesLaddersContentValidator(),
     new DualQuestPixiContentValidator(),
     new TrueFalseMazeContentValidator(),
+    new BiodiverCiudadContentValidator(),
   );
 }
 

@@ -14,6 +14,7 @@ import { MazeCollectorContentValidator } from '../content-validators/maze-collec
 import { SnakesLaddersContentValidator } from '../content-validators/snakes-ladders.content-validator.js';
 import { DualQuestPixiContentValidator } from '../content-validators/dual-quest-pixi.content-validator.js';
 import { TrueFalseMazeContentValidator } from '../content-validators/true-false-maze.content-validator.js';
+import { BiodiverCiudadContentValidator } from '../content-validators/biodiverciudad.content-validator.js';
 import { DeterministicGameAdapter } from '../adaptation/deterministic-game-adapter.js';
 import { FileTextExtractor } from '../../infrastructure/ai/file-text-extractor.js';
 import { ContentImageResolver } from '../services/content-image-resolver.service.js';
@@ -70,6 +71,7 @@ function build(game: Game, aiDraft: { config: unknown; content: unknown[] } = { 
     new SnakesLaddersContentValidator(),
     new DualQuestPixiContentValidator(),
     new TrueFalseMazeContentValidator(),
+    new BiodiverCiudadContentValidator(),
   );
   const generator = new GenerateGameDraftUseCase(
     assistant,

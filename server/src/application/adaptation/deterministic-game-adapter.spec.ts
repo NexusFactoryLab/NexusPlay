@@ -12,6 +12,7 @@ import { MazeCollectorContentValidator } from '../content-validators/maze-collec
 import { MemoryMatchContentValidator } from '../content-validators/memory-match.content-validator.js';
 import { SnakesLaddersContentValidator } from '../content-validators/snakes-ladders.content-validator.js';
 import { TrueFalseMazeContentValidator } from '../content-validators/true-false-maze.content-validator.js';
+import { BiodiverCiudadContentValidator } from '../content-validators/biodiverciudad.content-validator.js';
 import { DeterministicGameAdapter } from './deterministic-game-adapter.js';
 import { extractConcepts } from './game-concepts.js';
 
@@ -23,6 +24,7 @@ const registry = new ContentValidatorRegistry(
   new SnakesLaddersContentValidator(),
   new DualQuestPixiContentValidator(),
   new TrueFalseMazeContentValidator(),
+  new BiodiverCiudadContentValidator(),
 );
 const adapter = new DeterministicGameAdapter(registry);
 

@@ -14,7 +14,8 @@ export type GameTypeName =
   | 'MAZE_COLLECTOR'
   | 'SNAKES_LADDERS'
   | 'DUAL_QUEST_PIXI'
-  | 'TRUE_FALSE_MAZE';
+  | 'TRUE_FALSE_MAZE'
+  | 'BIODIVERCIUDAD';
 
 /**
  * Exportado (no solo interno de este archivo) para que los DTOs HTTP que
@@ -32,6 +33,7 @@ export const VALID_GAME_TYPES: readonly GameTypeName[] = [
   'SNAKES_LADDERS',
   'DUAL_QUEST_PIXI',
   'TRUE_FALSE_MAZE',
+  'BIODIVERCIUDAD',
 ];
 
 /**
@@ -48,6 +50,7 @@ export const GAME_TYPE_PUBLIC_NAMES: Readonly<Record<GameTypeName, string>> = {
   SNAKES_LADDERS: 'Escaleras y serpientes',
   DUAL_QUEST_PIXI: 'Dúo Lógico',
   TRUE_FALSE_MAZE: 'Laberinto Verdadero o Falso',
+  BIODIVERCIUDAD: 'Territorios en Juego',
 };
 
 export function publicGameTypeName(gameType: GameTypeName): string {
@@ -107,6 +110,10 @@ export class GameType {
 
   static trueFalseMaze(): GameType {
     return GameType.create('TRUE_FALSE_MAZE');
+  }
+
+  static biodiverCiudad(): GameType {
+    return GameType.create('BIODIVERCIUDAD');
   }
 
   getName(): GameTypeName {

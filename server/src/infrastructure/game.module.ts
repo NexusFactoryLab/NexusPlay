@@ -20,6 +20,7 @@ import { MazeCollectorContentValidator } from '../application/content-validators
 import { SnakesLaddersContentValidator } from '../application/content-validators/snakes-ladders.content-validator.js';
 import { DualQuestPixiContentValidator } from '../application/content-validators/dual-quest-pixi.content-validator.js';
 import { TrueFalseMazeContentValidator } from '../application/content-validators/true-false-maze.content-validator.js';
+import { BiodiverCiudadContentValidator } from '../application/content-validators/biodiverciudad.content-validator.js';
 import { ContentValidatorRegistry } from '../application/content-validators/content-validator.registry.js';
 import { RequesterAdminResolver } from '../application/services/requester-admin-resolver.service.js';
 import { GameAuthorizationService } from '../application/services/game-authorization.service.js';
@@ -119,6 +120,7 @@ import { AiProviderAttemptsController } from './http/controllers/ai-provider-att
     SnakesLaddersContentValidator,
     DualQuestPixiContentValidator,
     TrueFalseMazeContentValidator,
+    BiodiverCiudadContentValidator,
     ContentValidatorRegistry,
     RequesterAdminResolver,
     GameAuthorizationService,
