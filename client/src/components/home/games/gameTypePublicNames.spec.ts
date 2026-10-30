@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GAME_TYPE_PUBLIC_NAMES, resolveGameTypeDisplayName } from './gameTypePublicNames'
 
 describe('nombres públicos de tipos de juego', () => {
-  it('define los ocho nombres editoriales aprobados', () => {
+  it('define los nombres editoriales aprobados', () => {
     expect(GAME_TYPE_PUBLIC_NAMES).toEqual({
       MEMORY_MATCH: 'MatchMente',
       GUESS_WHO: 'Identidad Oculta',
@@ -11,6 +11,7 @@ describe('nombres públicos de tipos de juego', () => {
       SNAKES_LADDERS: 'Escaleras y serpientes',
       DUAL_QUEST_PIXI: 'Dúo Lógico',
       TRUE_FALSE_MAZE: 'Laberinto Verdadero o Falso',
+      BIODIVERCIUDAD: 'Territorios en Juego',
     })
   })
 

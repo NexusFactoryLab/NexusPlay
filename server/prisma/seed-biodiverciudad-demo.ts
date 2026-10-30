@@ -68,7 +68,8 @@ async function main(): Promise<void> {
       theme: { primaryColor: '#16a34a', coverImageUrl: null },
       categoryId,
       creatorUserId: 'system',
-      status: 'PUBLISHED',
+      // DRAFT hasta que exista el reproductor: un juego publicado que no abre es peor que uno oculto.
+      status: 'DRAFT',
       config: CONFIG,
       content: CONTENT,
       updatedAt: now,
@@ -80,7 +81,7 @@ async function main(): Promise<void> {
       console.log(`"${document.title}" actualizado (slug: ${SLUG}).`);
     } else {
       await games.insertOne({ _id: GAME_ID, ...document, createdAt: now } as never);
-      console.log(`"${document.title}" sembrado como juego PUBLISHED (slug: ${SLUG}).`);
+      console.log(`"${document.title}" sembrado como borrador (DRAFT) (slug: ${SLUG}).`);
     }
   } finally {
     await client.close();

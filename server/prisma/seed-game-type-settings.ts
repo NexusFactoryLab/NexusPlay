@@ -65,7 +65,8 @@ const GAME_TYPE_SEEDS: GameTypeSeed[] = [
     gameType: 'BIODIVERCIUDAD',
     displayName: 'Territorios en Juego',
     description: 'Tu consorcio recorre las regiones de Colombia en crisis, responde trivias citadas del libro guía y decide cómo salvar el territorio.',
-    archived: false,
+    // Nace archivado: todavía no tiene reproductor (mapa, salas de equipos). Un ADMIN lo activa desde el catálogo cuando esté listo.
+    archived: true,
   },
 ];
 

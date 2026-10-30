@@ -26,6 +26,7 @@ import { MazeCollectorGameFormPage } from './components/home/games/create/MazeCo
 import { SnakesLaddersGameFormPage } from './components/home/games/create/SnakesLaddersGameFormPage'
 import { DuoLogicoGameFormPage } from './components/home/games/create/DuoLogicoGameFormPage'
 import { TrueFalseMazeGameFormPage } from './components/home/games/create/TrueFalseMazeGameFormPage'
+import { BiodiverCiudadGameFormPage } from './components/home/games/create/BiodiverCiudadGameFormPage'
 import { DominoRoomPage } from './components/home/games/DominoRoomPage'
 import { SnakesLaddersRoomPage } from './components/home/games/SnakesLaddersRoomPage'
 import { MemoryMatchPlayPage } from './components/home/games/MemoryMatchPlayPage'
@@ -130,6 +131,7 @@ function App() {
         <Route path="escaleras-serpientes" element={<SnakesLaddersGameFormPage />} />
         <Route path="duo-logico" element={<DuoLogicoGameFormPage />} />
         <Route path="laberinto-vf" element={<TrueFalseMazeGameFormPage />} />
+        <Route path="territorios-en-juego" element={<BiodiverCiudadGameFormPage />} />
       </Route>
       <Route path="/domino/sala/:code?" element={<DominoRoomPage />} />
       <Route path="/escaleras-serpientes/sala/:code?" element={<SnakesLaddersRoomPage />} />

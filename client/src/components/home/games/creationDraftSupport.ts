@@ -196,6 +196,7 @@ const ROUTE_BY_GAME_TYPE: Record<string, string> = {
   SNAKES_LADDERS: '/juegos/crear/escaleras-serpientes',
   DUAL_QUEST_PIXI: '/juegos/crear/duo-logico',
   TRUE_FALSE_MAZE: '/juegos/crear/laberinto-vf',
+  BIODIVERCIUDAD: '/juegos/crear/territorios-en-juego',
 }
 
 export const GAME_TYPE_LABEL: Record<string, string> = {
@@ -206,6 +207,7 @@ export const GAME_TYPE_LABEL: Record<string, string> = {
   SNAKES_LADDERS: 'Escaleras y serpientes',
   DUAL_QUEST_PIXI: 'Dúo Lógico',
   TRUE_FALSE_MAZE: 'Laberinto V/F',
+  BIODIVERCIUDAD: 'Territorios en Juego',
 }
 
 /** Etiqueta del tipo de juego (con el modo para Cartas). */

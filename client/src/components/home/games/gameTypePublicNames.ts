@@ -12,6 +12,7 @@ export const GAME_TYPE_PUBLIC_NAMES: Readonly<Record<string, string>> = {
   SNAKES_LADDERS: 'Escaleras y serpientes',
   DUAL_QUEST_PIXI: 'Dúo Lógico',
   TRUE_FALSE_MAZE: 'Laberinto Verdadero o Falso',
+  BIODIVERCIUDAD: 'Territorios en Juego',
 }
 
 export function publicGameTypeName(gameType: string): string | undefined {

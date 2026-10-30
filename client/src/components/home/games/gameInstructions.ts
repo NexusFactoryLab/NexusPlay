@@ -2,7 +2,7 @@ import { MIN_DISCARDS_TO_ACCUSE } from './guessWhoTypes'
 import { ArrowUp, ArrowUpDown, Brain, Check, CircleHelp, Copy, Dice5, DoorOpen, Ear, Eye, Flag, Footprints, Hand, Handshake, Layers, Leaf, Link2, MessageCircleQuestion, MoveRight, Search, Shield, SquareMousePointer, Sun, Trophy, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
-export type InstructionKind = 'PAIRS' | 'OPPOSITES' | 'GUESS_WHO' | 'GUESS_WHO_GROUP' | 'DOMINO' | 'MAZE_COLLECTOR' | 'SNAKES_LADDERS' | 'DUAL_QUEST_PIXI' | 'TRUE_FALSE_MAZE'
+export type InstructionKind = 'PAIRS' | 'OPPOSITES' | 'GUESS_WHO' | 'GUESS_WHO_GROUP' | 'DOMINO' | 'MAZE_COLLECTOR' | 'SNAKES_LADDERS' | 'DUAL_QUEST_PIXI' | 'TRUE_FALSE_MAZE' | 'BIODIVERCIUDAD'
 type Instruction = { text: string; exampleTitle: string; labels: [string, string, string, string]; icons: [LucideIcon, LucideIcon, LucideIcon, LucideIcon]; caption: string }
 
 /** Solo contenido: la presentación y la forma de continuar son comunes. */
@@ -55,6 +55,12 @@ export const gameInstructions: Record<InstructionKind, Instruction> = {
     icons: [Eye, Footprints, Shield, Check],
     caption: 'Llega a la sala correcta antes de quedarte sin baterías.',
   },
+  BIODIVERCIUDAD: {
+    text: 'Tu consorcio recorre las estaciones regionales. En cada una responde la trivia apoyándote en el libro guía, resuelve el dilema territorial y registra tu entregable. Cada estación tiene su propio tiempo y suma Puntos de Bio-Resiliencia.',
+    exampleTitle: 'Ejemplo de una estación', labels: ['Lee', 'Responde', 'Decide', 'Suma'],
+    icons: [Eye, MessageCircleQuestion, Handshake, Trophy],
+    caption: 'Sin evidencia del libro no hay puntos: cada respuesta se justifica con una cita.',
+  },
   DUAL_QUEST_PIXI: {
     text: 'Juegan en pareja, cada uno desde su dispositivo: Lumen nada en la lava y Gota en el agua. Muévete con las flechas o A/D, salta con ↑, W o espacio (en celular, con los botones). Ayúdense con botones, palancas, cajas, básculas, válvulas y llaves, y párense juntos en los pedestales de cada Puerta del Saber: solo pasan si los dos responden bien.',
     exampleTitle: 'Ejemplo de cooperación', labels: ['Muévete', 'Salta', 'Coopera', 'Respondan'],
@@ -101,6 +107,10 @@ export const gameInstructionSummaries: Record<CreationInstructionKind, { purpose
   TRUE_FALSE_MAZE: {
     purpose: 'Decide si cada afirmación es verdadera o falsa recorriendo un laberinto.',
     howTo: 'Lleva al robot a la sala VERDADERO o FALSO y esquiva a las medusas galácticas.',
+  },
+  BIODIVERCIUDAD: {
+    purpose: 'Salva un territorio en crisis recorriendo estaciones regionales con trivias citadas de un libro guía.',
+    howTo: 'Responde la trivia de cada estación, resuelve el dilema territorial y suma Puntos de Bio-Resiliencia.',
   },
   SNAKES_LADDERS: {
     purpose: 'Avanza por el tablero respondiendo retos.',

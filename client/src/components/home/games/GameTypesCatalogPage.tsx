@@ -4,6 +4,7 @@ import {
   Bot,
   Ghost,
   Layers,
+  Leaf,
   Puzzle,
   UserRoundSearch,
   Dices,
@@ -35,6 +36,7 @@ const ICON_BY_GAME_TYPE: Record<string, LucideIcon> = {
   SNAKES_LADDERS: Dices,
   DUAL_QUEST_PIXI: Flame,
   TRUE_FALSE_MAZE: Bot,
+  BIODIVERCIUDAD: Leaf,
 }
 
 /**

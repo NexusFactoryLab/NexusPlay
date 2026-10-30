@@ -1,4 +1,4 @@
-import { Bot, Dices, Flame, Ghost, Layers, Puzzle, UserRoundSearch } from 'lucide-react'
+import { Bot, Dices, Flame, Ghost, Layers, Leaf, Puzzle, UserRoundSearch } from 'lucide-react'
 import type { CreationDraftSummary } from '../../../services/game-creation-draft.service'
 import { modeColorForGameType } from './gameModeVisuals'
 import { draftTypeLabel, expiryNotice, relativeTimeEs } from './creationDraftSupport'
@@ -11,6 +11,7 @@ const ICON_BY_GAME_TYPE: Record<string, typeof Layers> = {
   SNAKES_LADDERS: Dices,
   DUAL_QUEST_PIXI: Flame,
   TRUE_FALSE_MAZE: Bot,
+  BIODIVERCIUDAD: Leaf,
 }
 
 /** Parte izquierda de la fila de un borrador: ícono del tipo, nombre, tipo, tiempo relativo y vencimiento. */

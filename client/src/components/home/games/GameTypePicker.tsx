@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import { ArrowLeft, Bot, FileClock, Ghost, Layers, Puzzle, UserRoundSearch, Dices, Flame, User, Users } from 'lucide-react'
+import { ArrowLeft, Bot, FileClock, Ghost, Layers, Leaf, Puzzle, UserRoundSearch, Dices, Flame, User, Users } from 'lucide-react'
 import { LIVE_ROOM_GAME_TYPES } from './resolveRoomCode'
 import { modeColorForGameType } from './gameModeVisuals'
 import { resolveGameTypeDisplayName } from './gameTypePublicNames'
@@ -13,6 +13,7 @@ export type GameTypeChoice =
   | 'SNAKES_LADDERS'
   | 'DUAL_QUEST_PIXI'
   | 'TRUE_FALSE_MAZE'
+  | 'BIODIVERCIUDAD'
 
 type GameTypePickerProps = {
   onClose: () => void
@@ -79,6 +80,12 @@ const TYPE_OPTIONS: Array<{
     description:
       'Un robot recorre una nave espacial y responde cada afirmación entrando a la sala VERDADERO o FALSO, mientras esquiva medusas galácticas. Tú escribes las afirmaciones.',
     icon: Bot,
+  },
+  {
+    choice: 'BIODIVERCIUDAD',
+    description:
+      'Equipos recorren estaciones regionales: responden trivias citadas de un libro guía, resuelven dilemas territoriales y suman Puntos de Bio-Resiliencia. Tú defines las estaciones.',
+    icon: Leaf,
   },
 ]
 

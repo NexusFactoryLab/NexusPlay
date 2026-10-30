@@ -11,6 +11,7 @@ export type CreatedGameKind =
   | 'SNAKES_LADDERS'
   | 'DUAL_QUEST_PIXI'
   | 'TRUE_FALSE_MAZE'
+  | 'BIODIVERCIUDAD'
 
 /**
  * Mapeo explícito de cada formulario de creación a (issue #245):
@@ -35,6 +36,7 @@ const CREATED_GAME_KINDS: Record<CreatedGameKind, { label: string; gameType: str
     gameType: 'TRUE_FALSE_MAZE',
     instructionKind: 'TRUE_FALSE_MAZE',
   },
+  BIODIVERCIUDAD: { label: 'Territorios en Juego', gameType: 'BIODIVERCIUDAD', instructionKind: 'BIODIVERCIUDAD' },
 }
 
 export type CreatedGameSummary = {

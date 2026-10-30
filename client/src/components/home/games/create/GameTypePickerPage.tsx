@@ -16,6 +16,7 @@ const ROUTE_BY_CHOICE: Record<GameTypeChoice, string> = {
   SNAKES_LADDERS: '/juegos/crear/escaleras-serpientes',
   DUAL_QUEST_PIXI: '/juegos/crear/duo-logico',
   TRUE_FALSE_MAZE: '/juegos/crear/laberinto-vf',
+  BIODIVERCIUDAD: '/juegos/crear/territorios-en-juego',
 }
 
 export function GameTypePickerPage() {

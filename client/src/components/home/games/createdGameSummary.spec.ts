@@ -10,6 +10,8 @@ const EXPECTED: Record<CreatedGameKind, { typeLabel: string; isMultiplayer: bool
   SNAKES_LADDERS: { typeLabel: 'Escaleras y serpientes', isMultiplayer: true },
   DUAL_QUEST_PIXI: { typeLabel: 'Dúo Lógico', isMultiplayer: true },
   TRUE_FALSE_MAZE: { typeLabel: 'Laberinto Verdadero o Falso', isMultiplayer: false },
+  // Hasta que lleguen las salas de equipos no figura en LIVE_ROOM_GAME_TYPES: se vuelve multijugador junto con ellas.
+  BIODIVERCIUDAD: { typeLabel: 'Territorios en Juego', isMultiplayer: false },
 }
 
 describe('summarizeCreatedGame (issue #245)', () => {

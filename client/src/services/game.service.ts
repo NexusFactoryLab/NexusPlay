@@ -169,6 +169,29 @@ export type TrueFalseMazeQuestionInput = {
   explanation?: string
 }
 
+export type BiodiverCiudadStationInput = {
+  stationId?: string
+  region: string
+  location: string
+  challenge: string
+  timeLimitMinutes: number
+  reward: string
+  questions: Array<{
+    questionId?: string
+    prompt: string
+    options: string[]
+    correctIndex: number
+    explanation: string
+    citation: { author: string; page: number; excerpt?: string }
+  }>
+  dilemma: {
+    scenario: string
+    fictional: boolean
+    options: Array<{ optionId?: string; label: string; sustainable: boolean }>
+  }
+  deliverable: string
+}
+
 type CreateGameInputBase =
   | {
       title: string
@@ -265,6 +288,16 @@ type CreateGameInputBase =
         lightsOut: boolean
       }
       content: TrueFalseMazeQuestionInput[]
+    }
+  | {
+      title: string
+      description: string
+      gameType: 'BIODIVERCIUDAD'
+      categoryId: string
+      organizationId?: string | null
+      theme?: { primaryColor?: string; coverImageUrl?: string | null }
+      config: { pbrPerStation: number; shuffleQuestions: boolean; shuffleOptions: boolean }
+      content: BiodiverCiudadStationInput[]
     }
 
 export type CreateGameInput = CreateGameInputBase & {
