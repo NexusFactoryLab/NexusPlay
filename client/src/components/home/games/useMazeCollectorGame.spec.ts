@@ -298,3 +298,27 @@ describe('Camión Reciclador: preguntas de opción múltiple', () => {
     expect(state.scenarioDone).toBe(true)
   })
 })
+
+describe('comer contaminantes en los mapas temáticos (issue #154)', () => {
+  /** Un contaminante asustado a `gap` celdas del jugador, en la misma calle. */
+  function frightenedAt(layoutName: 'CITY' | 'AMAZON', gap: number) {
+    const layout = MAZE_LAYOUTS[layoutName]
+    const state = engine.createInitialState(layout, [], { ...config, layout: layoutName })
+    const ghost = state.ghosts[0]
+    ghost.mode = 'FRIGHTENED'
+    ghost.pos = { row: state.player.pos.row, col: state.player.pos.col + gap }
+    ghost.nextPos = ghost.pos
+    ghost.progress = 0
+    engine.resolveGhostCollisions(state, layout)
+    return ghost.mode
+  }
+
+  it('en Amazonia se come al tocarlo con el sprite grande, igual que en la Ciudad', () => {
+    expect(frightenedAt('AMAZON', 1)).toBe('EATEN')
+    expect(frightenedAt('CITY', 1)).toBe('FRIGHTENED')
+  })
+
+  it('a varias celdas no hay contacto en ningún mapa', () => {
+    expect(frightenedAt('AMAZON', 3)).toBe('FRIGHTENED')
+  })
+})

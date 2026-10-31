@@ -698,12 +698,16 @@ function wrappedDistance(a: { row: number; col: number }, b: { row: number; col:
 
 function resolveGhostCollisions(state: InternalState, layout: MazeLayoutDef) {
   const playerPoint = interpolated(state.player, layout.cols)
+  // El contacto crece con los sprites: en los mapas de celda fina (spriteScale
+  // 2.4) el muñeco ya se ve encima del contaminante mucho antes de estar a 0.6
+  // celdas, y se lo atravesaba sin comerlo. Así se siente igual que en la Ciudad.
+  const collisionRadius = COLLISION_RADIUS * (layout.spriteScale ?? 1)
 
   for (const ghost of state.ghosts) {
     if (ghost.mode === 'EATEN') continue
     const ghostPoint = interpolated(ghost, layout.cols)
     const distance = wrappedDistance(playerPoint, ghostPoint, layout.cols)
-    if (distance > COLLISION_RADIUS) continue
+    if (distance > collisionRadius) continue
 
     if (ghost.mode === 'FRIGHTENED') {
       ghost.mode = 'EATEN'
@@ -995,4 +999,4 @@ export function useMazeCollectorGame({ layout, items, config, inputEnabled = tru
 }
 
 /** Solo para pruebas del motor. */
-export const __engineForTests = { createInitialState, tickEngine, interpolated, wrappedDistance }
+export const __engineForTests = { createInitialState, tickEngine, interpolated, wrappedDistance, resolveGhostCollisions }

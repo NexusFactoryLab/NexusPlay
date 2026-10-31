@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Award, Check, MapPin, Play, Target } from 'lucide-react'
 import { MazeCollectorGame } from './MazeCollectorGame'
 import { MAZE_LAYOUTS } from './mazeCollectorTypes'
-import type { MazeCollectorConfig, MazeCollectorItem } from './mazeCollectorTypes'
+import type { MazeCollectorConfig, MazeCollectorItem, MazeLayout } from './mazeCollectorTypes'
 import { questionsForGame } from './mazeCollectorQuestions'
 import { MAZE_MAPS } from './mazeMaps'
 import { PBR_PER_STATION } from './mazeExpeditionStations'
@@ -27,21 +27,29 @@ type MazeExpeditionProps = {
  * repite la misma. Al final, el "Pacto Territorial" suma los Puntos de
  * Bio-Resiliencia (PBR) y los insumos ganados. Cada estación usa el banco de
  * preguntas fijo de su mapa.
+ *
+ * El jugador puede elegir en qué estación jugar (issue #154): no tiene que
+ * pasar todo el recorrido para probar un mapa. Las superadas quedan marcadas
+ * y el Pacto sale al completar todas, en cualquier orden. "Salir" dentro de
+ * un mapa vuelve a las estaciones.
  */
 export function MazeExpedition({ title, primaryColor, items, config, stations, onExit }: MazeExpeditionProps) {
   const [index, setIndex] = useState(0)
   const [phase, setPhase] = useState<'briefing' | 'playing' | 'done'>('briefing')
-  const [results, setResults] = useState<StationResult[]>([])
+  const [results, setResults] = useState<Partial<Record<MazeLayout, StationResult>>>({})
+  const [guideSeen, setGuideSeen] = useState(false)
   const station = stations[index]
 
   function restart() {
     setIndex(0)
-    setResults([])
+    setResults({})
     setPhase('briefing')
   }
 
   if (phase === 'playing') {
-    const last = index === stations.length - 1
+    const pending = stations.filter((item) => item.layout !== station.layout && !results[item.layout])
+    // La siguiente pendiente en el orden de la guía, empezando después de esta.
+    const next = pending.find((item) => item.number > station.number) ?? pending[0]
     return (
       <MazeCollectorGame
         key={station.layout}
@@ -51,18 +59,18 @@ export function MazeExpedition({ title, primaryColor, items, config, stations, o
         items={items}
         config={{ ...config, layout: station.layout }}
         questions={questionsForGame(undefined, station.layout)}
-        skipGuide={index > 0}
-        wonActionLabel={last ? 'Ver el Pacto Territorial' : `Ir a la estación ${station.number + 1}`}
+        skipGuide={guideSeen}
+        wonActionLabel={next ? `Ir a la estación ${next.number}` : 'Ver el Pacto Territorial'}
         onWon={(result) => {
-          setResults((current) => [...current, result])
-          if (last) {
-            setPhase('done')
-          } else {
-            setIndex(index + 1)
+          setResults((current) => ({ ...current, [station.layout]: result }))
+          if (next) {
+            setIndex(stations.indexOf(next))
             setPhase('briefing')
+          } else {
+            setPhase('done')
           }
         }}
-        onExit={onExit}
+        onExit={() => setPhase('briefing')}
       />
     )
   }
@@ -70,9 +78,25 @@ export function MazeExpedition({ title, primaryColor, items, config, stations, o
   return (
     <main className="flex min-h-full flex-1 items-center justify-center bg-[#0b1220] p-4 sm:p-8">
       {phase === 'briefing' ? (
-        <StationBriefing station={station} total={stations.length} done={results.length} onStart={() => setPhase('playing')} onExit={onExit} />
+        <StationBriefing
+          station={station}
+          stations={stations}
+          completed={results}
+          onPick={setIndex}
+          onStart={() => {
+            setGuideSeen(true)
+            setPhase('playing')
+          }}
+          onExit={onExit}
+        />
       ) : (
-        <TerritorialPact title={title} stations={stations} results={results} onPlayAgain={restart} onExit={onExit} />
+        <TerritorialPact
+          title={title}
+          stations={stations}
+          results={stations.flatMap((item) => (results[item.layout] ? [results[item.layout]!] : []))}
+          onPlayAgain={restart}
+          onExit={onExit}
+        />
       )}
     </main>
   )
@@ -80,18 +104,22 @@ export function MazeExpedition({ title, primaryColor, items, config, stations, o
 
 function StationBriefing({
   station,
-  total,
-  done,
+  stations,
+  completed,
+  onPick,
   onStart,
   onExit,
 }: {
   station: MazeStation
-  total: number
-  done: number
+  stations: MazeStation[]
+  completed: Partial<Record<MazeLayout, StationResult>>
+  onPick: (index: number) => void
   onStart: () => void
   onExit: () => void
 }) {
   const theme = MAZE_MAPS[station.layout]
+  const total = stations.length
+  const done = stations.filter((item) => completed[item.layout]).length
   return (
     <section
       aria-label={`Estación ${station.number}: ${station.region}`}
@@ -106,6 +134,26 @@ function StationBriefing({
         </div>
       </div>
       <div className="p-5 sm:p-6">
+        <nav aria-label="Elige la estación" className="mb-4 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+          {stations.map((item, position) => {
+            const active = item.layout === station.layout
+            const won = Boolean(completed[item.layout])
+            return (
+              <button
+                key={item.layout}
+                type="button"
+                aria-pressed={active}
+                onClick={() => onPick(position)}
+                className={`flex items-center justify-center gap-1.5 rounded-xl border px-2 py-2 text-[12.5px] font-bold transition ${
+                  active ? 'border-emerald-300 bg-emerald-400/15 text-white' : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'
+                }`}
+              >
+                {won ? <Check className="h-3.5 w-3.5 text-emerald-300" aria-hidden="true" /> : <span className="text-slate-400">{item.number}.</span>}
+                {MAZE_MAPS[item.layout].label}
+              </button>
+            )
+          })}
+        </nav>
         <p className="text-[12px] font-bold tracking-[0.14em] text-emerald-300 uppercase">
           Año 2035: La Alerta Nacional · Estación {station.number} de {total}
         </p>
