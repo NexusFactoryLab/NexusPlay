@@ -118,6 +118,14 @@ export interface TournamentMatch extends PausableGame {
   turnDeadline: number | null;
 }
 
+/** Cuántas veces apareció un concepto o afirmación y cuántas se falló. */
+export interface TournamentInsight {
+  kind: 'DOMINO' | 'MAZE';
+  label: string;
+  attempts: number;
+  misses: number;
+}
+
 export interface TournamentState {
   code: string;
   gameId: string;
@@ -130,6 +138,11 @@ export interface TournamentState {
   participants: TournamentParticipant[];
   /** Juegos del torneo: cada ronda sortea uno sin repetir el de la ronda anterior (ver `pickRoundGameIndex`). Vacío = solo `gameId`. */
   games?: { gameId: string; title: string; level: TournamentLevel; gameType?: TournamentGameType }[];
+  /**
+   * Qué conceptos (Dominó) y afirmaciones (Laberinto) se acertaron o fallaron en el torneo, para el resumen
+   * pedagógico del historial (issue #147). Clave estable por juego y concepto/afirmación.
+   */
+  insights?: Record<string, TournamentInsight>;
   /** El administrador tiene la ronda en pausa (issue #147). Se apaga solo al empezar la ronda siguiente. */
   pausedByAdmin?: boolean;
   /** Rondas cuyo juego eligió el administrador en vez del sorteo: ronda → posición en `games` (issue #147). */

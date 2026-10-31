@@ -400,3 +400,20 @@ describe('la pausa del administrador y el Laberinto (#147)', () => {
     expect(tournament.pausedByAdmin).toBe(false);
   });
 });
+
+describe('resumen pedagógico: qué afirmaciones se fallan (#147)', () => {
+  it('cuenta los intentos y los fallos de cada afirmación con su texto', async () => {
+    const { gateway, tournament, players } = await start(2, 1);
+    await gateway.handleTournamentMazeAnswer(players[0], { questionId: 'q1', chosen: true });
+    await gateway.handleTournamentMazeAnswer(players[1], { questionId: 'q1', chosen: false });
+    await gateway.handleTournamentMazeAnswer(players[0], { questionId: 'q2', chosen: false });
+    await gateway.handleTournamentMazeAnswer(players[0], { questionId: 'q2', chosen: true }); // repetida: no cuenta
+    const entries = Object.entries(tournament.insights ?? {});
+    const q1 = entries.find(([key]) => key.endsWith(':q1'))![1];
+    const q2 = entries.find(([key]) => key.endsWith(':q2'))![1];
+    expect(q1).toMatchObject({ kind: 'MAZE', attempts: 2, misses: 1 });
+    expect(q1.label.length).toBeGreaterThan(0);
+    expect(q1.label).not.toBe('q1');
+    expect(q2).toMatchObject({ attempts: 1, misses: 0 });
+  });
+});

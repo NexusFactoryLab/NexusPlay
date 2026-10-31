@@ -196,6 +196,27 @@ function mazeAnswerKey(content: unknown): Map<string, boolean> {
   return answers;
 }
 
+/** Texto de cada afirmación de un Laberinto Verdadero o Falso (para el resumen pedagógico). */
+function mazeStatementKey(content: unknown): Map<string, string> {
+  const statements = new Map<string, string>();
+  if (!Array.isArray(content)) return statements;
+  content.forEach((item, index) => {
+    const value = (item ?? {}) as Record<string, unknown>;
+    if (typeof value.statement !== 'string' || typeof value.answer !== 'boolean') return;
+    const id = typeof value.questionId === 'string' && value.questionId ? value.questionId : `q-${index + 1}`;
+    statements.set(id, value.statement);
+  });
+  return statements;
+}
+
+/** Suma un intento (y un fallo, si lo hubo) a un concepto o afirmación del torneo. */
+function recordInsight(tournament: TournamentState, key: string, kind: 'DOMINO' | 'MAZE', label: string, missed: boolean) {
+  const insights = (tournament.insights ??= {});
+  const item = (insights[key] ??= { kind, label: label.slice(0, 160), attempts: 0, misses: 0 });
+  item.attempts += 1;
+  if (missed) item.misses += 1;
+}
+
 /** Juego y nivel de la ronda en curso, tomados de sus partidas; `null` antes de que arranque la primera. */
 function currentRoundGameOf(tournament: TournamentState) {
   const match = tournament.matches.find((m) => m.round === tournament.currentRound);
@@ -1803,6 +1824,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
         });
       } else if (type === 'TRUE_FALSE_MAZE') {
         this.tournamentMazeGames.set(g.id, mazeAnswerKey(g.content));
+        this.tournamentMazeStatements.set(g.id, mazeStatementKey(g.content));
       } else {
         this.lastCreatedGameCards.set(g.id, g.content as GuessWhoCard[]);
       }
@@ -2406,6 +2428,8 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     maze.answeredIds.push(questionId);
     if (body.chosen === correctAnswer) maze.correct += 1;
     else maze.wrong += 1;
+    const gameKey = match.gameId ?? tournament.gameId;
+    recordInsight(tournament, `MAZE:${gameKey}:${questionId}`, 'MAZE', this.tournamentMazeStatements.get(gameKey)?.get(questionId) ?? questionId, body.chosen !== correctAnswer);
     if (body.chosen === correctAnswer) {
       // Crédito parcial: cada acierto cuenta para el desempate aunque no se complete el laberinto.
       const answering = tournament.participants.find((p) => p.userId === match.playerUserIds[0]);
@@ -2460,6 +2484,14 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     const match = tournament?.matches.find((m) => m.matchCode === room.tournamentMatchCode);
     if (!tournament || !match || match.phase === 'FINISHED') return;
 
+    // Resumen pedagógico: solo hay preguntas en los niveles que las usan (el fácil no pregunta).
+    if (room.level !== 'EASY') {
+      const missed = new Set(room.missedConceptIndexes ?? []);
+      for (const index of new Set(room.seenConceptIndexes ?? [])) {
+        const concept = room.concepts[index];
+        if (concept) recordInsight(tournament, `DOMINO:${room.gameId}:${concept.conceptId ?? index}`, 'DOMINO', concept.label, missed.has(index));
+      }
+    }
     match.phase = 'FINISHED';
     match.winnerUserId = room.winnerUserId;
     // Empate (bloqueo con las mismas fichas): nadie suma ni pierde.
@@ -2653,6 +2685,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
    * por `questionId`. El servidor es quien califica: el navegador solo dice qué eligió.
    */
   private readonly tournamentMazeGames = new Map<string, Map<string, boolean>>();
+  private readonly tournamentMazeStatements = new Map<string, Map<string, string>>();
 
   /** La clave de respuestas de un juego; si el servidor se reinició y la perdió, se vuelve a leer del juego. */
   private async mazeAnswers(gameId: string): Promise<Map<string, boolean>> {
@@ -2661,6 +2694,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     const game = await this.gameRepository.findById(gameId);
     const answers = mazeAnswerKey(game?.content);
     this.tournamentMazeGames.set(gameId, answers);
+    this.tournamentMazeStatements.set(gameId, mazeStatementKey(game?.content));
     return answers;
   }
 

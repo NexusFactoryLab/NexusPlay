@@ -487,3 +487,30 @@ describe('el administrador pausa un dominó del torneo y suma tiempo (#147)', ()
     expect(room.activePlayerUserId).not.toBe(active);
   });
 });
+
+describe('resumen pedagógico: qué conceptos se fallan en el dominó (#147)', () => {
+  type RoomWithSeen = { seenConceptIndexes?: number[]; missedConceptIndexes?: number[] };
+  it('al terminar la partida cuenta cada concepto que apareció y los que se fallaron', async () => {
+    const { tournament, domino, gateway } = await start(2, 'MEDIUM');
+    vi.advanceTimersByTime(3000);
+    const room = domino.get(tournament.matches[0].dominoRoomCode!)!;
+    expect(room.level).not.toBe('EASY');
+    (room as RoomWithSeen).seenConceptIndexes = [0, 1, 2];
+    (room as RoomWithSeen).missedConceptIndexes = [1];
+    (gateway as unknown as { finishDominoGame: FinishFn }).finishDominoGame(room, 'p1', false);
+    const byLabel = Object.fromEntries(Object.values(tournament.insights ?? {}).map((item) => [item.label, item]));
+    expect(byLabel['Sol']).toMatchObject({ kind: 'DOMINO', attempts: 1, misses: 0 });
+    expect(byLabel['Agua']).toMatchObject({ kind: 'DOMINO', attempts: 1, misses: 1 });
+    expect(byLabel['Aire']).toMatchObject({ attempts: 1, misses: 0 });
+    expect(byLabel['Tierra']).toBeUndefined();
+  });
+
+  it('en el nivel fácil no hay preguntas: no se registra nada', async () => {
+    const { tournament, domino, gateway } = await start(2, 'EASY');
+    vi.advanceTimersByTime(3000);
+    const room = domino.get(tournament.matches[0].dominoRoomCode!)!;
+    (room as RoomWithSeen).seenConceptIndexes = [0, 1];
+    (gateway as unknown as { finishDominoGame: FinishFn }).finishDominoGame(room, 'p1', false);
+    expect(tournament.insights ?? {}).toEqual({});
+  });
+});
