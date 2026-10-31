@@ -1,0 +1,129 @@
+/* Revelado del juego sorteado de la ronda (issue #147): tres tarjetas «?» se barajan y la del centro se voltea. */
+.round-reveal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  perspective: 800px;
+}
+
+.round-reveal__cards {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.round-reveal__card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 70px;
+  height: 96px;
+  border-radius: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: linear-gradient(135deg, rgba(123, 92, 255, 0.55), rgba(6, 182, 212, 0.4));
+  color: #fff;
+  font-size: 32px;
+  font-weight: 900;
+}
+
+/* Las de los lados se barajan y luego se apagan para que mire la del centro. */
+.round-reveal__card--side {
+  animation: round-reveal-shuffle 1s ease-in-out both;
+}
+
+.round-reveal__card--main {
+  position: relative;
+  width: 124px;
+  height: 164px;
+  padding: 0;
+  border: 0;
+  background: none;
+  transform-style: preserve-3d;
+  animation: round-reveal-flip 0.7s var(--ease-smooth, ease-out) 0.55s both;
+}
+
+.round-reveal__face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  backface-visibility: hidden;
+  text-align: center;
+}
+
+.round-reveal__face--back {
+  background: linear-gradient(135deg, rgba(123, 92, 255, 0.7), rgba(6, 182, 212, 0.55));
+  font-size: 54px;
+  font-weight: 900;
+}
+
+.round-reveal__face--front {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: 0 18px 40px -14px var(--accent-2);
+  transform: rotateY(180deg);
+}
+
+@keyframes round-reveal-flip {
+  from {
+    transform: rotateY(0deg) scale(1);
+  }
+  60% {
+    transform: rotateY(180deg) scale(1.1);
+  }
+  to {
+    transform: rotateY(180deg) scale(1);
+  }
+}
+
+@keyframes round-reveal-shuffle {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0.9;
+  }
+  18% {
+    transform: translateY(-14px) rotate(-5deg);
+  }
+  36% {
+    transform: translateY(9px) rotate(4deg);
+  }
+  54% {
+    transform: translateY(-8px) rotate(-3deg);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(0) rotate(0deg) scale(0.9);
+    opacity: 0.35;
+  }
+}
+
+@media (max-width: 380px) {
+  .round-reveal__card {
+    width: 56px;
+    height: 80px;
+    font-size: 26px;
+  }
+  .round-reveal__card--main {
+    width: 108px;
+    height: 148px;
+  }
+}
+
+/* Sin movimiento: se ve el juego ya revelado, sin voltear ni barajar. */
+@media (prefers-reduced-motion: reduce) {
+  .round-reveal__card--side {
+    animation: none;
+    opacity: 0.35;
+    transform: scale(0.9);
+  }
+  .round-reveal__card--main {
+    animation: none;
+    transform: rotateY(180deg);
+  }
+}

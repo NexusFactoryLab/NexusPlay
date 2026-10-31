@@ -6,6 +6,7 @@ import { TournamentCodeEntry } from './TournamentCodeEntry'
 import { TournamentCreateConfirm } from './TournamentCreateConfirm'
 import { TournamentConfirmModal } from './TournamentConfirmModal'
 import { TournamentFinalResults } from './TournamentFinalResults'
+import { TournamentRoundReveal, type RevealedGame } from './TournamentRoundReveal'
 import { TournamentRoundWaiting } from './TournamentRoundWaiting'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -357,16 +358,17 @@ function TournamentSession() {
         <PairingAnnouncementOverlay
           announcement={{ round: dominoMatch.round, pairing: dominoMatch.players.map((p) => ({ userId: p.userId, displayName: p.displayName })) }}
           selfUserId={user?.id ?? null}
+          game={tournament.currentRoundGame}
           durationMs={MATCH_ENTRY_DELAY_MS}
         />
       )}
       {playerWait && tournament.myMatch?.phase === 'PLAYING' && <PlayerWaitOverlay wait={playerWait} onLeave={handleExit} />}
-      {mazeMatch && <MazeRoundAnnouncement round={mazeMatch.round} title={mazeMatch.gameTitle} />}
+      {mazeMatch && <MazeRoundAnnouncement round={mazeMatch.round} title={mazeMatch.gameTitle} game={tournament.currentRoundGame} />}
       {showStandings && (
         <StandingsOverlay participants={tournament.participants} selfUserId={user?.id ?? null} round={Math.max(tournament.currentRound - (tournament.myMatch ? 1 : 0), 1)} />
       )}
       {!dominoMatch && showPairingOverlay && pairingAnnouncement && (
-        <PairingAnnouncementOverlay announcement={pairingAnnouncement} selfUserId={user?.id ?? null} />
+        <PairingAnnouncementOverlay announcement={pairingAnnouncement} selfUserId={user?.id ?? null} game={tournament.currentRoundGame} />
       )}
 
       <div className={tournament.myMatch?.phase === 'PLAYING' ? 'guess-who-play-shell' : 'mx-auto flex min-h-full max-w-[1560px] flex-col p-5 sm:p-8'}>
@@ -661,16 +663,20 @@ function StandingsOverlay({
 }
 
 /** Aviso de una ronda de Misión Galáctica: no hay pareja, cada persona juega sola. */
-function MazeRoundAnnouncement({ round, title }: { round: number; title: string }) {
+function MazeRoundAnnouncement({ round, title, game }: { round: number; title: string; game: RevealedGame | null }) {
   return (
     <div
       className="overlay-timed fixed inset-0 z-[70] flex flex-col items-center justify-center gap-4 bg-black/75 px-5 text-center text-white backdrop-blur-md"
       style={{ '--overlay-ms': `${MAZE_ENTRY_DELAY_MS}ms` } as React.CSSProperties}
     >
       <p className="stagger-in text-[13px] font-semibold tracking-[0.22em] text-white/70 uppercase">Ronda {round}</p>
-      <p className="stagger-in text-[26px] font-bold sm:text-[32px]" style={{ '--stagger': 1 } as React.CSSProperties}>
-        {title}
-      </p>
+      {game ? (
+        <TournamentRoundReveal game={game} />
+      ) : (
+        <p className="stagger-in text-[26px] font-bold sm:text-[32px]" style={{ '--stagger': 1 } as React.CSSProperties}>
+          {title}
+        </p>
+      )}
       <p className="stagger-in max-w-[420px] text-[14px] text-white/80" style={{ '--stagger': 2 } as React.CSSProperties}>
         Juegas solo. Respondiendo <b>todas</b> bien sumas un punto.
       </p>
@@ -681,10 +687,13 @@ function MazeRoundAnnouncement({ round, title }: { round: number; title: string 
 function PairingAnnouncementOverlay({
   announcement,
   selfUserId,
+  game,
   durationMs = PAIRING_OVERLAY_MS,
 }: {
   announcement: { round: number; pairing: { userId: string; displayName: string }[] }
   selfUserId: string | null
+  /** El juego sorteado de la ronda; se revela antes de mostrar la pareja. */
+  game: RevealedGame | null
   /** Cuánto se muestra: coincide con el temporizador que lo retira o que navega a la partida. */
   durationMs?: number
 }) {
@@ -698,6 +707,7 @@ function PairingAnnouncementOverlay({
       style={{ '--overlay-ms': `${durationMs}ms` } as React.CSSProperties}
     >
       <p className="stagger-in text-[13px] font-semibold tracking-[0.22em] text-white/70 uppercase">Ronda {announcement.round}</p>
+      {game && <TournamentRoundReveal game={game} />}
       <div className="flex w-full max-w-[640px] items-center justify-center gap-4 sm:gap-8">
         <div className="versus-left min-w-0 flex-1 rounded-2xl border border-white/15 bg-white/10 px-4 py-5 text-white">
           <p className="truncate text-[18px] font-bold sm:text-[22px]">{self?.displayName ?? 'Tú'}</p>
