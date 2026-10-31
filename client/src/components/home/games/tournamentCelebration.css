@@ -1,0 +1,47 @@
+/* Confeti de fin de torneo (issue #131): cae una sola vez y se queda quieto abajo. */
+.tournament-confetti {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  overflow: hidden;
+}
+
+.tournament-confetti__piece {
+  position: absolute;
+  top: -16px;
+  width: 9px;
+  height: 14px;
+  border-radius: 2px;
+  opacity: 0;
+  animation: tournament-confetti-fall var(--fall-ms, 3200ms) var(--ease-smooth, ease-out) var(--delay, 0ms) forwards;
+}
+
+.tournament-confetti__piece:nth-child(3n) {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+}
+
+@keyframes tournament-confetti-fall {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  10% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--drift, 0px), 105vh, 0) rotate(var(--spin, 540deg));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tournament-confetti {
+    display: none;
+  }
+}

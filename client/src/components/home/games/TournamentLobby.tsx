@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { CircleHelp, Copy, Link, LogOut, Play, Users } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
+import { AvatarCircle } from '../../avatar/AvatarCircle'
+import { usePlayersAvatars } from '../../avatar/usePlayersAvatars'
 import { Modal } from './Modal'
 import type { TournamentStateView } from './guessWhoTypes'
 import { GameInstructionsGate } from './GameInstructionsGate'
@@ -24,6 +26,7 @@ export function TournamentLobby({ tournament, error, onStart, onClose, onExit }:
   const [copied, setCopied] = useState<string | null>(null)
   const [showGuide, setShowGuide] = useState(false)
   const [confirmingClose, setConfirmingClose] = useState(false)
+  const avatars = usePlayersAvatars(useMemo(() => tournament.participants.map((p) => p.userId), [tournament.participants]))
 
   const invitationUrl = new URL(`/quien-es/torneo/${encodeURIComponent(tournament.code)}`, window.location.origin).href
   const canStart = tournament.participants.length >= 2
@@ -84,10 +87,16 @@ export function TournamentLobby({ tournament, error, onStart, onClose, onExit }:
         )}
 
         <div className="stagger-in rounded-2xl border border-border p-4" style={{ '--stagger': 2 } as React.CSSProperties}>
-          <p className="mb-2 flex items-center gap-1.5 text-[13px] font-semibold text-text-h">
-            <Users className="h-4 w-4 text-accent" strokeWidth={2} />
-            {tournament.participants.length} / {tournament.maxParticipants} participantes
-          </p>
+          <div className="mb-3 flex items-end justify-between gap-3">
+            <p className="flex items-center gap-1.5 text-[13px] font-semibold text-text-h">
+              <Users className="h-4 w-4 text-accent" strokeWidth={2} />
+              Participantes
+            </p>
+            <p className="text-text-h" aria-label={`${tournament.participants.length} de ${tournament.maxParticipants} participantes`}>
+              <span className="text-[34px] leading-none font-extrabold tabular-nums">{tournament.participants.length}</span>
+              <span className="text-[14px] font-semibold text-text"> / {tournament.maxParticipants}</span>
+            </p>
+          </div>
           <div className="progress-track mb-3" role="progressbar" aria-valuenow={tournament.participants.length} aria-valuemin={0} aria-valuemax={tournament.maxParticipants}>
             <div className="progress-fill" style={{ width: `${Math.min(100, (tournament.participants.length / tournament.maxParticipants) * 100)}%` }} />
           </div>
@@ -97,14 +106,23 @@ export function TournamentLobby({ tournament, error, onStart, onClose, onExit }:
               Esperando a que entre la primera persona…
             </p>
           ) : (
-            <div className="grid max-h-[260px] grid-cols-2 gap-1.5 overflow-y-auto sm:grid-cols-3">
+            <ul className="grid max-h-[300px] grid-cols-3 gap-x-2 gap-y-3 overflow-y-auto sm:grid-cols-4 md:grid-cols-5">
               {tournament.participants.map((participant) => (
-                <span key={participant.userId} className="chip-pop truncate rounded-lg bg-code-bg px-3 py-1.5 text-[12.5px] font-medium text-text-h">
-                  {participant.displayName}
-                  {participant.isSelf ? ' (tú)' : ''}
-                </span>
+                <li key={participant.userId} className="chip-pop flex min-w-0 flex-col items-center gap-1 text-center">
+                  <span className="relative">
+                    <AvatarCircle
+                      config={avatars[participant.userId]}
+                      name={participant.displayName}
+                      className={`h-12 w-12 border-2 text-[15px] shadow-sm ${participant.isSelf ? 'border-accent' : 'border-surface'}`}
+                    />
+                  </span>
+                  <span className={`w-full truncate text-[12px] font-medium ${participant.isSelf ? 'text-accent' : 'text-text-h'}`} title={participant.displayName}>
+                    {participant.displayName}
+                    {participant.isSelf ? ' (tú)' : ''}
+                  </span>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
         </div>
 

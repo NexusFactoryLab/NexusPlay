@@ -5,6 +5,8 @@ import { TournamentModeratorPanel } from './TournamentModeratorPanel'
 import { TournamentCodeEntry } from './TournamentCodeEntry'
 import { TournamentCreateConfirm } from './TournamentCreateConfirm'
 import { TournamentConfirmModal } from './TournamentConfirmModal'
+import { TournamentFinalResults } from './TournamentFinalResults'
+import { TournamentRoundWaiting } from './TournamentRoundWaiting'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Bot, Crown, LogOut, Swords, Trophy } from 'lucide-react'
@@ -331,7 +333,6 @@ function TournamentSession() {
   }
 
   const self = tournament.participants.find((p) => p.isSelf)
-  const tournamentWinnerName = tournament.participants.find((p) => p.userId === tournament.winnerUserId)?.displayName
 
   if (tournament.phase === 'WAITING') {
     return (
@@ -477,36 +478,14 @@ function TournamentSession() {
         )}
 
         {tournament.phase === 'RUNNING' && !tournament.myMatch && (
-          <div className="stagger-in flex flex-col items-center gap-3 py-8 text-center">
-            <p className="text-[16px] font-semibold text-text-h">Terminaste tu partida de la ronda {tournament.currentRound}.</p>
-            <p className="flex items-center gap-2 text-[13px] text-text">
-              <span className="live-dot" aria-hidden="true" />
-              Esperando a que terminen las demás para empezar la siguiente…
-            </p>
-            <RoundsRanking tournament={tournament} selfUserId={user?.id ?? null} />
+          <div className="flex justify-center">
+            <TournamentRoundWaiting tournament={tournament} selfUserId={user?.id ?? null} />
           </div>
         )}
 
         {tournament.phase === 'FINISHED' && (
-          <div className="stagger-in flex flex-col items-center gap-4 py-6 text-center">
-            <span
-              className="flex h-14 w-14 items-center justify-center rounded-full text-white shadow-[0_14px_30px_-12px_var(--accent)] animate-[trophy-pop-in_0.6s_cubic-bezier(0.16,1,0.3,1)]"
-              style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
-            >
-              <Trophy className="h-7 w-7" strokeWidth={1.75} />
-            </span>
-            <p className="text-[18px] font-semibold text-text-h">
-              {self?.userId === tournament.winnerUserId ? '¡Ganaste el torneo!' : `Ganó el torneo ${tournamentWinnerName}`}
-            </p>
-            <RoundsRanking tournament={tournament} selfUserId={user?.id ?? null} />
-            <button
-              type="button"
-              className="mt-2 rounded-lg px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_26px_-10px_var(--accent)] active:translate-y-0"
-              style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
-              onClick={handleExit}
-            >
-              Salir
-            </button>
+          <div className="flex justify-center">
+            <TournamentFinalResults tournament={tournament} selfUserId={user?.id ?? null} onExit={handleExit} />
           </div>
         )}
       </div>
@@ -592,72 +571,6 @@ function RunningMatch({
         {winnerIsSelf ? '¡Ganaste esta ronda!' : `Ganó ${opponent.displayName}`}
       </p>
       <p className="text-[13px] text-text">Esperando a que termine la ronda…</p>
-    </div>
-  )
-}
-
-function RoundsRanking({
-  tournament,
-  selfUserId,
-}: {
-  tournament: NonNullable<ReturnType<typeof useGuessWhoTournament>['tournament']>
-  selfUserId: string | null
-}) {
-  const ranked = [...tournament.participants].sort((a, b) => b.points - a.points)
-
-  return (
-    <div className="flex w-full max-w-[480px] flex-col gap-4 text-left">
-      <div className="rounded-xl border border-border p-4">
-        <p className="mb-3 flex items-center gap-1.5 text-[13px] font-semibold text-text-h">
-          <Crown className="h-4 w-4 text-accent" strokeWidth={2} />
-          Clasificación
-        </p>
-        <div className="flex flex-col gap-1.5">
-          {ranked.map((participant, index) => (
-            <div
-              key={participant.userId}
-              className={`stagger-in flex items-center justify-between rounded-lg px-3 py-1.5 text-[12.5px] transition-colors duration-300 ${
-                participant.userId === selfUserId ? 'bg-accent/10 ring-1 ring-accent/30' : 'bg-code-bg'
-              }`}
-              style={{ '--stagger': index } as React.CSSProperties}
-            >
-              <span className="font-medium text-text-h">
-                {participant.displayName}
-                {participant.userId === selfUserId ? ' (tú)' : ''}
-              </span>
-              <span className="text-text">
-                {participant.points} pts · {participant.wins}G {participant.losses}P
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-border p-4">
-        <p className="mb-3 text-[13px] font-semibold text-text-h">Rondas</p>
-        <div className="flex flex-col gap-2">
-          {tournament.rounds.map((round) => (
-            <div key={round.round} className="rounded-lg bg-code-bg px-3 py-2 text-[12px] text-text">
-              <p className="mb-1 font-semibold text-text-h">Ronda {round.round}</p>
-              {round.matches[0]?.gameType === 'TRUE_FALSE_MAZE' ? (
-                <p>
-                  Misión Galáctica: {round.matches.filter((match) => match.winnerUserId).length} de {round.matches.length}{' '}
-                  respondieron todo bien
-                  {round.matches.some((match) => match.phase !== 'FINISHED') ? ' (en curso)' : ''}
-                </p>
-              ) : (
-                round.matches.map((match) => (
-                  <p key={match.matchCode}>
-                    {match.winnerUserId
-                      ? `Ganó ${tournament.participants.find((p) => p.userId === match.winnerUserId)?.displayName ?? 'el bot'}${match.vsBot ? ' (vs bot)' : ''}`
-                      : 'En curso'}
-                  </p>
-                ))
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   )
 }
