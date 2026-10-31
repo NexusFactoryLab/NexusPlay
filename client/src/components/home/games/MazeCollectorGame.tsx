@@ -722,13 +722,13 @@ function MazeCollectorSession({
             ))}
         </div>
         {game.answerFeedback && game.phase !== 'lost' && <AnswerToast key={`answer-${game.answerFeedback.id}`} feedback={game.answerFeedback} />}
-        {cloudAlert > 0 && <CloudAlert key={`cloud-${cloudAlert}`} />}
+        {cloudAlert > 0 && <CloudAlert key={`cloud-${cloudAlert}`} emoji={mapTheme.text.emoji} enemyAnother={mapTheme.text.enemyAnother} />}
         {locating && (
           <p
             role="status"
             className="pointer-events-none absolute left-1/2 top-4 z-40 -translate-x-1/2 rounded-full border-2 border-amber-300 bg-slate-950/90 px-5 py-2 text-[16px] font-black text-amber-200 shadow-xl"
           >
-            ¡Ubícate! Busca tu camión y las letras
+            ¡Ubícate! Busca {mapTheme.text.player} y las letras
           </p>
         )}
       </div>
@@ -768,13 +768,13 @@ function MazeCollectorSession({
       {game.phase === 'ready' && !tutorial && (
         <Overlay>
           <div className="flex items-end justify-center gap-3 [@media(max-height:520px)]:hidden">
-            <SpriteStrip name="truck-drive" frames={4} size={84} durationMs={640} />
+            <SpriteStrip name={`${mapTheme.spritePrefix}truck-drive`} frames={4} size={84} durationMs={640} />
             <SpriteStrip name="item-pet" frames={4} size={48} durationMs={1200} />
-            <SpriteStrip name="cloud-chaser" frames={4} size={64} durationMs={900} />
+            <SpriteStrip name={`${mapTheme.spritePrefix}cloud-chaser`} frames={4} size={64} durationMs={900} />
           </div>
-          <h2 className="mt-2 text-[22px] font-bold tracking-tight text-white [@media(max-height:520px)]:mt-0">¡A limpiar la ciudad!</h2>
+          <h2 className="mt-2 text-[22px] font-bold tracking-tight text-white [@media(max-height:520px)]:mt-0">{mapTheme.text.startTitle}</h2>
           <p className="mx-auto mt-1.5 max-w-[400px] text-[13.5px] leading-relaxed text-slate-300">
-            Para salvar la ciudad, <b className="text-white">recoge todas las botellas PET</b> con el {config.collectorLabel.toLowerCase()} y esquiva las nubes de contaminación.{' '}
+            Para salvar {mapTheme.text.place}, <b className="text-white">recoge todas las botellas PET</b> con el {config.collectorLabel.toLowerCase()} y esquiva {mapTheme.text.enemies}.{' '}
             {game.question && (
               <>
                 Lee la pregunta y <b className="text-white">maneja hasta la respuesta correcta</b> antes de que se acabe el tiempo: una equivocada te quita una vida.{' '}
@@ -835,7 +835,7 @@ function MazeCollectorSession({
           <img src={mazeSpriteUrl('ui-trophy')} alt="" className="mx-auto h-20 w-20 animate-[maze-levelup-pop_0.4s_cubic-bezier(0.16,1,0.3,1)]" />
           <h2 className="mt-1 text-[22px] font-bold text-white">¡Ronda {game.level} superada!</h2>
           <p className="text-[14px] text-slate-300">
-            {game.targetRounds - game.level === 1 ? 'Falta 1 ronda' : `Faltan ${game.targetRounds - game.level} rondas`} para salvar la ciudad — las nubes vienen más
+            {game.targetRounds - game.level === 1 ? 'Falta 1 ronda' : `Faltan ${game.targetRounds - game.level} rondas`} para salvar {mapTheme.text.place}: los obstáculos vienen más
             rápido…
           </p>
         </Overlay>
@@ -843,11 +843,11 @@ function MazeCollectorSession({
 
       {game.phase === 'lost' && (
         <Overlay>
-          <SpriteStrip name="truck-hit" frames={1} size={96} className="mx-auto" />
-          <h2 className="mt-1 text-[22px] font-bold text-white">Sin batería</h2>
+          <SpriteStrip name={`${mapTheme.spritePrefix}truck-hit`} frames={1} size={96} className="mx-auto" />
+          <h2 className="mt-1 text-[22px] font-bold text-white">{mapTheme.text.lostTitle}</h2>
           {game.lostReason && (
             <p className="mb-2 text-[15px] font-bold text-rose-300" data-lost-reason={game.lostReason}>
-              {game.lostReason === 'timeout' ? '¡Se acabó el tiempo!' : game.lostReason === 'wrong' ? 'Esa no era la respuesta' : 'Te alcanzó una nube'}
+              {game.lostReason === 'timeout' ? '¡Se acabó el tiempo!' : game.lostReason === 'wrong' ? 'Esa no era la respuesta' : `Te alcanzó ${mapTheme.text.enemyOne}`}
             </p>
           )}
           <p className="mb-4 flex items-center justify-center gap-1.5 text-[14px] text-slate-300">
@@ -884,7 +884,7 @@ function MazeCollectorSession({
       )}
 
       {questionIntro && !guideOpen && (
-        <QuestionIntro question={questionIntro} number={game.answeredCorrect + 1} timed={!tutorial} onGo={startSearching} />
+        <QuestionIntro question={questionIntro} number={game.answeredCorrect + 1} timed={!tutorial} onGo={startSearching} enemyOne={mapTheme.text.enemyOne} />
       )}
 
       {game.paused && !guideOpen && !questionIntro && (
@@ -1034,7 +1034,20 @@ function EndButtons({ onPlayAgain, onExit }: { onPlayAgain: () => void; onExit: 
 }
 
 /** La pregunta en grande antes de salir a buscar la respuesta (el juego queda en pausa). */
-function QuestionIntro({ question, number, timed, onGo }: { question: ActiveQuestion; number: number; timed: boolean; onGo: () => void }) {
+function QuestionIntro({
+  question,
+  number,
+  timed,
+  onGo,
+  enemyOne,
+}: {
+  question: ActiveQuestion
+  number: number
+  timed: boolean
+  onGo: () => void
+  /** "una nube", "un contaminante"…: lo que llega si se demora (ver mazeMaps.ts). */
+  enemyOne: string
+}) {
   return (
     <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#0b1220]/75 p-2 backdrop-blur-[2px] sm:p-6">
       <section
@@ -1068,7 +1081,7 @@ function QuestionIntro({ question, number, timed, onGo }: { question: ActiveQues
             <>
               {' '}
               Tienes <b className="text-amber-300">{QUESTION_TIME_MS / 1000} segundos</b>: si se acaban, también pierdes una vida. Y cada{' '}
-              {EXTRA_CLOUD_EVERY_MS / 1000} segundos sin responder <b className="text-rose-300">llega una nube más</b>.
+              {EXTRA_CLOUD_EVERY_MS / 1000} segundos sin responder <b className="text-rose-300">llega {enemyOne} más</b>.
             </>
           )}
         </p>
@@ -1171,8 +1184,8 @@ function QuestionClock({ remainingMs, compact }: { remainingMs: number; compact?
   )
 }
 
-/** Aviso de que llegó una nube más por demorarse en responder. */
-function CloudAlert() {
+/** Aviso de que llegó un obstáculo más por demorarse en responder. */
+function CloudAlert({ emoji, enemyAnother }: { emoji: string; enemyAnother: string }) {
   const [visible, setVisible] = useState(true)
   useEffect(() => {
     const timer = window.setTimeout(() => setVisible(false), 2200)
@@ -1184,7 +1197,7 @@ function CloudAlert() {
       role="status"
       className="pointer-events-none absolute left-1/2 top-4 z-40 -translate-x-1/2 animate-[fade-in-up_0.3s_ease-out] rounded-full border-2 border-rose-300 bg-rose-950/90 px-5 py-2 text-center text-[15px] font-black text-rose-100 shadow-xl"
     >
-      ☁️ ¡Llegó otra nube! Responde la pregunta
+      {emoji} ¡Llegó {enemyAnother}! Responde la pregunta
     </p>
   )
 }

@@ -22,6 +22,24 @@ export type MazeMapTheme = {
    */
   sideView: boolean
   playerName: string
+  /** Textos del juego que nombran al muñeco, al lugar y a los obstáculos. */
+  text: {
+    /** "tu camión" */
+    player: string
+    /** "la ciudad" */
+    place: string
+    /** "una nube" */
+    enemyOne: string
+    /** "otra nube" */
+    enemyAnother: string
+    /** "las nubes de contaminación" */
+    enemies: string
+    /** Título al empezar: "¡A limpiar la ciudad!" */
+    startTitle: string
+    /** Título al perder todas las vidas: "Sin batería" */
+    lostTitle: string
+    emoji: string
+  }
 }
 
 export const MAZE_MAPS: Record<MazeLayout, MazeMapTheme> = {
@@ -33,6 +51,7 @@ export const MAZE_MAPS: Record<MazeLayout, MazeMapTheme> = {
     background: 'city-map',
     sideView: false,
     playerName: 'Camión reciclador',
+    text: { player: 'tu camión', place: 'la ciudad', enemyOne: 'una nube', enemyAnother: 'otra nube', enemies: 'las nubes de contaminación', startTitle: '¡A limpiar la ciudad!', lostTitle: 'Sin batería', emoji: '☁️' },
   },
   AMAZON: {
     id: 'AMAZON',
@@ -42,6 +61,7 @@ export const MAZE_MAPS: Record<MazeLayout, MazeMapTheme> = {
     background: 'amazon-map',
     sideView: true,
     playerName: 'Ranger de la selva',
+    text: { player: 'tu ranger', place: 'la selva', enemyOne: 'un contaminante', enemyAnother: 'otro contaminante', enemies: 'los contaminantes del río', startTitle: '¡A salvar la selva!', lostTitle: '¡Ranger agotado!', emoji: '🛢️' },
   },
   OCEAN: {
     id: 'OCEAN',
@@ -51,6 +71,7 @@ export const MAZE_MAPS: Record<MazeLayout, MazeMapTheme> = {
     background: 'ocean-map',
     sideView: true,
     playerName: 'Submarino recolector',
+    text: { player: 'tu submarino', place: 'el océano', enemyOne: 'un contaminante', enemyAnother: 'otro contaminante', enemies: 'la contaminación del mar', startTitle: '¡A limpiar el océano!', lostTitle: '¡Submarino averiado!', emoji: '🛢️' },
   },
   PARAMO: {
     id: 'PARAMO',
@@ -60,5 +81,6 @@ export const MAZE_MAPS: Record<MazeLayout, MazeMapTheme> = {
     background: 'paramo-map',
     sideView: true,
     playerName: 'Guardián del páramo',
+    text: { player: 'tu guardián', place: 'el páramo', enemyOne: 'una amenaza', enemyAnother: 'otra amenaza', enemies: 'las amenazas del páramo', startTitle: '¡A proteger el páramo!', lostTitle: '¡Guardián agotado!', emoji: '🔥' },
   },
 }

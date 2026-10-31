@@ -90,7 +90,7 @@ export function MazeCollectorPlayPage() {
       layout={MAZE_LAYOUTS[normalizeMazeLayout(config.layout)]}
       items={game.content as MazeCollectorItem[]}
       config={config}
-      questions={questionsForGame((game.config as { questions?: unknown } | null)?.questions)}
+      questions={questionsForGame((game.config as { questions?: unknown } | null)?.questions, normalizeMazeLayout(config.layout))}
       onExit={handleExit}
     />
   )
