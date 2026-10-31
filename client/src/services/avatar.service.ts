@@ -7,11 +7,17 @@ import type { AuthUser } from './auth.service'
  * `components/avatar/avatarConfig.ts` y el servidor valida lo mismo.
  */
 export type AvatarConfig = {
+  /** Peinado (null: sin pelo). */
   top: string | null
+  /** Gorro, encima del peinado (null: sin gorro). */
+  hat: string | null
   hairColor: string
   hatColor: string
   skinColor: string
+  /** Torso. */
   outfit: string
+  pants: string
+  shoes: string
   shirtColor: string
   jacketColor: string
   pantsColor: string

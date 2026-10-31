@@ -201,6 +201,264 @@ export const DUO_QUESTION_BANK: readonly DuoQuestion[] = [
     hints: ['Uno es cambiar algo; el otro, un hábito.', 'Un aparato en espera sigue gastando.'],
     explanation: 'Un LED gasta mucho menos, y desconectar evita el consumo "fantasma".',
   },
+  // ---- Río ----
+  {
+    id: 'rio-cuenca',
+    level: 'rio',
+    concept: 'De dónde viene el agua del río',
+    parts: {
+      FIRE: {
+        prompt: '¿Cómo se llama el territorio cuya agua de lluvia termina en un mismo río?',
+        options: ['La cuenca', 'El delta', 'La represa', 'El puerto'],
+      },
+      WATER: {
+        prompt: '¿Qué ecosistema de montaña es el nacimiento de muchos ríos de Colombia?',
+        options: ['El páramo', 'El desierto', 'La playa', 'El manglar'],
+      },
+    },
+    hints: ['Piensa en todo el terreno que rodea al río.', 'Allí crecen los frailejones.'],
+    explanation: 'Cada río recoge el agua de su cuenca, y muchos nacen en los páramos: cuidarlos es cuidar el agua.',
+  },
+  {
+    id: 'rio-ciclo',
+    level: 'rio',
+    concept: 'El ciclo del agua',
+    parts: {
+      FIRE: {
+        prompt: '¿Cómo se llama el paso del agua líquida a vapor por el calor del sol?',
+        options: ['Evaporación', 'Condensación', 'Precipitación', 'Infiltración'],
+      },
+      WATER: {
+        prompt: '¿Cómo se llama la lluvia, el granizo o la nieve que cae de las nubes?',
+        options: ['Precipitación', 'Evaporación', 'Filtración', 'Erosión'],
+      },
+    },
+    hints: ['Uno sube al cielo como vapor.', 'El otro cae de las nubes.'],
+    explanation: 'El agua se evapora, forma nubes y vuelve a caer como precipitación: es la misma agua dando vueltas.',
+  },
+  {
+    id: 'rio-limpio',
+    level: 'rio',
+    concept: 'Un río limpio',
+    parts: {
+      FIRE: {
+        prompt: '¿Qué NO se debe echar por el lavaplatos ni al río?',
+        options: ['Aceite de cocina usado', 'Agua de lluvia', 'Agua del grifo', 'Agua con la que se lavaron frutas'],
+      },
+      WATER: {
+        prompt: '¿Qué hace una planta de tratamiento de aguas residuales?',
+        options: ['Limpia el agua usada antes de devolverla al río', 'Fabrica botellas', 'Produce gasolina', 'Calienta el agua de las casas'],
+      },
+    },
+    hints: ['Un litro contamina muchísima agua.', 'La planta del final del río pasa de sucia a limpia.'],
+    explanation: 'El aceite usado se guarda en una botella y se lleva a un punto de recolección; las plantas de tratamiento limpian el agua antes de devolverla.',
+  },
+  {
+    id: 'rio-ahorro',
+    level: 'rio',
+    concept: 'Ahorrar agua',
+    parts: {
+      FIRE: {
+        prompt: '¿Qué ahorra más agua al cepillarse los dientes?',
+        options: ['Cerrar la llave mientras te cepillas', 'Dejar la llave abierta', 'Usar agua caliente', 'Cepillarte dos veces seguidas'],
+      },
+      WATER: {
+        prompt: 'Una ducha gasta 10 litros por minuto. ¿Cuántos litros ahorras si te bañas 5 minutos en vez de 10?',
+        options: ['50 litros', '10 litros', '5 litros', '100 litros'],
+      },
+    },
+    hints: ['Uno es un hábito.', 'El otro se resuelve multiplicando.'],
+    explanation: 'Cerrar la llave y bañarse más rápido ahorra decenas de litros cada día.',
+  },
+  {
+    id: 'rio-orilla',
+    level: 'rio',
+    concept: 'Los árboles de la orilla',
+    parts: {
+      FIRE: {
+        prompt: '¿Para qué sirven los árboles en la orilla de un río?',
+        options: ['Sostienen la tierra para que no caiga al agua', 'Calientan el agua', 'Secan el río', 'Atraen basura'],
+      },
+      WATER: {
+        prompt: '¿Qué le pasa a un río si talan el bosque que lo rodea?',
+        options: ['Le cae más tierra y en verano lleva menos agua', 'Se vuelve más limpio', 'Tiene más peces', 'No le pasa nada'],
+      },
+    },
+    hints: ['Piensa en las raíces.', 'Sin bosque, la lluvia arrastra la tierra.'],
+    explanation: 'Las raíces sostienen las orillas y el bosque guarda agua: sin él, el río se llena de tierra y se seca más.',
+  },
+  // ---- Reciclaje ----
+  {
+    id: 'reciclaje-canecas',
+    level: 'reciclaje',
+    concept: 'Separar en la fuente',
+    parts: {
+      FIRE: {
+        prompt: 'En Colombia, ¿de qué color es la caneca para plástico, vidrio, metal, papel y cartón limpios?',
+        options: ['Blanca', 'Negra', 'Verde', 'Roja'],
+      },
+      WATER: {
+        prompt: 'En Colombia, ¿de qué color es la caneca para restos de comida y cáscaras?',
+        options: ['Verde', 'Blanca', 'Negra', 'Azul'],
+      },
+    },
+    hints: ['Son tres colores: blanco, verde y negro.', 'Lo orgánico tiene el color de las plantas.'],
+    explanation: 'Blanca para lo aprovechable, verde para lo orgánico y negra para lo que no se aprovecha.',
+  },
+  {
+    id: 'reciclaje-negra',
+    level: 'reciclaje',
+    concept: 'Lo que no se aprovecha',
+    parts: {
+      FIRE: {
+        prompt: '¿En qué caneca va una servilleta usada?',
+        options: ['En la negra', 'En la blanca', 'En la verde', 'En cualquiera'],
+      },
+      WATER: {
+        prompt: '¿Por qué hay que vaciar y enjuagar un envase antes de reciclarlo?',
+        options: ['Para que no ensucie el resto del material', 'Para que pese más', 'Porque el agua lo derrite', 'No hace falta'],
+      },
+    },
+    hints: ['Lo que está sucio ya no se puede reciclar.', 'Un envase sucio daña todo lo que toca.'],
+    explanation: 'Lo sucio o contaminado va a la negra; un envase limpio sí se puede convertir en algo nuevo.',
+  },
+  {
+    id: 'reciclaje-compost',
+    level: 'reciclaje',
+    concept: 'El compostaje',
+    parts: {
+      FIRE: {
+        prompt: '¿Qué se obtiene al compostar restos de frutas y verduras?',
+        options: ['Abono para las plantas', 'Plástico nuevo', 'Gasolina', 'Vidrio'],
+      },
+      WATER: {
+        prompt: '¿Qué NO debe ir a la compostera?',
+        options: ['Bolsas plásticas', 'Cáscaras de banano', 'Hojas secas', 'Cuncho de café'],
+      },
+    },
+    hints: ['Las lombrices ayudan.', 'Solo va lo que se pudre solo.'],
+    explanation: 'El compost convierte los restos orgánicos en abono; el plástico no se descompone y lo daña.',
+  },
+  {
+    id: 'reciclaje-3r',
+    level: 'reciclaje',
+    concept: 'Reducir y reutilizar',
+    parts: {
+      FIRE: {
+        prompt: '¿Cuál de estas acciones es REDUCIR?',
+        options: ['Llevar tu propia bolsa de tela al mercado', 'Pedir una bolsa nueva cada vez', 'Comprar más empaques', 'Quemar la basura'],
+      },
+      WATER: {
+        prompt: '¿Cuál de estas acciones es REUTILIZAR?',
+        options: ['Usar un frasco de vidrio como portalápices', 'Botar el frasco', 'Comprar frascos nuevos cada semana', 'Romper el frasco'],
+      },
+    },
+    hints: ['Reducir es generar menos basura.', 'Reutilizar es darle otro uso a lo mismo.'],
+    explanation: 'Lo mejor es no generar basura (reducir); después, darle otro uso (reutilizar) y por último reciclar.',
+  },
+  {
+    id: 'reciclaje-calculo',
+    level: 'reciclaje',
+    concept: 'Cuánto se tarda y cuánto se junta',
+    parts: {
+      FIRE: {
+        prompt: '¿Qué tarda MÁS en degradarse en la naturaleza?',
+        options: ['Una botella de plástico', 'Una cáscara de naranja', 'Una hoja de papel', 'Un corazón de manzana'],
+      },
+      WATER: {
+        prompt: 'Un colegio separa 30 kg de cartón por semana. ¿Cuántos kg separa en 4 semanas?',
+        options: ['120 kg', '34 kg', '90 kg', '7,5 kg'],
+      },
+    },
+    hints: ['Uno dura cientos de años.', 'El otro se multiplica.'],
+    explanation: 'Una botella puede durar cientos de años; separar cada semana suma mucho material que se recupera.',
+  },
+  // ---- Ciudad ----
+  {
+    id: 'ciudad-movilidad',
+    level: 'ciudad',
+    concept: 'Moverse por la ciudad',
+    parts: {
+      FIRE: {
+        prompt: '¿Qué transporte con cables y cabinas sube a los barrios de montaña, como en Medellín?',
+        options: ['El metrocable', 'El avión', 'El barco', 'El tren de vapor'],
+      },
+      WATER: {
+        prompt: '¿Cómo se llama el carril exclusivo para bicicletas?',
+        options: ['Ciclorruta', 'Autopista', 'Peaje', 'Bahía'],
+      },
+    },
+    hints: ['Es como el teleférico de este escenario.', 'Mira el piso por el que caminan.'],
+    explanation: 'El metrocable y la bicicleta mueven a mucha gente sin llenar la ciudad de humo.',
+  },
+  {
+    id: 'ciudad-semaforo',
+    level: 'ciudad',
+    concept: 'Cruzar la calle',
+    parts: {
+      FIRE: {
+        prompt: '¿Qué indica el muñeco verde del semáforo peatonal?',
+        options: ['Que el peatón puede cruzar', 'Que los carros deben acelerar', 'Que hay que correr', 'Que el semáforo está dañado'],
+      },
+      WATER: {
+        prompt: '¿Por dónde debe cruzar un peatón la calle?',
+        options: ['Por la cebra o el paso peatonal', 'Por la mitad de la cuadra', 'Entre los carros', 'Por donde quiera'],
+      },
+    },
+    hints: ['Verde es "siga".', 'Tiene rayas blancas en el piso.'],
+    explanation: 'Se cruza por la cebra y con el semáforo peatonal en verde: así los conductores te esperan.',
+  },
+  {
+    id: 'ciudad-verde',
+    level: 'ciudad',
+    concept: 'Una ciudad con plantas',
+    parts: {
+      FIRE: {
+        prompt: '¿Qué hacen los árboles de la ciudad por el aire?',
+        options: ['Lo limpian y dan sombra', 'Lo calientan', 'Lo llenan de humo', 'Nada'],
+      },
+      WATER: {
+        prompt: '¿Cómo se llaman los techos cubiertos de plantas?',
+        options: ['Techos verdes', 'Techos de zinc', 'Techos de vidrio', 'Tejados de barro'],
+      },
+    },
+    hints: ['Piensa en la sombra de un parque.', 'Su nombre es su color.'],
+    explanation: 'Árboles y techos verdes limpian el aire, refrescan la ciudad y guardan el agua de la lluvia.',
+  },
+  {
+    id: 'ciudad-energia',
+    level: 'ciudad',
+    concept: 'Iluminar la ciudad',
+    parts: {
+      FIRE: {
+        prompt: '¿Qué bombillo conviene en el alumbrado público para gastar menos energía?',
+        options: ['LED', 'Incandescente', 'Halógeno', 'Vela'],
+      },
+      WATER: {
+        prompt: 'Un farol solar se carga de día. ¿Con qué se carga?',
+        options: ['Con un panel solar', 'Con gasolina', 'Con leña', 'Con carbón'],
+      },
+    },
+    hints: ['Es el mismo de la casa que ahorra.', 'Mira el poste con el panel del escenario.'],
+    explanation: 'Los faroles LED y solares iluminan la ciudad gastando poca energía, y la solar es limpia.',
+  },
+  {
+    id: 'ciudad-calculo',
+    level: 'ciudad',
+    concept: 'Calcular el viaje',
+    parts: {
+      FIRE: {
+        prompt: 'Una cabina del teleférico lleva 8 personas. ¿Cuántas personas llevan 5 cabinas?',
+        options: ['40', '13', '35', '45'],
+      },
+      WATER: {
+        prompt: 'En bicicleta recorres 12 km en 1 hora. ¿Cuántos km recorres en media hora?',
+        options: ['6 km', '12 km', '24 km', '3 km'],
+      },
+    },
+    hints: ['Uno multiplica.', 'El otro divide entre 2.'],
+    explanation: 'Calcular cuánta gente se mueve y cuánto tarda ayuda a planear una ciudad sin trancones.',
+  },
 ];
 
 export function questionsOf(level: string): DuoQuestion[] {

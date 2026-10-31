@@ -5,10 +5,12 @@ import {
   collectCoins,
   collectGems,
   createWorldState,
+  floaterOf,
   gateWithBothOnPedestals,
   scaleSideOf,
   updateFlags,
   updateKeys,
+  updatePools,
   updateScales,
   updateSwitches,
 } from './shared/duoWorld.js';
@@ -296,10 +298,11 @@ export function applyClientState(room: DuoRoomState, userId: string, state: DuoC
   };
   const riding = s.mover && typeof s.mover === 'object' ? s.mover : null;
   if (riding && typeof riding.id === 'string' && finite(riding.dx)) {
-    // Plataforma móvil o un lado de báscula que existan en el escenario.
+    // Plataforma móvil, lado de báscula o tronco que existan en el escenario.
     const mover = level.def.movers?.find((m) => m.id === riding.id);
     const side = scaleSideOf(level, riding.id);
-    const width = mover ? mover.width : side ? side.scale[side.side].width : null;
+    const floater = floaterOf(level, riding.id);
+    const width = mover ? mover.width : side ? side.scale[side.side].width : floater ? floater.width : null;
     if (width !== null) player.state.mover = { id: riding.id, dx: Math.max(-TILE, Math.min((width + 1) * TILE, riding.dx)) };
   }
   player.stateAt = now;
@@ -331,12 +334,21 @@ function shuffled(n: number, rng: () => number): number[] {
   return order;
 }
 
+/**
+ * Pregunta para la próxima puerta, sin repetir mientras queden otras. Un juego
+ * con preguntas propias las usa en todos sus escenarios: primero las escritas
+ * para este y, si no alcanzan, las de los demás. Sin propias, sale del banco
+ * del escenario.
+ */
 function pickQuestion(room: DuoRoomState, rng: () => number): DuoQuestion {
-  const custom = room.customQuestions.filter((q) => q.level === room.levelId);
-  const pool = custom.length > 0 ? custom : questionsOf(room.levelId);
-  const fresh = pool.filter((q) => !room.usedQuestionIds.includes(q.id));
-  const from = fresh.length > 0 ? fresh : pool;
-  return from[Math.floor(rng() * from.length)];
+  const own = room.customQuestions;
+  const tiers = own.length > 0 ? [own.filter((q) => q.level === room.levelId), own] : [questionsOf(room.levelId)];
+  for (const pool of tiers) {
+    const fresh = pool.filter((q) => !room.usedQuestionIds.includes(q.id));
+    if (fresh.length > 0) return fresh[Math.floor(rng() * fresh.length)];
+  }
+  const pool = tiers.find((t) => t.length > 0) ?? [];
+  return pool[Math.floor(rng() * pool.length)];
 }
 
 function shuffleOptions(active: ActiveQuestion, rng: () => number): void {
@@ -423,6 +435,7 @@ export function tickDuoRoom(room: DuoRoomState, now: number, rng: () => number =
     stepHeavyCrates(level, room.world, bodies, dt, now / 1000, room.heavyFall);
     updateScales(level, room.world, bodies, dt);
     updateSwitches(level, room.world, bodies);
+    updatePools(level, room.world, dt);
     for (const coin of collectCoins(level, room.world, bodies)) {
       const def = level.def.coins.find((c) => c.id === coin.id);
       notices.push({ kind: 'coin', by: coin.by, hintsForGate: def ? coinsForGate(level, room.world, def.gate) : 0 });

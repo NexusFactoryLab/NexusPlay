@@ -1,5 +1,21 @@
-import { TILE, crateSpawn, isLiquidTile, isSolidTile, moverRect, scaleSideId, tileAt, type DuoLevel, type TileKind } from './duoLevel.js';
-import { PLAYER_H, PLAYER_W, crateRect, dynamicSolids, playerRect, scaleSideOf, scaleSides, touchesActiveBarrier, type DynamicSolids } from './duoWorld.js';
+import { BELT_SPEED, CURRENT_SPEED, TILE, crateSpawn, floaterMoverId, isLiquidTile, isSolidTile, moverRect, pressHeadRect, scaleSideId, tileAt, type DuoLevel, type TileKind } from './duoLevel.js';
+import {
+  PLAYER_H,
+  PLAYER_W,
+  crateRect,
+  dynamicSolids,
+  floaterOf,
+  floaterSurfaces,
+  flowDirection,
+  inCurrent,
+  inPoolWater,
+  playerRect,
+  pressK,
+  scaleSideOf,
+  scaleSides,
+  touchesActiveBarrier,
+  type DynamicSolids,
+} from './duoWorld.js';
 import type { DuoAnim, DuoInput, DuoPlayerNet, DuoRole, DuoWorldState, Rect } from './duoTypes.js';
 
 /** Paso fijo de la simulación (s). El cliente corre varios por cuadro si hace falta. */
@@ -35,7 +51,7 @@ export const PHYS = {
   heavyPushSpeed: 110,
 } as const;
 
-export type DeathCause = 'lava' | 'water' | 'sludge' | 'thorns' | 'fall' | 'electric';
+export type DeathCause = 'lava' | 'water' | 'sludge' | 'thorns' | 'fall' | 'electric' | 'press';
 
 export interface PlayerSim {
   role: DuoRole;
@@ -171,6 +187,9 @@ function oneWayTops(level: DuoLevel, dyn: DynamicSolids, x: number, w: number, f
 /** Margen (px) con el que una superficie que se mueve ataja a quien cae sobre ella. */
 const MOVING_CATCH = 6;
 
+/** Lo más alto (px) que se sube caminando, sin saltar. */
+const STEP_UP = 10;
+
 /** Mueve una caja en x lo que pueda (sin atravesar nada). Devuelve lo que se movió. */
 function pushCrateX(level: DuoLevel, dyn: DynamicSolids, crates: CrateSim[], crate: CrateSim, dx: number): number {
   const next = { ...crateRect(crate), x: crate.x + dx };
@@ -211,15 +230,18 @@ export function stepCrate(level: DuoLevel, world: DuoWorldState, crates: CrateSi
   } else {
     crate.y += dy;
   }
-  const center = tileAt(level, Math.floor((crate.x + rect.w / 2) / TILE), Math.floor((crate.y + rect.h / 2) / TILE));
-  return !isLiquidTile(center) && crate.y < level.heightPx;
+  const cx = crate.x + rect.w / 2;
+  const cy = crate.y + rect.h / 2;
+  const center = tileAt(level, Math.floor(cx / TILE), Math.floor(cy / TILE));
+  return !isLiquidTile(center) && !inPoolWater(level, world, cx, cy) && crate.y < level.heightPx;
 }
 
 /** Qué celda de peligro toca el personaje, si alguna. */
-function hazardUnder(level: DuoLevel, p: PlayerSim): TileKind | null {
+function hazardUnder(level: DuoLevel, world: DuoWorldState, p: PlayerSim): TileKind | null {
   // Los líquidos se miran a la altura de los pies (un poco adentro del cuerpo).
   const feet = tileAt(level, Math.floor(p.x / TILE), Math.floor((p.y - 10) / TILE));
   if (isLiquidTile(feet)) return feet;
+  if (inPoolWater(level, world, p.x, p.y - 10)) return 'water';
   // Las espinas ocupan la mitad baja de su celda.
   const rect = playerRect(p);
   const c0 = Math.floor(rect.x / TILE);
@@ -270,6 +292,46 @@ function noteMover(level: DuoLevel, world: DuoWorldState, p: PlayerSim, time: nu
       return;
     }
   }
+  for (const { floater, rect } of floaterSurfaces(level, world)) {
+    if (!on(rect)) continue;
+    p.standingOn = floaterMoverId(floater.id);
+    p.moverDx = p.x - rect.x;
+    return;
+  }
+}
+
+/**
+ * Arrastre horizontal (px/s) de las cintas sobre las que va parado y de las
+ * corrientes en las que nada (según el paso anterior).
+ */
+function flowDrift(level: DuoLevel, world: DuoWorldState, p: PlayerSim): number {
+  let drift = 0;
+  for (const flow of level.def.flows ?? []) {
+    const dir = flowDirection(flow, world.switches);
+    if (dir === 0) continue;
+    if (flow.kind === 'belt') {
+      // Arrastra mientras algo del cuerpo pisa la cinta (igual que el piso lo sostiene): en la punta lo saca.
+      const onBelt =
+        p.grounded && Math.abs(p.y - flow.row * TILE) < 1 && p.x + PLAYER_W / 2 > flow.col * TILE && p.x - PLAYER_W / 2 < (flow.col + flow.width) * TILE;
+      if (onBelt) drift += dir * BELT_SPEED;
+    } else if (p.swimming && inCurrent(flow, p.x, p.y - 10)) {
+      drift += dir * CURRENT_SPEED;
+    }
+  }
+  return drift;
+}
+
+/** ¿Lo aplasta el cabezal de una prensa que está bajando o abajo? */
+function crushedByPress(level: DuoLevel, world: DuoWorldState, p: PlayerSim, time: number): boolean {
+  const body = playerRect(p);
+  const inner = { x: body.x + 6, y: body.y + 4, w: body.w - 12, h: body.h - 4 };
+  for (const press of level.def.presses ?? []) {
+    const k = pressK(press, world, time);
+    if (k < 0.15) continue;
+    const head = pressHeadRect(press, k);
+    if (inner.x < head.x + head.w && inner.x + inner.w > head.x && inner.y < head.y + head.h && inner.y + inner.h > head.y) return true;
+  }
+  return false;
 }
 
 /** Un paso de simulación del personaje propio. */
@@ -289,9 +351,14 @@ export function stepPlayer(p: PlayerSim, input: DuoInput, ctx: StepContext, dt: 
   const time = ctx.time ?? 0;
   const dyn = dynamicSolids(level, ctx.world, time);
 
-  // --- Báscula: quien va parado en un lado sube o baja con él ---
+  // --- Báscula y troncos: quien va parado encima sube o baja con ellos ---
   const riding = p.grounded ? scaleSideOf(level, p.standingOn ?? undefined) : null;
   if (riding) p.y = scaleSides(riding.scale, ctx.world)[riding.side].y;
+  const floating = p.grounded ? floaterOf(level, p.standingOn ?? undefined) : null;
+  if (floating) {
+    const surface = floaterSurfaces(level, ctx.world).find((f) => f.floater.id === floating.id);
+    if (surface) p.y = surface.rect.y;
+  }
 
   // --- Plataformas móviles: quien está parado encima viaja con ellas ---
   if (p.grounded) {
@@ -336,9 +403,9 @@ export function stepPlayer(p: PlayerSim, input: DuoInput, ctx: StepContext, dt: 
   if (input.down && p.grounded) p.dropTimer = PHYS.dropThrough;
   else p.dropTimer = Math.max(0, p.dropTimer - dt);
 
-  // --- Mover en x (empujando cajas) ---
+  // --- Mover en x (empujando cajas; las cintas y corrientes arrastran) ---
   p.pushing = false;
-  const dx = p.vx * dt;
+  const dx = (p.vx + flowDrift(level, ctx.world, p)) * dt;
   if (dx !== 0) {
     let target = p.x + dx;
     const half = PLAYER_W / 2;
@@ -357,6 +424,15 @@ export function stepPlayer(p: PlayerSim, input: DuoInput, ctx: StepContext, dt: 
       }
     }
     blockers = blockersFor(level, dyn, ctx.crates, next);
+    // Un borde apenas más alto que los pies (al bajarse de un teleférico, un
+    // tronco o una báscula que quedó unos píxeles abajo) se sube caminando.
+    if (p.grounded && blockers.length > 0 && blockers.every((b) => !b.crate && b.rect.y < p.y && p.y - b.rect.y <= STEP_UP)) {
+      const top = Math.min(...blockers.map((b) => b.rect.y));
+      if (blockersFor(level, dyn, ctx.crates, { ...next, y: top - PLAYER_H }).length === 0) {
+        p.y = top;
+        blockers = [];
+      }
+    }
     for (const b of blockers) {
       if (dx > 0) target = Math.min(target, b.rect.x - half);
       else target = Math.max(target, b.rect.x + b.rect.w + half);
@@ -427,11 +503,12 @@ export function stepPlayer(p: PlayerSim, input: DuoInput, ctx: StepContext, dt: 
   noteMover(level, ctx.world, p, time);
 
   // --- Líquidos y peligros ---
-  const hazard = hazardUnder(level, p);
+  const hazard = hazardUnder(level, ctx.world, p);
   const ownLiquid = (p.role === 'FIRE' && hazard === 'lava') || (p.role === 'WATER' && hazard === 'water');
   p.swimming = ownLiquid;
   if (hazard && !ownLiquid) return kill(p, hazard as DeathCause);
-  if (touchesActiveBarrier(level, ctx.world, playerRect(p))) return kill(p, 'electric');
+  if (touchesActiveBarrier(level, ctx.world, playerRect(p), time)) return kill(p, 'electric');
+  if (crushedByPress(level, ctx.world, p, time)) return kill(p, 'press');
   return bounced ? { kind: 'bounced' } : null;
 }
 

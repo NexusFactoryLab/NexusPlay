@@ -5,7 +5,9 @@ Pasos:
   1. Descargarlas en una carpeta de trabajo (Lumen_Sprite_Sheet.jpg, ...).
   2. Quitarles el cuadriculado falso, una por una:
        py clean-duo-logico-sheet.py <trabajo>/Lumen_Sprite_Sheet.jpg <trabajo>/Lumen_Sprite_Sheet.png
-     (igual para Gota_Sprite_Sheet, Assets_Interaccion, Trampas_Hazards, Tileset_Plataformas)
+     (igual para Gota_Sprite_Sheet, Assets_Interaccion, Trampas_Hazards, Tileset_Plataformas,
+     objetos-generales, tiles-solar, objetos-solar, objetos-rio, tiles-reciclaje,
+     objetos-reciclaje, tiles-ciudad y objetos-ciudad; los fondos fondo-*.jpg van tal cual)
   3. py build-duo-logico-assets.py ../public/assets/duo-logico <trabajo>
 Requiere numpy, scipy y Pillow.
 
@@ -21,6 +23,8 @@ Salida en client/public/assets/duo-logico/:
   terrain.webp/json                -> piezas del bosque (tapas, ramas, decoración)
   dirt.webp, grass.webp, lava.webp, lava-top-*.webp, sludge*.webp  -> texturas repetibles
   bosque.webp                      -> fondo
+  general.webp/json                -> llaves, puerta con candado, gemas, banderas, hongo
+  <id>-fill/top/terrain/objects/bg -> escenarios solar, rio, reciclaje y ciudad (ver THEMES)
 """
 import json
 import os
@@ -530,30 +534,132 @@ THEMES = {
             'battery-2': ((691, 863, 986, 1097), False, (0.5, 1)),
         },
     },
+    # Issue #132. Las hojas nuevas son más chicas (1024 x 559): se guardan a
+    # tamaño completo para que no se vean borrosas al dibujarlas.
+    # Río: Drive no trae suelo propio, así que usa el del bosque (solo objetos y fondo).
+    'rio': {
+        'tiles': None, 'bg': 'fondo-rio.jpg', 'sheet': 'objetos-rio', 'scale': 1.0,
+        'objects': {
+            'sluice-closed': ((33, 206, 49, 198), False, (0.5, 1)),
+            'sluice-half': ((33, 229, 226, 377), False, (0.5, 1)),
+            'sluice-open': ((33, 231, 406, 567), False, (0.5, 1)),
+            'purifier-dirty': ((32, 214, 593, 774), False, (0.5, 1)),
+            'purifier-clean': ((32, 214, 800, 981), False, (0.5, 1)),
+            'current': ((258, 366, 229, 355), False, (0, 0)),
+            'log-small': ((266, 350, 472, 590), False, (0.5, 0.5)),
+            'log-long': ((252, 352, 664, 987), False, (0.5, 0.5)),
+            'valve-down': ((400, 523, 54, 232), False, (0.5, 1)),
+            'valve-up': ((400, 523, 287, 465), False, (0.5, 1)),
+            'fish': ((406, 517, 564, 699), False, (0.5, 0.5)),
+            'lily': ((402, 521, 775, 976), False, (0.5, 0.5)),
+        },
+    },
+    'reciclaje': {
+        'tiles': 'tiles-reciclaje', 'bg': 'fondo-reciclaje.jpg', 'sheet': 'objetos-reciclaje', 'scale': 1.0,
+        'fill': (350, 150, 560, 232),
+        'top': (350, 21, 660, 95),
+        'terrain': {
+            'cap-left': ((21, 124, 33, 100), (0, 0)),
+            'cap-right': ((21, 124, 925, 991), (1, 0)),
+            'float-left': ((274, 347, 333, 400), (0, 0)),
+            'float-mid': ((274, 347, 425, 505), (0, 0)),
+            'float-right': ((274, 347, 530, 599), (1, 0)),
+            'float-small': ((277, 346, 895, 992), (0.5, 0)),
+            'thin-left': ((367, 410, 32, 120), (0, 0)),
+            'thin-mid': ((367, 410, 380, 620), (0, 0)),
+            'thin-right': ((367, 410, 905, 992), (1, 0)),
+            'bin': ((455, 535, 433, 499), (0.5, 1)),
+            'hose': ((468, 538, 537, 621), (0.5, 1)),
+            'bucket': ((457, 535, 658, 726), (0.5, 1)),
+            'toolbox': ((474, 534, 766, 845), (0.5, 1)),
+            'boxes': ((448, 538, 882, 984), (0.5, 1)),
+        },
+        'objects': {
+            # Cinta recta en 3 piezas: punta, tramo entre dos rodillos (se repite) y punta.
+            'belt-left': ((57, 134, 182, 205), False, (0, 0)),
+            'belt-mid': ((57, 134, 205, 266), False, (0, 0)),
+            'belt-right': ((57, 134, 327, 365), False, (0, 0)),
+            'cube-plastic': ((401, 526, 585, 715), False, (0.5, 0.5)),
+            'cube-cardboard': ((401, 526, 737, 865), False, (0.5, 0.5)),
+            'trash': ((280, 357, 584, 702), False, (0.5, 1)),
+            'cardboard': ((265, 361, 711, 842), False, (0.5, 1)),
+            'box-bottles': ((238, 360, 847, 988), False, (0.5, 1)),
+            'sign-recycle': ((396, 524, 897, 983), False, (0.5, 1)),
+            'scale-full': ((397, 526, 383, 543), False, (0.5, 1)),
+        },
+    },
+    'ciudad': {
+        'tiles': 'tiles-ciudad', 'bg': 'fondo-ciudad.jpg', 'sheet': 'objetos-ciudad', 'scale': 1.0,
+        # Dos hileras de ladrillo que se repiten hacia abajo.
+        'fill': (345, 316, 680, 338), 'fill_stack': 6, 'fill_size': (300, 128),
+        # La ciclorruta: la superficie por la que se camina.
+        'top': (330, 45, 695, 128),
+        'terrain': {
+            'cap-left': ((18, 143, 22, 130), (0, 0)),
+            'cap-right': ((11, 143, 900, 990), (1, 0)),
+            'float-left': ((259, 341, 726, 775), (0, 0)),
+            'float-mid': ((259, 341, 780, 850), (0, 0)),
+            'float-right': ((259, 341, 850, 894), (1, 0)),
+            'float-small': ((240, 340, 922, 991), (0.5, 0)),
+            'thin-left': ((359, 418, 36, 130), (0, 0)),
+            'thin-mid': ((365, 408, 380, 640), (0, 0)),
+            'thin-right': ((361, 410, 900, 993), (1, 0)),
+            'smart-bin': ((444, 531, 495, 544), (0.5, 1)),
+            'flowers-big': ((429, 538, 575, 690), (0.5, 1)),
+            'flower-pot': ((436, 533, 706, 787), (0.5, 1)),
+            'books': ((467, 529, 819, 892), (0.5, 1)),
+        },
+        'objects': {
+            'light-red': ((34, 165, 45, 138), False, (0.5, 0)),
+            'light-yellow': ((34, 165, 191, 283), False, (0.5, 0)),
+            'light-green': ((34, 165, 353, 445), False, (0.5, 0)),
+            'cablecar': ((38, 193, 727, 870), False, (0.5, 0)),
+            'lamp-off': ((201, 349, 533, 582), False, (0.5, 1)),
+            'lamp-on': ((195, 349, 610, 697), True, (0.5, 1)),
+            'bikes': ((255, 348, 41, 273), False, (0.5, 1)),
+            'bench': ((252, 349, 318, 494), False, (0.5, 1)),
+            'tree': ((307, 533, 721, 865), False, (0.5, 1)),
+            'solar-lamp': ((335, 527, 895, 985), False, (0.5, 1)),
+            'door-locked': ((388, 526, 252, 430), False, (0.5, 1)),
+            'door-open': ((388, 527, 467, 654), False, (0.5, 1)),
+        },
+    },
 }
 
 
 def build_theme(key, spec):
-    tiles_im = load(spec['tiles'])
-    x0, y0, x1, y1 = spec['fill']
-    fill = tiles_im.crop((x0, y0, x1, y1))
-    fill = Image.fromarray(np.concatenate([np.asarray(fill), np.asarray(fill.transpose(Image.FLIP_TOP_BOTTOM))], axis=0))
-    save_tex(f'{key}-fill', seamless_y(seamless_x(fill)), (128, 128))
-    x0, y0, x1, y1 = spec['top']
-    save_tex(f'{key}-top', seamless_x(tiles_im.crop((x0, y0, x1, y1)), 50), (160, 64), pad=True)
-    terrain_atlas = Atlas(width=1400)
-    tiles_bg = sheet_background(spec['tiles'], tiles_im)
-    for name, ((ty0, ty1, tx0, tx1), anchor) in spec['terrain'].items():
-        im = clean_cut(tiles_im, tiles_bg, (tx0, ty0, tx1, ty1))
-        terrain_atlas.add(name, im if name.startswith(('float-', 'thin-')) else trim(im, 0), anchor)
-    terrain_atlas.save(f'{key}-terrain', scale=0.5)
+    scale = spec.get('scale', 0.5)
+    if spec.get('tiles'):
+        tiles_im = load(spec['tiles'])
+        x0, y0, x1, y1 = spec['fill']
+        fill = tiles_im.crop((x0, y0, x1, y1))
+        if spec.get('fill_stack'):
+            # Hileras de ladrillo: se apilan tal cual (ya empalman) y conservan su proporción.
+            fill = Image.fromarray(np.concatenate([np.asarray(fill)] * spec['fill_stack'], axis=0))
+            save_tex(f'{key}-fill', seamless_x(fill), spec['fill_size'])
+        else:
+            fill = Image.fromarray(np.concatenate([np.asarray(fill), np.asarray(fill.transpose(Image.FLIP_TOP_BOTTOM))], axis=0))
+            save_tex(f'{key}-fill', seamless_y(seamless_x(fill)), (128, 128))
+        x0, y0, x1, y1 = spec['top']
+        save_tex(f'{key}-top', seamless_x(tiles_im.crop((x0, y0, x1, y1)), 50), (160, 64), pad=True)
+        terrain_atlas = Atlas(width=1400)
+        tiles_bg = sheet_background(spec['tiles'], tiles_im)
+        for name, ((ty0, ty1, tx0, tx1), anchor) in spec['terrain'].items():
+            im = clean_cut(tiles_im, tiles_bg, (tx0, ty0, tx1, ty1))
+            terrain_atlas.add(name, im if name.startswith(('float-', 'thin-')) else trim(im, 0), anchor)
+        terrain_atlas.save(f'{key}-terrain', scale=scale)
     obj_im = load(spec['sheet'])
     obj_bg = sheet_background(spec['sheet'], obj_im)
     objects_atlas = Atlas(width=1400)
     for name, ((oy0, oy1, ox0, ox1), glow, anchor) in spec['objects'].items():
-        im = clean_cut(obj_im, obj_bg, (ox0 - 4, oy0 - 4, ox1 + 4, oy1 + 4), glow=glow)
-        objects_atlas.add(name, trim(im if glow else keep_main(im, min_sat=0)), anchor)
-    objects_atlas.save(f'{key}-objects', scale=0.5)
+        if name.startswith('belt-'):
+            # Las piezas de la cinta se cortan justo en los rodillos (sin margen ni recorte).
+            im = clean_cut(obj_im, obj_bg, (ox0, oy0, ox1, oy1))
+        else:
+            im = clean_cut(obj_im, obj_bg, (ox0 - 4, oy0 - 4, ox1 + 4, oy1 + 4), glow=glow)
+            im = trim(im if glow else keep_main(im, min_sat=0))
+        objects_atlas.add(name, im, anchor)
+    objects_atlas.save(f'{key}-objects', scale=scale)
     bg = Image.open(os.path.join(SRC, spec['bg'])).convert('RGB')
     both = Image.new('RGB', (bg.width * 2, bg.height))
     both.paste(bg, (0, 0))
@@ -563,5 +669,5 @@ def build_theme(key, spec):
 
 
 for theme_key, theme_spec in THEMES.items():
-    if os.path.exists(os.path.join(SRC, theme_spec['tiles'] + '.png')):
+    if os.path.exists(os.path.join(SRC, (theme_spec['tiles'] or theme_spec['sheet']) + '.png')):
         build_theme(theme_key, theme_spec)

@@ -1,10 +1,12 @@
 import { Avatar, Style } from '@dicebear/core'
-import voxelArt from '@dicebear/styles/voxel-art.json'
+import nexusVoxel from './nexus-voxel.json'
 import type { AvatarConfig } from '../../services/avatar.service'
 
 /**
- * Reglas del avatar (issue #77) con el estilo Voxel Art de DiceBear (CC0):
- * qué opciones existen, cómo se valida un avatar guardado y cómo se dibuja.
+ * Reglas del avatar (issues #77 y #136) con un estilo propio hecho a partir de
+ * Voxel Art de DiceBear (CC0, ver client/scripts/build-avatar-style.mjs): qué
+ * opciones existen, cómo se valida un avatar guardado y cómo se dibuja. Cada
+ * parte va por su cuenta: pelo, gorro (encima del pelo), torso, pantalón y calzado.
  * Las mismas listas están en el servidor (AvatarConfig del dominio).
  */
 
@@ -15,40 +17,72 @@ export const TOPS: Option[] = [
   { id: 'spiky', label: 'En puntas' },
   { id: 'bowl', label: 'Taza' },
   { id: 'sideSwept', label: 'De lado' },
-  { id: 'curly', label: 'Rizado' },
   { id: 'mohawk', label: 'Mohicano' },
   { id: 'halfShaved', label: 'Medio rapado' },
   { id: 'afro', label: 'Afro' },
   { id: 'buns', label: 'Moños' },
   { id: 'ponytail', label: 'Cola de caballo' },
   { id: 'bob', label: 'Melena corta' },
-  { id: 'shoulderLength', label: 'A los hombros' },
   { id: 'longStraight', label: 'Largo liso' },
   { id: 'longWavy', label: 'Largo ondulado' },
-  { id: 'partedLong', label: 'Largo con raya' },
   { id: 'braids', label: 'Trenzas' },
   { id: 'twinTails', label: 'Dos colitas' },
 ]
 
-/** Gorros y orejas: van en la misma ranura que el pelo (`top`) en Voxel Art. */
+/** Opciones que se quitaron por parecerse a otras (#136): el avatar guardado pasa a la más parecida. */
+const RETIRED: Partial<Record<keyof AvatarConfig, Record<string, string>>> = {
+  top: { curly: 'spiky', shoulderLength: 'bob', partedLong: 'longStraight' },
+  glasses: { square: 'round' },
+}
+
+/** Gorros: van encima del pelo. */
 export const HATS: Option[] = [
   { id: 'cap', label: 'Gorra' },
+  { id: 'backwardsCap', label: 'Gorra al revés' },
   { id: 'beanie', label: 'Gorro de lana' },
-  { id: 'animalEars', label: 'Orejas de gato' },
-  { id: 'bunnyEars', label: 'Orejas de conejo' },
+  { id: 'beret', label: 'Boina' },
+  { id: 'sunHat', label: 'Sombrero' },
+  { id: 'helmet', label: 'Casco' },
+  { id: 'headband', label: 'Cintillo' },
+  { id: 'crown', label: 'Corona' },
+  { id: 'animalEars', label: 'Capucha de gato' },
+  { id: 'bunnyEars', label: 'Capucha de conejo' },
 ]
 
+/** Los que dejan ver todo el peinado; los demás tapan la coronilla y el pelo asoma por los lados. */
+const HATS_OVER_HAIR = new Set(['headband', 'crown'])
+
+/** Torso. */
 export const OUTFITS: Option[] = [
   { id: 'plain', label: 'Camiseta' },
+  { id: 'tank', label: 'Esqueleto' },
+  { id: 'jersey', label: 'Deportiva' },
   { id: 'stripes', label: 'A rayas' },
   { id: 'checker', label: 'A cuadros' },
   { id: 'hoodie', label: 'Hoodie' },
   { id: 'jacket', label: 'Chaqueta' },
+  { id: 'vest', label: 'Chaleco' },
   { id: 'coat', label: 'Abrigo' },
   { id: 'dress', label: 'Vestido' },
   { id: 'overalls', label: 'Overol' },
   { id: 'suit', label: 'Traje' },
   { id: 'tie', label: 'Corbata' },
+]
+
+export const PANTS: Option[] = [
+  { id: 'long', label: 'Pantalón' },
+  { id: 'jeans', label: 'Jean' },
+  { id: 'joggers', label: 'Sudadera' },
+  { id: 'cargo', label: 'Cargo' },
+  { id: 'shorts', label: 'Pantaloneta' },
+  { id: 'skirt', label: 'Falda' },
+]
+
+export const SHOES: Option[] = [
+  { id: 'classic', label: 'Zapatos' },
+  { id: 'sneakers', label: 'Tenis' },
+  { id: 'boots', label: 'Botas' },
+  { id: 'sandals', label: 'Sandalias' },
 ]
 
 export const EYES: Option[] = [
@@ -97,7 +131,6 @@ export const CHEEKS: Option[] = [
 
 export const GLASSES: Option[] = [
   { id: 'round', label: 'Redondas' },
-  { id: 'square', label: 'Cuadradas' },
   { id: 'cat', label: 'De gato' },
   { id: 'shades', label: 'De sol' },
   { id: 'visor', label: 'Visor' },
@@ -130,10 +163,13 @@ export const DEFAULT_AVATAR: AvatarConfig = {
   hairColor: '5a3825',
   hatColor: 'e64980',
   skinColor: 'eab890',
+  hat: null,
   outfit: 'jacket',
   shirtColor: 'f2f2f2',
   jacketColor: '6b4f3a',
+  pants: 'long',
   pantsColor: '3b5b8c',
+  shoes: 'sneakers',
   shoesColor: 'e03131',
   eyes: 'open',
   eyebrows: 'soft',
@@ -145,22 +181,23 @@ export const DEFAULT_AVATAR: AvatarConfig = {
 }
 
 const ids = (options: Option[]) => new Set(options.map((option) => option.id))
-const TOP_IDS = new Set([...ids(TOPS), ...ids(HATS)])
+const HAT_IDS = ids(HATS)
 const REQUIRED: { field: keyof AvatarConfig; allowed: Set<string> }[] = [
   { field: 'outfit', allowed: ids(OUTFITS) },
+  { field: 'pants', allowed: ids(PANTS) },
+  { field: 'shoes', allowed: ids(SHOES) },
   { field: 'eyes', allowed: ids(EYES) },
   { field: 'mouth', allowed: ids(MOUTHS) },
   { field: 'nose', allowed: ids(NOSES) },
 ]
 const OPTIONAL: { field: keyof AvatarConfig; allowed: Set<string> }[] = [
-  { field: 'top', allowed: TOP_IDS },
+  { field: 'top', allowed: ids(TOPS) },
+  { field: 'hat', allowed: HAT_IDS },
   { field: 'eyebrows', allowed: ids(EYEBROWS) },
   { field: 'cheeks', allowed: ids(CHEEKS) },
   { field: 'glasses', allowed: ids(GLASSES) },
   { field: 'beard', allowed: ids(BEARDS) },
 ]
-
-export const isHat = (top: string | null) => top !== null && ids(HATS).has(top)
 
 /**
  * Deja un avatar guardado en algo que se pueda dibujar: lo desconocido toma
@@ -168,7 +205,16 @@ export const isHat = (top: string | null) => top !== null && ids(HATS).has(top)
  */
 export function normalizeAvatar(raw: unknown): AvatarConfig | null {
   if (!raw || typeof raw !== 'object') return null
-  const source = raw as Record<string, unknown>
+  const source = { ...(raw as Record<string, unknown>) }
+  // Antes de #136 el gorro iba en lugar del pelo (en `top`): ahora va encima del peinado por defecto.
+  if (typeof source.top === 'string' && HAT_IDS.has(source.top)) {
+    if (source.hat === undefined) source.hat = source.top
+    source.top = DEFAULT_AVATAR.top
+  }
+  for (const [field, map] of Object.entries(RETIRED)) {
+    const value = source[field]
+    if (typeof value === 'string' && value in map) source[field] = map[value]
+  }
   const config: AvatarConfig = { ...DEFAULT_AVATAR }
   for (const { field, allowed } of REQUIRED) {
     const value = source[field]
@@ -202,14 +248,17 @@ export function randomAvatar(random: () => number = Math.random): AvatarConfig {
   const pick = <T,>(items: readonly T[]): T => items[Math.min(items.length - 1, Math.floor(random() * items.length))]
   const maybe = <T,>(chance: number, items: readonly T[]): T | null => (random() < chance ? pick(items) : null)
   return {
-    top: random() < 0.15 ? pick(HATS).id : pick(TOPS).id,
+    top: maybe(0.95, TOPS)?.id ?? null,
+    hat: maybe(0.3, HATS)?.id ?? null,
     hairColor: pick(PALETTES.hairColor),
     hatColor: pick(PALETTES.hatColor),
     skinColor: pick(PALETTES.skinColor),
     outfit: pick(OUTFITS).id,
     shirtColor: pick(PALETTES.shirtColor),
     jacketColor: pick(PALETTES.jacketColor),
+    pants: pick(PANTS).id,
     pantsColor: pick(PALETTES.pantsColor),
+    shoes: pick(SHOES).id,
     shoesColor: pick(PALETTES.shoesColor),
     eyes: pick(EYES).id,
     eyebrows: maybe(0.85, EYEBROWS)?.id ?? null,
@@ -223,13 +272,16 @@ export function randomAvatar(random: () => number = Math.random): AvatarConfig {
 
 // ---------------------------------------------------------------- dibujo
 
-const style = new Style(voxelArt)
+const style = new Style(nexusVoxel as never)
 
 /** Opciones de DiceBear: todo explícito (probabilidades 0/100) para que la semilla no decida nada. */
 export function toDiceBearOptions(config: AvatarConfig): Record<string, unknown> {
   // Sin variante se omite la clave: DiceBear rechaza un valor undefined.
   const variant = (value: string | null) => (value ? { variant: [value], probability: 100 } : { probability: 0 })
-  const top = variant(config.top)
+  // Con un gorro que tapa la coronilla se usa la versión del peinado recortada por encima del ala.
+  const underHat = config.hat !== null && !HATS_OVER_HAIR.has(config.hat)
+  const top = variant(config.top && underHat ? `${config.top}UnderHat` : config.top)
+  const hat = variant(config.hat)
   const eyebrows = variant(config.eyebrows)
   const cheeks = variant(config.cheeks)
   const glasses = variant(config.glasses)
@@ -240,6 +292,8 @@ export function toDiceBearOptions(config: AvatarConfig): Record<string, unknown>
     backgroundColor: [],
     topVariant: top.variant,
     topProbability: top.probability,
+    hatVariant: hat.variant,
+    hatProbability: hat.probability,
     eyebrowsVariant: eyebrows.variant,
     eyebrowsProbability: eyebrows.probability,
     cheeksVariant: cheeks.variant,
@@ -249,6 +303,9 @@ export function toDiceBearOptions(config: AvatarConfig): Record<string, unknown>
     beardVariant: beard.variant,
     beardProbability: beard.probability,
     outfitVariant: [config.outfit],
+    pantsVariant: [config.pants],
+    shoesVariant: [config.shoes],
+    shoesOverVariant: [config.shoes],
     eyesVariant: [config.eyes],
     mouthVariant: [config.mouth],
     noseVariant: [config.nose],
@@ -266,16 +323,34 @@ export function toDiceBearOptions(config: AvatarConfig): Record<string, unknown>
 }
 
 const cache = new Map<string, string>()
+const CACHE_LIMIT = 400
 
-/** SVG del avatar como data URI (con caché: el mismo avatar se pinta en varios lugares). */
+/** Clave de caché de un avatar (los campos siempre en el mismo orden). */
+export function avatarKey(config: AvatarConfig): string {
+  return (Object.keys(DEFAULT_AVATAR) as (keyof AvatarConfig)[]).map((field) => config[field] ?? '').join('|')
+}
+
+/** El avatar ya dibujado, si está en caché (no dibuja nada). */
+export function cachedAvatarUri(config: AvatarConfig): string | undefined {
+  return cache.get(avatarKey(config))
+}
+
+/**
+ * SVG del avatar como data URI (con caché: el mismo avatar se pinta en varios
+ * lugares). Al llenarse la caché se olvida lo más viejo, no todo de golpe
+ * (issue #140: vaciarla entera obligaba a redibujar todas las miniaturas).
+ */
 export function avatarDataUri(config: AvatarConfig): string {
-  const key = JSON.stringify(config)
+  const key = avatarKey(config)
   let uri = cache.get(key)
-  if (!uri) {
+  if (uri) {
+    // Lo usado hace poco pasa al final: lo que se olvida es lo que nadie mira.
+    cache.delete(key)
+  } else {
     const svg = new Avatar(style, toDiceBearOptions(config) as never).toString()
     uri = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
-    if (cache.size > 300) cache.clear()
-    cache.set(key, uri)
+    if (cache.size >= CACHE_LIMIT) cache.delete(cache.keys().next().value as string)
   }
+  cache.set(key, uri)
   return uri
 }

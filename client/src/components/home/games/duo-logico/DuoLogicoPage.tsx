@@ -151,7 +151,7 @@ function DuoLogicoSession({ slug, code }: { slug?: string; code?: string }) {
           <p className="text-[12px] font-semibold uppercase tracking-wide text-accent">Dúo Lógico · en pareja</p>
           <h1 className="text-[24px] font-bold tracking-tight text-text-h">{game?.title ?? 'Dúo Lógico'}</h1>
           <p className="mt-1 text-[14px] text-text">
-            Recorran el bosque juntos, superen los obstáculos y respondan bien los dos en cada Puerta del Saber.
+            Recorran los escenarios juntos, superen los obstáculos y respondan bien los dos en cada Puerta del Saber.
           </p>
         </header>
 
