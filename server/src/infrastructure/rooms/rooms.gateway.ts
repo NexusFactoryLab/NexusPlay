@@ -71,12 +71,15 @@ import { GuessWhoBotRunner } from '../bots/guess-who-bot-runner.js';
 import {
   assertNotPaused,
   awaitingView,
+  ADMIN_PAUSE_KEY,
   clearWaiting,
   expiredWaits,
+  isPaused,
   isWaitingSocketId,
   nextWaitDeadline,
   startWaiting,
   stopWaiting,
+  pauseByAdmin,
   waitingSocketId,
   type PausableGame,
 } from '../../domain/services/player-wait.js';
@@ -237,6 +240,7 @@ function toTournamentClientView(
     // El juego que se sorteó para la ronda en curso (con el sorteo, ya no es `games[ronda % n]`).
     currentRoundGame: currentRoundGameOf(tournament),
     totalRounds: tournament.totalRounds,
+    paused: tournament.pausedByAdmin === true,
     // Lo que eligió el administrador para la siguiente ronda (posición en `games`); a los demás no se les revela.
     nextRoundGameIndex: tournament.creatorUserId === forUserId ? tournament.gameOverrides?.[tournament.currentRound + 1] ?? null : null,
     creatorUserId: tournament.creatorUserId,
@@ -1993,6 +1997,88 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     if (tournament.phase === 'RUNNING') this.maybeAdvanceTournamentRound(tournament);
   }
 
+  /**
+   * El administrador pausa o reanuda la ronda (issue #147). Congela los relojes de Identidad Oculta y de
+   * Dominó, que dejan de aceptar jugadas hasta que se reanude; el Laberinto es a ritmo propio y no se pausa.
+   */
+  @SubscribeMessage('tournament:pause')
+  handleTournamentPause(@ConnectedSocket() socket: AuthenticatedSocket, @MessageBody() body: { paused?: unknown }) {
+    const tournament = this.requireModeratedTournament(socket);
+    if (tournament.phase !== 'RUNNING') throw new Error('El torneo no está en curso.');
+    if (typeof body?.paused !== 'boolean') throw new Error('Indica si se pausa o se reanuda.');
+    if (body.paused === (tournament.pausedByAdmin === true)) return;
+    tournament.pausedByAdmin = body.paused;
+    const now = Date.now();
+    for (const match of tournament.matches.filter((m) => m.round === tournament.currentRound && m.phase === 'PLAYING')) {
+      if (this.isGuessWhoTournamentMatch(match)) {
+        if (body.paused) {
+          if (pauseByAdmin(match, now, match.turnDeadline)) {
+            this.clearTournamentTurnTimer(match.matchCode);
+            match.turnDeadline = null;
+          }
+          this.tournamentBotRunner.forget(match.matchCode);
+        } else {
+          const back = stopWaiting(match, ADMIN_PAUSE_KEY);
+          if (back?.resumed) this.resumeTournamentMatch(tournament, match, back.remainingMs);
+        }
+        this.broadcastMatchState(tournament, match);
+      } else if (match.dominoRoomCode) {
+        const room = this.dominoRoomStore.get(match.dominoRoomCode);
+        if (!room || room.phase !== 'PLAYING') continue;
+        if (body.paused) {
+          if (pauseByAdmin(room, now, room.turnDeadline)) {
+            this.clearDominoTurnTimer(room.code);
+            room.turnDeadline = null;
+          }
+          this.clearDominoBotTimer(room.code);
+        } else {
+          this.resumeDominoPlayer(room, ADMIN_PAUSE_KEY);
+        }
+        this.dominoRoomStore.set(room);
+        this.broadcastDominoState(room);
+      }
+    }
+    this.tournamentStore.set(tournament);
+    this.broadcastTournamentState(tournament);
+  }
+
+  /** El administrador suma segundos a los turnos en curso de Identidad Oculta y Dominó (issue #147). */
+  @SubscribeMessage('tournament:add-time')
+  handleTournamentAddTime(@ConnectedSocket() socket: AuthenticatedSocket, @MessageBody() body: { seconds?: unknown }) {
+    const tournament = this.requireModeratedTournament(socket);
+    if (tournament.phase !== 'RUNNING') throw new Error('El torneo no está en curso.');
+    const seconds = body?.seconds;
+    if (typeof seconds !== 'number' || !Number.isInteger(seconds) || seconds < 5 || seconds > 120) {
+      throw new Error('Elige entre 5 y 120 segundos.');
+    }
+    const extra = seconds * 1000;
+    const now = Date.now();
+    for (const match of tournament.matches.filter((m) => m.round === tournament.currentRound && m.phase === 'PLAYING')) {
+      if (this.isGuessWhoTournamentMatch(match)) {
+        if (match.pausedTurnMs != null) {
+          match.pausedTurnMs += extra;
+        } else if (match.turnDeadline && match.activePlayerUserId) {
+          match.turnDeadline += extra;
+          this.armTournamentTurnTimer(tournament, match, match.activePlayerUserId, match.turnDeadline - now);
+        } else continue;
+        this.broadcastMatchState(tournament, match);
+      } else if (match.dominoRoomCode) {
+        const room = this.dominoRoomStore.get(match.dominoRoomCode);
+        if (!room || room.phase !== 'PLAYING') continue;
+        if (room.pausedTurnMs != null) {
+          room.pausedTurnMs += extra;
+        } else if (room.turnDeadline && room.activePlayerUserId) {
+          room.turnDeadline += extra;
+          this.startDominoTurnTimer(room, room.activePlayerUserId, room.turnDeadline - now);
+        } else continue;
+        this.dominoRoomStore.set(room);
+        this.broadcastDominoState(room);
+      }
+    }
+    this.tournamentStore.set(tournament);
+    this.sendTournamentStateToModerator(tournament);
+  }
+
   @SubscribeMessage('tournament:end-round')
   handleTournamentEndRound(@ConnectedSocket() socket: AuthenticatedSocket) {
     const tournament = this.requireModeratedTournament(socket);
@@ -2075,6 +2161,8 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
    */
   private startTournamentRound(tournament: TournamentState, userIds: string[]) {
     tournament.currentRound += 1;
+    // Una ronda nueva empieza siempre sin pausa del administrador (issue #147).
+    tournament.pausedByAdmin = false;
     // Las salas de dominó de la ronda anterior ya cumplieron: se liberan.
     this.disposeTournamentDominoRooms(tournament, tournament.currentRound - 1);
     const shuffledIds = shuffle(userIds);
@@ -2402,7 +2490,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   private driveDominoBot(room: DominoRoomState) {
     const bot = room.players.find((p) => p.socketId.startsWith('bot:'));
     if (!bot) return;
-    if (room.phase !== 'PLAYING' || room.activePlayerUserId !== bot.userId) {
+    if (room.phase !== 'PLAYING' || room.activePlayerUserId !== bot.userId || isPaused(room)) {
       this.clearDominoBotTimer(room.code);
       return;
     }
@@ -2851,7 +2939,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       this.server.to(participant.socketId).emit('tournament:match-state', toMatchClientView(match, tournament, userId));
     }
     // El bot reacciona a cada cambio de su match (le toca preguntar, responder, descartar...).
-    if (match.vsBot && match.phase === 'PLAYING') {
+    if (match.vsBot && match.phase === 'PLAYING' && !isPaused(match)) {
       const room = this.tournamentBotRooms.get(match.matchCode);
       if (room) this.tournamentBotRunner.onRoomChanged(room);
     }

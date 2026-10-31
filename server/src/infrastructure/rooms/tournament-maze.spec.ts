@@ -383,3 +383,20 @@ describe('el administrador expulsa a un participante (#147)', () => {
     expect(() => gateway.handleTournamentKick(admin, { userId: 'p0' })).toThrow(/ya terminó/);
   });
 });
+
+describe('la pausa del administrador y el Laberinto (#147)', () => {
+  it('el Laberinto sigue a su ritmo mientras la ronda está pausada, y la ronda siguiente empieza sin pausa', async () => {
+    const { gateway, tournament, admin, players } = await start(2, 2);
+    gateway.handleTournamentPause(admin, { paused: true });
+    expect(tournament.pausedByAdmin).toBe(true);
+    // Responder sigue siendo posible: el Laberinto no se puede pausar desde el servidor.
+    for (const p of players) {
+      await gateway.handleTournamentMazeAnswer(p, { questionId: 'q1', chosen: true });
+      await gateway.handleTournamentMazeAnswer(p, { questionId: 'q2', chosen: false });
+      await gateway.handleTournamentMazeAnswer(p, { questionId: 'q3', chosen: true });
+      gateway.handleTournamentMazeFinish(p);
+    }
+    expect(tournament.currentRound).toBe(2);
+    expect(tournament.pausedByAdmin).toBe(false);
+  });
+});

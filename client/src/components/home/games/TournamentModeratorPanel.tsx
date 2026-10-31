@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Bot, Crown, Layers, LogOut, Medal, MonitorPlay, Radio, Swords, Trophy, UserX, Users } from 'lucide-react'
+import { Bot, Crown, Layers, LogOut, Medal, MonitorPlay, Pause, Play, Radio, Swords, Timer, Trophy, UserX, Users } from 'lucide-react'
 import { AvatarCircle } from '../../avatar/AvatarCircle'
 import { usePlayersAvatars } from '../../avatar/usePlayersAvatars'
 import type { AvatarConfig } from '../../../services/avatar.service'
@@ -23,6 +23,10 @@ type Props = {
   onSetNextGame?: (gameIndex: number | null) => void
   /** Expulsar a una persona del torneo. Si falta, el panel no muestra el botón. */
   onKick?: (userId: string) => void
+  /** Pausar o reanudar la ronda. Si falta, el panel no muestra el botón. */
+  onPause?: (paused: boolean) => void
+  /** Sumar segundos a los turnos en curso. Si falta, el panel no muestra el botón. */
+  onAddTime?: (seconds: number) => void
   onExit: () => void
 }
 
@@ -128,7 +132,7 @@ function MatchStatus({ match }: { match: TournamentLiveMatch }) {
  * podio con avatares, gráfica de puntos por ronda, clasificación y las partidas
  * de la ronda en curso. Todo se recalcula con cada estado que llega por socket.
  */
-export function TournamentModeratorPanel({ tournament, error, onClose, onEndRound, onSetNextGame, onKick, onExit }: Props) {
+export function TournamentModeratorPanel({ tournament, error, onClose, onEndRound, onSetNextGame, onKick, onPause, onAddTime, onExit }: Props) {
   const [confirming, setConfirming] = useState<'round' | 'close' | null>(null)
   const [projecting, setProjecting] = useState(false)
   const [kicking, setKicking] = useState<{ userId: string; displayName: string } | null>(null)
@@ -201,6 +205,28 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
               <LogOut className="h-4 w-4" strokeWidth={2} />
               Salir del panel
             </button>
+            {!finished && tournament.phase === 'RUNNING' && onPause && (
+              <button
+                type="button"
+                className="flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-2 text-[13px] font-semibold text-text-h transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/50"
+                title="Detiene los relojes de Identidad Oculta y Dominó. El Laberinto es a ritmo propio y no se pausa."
+                onClick={() => onPause(!tournament.paused)}
+              >
+                {tournament.paused ? <Play className="h-4 w-4" strokeWidth={2} /> : <Pause className="h-4 w-4" strokeWidth={2} />}
+                {tournament.paused ? 'Reanudar ronda' : 'Pausar ronda'}
+              </button>
+            )}
+            {!finished && tournament.phase === 'RUNNING' && onAddTime && (
+              <button
+                type="button"
+                className="flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-2 text-[13px] font-semibold text-text-h transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/50"
+                title="Suma 30 segundos al turno en curso de cada partida de Identidad Oculta y Dominó"
+                onClick={() => onAddTime(30)}
+              >
+                <Timer className="h-4 w-4" strokeWidth={2} />
+                +30 s
+              </button>
+            )}
             {!finished && (
               <button
                 type="button"
@@ -224,6 +250,12 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
         {error && (
           <p className="rounded-lg border border-danger/35 bg-danger/10 px-3 py-2 text-sm text-danger" role="alert">
             {error}
+          </p>
+        )}
+
+        {tournament.paused && (
+          <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[13px] text-text-h" role="status">
+            <strong>Ronda en pausa.</strong> Identidad Oculta y Dominó están detenidos; el Laberinto sigue a su ritmo. Pulsa «Reanudar ronda» para seguir.
           </p>
         )}
 

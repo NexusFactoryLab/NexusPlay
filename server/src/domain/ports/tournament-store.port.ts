@@ -130,6 +130,8 @@ export interface TournamentState {
   participants: TournamentParticipant[];
   /** Juegos del torneo: cada ronda sortea uno sin repetir el de la ronda anterior (ver `pickRoundGameIndex`). Vacío = solo `gameId`. */
   games?: { gameId: string; title: string; level: TournamentLevel; gameType?: TournamentGameType }[];
+  /** El administrador tiene la ronda en pausa (issue #147). Se apaga solo al empezar la ronda siguiente. */
+  pausedByAdmin?: boolean;
   /** Rondas cuyo juego eligió el administrador en vez del sorteo: ronda → posición en `games` (issue #147). */
   gameOverrides?: Record<number, number>;
   /** Administrador que modera el torneo: no juega ni entra al emparejamiento. */

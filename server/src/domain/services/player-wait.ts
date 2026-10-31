@@ -9,6 +9,10 @@
 /** Cuánto se espera a quien se desconecta: lo mismo que en Dúo Lógico. */
 export const PLAYER_WAIT_MS = 90_000;
 
+/** Clave con la que el administrador pausa una partida de torneo (issue #147); no es una persona y nunca vence. */
+export const ADMIN_PAUSE_KEY = '__admin__';
+const ADMIN_PAUSE_UNTIL = Number.MAX_SAFE_INTEGER;
+
 /** Una sala (o una partida de torneo) que puede ponerse en pausa. */
 export interface PausableGame {
   /** userId → hora (ms) hasta la que se espera a ese jugador. */
@@ -44,6 +48,7 @@ export function isPaused(game: PausableGame): boolean {
 export function assertNotPaused(game: PausableGame, nameOf: (userId: string) => string): void {
   const ids = Object.keys(game.awaiting ?? {});
   if (ids.length === 0) return;
+  if (ids.includes(ADMIN_PAUSE_KEY)) throw new Error('La ronda está en pausa: la pausó el administrador.');
   throw new Error(`La partida está en pausa: esperando a ${ids.map(nameOf).join(' y ')}.`);
 }
 
@@ -57,6 +62,17 @@ export function startWaiting(game: PausableGame, userId: string, now: number, de
   if (first) game.pausedTurnMs = deadline !== null ? Math.max(0, deadline - now) : null;
   game.awaiting = { ...game.awaiting, [userId]: now + PLAYER_WAIT_MS };
   return first;
+}
+
+/** El administrador pausa la partida: congela el reloj del turno igual que la espera por desconexión. Devuelve true si es la primera pausa. */
+export function pauseByAdmin(game: PausableGame, now: number, deadline: number | null): boolean {
+  const first = startWaiting(game, ADMIN_PAUSE_KEY, now, deadline);
+  game.awaiting = { ...game.awaiting, [ADMIN_PAUSE_KEY]: ADMIN_PAUSE_UNTIL };
+  return first;
+}
+
+export function isPausedByAdmin(game: PausableGame): boolean {
+  return game.awaiting?.[ADMIN_PAUSE_KEY] !== undefined;
 }
 
 /**
@@ -90,14 +106,17 @@ export function expiredWaits(game: PausableGame, now: number): string[] {
 
 /** La próxima hora en que vence una espera, o null si no se espera a nadie. */
 export function nextWaitDeadline(game: PausableGame): number | null {
-  const times = Object.values(game.awaiting ?? {});
+  // La pausa del administrador no vence sola: no cuenta para programar el fin de la espera.
+  const times = Object.entries(game.awaiting ?? {})
+    .filter(([userId]) => userId !== ADMIN_PAUSE_KEY)
+    .map(([, until]) => until);
   return times.length > 0 ? Math.min(...times) : null;
 }
 
 export function awaitingView(game: PausableGame, players: ReadonlyArray<{ userId: string; displayName: string }>, now: number): AwaitingView[] {
   return Object.entries(game.awaiting ?? {}).map(([userId, until]) => ({
     userId,
-    displayName: players.find((p) => p.userId === userId)?.displayName ?? 'tu compañero',
-    remainingMs: Math.max(0, until - now),
+    displayName: userId === ADMIN_PAUSE_KEY ? 'el administrador' : (players.find((p) => p.userId === userId)?.displayName ?? 'tu compañero'),
+    remainingMs: userId === ADMIN_PAUSE_KEY ? 0 : Math.max(0, until - now),
   }));
 }

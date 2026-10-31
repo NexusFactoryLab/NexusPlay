@@ -122,6 +122,16 @@ export function useGuessWhoTournament(token: string | null) {
     socketRef.current?.emit('tournament:kick', { userId })
   }, [])
 
+  /** El administrador pausa o reanuda la ronda. */
+  const setPaused = useCallback((paused: boolean) => {
+    socketRef.current?.emit('tournament:pause', { paused })
+  }, [])
+
+  /** El administrador suma segundos a los turnos en curso. */
+  const addTime = useCallback((seconds: number) => {
+    socketRef.current?.emit('tournament:add-time', { seconds })
+  }, [])
+
   const endRound = useCallback(() => {
     socketRef.current?.emit('tournament:end-round')
   }, [])
@@ -188,6 +198,8 @@ export function useGuessWhoTournament(token: string | null) {
     matchAbandonedMessage,
     kickedMessage,
     kickParticipant,
+    setPaused,
+    addTime,
     clearMatchAbandonedMessage: () => setMatchAbandonedMessage(null),
     createTournament,
     sendMazeAnswer,

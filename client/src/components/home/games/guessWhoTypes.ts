@@ -188,6 +188,8 @@ export type TournamentStateView = {
   /** El juego que se sorteó para la ronda en curso; `null` antes de que arranque la primera. */
   currentRoundGame: { title: string; level: TournamentLevel; gameType: TournamentGameType } | null
   totalRounds: number
+  /** El administrador tiene la ronda en pausa (Identidad Oculta y Dominó; el Laberinto sigue a su ritmo). */
+  paused?: boolean
   /** Solo para el administrador: el juego que eligió para la siguiente ronda (posición en `games`), o null si queda al sorteo. */
   nextRoundGameIndex?: number | null
   /** Solo para el administrador: quienes expulsó (ya no aparecen entre los participantes). */

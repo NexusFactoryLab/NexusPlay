@@ -433,3 +433,57 @@ describe('expulsar a alguien que está jugando un dominó (#147)', () => {
     expect(h.tournament.participants.find((p) => p.userId === first)!.kicked).toBe(true);
   });
 });
+
+describe('el administrador pausa un dominó del torneo y suma tiempo (#147)', () => {
+  async function playing() {
+    const h = await start(2);
+    vi.advanceTimersByTime(3000);
+    const room = h.domino.get(h.tournament.matches[0].dominoRoomCode!)!;
+    expect(room.phase).toBe('PLAYING');
+    return { ...h, room };
+  }
+
+  it('pausar congela el reloj del turno y bloquea la partida; reanudar sigue con lo que quedaba', async () => {
+    const { gateway, admin, room } = await playing();
+    const active = room.activePlayerUserId;
+    vi.advanceTimersByTime(10_000);
+    gateway.handleTournamentPause(admin, { paused: true });
+    expect(room.turnDeadline).toBeNull();
+    expect(Object.keys(room.awaiting ?? {})).toEqual(['__admin__']);
+    expect(room.pausedTurnMs).toBeGreaterThan(0);
+    // Pasa mucho más de un turno: nadie lo pierde.
+    vi.advanceTimersByTime(10 * room.turnDurationSeconds * 1000);
+    expect(room.activePlayerUserId).toBe(active);
+
+    const remaining = room.pausedTurnMs!;
+    gateway.handleTournamentPause(admin, { paused: false });
+    expect(room.awaiting).toEqual({});
+    expect(room.turnDeadline).toBe(Date.now() + remaining);
+    vi.advanceTimersByTime(remaining + 50);
+    expect(room.activePlayerUserId).not.toBe(active);
+  });
+
+  it('contra el bot, el bot no mueve mientras dure la pausa', async () => {
+    const h = await start(3);
+    vi.advanceTimersByTime(3000);
+    const botMatch = h.tournament.matches.find((m) => m.vsBot)!;
+    const room = h.domino.get(botMatch.dominoRoomCode!)!;
+    h.gateway.handleTournamentPause(h.admin, { paused: true });
+    const before = JSON.stringify([room.board, room.players.map((p) => p.hand.length), room.activePlayerUserId]);
+    vi.advanceTimersByTime(60_000);
+    expect(JSON.stringify([room.board, room.players.map((p) => p.hand.length), room.activePlayerUserId])).toBe(before);
+  });
+
+  it('sumar tiempo alarga el turno en curso', async () => {
+    const { gateway, admin, room } = await playing();
+    const active = room.activePlayerUserId;
+    const before = room.turnDeadline!;
+    gateway.handleTournamentAddTime(admin, { seconds: 20 });
+    expect(room.turnDeadline).toBe(before + 20_000);
+    // El reloj original ya habría vencido; con el tiempo extra el turno sigue siendo del mismo jugador.
+    vi.advanceTimersByTime(room.turnDurationSeconds * 1000 + 100);
+    expect(room.activePlayerUserId).toBe(active);
+    vi.advanceTimersByTime(20_000);
+    expect(room.activePlayerUserId).not.toBe(active);
+  });
+});

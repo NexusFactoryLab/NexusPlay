@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { LogOut, WifiOff } from 'lucide-react'
+import { LogOut, Pause, WifiOff } from 'lucide-react'
 import { useCountdown } from './MatchBoard'
 import { PLAYER_WAIT_MS, joinNames, type PlayerWait } from './playerWait'
 
@@ -99,21 +99,25 @@ export function PlayerWaitOverlay({ wait, onLeave }: PlayerWaitOverlayProps) {
             <span className="relative mx-auto mb-3 flex h-16 w-16 items-center justify-center" aria-hidden="true">
               <span className="absolute inset-0 animate-ping rounded-full bg-accent/25 motion-reduce:animate-none" />
               <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-accent/15 text-accent">
-                <WifiOff className="h-8 w-8" strokeWidth={2.2} />
+                {wait.byAdmin ? <Pause className="h-8 w-8" strokeWidth={2.2} /> : <WifiOff className="h-8 w-8" strokeWidth={2.2} />}
               </span>
             </span>
             <h2 id={titleId} className="text-[20px] font-extrabold text-text-h" aria-live="polite">
-              Esperando a {joinNames(wait.names)}…
+              {wait.byAdmin ? 'Ronda en pausa' : `Esperando a ${joinNames(wait.names)}…`}
             </h2>
             <p id={textId} className="mt-1.5 text-[14px] leading-snug text-text">
-              {plural ? 'Se desconectaron.' : 'Se desconectó.'} La partida sigue cuando {plural ? 'vuelvan' : 'vuelva'}.
+              {wait.byAdmin
+                ? 'El administrador pausó la ronda. La partida sigue cuando la reanude.'
+                : `${plural ? 'Se desconectaron.' : 'Se desconectó.'} La partida sigue cuando ${plural ? 'vuelvan' : 'vuelva'}.`}
             </p>
-            <div className="mt-4" role="timer" aria-label={`Quedan ${seconds} segundos de espera`}>
-              <div className="h-2 overflow-hidden rounded-full bg-border/60">
-                <div className="h-full rounded-full bg-accent transition-[width] duration-200 ease-linear" style={{ width: `${progress * 100}%` }} />
+            {!wait.byAdmin && (
+              <div className="mt-4" role="timer" aria-label={`Quedan ${seconds} segundos de espera`}>
+                <div className="h-2 overflow-hidden rounded-full bg-border/60">
+                  <div className="h-full rounded-full bg-accent transition-[width] duration-200 ease-linear" style={{ width: `${progress * 100}%` }} />
+                </div>
+                <p className="mt-1.5 text-[13px] font-semibold tabular-nums text-text-h">Quedan {seconds} s</p>
               </div>
-              <p className="mt-1.5 text-[13px] font-semibold tabular-nums text-text-h">Quedan {seconds} s</p>
-            </div>
+            )}
             <button
               ref={exitButton}
               type="button"
