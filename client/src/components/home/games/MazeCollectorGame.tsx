@@ -20,7 +20,7 @@ import { BonusSprite, PetSprite, PowerPelletSprite, TrashBagSprite } from './maz
 import { SostenibleCityBackground } from './SostenibleCityBackground'
 import { MAZE_MAPS } from './mazeMaps'
 import { normalizeMazeLayout } from './mazeCollectorTypes'
-import { SpriteStrip, mazeSpriteUrl } from './mazeSpriteStrip'
+import { MazeSpriteThemeContext, SpriteStrip, mazeSpriteUrl } from './mazeSpriteStrip'
 import { MazeCollectorGuide } from './MazeCollectorGuide'
 import { useInTournamentPlay } from './tournamentPlay'
 import { MazeCollectorTutorial } from './tutorial/MazeCollectorTutorial'
@@ -107,6 +107,8 @@ const PET_FILTER = 'saturate(0.5) brightness(1.15) contrast(0.85)'
 const ANSWER_COLORS: Record<string, string> = { A: '#f59e0b', B: '#38bdf8', C: '#f472b6', D: '#a78bfa' }
 const BAG_SCALE = 0.8
 const BONUS_SCALE = 1
+/** Tope de crecimiento de botellas y bolsas: van casi en cada celda y, más grandes, se amontonan. */
+const PICKUP_MAX_SCALE = 1.4
 const FULLSCREEN_PREF_KEY = 'nexusplay-maze-collector-fullscreen'
 
 /**
@@ -179,9 +181,11 @@ export function MazeCollectorGame(props: MazeCollectorGameProps) {
       />
     )
   }
+  const theme = MAZE_MAPS[normalizeMazeLayout(props.config.layout)]
   // La guía se dibuja DENTRO de la sesión: en pantalla completa el navegador
   // solo muestra lo que está dentro del elemento que la pidió.
   return (
+    <MazeSpriteThemeContext.Provider value={{ prefix: theme.spritePrefix, sideView: theme.sideView, background: theme.background }}>
     <MazeCollectorSession
       key={round}
       {...props}
@@ -194,6 +198,7 @@ export function MazeCollectorGame(props: MazeCollectorGameProps) {
       onRoundsChange={setRounds}
       onPlayAgain={() => setRound((value) => value + 1)}
     />
+    </MazeSpriteThemeContext.Provider>
   )
 }
 
@@ -629,8 +634,8 @@ function MazeCollectorSession({
           <MapBackground name={mapTheme.background} />
 
           {/* Capa 2: coleccionables — solo los que quedan, cada uno en su celda lógica (no interpolan, no se mueven). */}
-          <PickupsLayer pickups={game.pickups} bags={game.bags} count={game.pickups.length + game.bags.length} cellSize={cellSize} spriteScale={spriteScale} />
-          {game.bonus && <BonusMarker bonus={game.bonus} cellSize={cellSize} pixelPos={pixelPos} />}
+          <PickupsLayer pickups={game.pickups} bags={game.bags} count={game.pickups.length + game.bags.length} cellSize={cellSize} spriteScale={Math.min(spriteScale, PICKUP_MAX_SCALE)} />
+          {game.bonus && <BonusMarker bonus={game.bonus} cellSize={cellSize} scale={spriteScale} pixelPos={pixelPos} />}
           {tutorial?.scenario.goal && (
             <div
               className="absolute flex items-center justify-center"
@@ -698,7 +703,7 @@ function MazeCollectorSession({
           {game.question?.answers
             .filter((answer) => !answer.wrong)
             .map((answer) => (
-              <AnswerMarker key={`${game.question!.id}-${answer.letter}`} answer={answer} cellSize={cellSize} style={pixelPos(answer.pos)} />
+              <AnswerMarker key={`${game.question!.id}-${answer.letter}`} answer={answer} cellSize={cellSize} scale={spriteScale} style={pixelPos(answer.pos)} />
             ))}
 
           {/* Tutorial: la zona que se enseña queda iluminada y el resto del mapa, oscurecido. */}
@@ -929,9 +934,20 @@ function MazeCollectorSession({
 }
 
 /** Una respuesta en el mapa: la letra en una ficha de su color, con un pulso para que se vea entre las calles. */
-function AnswerMarker({ answer, cellSize, style }: { answer: MazeAnswer; cellSize: number; style: { left: number; top: number } }) {
+function AnswerMarker({
+  answer,
+  cellSize,
+  scale,
+  style,
+}: {
+  answer: MazeAnswer
+  cellSize: number
+  /** `spriteScale` del mapa: en los mapas de celda fina la ficha crece para seguir leyéndose. */
+  scale: number
+  style: { left: number; top: number }
+}) {
   const color = ANSWER_COLORS[answer.letter]
-  const size = cellSize * ANSWER_SCALE
+  const size = cellSize * ANSWER_SCALE * scale
   return (
     <div
       className="absolute z-10 flex items-center justify-center"
@@ -941,11 +957,11 @@ function AnswerMarker({ answer, cellSize, style }: { answer: MazeAnswer; cellSiz
     >
       <span
         aria-hidden="true"
-        className="absolute animate-ping rounded-full opacity-40 motion-reduce:animate-none"
+        className="absolute shrink-0 animate-ping rounded-full opacity-40 motion-reduce:animate-none"
         style={{ width: size * 0.9, height: size * 0.9, background: color }}
       />
       <span
-        className="relative flex items-center justify-center rounded-full border-2 border-white font-black text-slate-950 shadow-[0_4px_12px_rgba(0,0,0,0.6)]"
+        className="relative flex shrink-0 items-center justify-center rounded-full border-2 border-white font-black text-slate-950 shadow-[0_4px_12px_rgba(0,0,0,0.6)]"
         style={{ width: size, height: size, background: color, fontSize: Math.max(11, size * 0.55) }}
       >
         {answer.letter}
@@ -1286,10 +1302,12 @@ function CenteredSprite({
 function BonusMarker({
   bonus,
   cellSize,
+  scale,
   pixelPos,
 }: {
   bonus: { pos: CellPosition; item: MazeCollectorItem }
   cellSize: number
+  scale: number
   pixelPos: (cell: CellPosition) => { left: number; top: number }
 }) {
   const { left, top } = pixelPos(bonus.pos)
@@ -1299,7 +1317,7 @@ function BonusMarker({
       style={{ left, top, width: cellSize, height: cellSize }}
       title={bonus.item.label}
     >
-      <BonusSprite size={cellSize * BONUS_SCALE} />
+      <BonusSprite size={cellSize * BONUS_SCALE * scale} />
     </div>
   )
 }

@@ -97,7 +97,8 @@ const OCEAN_MAP_ROWS = [
 
 /** Fila de la avenida central: la única que cruza de borde a borde. */
 const TUNNEL_ROWS = [18]
-const SCALE = { speedScale: 1.8, spriteScale: 1.5 }
+// spriteScale 2.4: con celdas de la mitad, el muñeco y las respuestas se ven algo más grandes que en la Ciudad.
+const SCALE = { speedScale: 1.8, spriteScale: 2.4 }
 
 export const AMAZON_LAYOUT_ROWS = LAND_MAP_ROWS
 export function buildAmazonLayout(): MazeLayoutDef {

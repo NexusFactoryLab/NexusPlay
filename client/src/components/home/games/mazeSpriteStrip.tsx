@@ -1,3 +1,4 @@
+import { createContext, useContext } from 'react'
 import type { CSSProperties } from 'react'
 
 /**
@@ -11,6 +12,38 @@ const SPRITE_URLS = import.meta.glob<string>('./assets/maze-collector/*.webp', {
   query: '?url',
   import: 'default',
 })
+
+/**
+ * El mapa que se está jugando (issue #152): con él, cualquier `truck-*` o
+ * `cloud-*` se dibuja con el muñeco y los obstáculos de ese mapa —también en la
+ * guía y en los efectos, que nombran los sprites de la Ciudad—. Los muñecos de
+ * lado (`sideView`) no se giran como el camión visto desde arriba: hacia la
+ * izquierda se voltean y en los demás sentidos quedan derechos.
+ */
+export type MazeSpriteTheme = { prefix: string; sideView: boolean; background: string }
+
+const CITY_SPRITES: MazeSpriteTheme = { prefix: '', sideView: false, background: 'city-map' }
+
+export const MazeSpriteThemeContext = createContext<MazeSpriteTheme>(CITY_SPRITES)
+
+export function useMazeSpriteTheme(): MazeSpriteTheme {
+  return useContext(MazeSpriteThemeContext)
+}
+
+/** `truck-drive` → `amazon-truck-drive` en Amazonia; los coleccionables y la interfaz son de todos los mapas. */
+export function themedSpriteName(name: string, theme: MazeSpriteTheme): string {
+  if (!theme.prefix || name.startsWith(theme.prefix) || !/^(truck|cloud)-/.test(name)) return name
+  return theme.prefix + name
+}
+
+/** Un `rotate(...)` pensado para el camión, traducido para un muñeco de lado. */
+function sideViewTransform(transform: CSSProperties['transform']): CSSProperties['transform'] {
+  if (typeof transform !== 'string') return transform
+  const match = transform.match(/rotate\((-?\d+)deg\)/)
+  if (!match) return transform
+  const degrees = ((Number(match[1]) % 360) + 360) % 360
+  return transform.replace(match[0], degrees === 270 ? 'scaleX(-1)' : '').trim() || undefined
+}
 
 export function mazeSpriteUrl(name: string): string {
   return SPRITE_URLS[`./assets/maze-collector/${name}.webp`] ?? ''
@@ -35,7 +68,10 @@ type SpriteStripProps = {
  * re-renderizar React. `jump-none` hace que el primero y el último se vean el
  * mismo tiempo que los demás.
  */
-export function SpriteStrip({ name, frames, size, durationMs = 600, frame, className, style }: SpriteStripProps) {
+export function SpriteStrip({ name: baseName, frames, size, durationMs = 600, frame, className, style: baseStyle }: SpriteStripProps) {
+  const theme = useMazeSpriteTheme()
+  const name = themedSpriteName(baseName, theme)
+  const style = theme.sideView && name !== baseName && baseName.startsWith('truck-') && baseStyle ? { ...baseStyle, transform: sideViewTransform(baseStyle.transform) } : baseStyle
   const fixed = frame !== undefined || frames === 1
   const position = frames > 1 && frame !== undefined ? (frame / (frames - 1)) * 100 : 0
   return (
