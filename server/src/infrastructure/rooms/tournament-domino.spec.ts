@@ -356,3 +356,62 @@ describe('torneo con Dominó: el panel del administrador ve la conexión de cada
     expect(live.players.find((p) => p.userId.startsWith('bot:'))!.connection).toBeNull();
   });
 });
+
+describe('torneo terminado: el reporte solo se puede ver estando en la sala (#147)', () => {
+  async function finished() {
+    const h = await start(2);
+    vi.advanceTimersByTime(3000);
+    const room = h.domino.get(h.tournament.matches[0].dominoRoomCode!)!;
+    (h.gateway as unknown as { finishDominoGame: FinishFn }).finishDominoGame(room, 'p1', false);
+    expect(h.tournament.phase).toBe('FINISHED');
+    return h;
+  }
+  const rejoin = (id: string) => {
+    const c = client(`${id}-nuevo`);
+    c.data.userId = id;
+    return c;
+  };
+
+  it('quien sale a propósito ya no puede volver a entrar', async () => {
+    const { gateway, tournament } = await finished();
+    gateway.handleTournamentLeave(client('p0'));
+    expect(() => gateway.handleTournamentJoin(rejoin('p0'), { code: tournament.code })).toThrow(/solo se puede descargar mientras estás en ella/);
+  });
+
+  it('quien se queda en la sala no pierde nada y quien nunca salió puede reconectarse', async () => {
+    const { gateway, tournament } = await finished();
+    expect(() => gateway.handleTournamentJoin(rejoin('p1'), { code: tournament.code })).not.toThrow();
+  });
+
+  it('un corte de red tiene un margen corto para volver; pasado ese margen, ya no', async () => {
+    const { gateway, tournament } = await finished();
+    gateway.handleDisconnect(client('p0'));
+    vi.advanceTimersByTime(30_000);
+    expect(() => gateway.handleTournamentJoin(rejoin('p0'), { code: tournament.code })).not.toThrow();
+    // Volvió: la marca de salida se borra. Si se corta otra vez y tarda más del margen, ya no vuelve.
+    gateway.handleDisconnect(client('p0-nuevo'));
+    vi.advanceTimersByTime(61_000);
+    expect(() => gateway.handleTournamentJoin(rejoin('p0'), { code: tournament.code })).toThrow(/reporte/);
+  });
+
+  it('el administrador siempre puede volver a su panel', async () => {
+    const { gateway, tournament, admin } = await finished();
+    gateway.handleTournamentLeave(admin);
+    const back = client('admin-nuevo');
+    back.data.userId = 'admin';
+    expect(() => gateway.handleTournamentJoin(back, { code: tournament.code })).not.toThrow();
+  });
+
+  it('lo que se envía a las pantallas no revela cuándo ni cómo salió nadie', async () => {
+    const { gateway, tournament } = await finished();
+    const sent: string[] = [];
+    gateway.server = {
+      to: () => ({ emit: (_event: string, payload: unknown) => sent.push(JSON.stringify(payload)) }),
+      in: () => ({ socketsLeave: () => {} }),
+    } as unknown as Server;
+    gateway.handleTournamentLeave(client('p0'));
+    gateway.handleTournamentJoin(rejoin('p1'), { code: tournament.code });
+    expect(sent.length).toBeGreaterThan(0);
+    expect(sent.join('')).not.toContain('finalExit');
+  });
+});

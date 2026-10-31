@@ -5,6 +5,7 @@ import type { TournamentStateView } from './guessWhoTypes'
 import { TournamentConfetti } from './TournamentConfetti'
 import { TournamentPodium } from './TournamentPodium'
 import { TournamentRoundsList } from './TournamentRoundsList'
+import { TournamentStudentReport } from './TournamentStudentReport'
 import { TournamentStandingsList, ordinal } from './TournamentStandingsList'
 import { rankParticipants } from './tournamentStats'
 
@@ -12,13 +13,15 @@ type Props = {
   tournament: TournamentStateView
   selfUserId: string | null
   onExit: () => void
+  /** La persona ya descargó su reporte (CSV o PDF). */
+  onReportSaved?: () => void
 }
 
 /**
  * Final del torneo para quien jugó (issue #131): su puesto en grande, el podio con
  * personajes, la clasificación completa y confeti si quedó en los tres primeros.
  */
-export function TournamentFinalResults({ tournament, selfUserId, onExit }: Props) {
+export function TournamentFinalResults({ tournament, selfUserId, onExit, onReportSaved }: Props) {
   const ranking = useMemo(() => rankParticipants(tournament.participants), [tournament.participants])
   const ids = useMemo(() => ranking.map((participant) => participant.userId), [ranking])
   const avatars = usePlayersAvatars(ids)
@@ -67,6 +70,8 @@ export function TournamentFinalResults({ tournament, selfUserId, onExit }: Props
           <TournamentRoundsList tournament={tournament} />
         </div>
       </details>
+
+      <TournamentStudentReport tournament={tournament} selfUserId={selfUserId} onSaved={onReportSaved} />
 
       <button
         type="button"

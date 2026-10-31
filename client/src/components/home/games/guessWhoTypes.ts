@@ -139,6 +139,9 @@ export type TournamentRoundMatchSummary = {
   winnerUserId: string | null
   vsBot: boolean
   gameType: TournamentGameType
+  /** Juego y nivel de esta partida (para el reporte de cada estudiante). */
+  gameTitle?: string
+  level?: TournamentLevel
 }
 
 export type TournamentRoundSummary = {

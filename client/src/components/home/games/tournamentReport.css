@@ -1,0 +1,72 @@
+/* Reporte personal del torneo (issue #147): en pantalla no se ve; al imprimir o guardar como PDF es lo único que sale. */
+.tournament-report-print {
+  display: none;
+}
+
+@media print {
+  body.print-tournament-report #root {
+    display: none !important;
+  }
+
+  body.print-tournament-report .tournament-report-print {
+    display: block;
+    padding: 24px;
+    color: #111827;
+    background: #ffffff;
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    font-size: 12pt;
+  }
+
+  .tournament-report-print h1 {
+    margin: 0 0 4px;
+    font-size: 20pt;
+  }
+
+  .tournament-report-print h2 {
+    margin: 18px 0 6px;
+    font-size: 13pt;
+  }
+
+  .tournament-report-print dl {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 2px 14px;
+    margin: 10px 0;
+  }
+
+  .tournament-report-print dt {
+    font-weight: 700;
+  }
+
+  .tournament-report-print dd {
+    margin: 0;
+  }
+
+  .tournament-report-print table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 4px;
+  }
+
+  .tournament-report-print th,
+  .tournament-report-print td {
+    border: 1px solid #9ca3af;
+    padding: 5px 8px;
+    text-align: left;
+  }
+
+  .tournament-report-print th {
+    background: #e5e7eb;
+  }
+
+  .tournament-report-print tr.is-self td {
+    font-weight: 700;
+    background: #fef3c7;
+  }
+
+  .tournament-report-print p.note {
+    margin-top: 18px;
+    font-size: 10pt;
+    color: #4b5563;
+  }
+}

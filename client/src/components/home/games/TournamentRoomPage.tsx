@@ -126,7 +126,9 @@ function TournamentSession() {
   const [joinCodeInput, setJoinCodeInput] = useState('')
   const [showPairingOverlay, setShowPairingOverlay] = useState(false)
   const [showStandings, setShowStandings] = useState(false)
-  const [confirmingExit, setConfirmingExit] = useState(false)
+  // Qué confirma el aviso de salida: abandonar una partida en curso, o irse sin haber descargado el reporte.
+  const [confirmingExit, setConfirmingExit] = useState<'match' | 'report' | null>(null)
+  const [reportSaved, setReportSaved] = useState(false)
 
   // Arranque de la sala: si la URL trae un código en el path, se une a esa
   // sala — mismo patrón de reconexión que Dominó/Escaleras/GuessWho.
@@ -217,6 +219,13 @@ function TournamentSession() {
     const timeout = setTimeout(clearMatchAbandonedMessage, 8000)
     return () => clearTimeout(timeout)
   }, [matchAbandonedMessage, clearMatchAbandonedMessage])
+
+  /** Salir pide confirmación solo si cuesta algo: abandonar una partida o perder el reporte sin descargarlo. */
+  function requestExit() {
+    if (tournament?.phase === 'RUNNING' && tournament.myMatch?.phase === 'PLAYING') setConfirmingExit('match')
+    else if (tournament?.phase === 'FINISHED' && !tournament.isModerator && !reportSaved && tournament.participants.some((p) => p.isSelf)) setConfirmingExit('report')
+    else handleExit()
+  }
 
   function handleExit() {
     leaveTournament()
@@ -398,7 +407,7 @@ function TournamentSession() {
             type="button"
             className="flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-2 text-[13px] font-medium text-text-h transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/50 hover:text-accent"
             // En plena partida, salir es abandonarla (la gana tu rival): se confirma antes.
-            onClick={() => (tournament.phase === 'RUNNING' && tournament.myMatch?.phase === 'PLAYING' ? setConfirmingExit(true) : handleExit())}
+            onClick={requestExit}
           >
             <LogOut className="h-4 w-4" strokeWidth={2} />
             Salir
@@ -487,21 +496,25 @@ function TournamentSession() {
 
         {tournament.phase === 'FINISHED' && (
           <div className="flex justify-center">
-            <TournamentFinalResults tournament={tournament} selfUserId={user?.id ?? null} onExit={handleExit} />
+            <TournamentFinalResults tournament={tournament} selfUserId={user?.id ?? null} onExit={requestExit} onReportSaved={() => setReportSaved(true)} />
           </div>
         )}
       </div>
       {confirmingExit && (
         <TournamentConfirmModal
-          title="¿Salir del torneo?"
-          message="Estás en medio de una partida. Si sales, la abandonas: la gana tu rival y tú no sumas puntos."
+          title={confirmingExit === 'report' ? '¿Salir sin descargar tu reporte?' : '¿Salir del torneo?'}
+          message={
+            confirmingExit === 'report'
+              ? 'Si sales de la sala, ya no podrás descargar tu reporte: no se guarda en Nexus Play.'
+              : 'Estás en medio de una partida. Si sales, la abandonas: la gana tu rival y tú no sumas puntos.'
+          }
           confirmLabel="Sí, salir"
-          cancelLabel="Seguir jugando"
+          cancelLabel={confirmingExit === 'report' ? 'Volver al reporte' : 'Seguir jugando'}
           onConfirm={() => {
-            setConfirmingExit(false)
+            setConfirmingExit(null)
             handleExit()
           }}
-          onCancel={() => setConfirmingExit(false)}
+          onCancel={() => setConfirmingExit(null)}
         />
       )}
     </div>

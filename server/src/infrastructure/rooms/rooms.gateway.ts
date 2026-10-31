@@ -142,6 +142,8 @@ const MAX_CHAT_MESSAGE_LENGTH = 500;
 
 /** Espera antes de repartir una partida de dominó del torneo: es lo que dura el anuncio del duelo. */
 const TOURNAMENT_DOMINO_DEAL_DELAY_MS = 2800;
+/** Con el torneo terminado, quien pierde la conexión puede volver a ver su reporte durante este margen (issue #147). */
+const TOURNAMENT_FINAL_REJOIN_MS = 60_000;
 
 /** Nivel de dominó para una complejidad del torneo; si el contenido no puede ofrecerlo, baja al más alto disponible. */
 export function resolveTournamentDominoLevel(concepts: DominoConcept[], level: TournamentLevel): DominoLevel {
@@ -285,6 +287,8 @@ function buildRoundsSummary(tournament: TournamentState) {
         winnerUserId: match.winnerUserId,
         vsBot: match.vsBot === true,
         gameType: match.gameType ?? 'GUESS_WHO',
+        gameTitle: match.gameTitle ?? tournament.gameTitle,
+        level: match.level ?? 'MEDIUM',
       })),
     }));
 }
@@ -871,6 +875,10 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       this.handleTournamentLeave(socket);
     } else if (tournament) {
       if (wait) this.waitForTournamentParticipant(tournament, socket.id);
+      if (tournament.phase === 'FINISHED') {
+        const leaving = tournament.participants.find((p) => p.socketId === socket.id);
+        if (leaving && !leaving.finalExit?.explicit) leaving.finalExit = { at: Date.now(), explicit: false };
+      }
       this.tournamentStore.set(tournament);
     }
 
@@ -1818,8 +1826,15 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     const existing = tournament.participants.find((p) => p.userId === socket.data.userId);
     // Quien ya estaba en el torneo puede reconectarse aunque ya haya iniciado.
     if (tournament.phase !== 'WAITING' && !existing) throw new Error('El torneo ya inició.');
+    if (tournament.phase === 'FINISHED' && existing?.finalExit) {
+      const { at, explicit } = existing.finalExit;
+      if (explicit || Date.now() - at > TOURNAMENT_FINAL_REJOIN_MS) {
+        throw new Error('El torneo ya terminó y saliste de la sala: el reporte solo se puede descargar mientras estás en ella.');
+      }
+    }
 
     if (existing) {
+      existing.finalExit = undefined;
       if (tournament.phase === 'WAITING' && existing.socketId !== socket.id) existing.ready = false;
       existing.socketId = socket.id;
       if (tournament.phase === 'RUNNING') this.resumeTournamentParticipant(tournament, existing.userId);
@@ -1961,6 +1976,13 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     if (tournament.phase === 'RUNNING') {
       const leaving = tournament.participants.find((p) => p.socketId === socket.id);
       if (leaving) this.forfeitParticipantMatches(tournament, leaving.userId);
+    }
+    if (tournament.phase === 'FINISHED') {
+      const leaving = tournament.participants.find((p) => p.socketId === socket.id);
+      if (leaving) {
+        leaving.finalExit = { at: Date.now(), explicit: true };
+        this.tournamentStore.set(tournament);
+      }
     }
   }
 

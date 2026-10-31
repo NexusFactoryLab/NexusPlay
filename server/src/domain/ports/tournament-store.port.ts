@@ -64,6 +64,11 @@ export interface TournamentParticipant {
   wrongAccusations?: number;
   /** Afirmaciones del Laberinto V/F acertadas: crédito parcial para el desempate (issue #147). */
   correctAnswers?: number;
+  /**
+   * Cómo salió de la sala con el torneo ya terminado (issue #147). El reporte final solo se ve estando en la sala:
+   * si salió a propósito no puede volver, y si solo se le cortó la conexión tiene un margen corto para volver.
+   */
+  finalExit?: { at: number; explicit: boolean };
 }
 
 /**
