@@ -4,6 +4,7 @@ import { TournamentLobby } from './TournamentLobby'
 import { TournamentModeratorPanel } from './TournamentModeratorPanel'
 import { TournamentCodeEntry } from './TournamentCodeEntry'
 import { TournamentCreateConfirm } from './TournamentCreateConfirm'
+import { TournamentConfirmModal } from './TournamentConfirmModal'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Bot, Crown, LogOut, Swords, Trophy } from 'lucide-react'
@@ -122,6 +123,7 @@ function TournamentSession() {
   const [joinCodeInput, setJoinCodeInput] = useState('')
   const [showPairingOverlay, setShowPairingOverlay] = useState(false)
   const [showStandings, setShowStandings] = useState(false)
+  const [confirmingExit, setConfirmingExit] = useState(false)
 
   // Arranque de la sala: si la URL trae un código en el path, se une a esa
   // sala — mismo patrón de reconexión que Dominó/Escaleras/GuessWho.
@@ -370,7 +372,7 @@ function TournamentSession() {
         <div className="mb-5 flex items-center justify-between gap-3">
           <div>
             <h2 className="flex flex-wrap items-center gap-2 text-[19px] tracking-tight text-text-h">
-              {tournament.myMatch?.gameTitle ?? tournament.gameTitle}
+              {tournament.myMatch?.gameTitle ?? 'Torneo'}
               {tournament.myMatch && (
                 <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${TOURNAMENT_LEVEL_INFO[tournament.myMatch.level].tone}`}>
                   {TOURNAMENT_LEVEL_INFO[tournament.myMatch.level].label}
@@ -392,7 +394,8 @@ function TournamentSession() {
           <button
             type="button"
             className="flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-2 text-[13px] font-medium text-text-h transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/50 hover:text-accent"
-            onClick={handleExit}
+            // En plena partida, salir es abandonarla (la gana tu rival): se confirma antes.
+            onClick={() => (tournament.phase === 'RUNNING' && tournament.myMatch?.phase === 'PLAYING' ? setConfirmingExit(true) : handleExit())}
           >
             <LogOut className="h-4 w-4" strokeWidth={2} />
             Salir
@@ -507,6 +510,19 @@ function TournamentSession() {
           </div>
         )}
       </div>
+      {confirmingExit && (
+        <TournamentConfirmModal
+          title="¿Salir del torneo?"
+          message="Estás en medio de una partida. Si sales, la abandonas: la gana tu rival y tú no sumas puntos."
+          confirmLabel="Sí, salir"
+          cancelLabel="Seguir jugando"
+          onConfirm={() => {
+            setConfirmingExit(false)
+            handleExit()
+          }}
+          onCancel={() => setConfirmingExit(false)}
+        />
+      )}
     </div>
   )
 }

@@ -126,6 +126,13 @@ beforeEach(() => {
 })
 
 describe('TournamentModeratorPanel', () => {
+  it('el título es «Torneo» (no el de un solo juego) y no hay confirmaciones abiertas de entrada (#131)', () => {
+    const html = render(build())
+    expect(html).toContain('>Torneo</h2>')
+    expect(html).not.toContain('Banderas + Dominexo')
+    expect(html).not.toContain('role="dialog"')
+  })
+
   it('muestra el podio con los tres primeros, su nombre y sus puntos', () => {
     const html = render(build())
     expect(html).toContain('aria-label="Podio del torneo"')

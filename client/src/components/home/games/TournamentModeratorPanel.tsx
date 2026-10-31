@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Bot, Crown, Layers, LogOut, Medal, Radio, Swords, Trophy, Users } from 'lucide-react'
 import { AvatarCircle } from '../../avatar/AvatarCircle'
@@ -7,6 +7,7 @@ import type { AvatarConfig } from '../../../services/avatar.service'
 import { useFlip } from '../../../hooks/useFlip'
 import type { TournamentLiveMatch, TournamentStateView } from './guessWhoTypes'
 import { PointsValue } from './PointsValue'
+import { TournamentConfirmModal } from './TournamentConfirmModal'
 import { TournamentPodium } from './TournamentPodium'
 import { TournamentPointsChart } from './TournamentPointsChart'
 import { TOURNAMENT_GAME_LABEL, TOURNAMENT_LEVEL_INFO } from './tournamentLevels'
@@ -110,6 +111,7 @@ function MatchStatus({ match }: { match: TournamentLiveMatch }) {
  * de la ronda en curso. Todo se recalcula con cada estado que llega por socket.
  */
 export function TournamentModeratorPanel({ tournament, error, onClose, onEndRound, onExit }: Props) {
+  const [confirming, setConfirming] = useState<'round' | 'close' | null>(null)
   const ranking = useMemo(() => rankParticipants(tournament.participants), [tournament.participants])
   const history = useMemo(() => buildPointsHistory(tournament), [tournament])
   const finished = tournament.phase === 'FINISHED'
@@ -139,7 +141,7 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
         <header className="stagger-in flex flex-wrap items-start justify-between gap-3" style={stagger(0)}>
           <div className="min-w-0">
             <p className="text-[11px] font-semibold tracking-[0.18em] text-accent uppercase">Panel del administrador</p>
-            <h2 className="truncate text-[26px] font-bold tracking-tight text-text-h">{tournament.gameTitle}</h2>
+            <h2 className="truncate text-[26px] font-bold tracking-tight text-text-h">Torneo</h2>
             <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-text">
               <span>
                 Código <strong className="tracking-widest text-text-h">{tournament.code}</strong>
@@ -174,9 +176,7 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
                 type="button"
                 className="rounded-lg border border-border bg-surface px-3 py-2 text-[13px] font-semibold text-text-h transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/50"
                 title="Termina las partidas sin acabar de esta ronda (sin puntos) y pasa a la siguiente"
-                onClick={() => {
-                  if (window.confirm('¿Cerrar la ronda ahora? Las partidas sin terminar quedan sin ganador.')) onEndRound()
-                }}
+                onClick={() => setConfirming('round')}
               >
                 {tournament.currentRound >= tournament.totalRounds ? 'Terminar torneo' : 'Cerrar ronda'}
               </button>
@@ -184,7 +184,7 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
             <button
               type="button"
               className="rounded-lg border border-danger/40 px-3 py-2 text-[13px] font-semibold text-danger transition-all duration-200 hover:-translate-y-0.5 hover:bg-danger/10"
-              onClick={onClose}
+              onClick={() => setConfirming('close')}
             >
               Cerrar torneo
             </button>
@@ -361,6 +361,36 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
           </section>
         </div>
       </div>
+      {confirming === 'round' && (
+        <TournamentConfirmModal
+          title={tournament.currentRound >= tournament.totalRounds ? '¿Terminar el torneo ahora?' : '¿Cerrar la ronda ahora?'}
+          message={
+            playing === 0
+              ? 'Todas las partidas ya terminaron. Se pasa a lo siguiente.'
+              : `${playing} ${playing === 1 ? 'partida sigue' : 'partidas siguen'} en juego y quedarán sin ganador ni puntos.`
+          }
+          confirmLabel={tournament.currentRound >= tournament.totalRounds ? 'Sí, terminar torneo' : 'Sí, cerrar ronda'}
+          cancelLabel="Seguir jugando"
+          onConfirm={() => {
+            setConfirming(null)
+            onEndRound()
+          }}
+          onCancel={() => setConfirming(null)}
+        />
+      )}
+      {confirming === 'close' && (
+        <TournamentConfirmModal
+          title="¿Cerrar el torneo?"
+          message={`Se cierra para las ${tournament.participants.length} personas que participan y se pierden los ${totalPoints} ${totalPoints === 1 ? 'punto repartido' : 'puntos repartidos'}. No se puede deshacer.`}
+          confirmLabel="Sí, cerrar torneo"
+          cancelLabel="Volver al panel"
+          onConfirm={() => {
+            setConfirming(null)
+            onClose()
+          }}
+          onCancel={() => setConfirming(null)}
+        />
+      )}
     </div>
   )
 }

@@ -5,6 +5,7 @@ import { Modal } from './Modal'
 import type { TournamentStateView } from './guessWhoTypes'
 import { GameInstructionsGate } from './GameInstructionsGate'
 import { TOURNAMENT_GAME_LABEL, TOURNAMENT_LEVEL_INFO } from './tournamentLevels'
+import { TournamentConfirmModal } from './TournamentConfirmModal'
 
 type Props = {
   tournament: TournamentStateView
@@ -22,6 +23,7 @@ type Props = {
 export function TournamentLobby({ tournament, error, onStart, onClose, onExit }: Props) {
   const [copied, setCopied] = useState<string | null>(null)
   const [showGuide, setShowGuide] = useState(false)
+  const [confirmingClose, setConfirmingClose] = useState(false)
 
   const invitationUrl = new URL(`/quien-es/torneo/${encodeURIComponent(tournament.code)}`, window.location.origin).href
   const canStart = tournament.participants.length >= 2
@@ -37,15 +39,15 @@ export function TournamentLobby({ tournament, error, onStart, onClose, onExit }:
   }
 
   return (
-    <Modal onClose={tournament.isModerator ? onClose : onExit} maxWidthClassName="max-w-[760px]" ariaLabel="Sala de espera del torneo">
+    <Modal onClose={() => {}} dismissible={false} maxWidthClassName="max-w-[760px]" ariaLabel="Sala de espera del torneo">
       <div className="flex flex-col gap-4">
         <div className="stagger-in flex items-start justify-between gap-3" style={{ '--stagger': 0 } as React.CSSProperties}>
           <div>
             <p className="text-[11px] font-semibold tracking-[0.18em] text-accent uppercase">
               {tournament.isModerator ? 'Torneo · Administrador' : 'Torneo'}
             </p>
-            <h2 className="mt-1 text-[22px] font-bold tracking-tight text-text-h">{tournament.gameTitle}</h2>
-            <p className="text-[12.5px] text-text">{tournament.totalRounds} rondas · 1 punto por partida ganada</p>
+            <h2 className="mt-1 text-[22px] font-bold tracking-tight text-text-h">Torneo</h2>
+            <p className="text-[12.5px] text-text">{tournament.totalRounds} rondas · 1 punto por ronda ganada</p>
           </div>
           <button
             type="button"
@@ -107,14 +109,15 @@ export function TournamentLobby({ tournament, error, onStart, onClose, onExit }:
         </div>
 
         <div className="stagger-in rounded-2xl border border-border p-4" style={{ '--stagger': 3 } as React.CSSProperties}>
-          <p className="mb-2 text-[13px] font-semibold text-text-h">Rondas del torneo</p>
-          <ol className="flex flex-col gap-1.5">
-            {Array.from({ length: tournament.totalRounds }, (_, round) => {
-              const game = tournament.games[round % tournament.games.length]
+          <p className="mb-1 text-[13px] font-semibold text-text-h">Juegos del torneo</p>
+          <p className="mb-2.5 text-[12px] text-text">
+            En cada ronda se sortea uno de estos juegos, y nunca toca el mismo dos veces seguidas. ¡Es una sorpresa!
+          </p>
+          <ul className="flex flex-col gap-1.5">
+            {tournament.games.map((game, index) => {
               const info = TOURNAMENT_LEVEL_INFO[game.level]
               return (
-                <li key={round} className="flex items-center gap-2 text-[12.5px] text-text-h">
-                  <span className="w-14 shrink-0 text-text">Ronda {round + 1}</span>
+                <li key={`${game.title}-${index}`} className="flex items-center gap-2 text-[12.5px] text-text-h">
                   <span className="min-w-0 flex-1 truncate font-medium">
                     {game.title} <span className="font-normal text-text">· {TOURNAMENT_GAME_LABEL[game.gameType]}</span>
                   </span>
@@ -124,7 +127,7 @@ export function TournamentLobby({ tournament, error, onStart, onClose, onExit }:
                 </li>
               )
             })}
-          </ol>
+          </ul>
         </div>
 
         {error && (
@@ -135,7 +138,7 @@ export function TournamentLobby({ tournament, error, onStart, onClose, onExit }:
 
         {tournament.isModerator ? (
           <div className="flex gap-2">
-            <button type="button" className="rounded-lg border border-border px-4 py-2.5 text-[14px] font-medium text-text-h transition-all duration-200 hover:-translate-y-0.5 hover:border-danger/50 hover:text-danger active:translate-y-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" onClick={onClose}>
+            <button type="button" className="rounded-lg border border-border px-4 py-2.5 text-[14px] font-medium text-text-h transition-all duration-200 hover:-translate-y-0.5 hover:border-danger/50 hover:text-danger active:translate-y-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" onClick={() => setConfirmingClose(true)}>
               Cerrar torneo
             </button>
             <button
@@ -166,6 +169,23 @@ export function TournamentLobby({ tournament, error, onStart, onClose, onExit }:
           </div>
         )}
       </div>
+      {confirmingClose && (
+        <TournamentConfirmModal
+          title="¿Cerrar el torneo?"
+          message={
+            tournament.participants.length === 0
+              ? 'Se cierra la sala y el código deja de funcionar. No se puede deshacer.'
+              : `Se cierra la sala para las ${tournament.participants.length} ${tournament.participants.length === 1 ? 'persona que ya entró' : 'personas que ya entraron'} y el código deja de funcionar. No se puede deshacer.`
+          }
+          confirmLabel="Sí, cerrar torneo"
+          cancelLabel="Seguir esperando"
+          onConfirm={() => {
+            setConfirmingClose(false)
+            onClose()
+          }}
+          onCancel={() => setConfirmingClose(false)}
+        />
+      )}
       {showGuide && (
         <GameInstructionsGate kind="GUESS_WHO_GROUP">
           <CloseGuide onDone={() => setShowGuide(false)} />
