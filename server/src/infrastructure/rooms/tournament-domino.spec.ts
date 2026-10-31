@@ -415,3 +415,21 @@ describe('torneo terminado: el reporte solo se puede ver estando en la sala (#14
     expect(sent.join('')).not.toContain('finalExit');
   });
 });
+
+describe('expulsar a alguien que está jugando un dominó (#147)', () => {
+  it('pierde la partida sin desarmar la sala y su rival suma el punto', async () => {
+    const h = await start(4);
+    vi.advanceTimersByTime(3000);
+    const match = h.tournament.matches.find((m) => !m.vsBot)!;
+    const room = h.domino.get(match.dominoRoomCode!)!;
+    const [first, second] = match.playerUserIds as [string, string];
+    h.gateway.handleTournamentKick(h.admin, { userId: first });
+    const after = h.domino.get(room.code)!;
+    expect(after).toBeDefined();
+    expect(after.phase).toBe('FINISHED');
+    expect(after.abandonedByUserId).toBe(first);
+    expect(after.winnerUserId).toBe(second);
+    expect(h.tournament.participants.find((p) => p.userId === second)!.points).toBe(1);
+    expect(h.tournament.participants.find((p) => p.userId === first)!.kicked).toBe(true);
+  });
+});

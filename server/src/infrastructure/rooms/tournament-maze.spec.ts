@@ -288,3 +288,98 @@ describe('el administrador elige el juego de la siguiente ronda (#147)', () => {
     expect(() => single.gateway.handleTournamentSetNextGame(single.admin, { gameIndex: 0 })).toThrow(/un solo juego/);
   });
 });
+
+describe('el administrador expulsa a un participante (#147)', () => {
+  type Views = { participants: { userId: string }[]; kickedParticipants: { userId: string }[] };
+  const lastState = (emitted: { target: string; event: string; payload: unknown }[], target: string) =>
+    [...emitted].reverse().find((e) => e.target === target && e.event === 'tournament:state')?.payload as Views | undefined;
+  const solve = async (gateway: Awaited<ReturnType<typeof start>>['gateway'], p: ReturnType<typeof client>) => {
+    await gateway.handleTournamentMazeAnswer(p, { questionId: 'q1', chosen: true });
+    await gateway.handleTournamentMazeAnswer(p, { questionId: 'q2', chosen: false });
+    await gateway.handleTournamentMazeAnswer(p, { questionId: 'q3', chosen: true });
+    gateway.handleTournamentMazeFinish(p);
+  };
+
+  it('en la sala de espera sale del torneo, no cuenta para iniciar y no puede volver con el código', async () => {
+    const h = setup(2);
+    const admin = client('admin');
+    await h.gateway.handleTournamentCreate(admin);
+    const tournament = h.tournaments.findBySocketId('admin')!;
+    const [a, b, c] = [client('p0'), client('p1'), client('p2')];
+    for (const p of [a, b, c]) h.gateway.handleTournamentJoin(p, { code: tournament.code });
+    h.gateway.handleTournamentKick(admin, { userId: 'p1' });
+    expect(h.emitted.some((e) => e.target === 'p1' && e.event === 'tournament:kicked')).toBe(true);
+    expect(lastState(h.emitted, 'p0')!.participants.map((p) => p.userId)).toEqual(['p0', 'p2']);
+    expect(lastState(h.emitted, 'admin')!.kickedParticipants.map((p) => p.userId)).toEqual(['p1']);
+    expect(() => h.gateway.handleTournamentJoin(client('p1-otra-vez'), { code: tournament.code })).not.toThrow(/sacó/); // otro usuario cualquiera
+    const back = client('p1-nuevo');
+    back.data.userId = 'p1';
+    expect(() => h.gateway.handleTournamentJoin(back, { code: tournament.code })).toThrow(/sacó de este torneo/);
+    h.gateway.handleTournamentStart(admin);
+    const round1 = tournament.matches.filter((m) => m.round === 1).flatMap((m) => m.playerUserIds);
+    expect(round1).not.toContain('p1');
+    expect(round1).toEqual(expect.arrayContaining(['p0', 'p2']));
+  });
+
+  it('en pleno torneo no entra en la siguiente ronda ni cuenta en la clasificación aunque fuera el mejor', async () => {
+    const { gateway, tournament, admin, players } = await start(3, 2);
+    const fail = async (p: ReturnType<typeof client>) => {
+      await gateway.handleTournamentMazeAnswer(p, { questionId: 'q1', chosen: true });
+      await gateway.handleTournamentMazeAnswer(p, { questionId: 'q2', chosen: true }); // la correcta es false
+      await gateway.handleTournamentMazeAnswer(p, { questionId: 'q3', chosen: true });
+      gateway.handleTournamentMazeFinish(p);
+    };
+    // Ronda 1: p0 es el único que suma (va primero y sin derrotas).
+    await solve(gateway, players[0]);
+    await fail(players[1]);
+    gateway.handleTournamentKick(admin, { userId: 'p0' });
+    await fail(players[2]);
+    expect(tournament.currentRound).toBe(2);
+    expect(tournament.matches.filter((m) => m.round === 2).flatMap((m) => m.playerUserIds).sort()).toEqual(['p1', 'p2']);
+    // Ronda 2: p1 suma y p2 no. Con p0 dentro ganaría p0 (1 punto y 0 derrotas); expulsado, gana p1.
+    await solve(gateway, players[1]);
+    await fail(players[2]);
+    expect(tournament.phase).toBe('FINISHED');
+    expect(tournament.participants.find((p) => p.userId === 'p0')).toMatchObject({ points: 1, losses: 0, kicked: true });
+    expect(tournament.winnerUserId).toBe('p1');
+  });
+
+  it('quien se expulsa en plena ronda no deja la ronda colgada: si era el último, la ronda avanza', async () => {
+    const { gateway, tournament, admin, players } = await start(2, 2);
+    await solve(gateway, players[0]);
+    expect(tournament.currentRound).toBe(1);
+    gateway.handleTournamentKick(admin, { userId: 'p1' });
+    expect(tournament.currentRound).toBe(2);
+    expect(tournament.matches.filter((m) => m.round === 2).flatMap((m) => m.playerUserIds)).toEqual(['p0']);
+  });
+
+  it('si se expulsa a todos, el torneo termina sin ganador', async () => {
+    const { gateway, tournament, admin } = await start(2, 3);
+    gateway.handleTournamentKick(admin, { userId: 'p0' });
+    gateway.handleTournamentKick(admin, { userId: 'p1' });
+    expect(tournament.phase).toBe('FINISHED');
+    expect(tournament.winnerUserId).toBeNull();
+  });
+
+  it('no puede volver a entrar y no ve más estados del torneo', async () => {
+    const { gateway, tournament, admin, emitted } = await start(3, 2);
+    gateway.handleTournamentKick(admin, { userId: 'p2' });
+    const before = emitted.filter((e) => e.target === 'p2' && e.event === 'tournament:state').length;
+    gateway.handleTournamentEndRound(admin);
+    expect(emitted.filter((e) => e.target === 'p2' && e.event === 'tournament:state').length).toBe(before);
+    const back = client('p2-nuevo');
+    back.data.userId = 'p2';
+    expect(() => gateway.handleTournamentJoin(back, { code: tournament.code })).toThrow(/sacó de este torneo/);
+  });
+
+  it('solo el administrador, solo a quien está en el torneo, y no con el torneo terminado', async () => {
+    const { gateway, tournament, admin, players } = await start(2, 1);
+    expect(() => gateway.handleTournamentKick(players[0], { userId: 'p1' })).toThrow(/Solo el administrador/);
+    expect(() => gateway.handleTournamentKick(admin, { userId: 'nadie' })).toThrow(/no está en el torneo/);
+    expect(() => gateway.handleTournamentKick(admin, { userId: 7 as never })).toThrow(/no válido/);
+    gateway.handleTournamentKick(admin, { userId: 'p1' });
+    expect(() => gateway.handleTournamentKick(admin, { userId: 'p1' })).toThrow(/no está en el torneo/);
+    tournament.phase = 'FINISHED';
+    expect(() => gateway.handleTournamentKick(admin, { userId: 'p0' })).toThrow(/ya terminó/);
+  });
+});

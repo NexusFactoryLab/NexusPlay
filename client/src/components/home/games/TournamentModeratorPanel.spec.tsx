@@ -127,6 +127,29 @@ beforeEach(() => {
 })
 
 describe('TournamentModeratorPanel', () => {
+  describe('expulsar participantes (#147)', () => {
+    const withKick = (view: TournamentStateView) =>
+      renderToStaticMarkup(<TournamentModeratorPanel tournament={view} error={null} onClose={() => {}} onEndRound={() => {}} onKick={() => {}} onExit={() => {}} />)
+
+    it('cada persona de la clasificación lleva su botón de expulsar, con su nombre para los lectores de pantalla', () => {
+      const html = withKick(build())
+      for (const name of NAMES) expect(html).toContain(`aria-label="Expulsar a ${name}"`)
+      expect(html).not.toContain('<strong class="text-text-h">Expulsados:')
+    })
+
+    it('lista a quienes ya expulsó y avisa que no cuentan ni pueden volver', () => {
+      const html = withKick(build({ kickedParticipants: [{ userId: 'x1', displayName: 'Zoe' }, { userId: 'x2', displayName: 'Yago' }] }))
+      expect(html).toContain('Expulsados:')
+      expect(html).toContain('Zoe, Yago')
+      expect(html).toContain('No cuentan en la clasificación ni pueden volver')
+    })
+
+    it('sin el comando o con el torneo terminado no hay botón de expulsar', () => {
+      expect(render(build())).not.toContain('Expulsar a ')
+      expect(withKick(build({ phase: 'FINISHED' }))).not.toContain('Expulsar a ')
+    })
+  })
+
   describe('selector del juego de la siguiente ronda (#147)', () => {
     const withSelector = (view: TournamentStateView) =>
       renderToStaticMarkup(<TournamentModeratorPanel tournament={view} error={null} onClose={() => {}} onEndRound={() => {}} onSetNextGame={() => {}} onExit={() => {}} />)

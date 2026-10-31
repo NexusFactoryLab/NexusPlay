@@ -69,6 +69,8 @@ export interface TournamentParticipant {
    * si salió a propósito no puede volver, y si solo se le cortó la conexión tiene un margen corto para volver.
    */
   finalExit?: { at: number; explicit: boolean };
+  /** Expulsado por el administrador (issue #147): no entra en las rondas siguientes, no cuenta en la clasificación y no puede volver. */
+  kicked?: boolean;
 }
 
 /**

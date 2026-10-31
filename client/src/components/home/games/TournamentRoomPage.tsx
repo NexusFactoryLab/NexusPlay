@@ -104,6 +104,8 @@ function TournamentSession() {
     matchAccusationFailedMessage,
     clearMatchAccusationFailedMessage,
     matchAbandonedMessage,
+    kickedMessage,
+    kickParticipant,
     clearMatchAbandonedMessage,
     createTournament,
     joinTournament,
@@ -248,6 +250,21 @@ function TournamentSession() {
     navigate('/quien-es/torneo', { replace: true })
   }
 
+  // El administrador te sacó del torneo (issue #147).
+  if (kickedMessage) {
+    return (
+      <Modal onClose={() => navigate('/')} dismissible={false}>
+        <div className="flex flex-col items-center gap-3 py-4 text-center">
+          <p className="text-[15px] font-semibold text-text-h">{kickedMessage}</p>
+          <p className="text-[13px] text-text">Ya no puedes volver a entrar a este torneo.</p>
+          <button type="button" className="rounded-lg border border-border px-4 py-2 text-[14px] font-medium text-text-h" onClick={() => navigate('/')}>
+            Volver al inicio
+          </button>
+        </div>
+      </Modal>
+    )
+  }
+
   // El administrador cerró el torneo.
   if (closed) {
     return (
@@ -359,7 +376,7 @@ function TournamentSession() {
 
   // El administrador no juega: ve el panel con la clasificación y las partidas en vivo.
   if (tournament.isModerator) {
-    return <TournamentModeratorPanel tournament={tournament} error={error} onClose={closeTournament} onEndRound={endRound} onSetNextGame={setNextGame} onExit={handleExit} />
+    return <TournamentModeratorPanel tournament={tournament} error={error} onClose={closeTournament} onEndRound={endRound} onSetNextGame={setNextGame} onKick={kickParticipant} onExit={handleExit} />
   }
 
   return (

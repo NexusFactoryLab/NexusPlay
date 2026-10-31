@@ -49,7 +49,7 @@ export function buildStudentReport(tournament: TournamentStateView, selfUserId: 
   const rows: ReportRow[] = tournament.rounds.map((round) => {
     const mine = round.matches.find((match) => match.playerUserIds.includes(selfUserId))
     if (!mine) return { round: round.round, game: '—', level: '—', rival: '—', result: 'No participaste en esta ronda' }
-    const { rival, result } = describeMatch(mine, selfUserId, nameOf)
+    const { rival, result } = describeMatch(mine, selfUserId, (userId) => mine.playerNames?.[userId] ?? nameOf(userId))
     return {
       round: round.round,
       game: mine.gameTitle ? `${mine.gameTitle} (${TOURNAMENT_GAME_LABEL[mine.gameType]})` : TOURNAMENT_GAME_LABEL[mine.gameType],

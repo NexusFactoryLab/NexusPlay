@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Bot, Crown, Layers, LogOut, Medal, MonitorPlay, Radio, Swords, Trophy, Users } from 'lucide-react'
+import { Bot, Crown, Layers, LogOut, Medal, MonitorPlay, Radio, Swords, Trophy, UserX, Users } from 'lucide-react'
 import { AvatarCircle } from '../../avatar/AvatarCircle'
 import { usePlayersAvatars } from '../../avatar/usePlayersAvatars'
 import type { AvatarConfig } from '../../../services/avatar.service'
@@ -21,6 +21,8 @@ type Props = {
   onEndRound: () => void
   /** Elegir el juego de la siguiente ronda (`null` = sorteo). Si falta, el panel no muestra el selector. */
   onSetNextGame?: (gameIndex: number | null) => void
+  /** Expulsar a una persona del torneo. Si falta, el panel no muestra el botón. */
+  onKick?: (userId: string) => void
   onExit: () => void
 }
 
@@ -126,9 +128,10 @@ function MatchStatus({ match }: { match: TournamentLiveMatch }) {
  * podio con avatares, gráfica de puntos por ronda, clasificación y las partidas
  * de la ronda en curso. Todo se recalcula con cada estado que llega por socket.
  */
-export function TournamentModeratorPanel({ tournament, error, onClose, onEndRound, onSetNextGame, onExit }: Props) {
+export function TournamentModeratorPanel({ tournament, error, onClose, onEndRound, onSetNextGame, onKick, onExit }: Props) {
   const [confirming, setConfirming] = useState<'round' | 'close' | null>(null)
   const [projecting, setProjecting] = useState(false)
+  const [kicking, setKicking] = useState<{ userId: string; displayName: string } | null>(null)
   const ranking = useMemo(() => rankParticipants(tournament.participants), [tournament.participants])
   const history = useMemo(() => buildPointsHistory(tournament), [tournament])
   const finished = tournament.phase === 'FINISHED'
@@ -374,6 +377,17 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
                         {participant.botMatches} bot
                       </span>
                     </div>
+                    {onKick && !finished && (
+                      <button
+                        type="button"
+                        className="shrink-0 rounded-md p-1.5 text-text transition-colors hover:bg-danger/10 hover:text-danger focus-visible:outline-2 focus-visible:outline-danger"
+                        aria-label={`Expulsar a ${participant.displayName}`}
+                        title={`Expulsar a ${participant.displayName}`}
+                        onClick={() => setKicking({ userId: participant.userId, displayName: participant.displayName })}
+                      >
+                        <UserX className="h-4 w-4" strokeWidth={2} />
+                      </button>
+                    )}
                     <span className="w-[46px] shrink-0 text-right text-[18px] leading-none font-bold">
                       <PointsValue value={participant.points} />
                       <span className="block text-[10px] font-medium text-text">{participant.points === 1 ? 'punto' : 'puntos'}</span>
@@ -383,6 +397,11 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
               })}
               {ranking.length === 0 && <p className="text-[13px] text-text">Todavía no hay participantes.</p>}
             </div>
+            {(tournament.kickedParticipants?.length ?? 0) > 0 && (
+              <p className="mt-3 rounded-lg bg-code-bg px-3 py-2 text-[12px] text-text">
+                <strong className="text-text-h">Expulsados:</strong> {tournament.kickedParticipants?.map((person) => person.displayName).join(', ')}. No cuentan en la clasificación ni pueden volver.
+              </p>
+            )}
             <p className="mt-3 text-[11.5px] text-text">G = ganadas · P = perdidas · Aciertos = afirmaciones acertadas del Laberinto · Fallos = acusaciones equivocadas · Bot = partidas contra el bot. Desempate: menos derrotas, más aciertos, menos fallos.</p>
           </section>
 
@@ -433,6 +452,24 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
         </div>
       </div>
       {projecting && <TournamentProjector tournament={tournament} onClose={() => setProjecting(false)} />}
+      {kicking && onKick && (
+        <TournamentConfirmModal
+          title={`¿Expulsar a ${kicking.displayName}?`}
+          message={
+            tournament.phase === 'WAITING'
+              ? 'Sale del torneo y no podrá volver a entrar con el código.'
+              : 'Pierde la partida que tenga en curso (su rival suma el punto), no entra en las rondas que siguen, no cuenta en la clasificación y no puede volver. No se puede deshacer.'
+          }
+          confirmLabel="Sí, expulsar"
+          cancelLabel="Cancelar"
+          onConfirm={() => {
+            const { userId } = kicking
+            setKicking(null)
+            onKick(userId)
+          }}
+          onCancel={() => setKicking(null)}
+        />
+      )}
       {confirming === 'round' && (
         <TournamentConfirmModal
           title={tournament.currentRound >= tournament.totalRounds ? '¿Terminar el torneo ahora?' : '¿Cerrar la ronda ahora?'}

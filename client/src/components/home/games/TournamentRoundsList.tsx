@@ -16,7 +16,7 @@ export function TournamentRoundsList({ tournament }: { tournament: Pick<Tourname
             round.matches.map((match) => (
               <p key={match.matchCode}>
                 {match.winnerUserId
-                  ? `Ganó ${tournament.participants.find((p) => p.userId === match.winnerUserId)?.displayName ?? 'el bot'}${match.vsBot ? ' (vs bot)' : ''}`
+                  ? `Ganó ${tournament.participants.find((p) => p.userId === match.winnerUserId)?.displayName ?? match.playerNames?.[match.winnerUserId] ?? 'el bot'}${match.vsBot ? ' (vs bot)' : ''}`
                   : match.phase === 'FINISHED'
                     ? 'Sin ganador'
                     : 'En curso'}

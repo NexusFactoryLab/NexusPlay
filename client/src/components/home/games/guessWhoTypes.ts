@@ -139,6 +139,8 @@ export type TournamentRoundMatchSummary = {
   winnerUserId: string | null
   vsBot: boolean
   gameType: TournamentGameType
+  /** Nombre de cada persona de la partida (sirve aunque ya no esté entre los participantes, p. ej. si fue expulsada). */
+  playerNames?: Record<string, string>
   /** Juego y nivel de esta partida (para el reporte de cada estudiante). */
   gameTitle?: string
   level?: TournamentLevel
@@ -188,6 +190,8 @@ export type TournamentStateView = {
   totalRounds: number
   /** Solo para el administrador: el juego que eligió para la siguiente ronda (posición en `games`), o null si queda al sorteo. */
   nextRoundGameIndex?: number | null
+  /** Solo para el administrador: quienes expulsó (ya no aparecen entre los participantes). */
+  kickedParticipants?: { userId: string; displayName: string }[]
   creatorUserId: string
   /** true para el administrador que modera: ve el panel y no juega. */
   isModerator: boolean

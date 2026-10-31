@@ -22,7 +22,7 @@ export function TrueFalseMazeTournamentPage() {
   const { code = '' } = useParams<{ code: string }>()
   const navigate = useNavigate()
   const { token } = useAuth()
-  const { tournament, connecting, error, closed, joinTournament, sendMazeAnswer, sendMazeFinish } = useGuessWhoTournament(token)
+  const { tournament, connecting, error, closed, kickedMessage, joinTournament, sendMazeAnswer, sendMazeFinish } = useGuessWhoTournament(token)
   const tournamentCode = code.toUpperCase()
 
   const [run, setRun] = useState<Run | null>(null)
@@ -105,6 +105,19 @@ export function TrueFalseMazeTournamentPage() {
       sendMazeFinish()
     }
     backToTournament()
+  }
+
+  // El administrador te sacó del torneo (issue #147).
+  if (kickedMessage) {
+    return (
+      <main className="flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center">
+        <p className="text-[15px] font-semibold text-text-h">{kickedMessage}</p>
+        <p className="text-[13px] text-text">Ya no puedes volver a entrar a este torneo.</p>
+        <button type="button" className="rounded-lg border border-border px-4 py-2.5 text-[14px] font-medium text-text-h" onClick={() => navigate('/', { replace: true })}>
+          Volver al inicio
+        </button>
+      </main>
+    )
   }
 
   if (loadError) {
