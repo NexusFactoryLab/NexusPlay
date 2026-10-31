@@ -19,6 +19,8 @@ type Props = {
   error: string | null
   onClose: () => void
   onEndRound: () => void
+  /** Elegir el juego de la siguiente ronda (`null` = sorteo). Si falta, el panel no muestra el selector. */
+  onSetNextGame?: (gameIndex: number | null) => void
   onExit: () => void
 }
 
@@ -124,7 +126,7 @@ function MatchStatus({ match }: { match: TournamentLiveMatch }) {
  * podio con avatares, gráfica de puntos por ronda, clasificación y las partidas
  * de la ronda en curso. Todo se recalcula con cada estado que llega por socket.
  */
-export function TournamentModeratorPanel({ tournament, error, onClose, onEndRound, onExit }: Props) {
+export function TournamentModeratorPanel({ tournament, error, onClose, onEndRound, onSetNextGame, onExit }: Props) {
   const [confirming, setConfirming] = useState<'round' | 'close' | null>(null)
   const [projecting, setProjecting] = useState(false)
   const ranking = useMemo(() => rankParticipants(tournament.participants), [tournament.participants])
@@ -258,6 +260,32 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
             <div className="progress-fill" style={{ width: `${progress}%` }} />
           </div>
         </div>
+
+        {onSetNextGame && !finished && tournament.currentRound < tournament.totalRounds && tournament.games.length > 1 && (
+          <div className="stagger-in flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-border bg-surface px-4 py-3" style={stagger(5)}>
+            <label htmlFor="siguiente-juego" className="text-[13px] font-semibold text-text-h">
+              Juego de la ronda {tournament.currentRound + 1}
+            </label>
+            <select
+              id="siguiente-juego"
+              className="min-w-[200px] max-w-full flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-[13px] font-medium text-text-h focus-visible:outline-2 focus-visible:outline-accent sm:flex-none"
+              value={tournament.nextRoundGameIndex ?? ''}
+              onChange={(event) => onSetNextGame(event.target.value === '' ? null : Number(event.target.value))}
+            >
+              <option value="">Sorteo (sorpresa)</option>
+              {tournament.games.map((game, index) => (
+                <option key={`${game.title}-${index}`} value={index}>
+                  {game.title} · {TOURNAMENT_GAME_LABEL[game.gameType]} · {TOURNAMENT_LEVEL_INFO[game.level].label}
+                </option>
+              ))}
+            </select>
+            <p className="min-w-0 flex-1 text-[12px] text-text">
+              {tournament.nextRoundGameIndex === null || tournament.nextRoundGameIndex === undefined
+                ? 'Si no eliges, se sortea y nunca repite el de la ronda anterior.'
+                : 'Los participantes no ven tu elección: se revela al empezar la ronda.'}
+            </p>
+          </div>
+        )}
 
         {finished && winner && (
           <div

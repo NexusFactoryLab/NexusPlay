@@ -237,6 +237,8 @@ function toTournamentClientView(
     // El juego que se sorteó para la ronda en curso (con el sorteo, ya no es `games[ronda % n]`).
     currentRoundGame: currentRoundGameOf(tournament),
     totalRounds: tournament.totalRounds,
+    // Lo que eligió el administrador para la siguiente ronda (posición en `games`); a los demás no se les revela.
+    nextRoundGameIndex: tournament.creatorUserId === forUserId ? tournament.gameOverrides?.[tournament.currentRound + 1] ?? null : null,
     creatorUserId: tournament.creatorUserId,
     /** El administrador modera: ve el panel completo y no juega. */
     isModerator: tournament.creatorUserId === forUserId,
@@ -1917,6 +1919,33 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
    * quedó inactivo): esas partidas terminan sin ganador ni puntos y el torneo
    * avanza a la siguiente ronda o, si era la última, termina.
    */
+  /**
+   * El administrador elige el juego de la siguiente ronda (o vuelve al sorteo con `null`). La elección no se
+   * revela a los participantes y el sorteo de las rondas que siguen respeta que no se repita el elegido.
+   */
+  @SubscribeMessage('tournament:set-next-game')
+  handleTournamentSetNextGame(@ConnectedSocket() socket: AuthenticatedSocket, @MessageBody() body: { gameIndex?: unknown }) {
+    const tournament = this.requireModeratedTournament(socket);
+    if (tournament.phase !== 'RUNNING') throw new Error('El torneo no está en curso.');
+    const round = tournament.currentRound + 1;
+    if (round > tournament.totalRounds) throw new Error('Ya es la última ronda: no hay una siguiente que elegir.');
+    const games = tournament.games ?? [];
+    if (games.length < 2) throw new Error('Este torneo tiene un solo juego: no hay nada que elegir.');
+    const overrides = { ...tournament.gameOverrides };
+    const index = body?.gameIndex;
+    if (index === null || index === undefined) {
+      delete overrides[round];
+    } else {
+      if (typeof index !== 'number' || !Number.isInteger(index) || index < 0 || index >= games.length) {
+        throw new Error('Ese juego no es de este torneo.');
+      }
+      overrides[round] = index;
+    }
+    tournament.gameOverrides = overrides;
+    this.tournamentStore.set(tournament);
+    this.sendTournamentStateToModerator(tournament);
+  }
+
   @SubscribeMessage('tournament:end-round')
   handleTournamentEndRound(@ConnectedSocket() socket: AuthenticatedSocket) {
     const tournament = this.requireModeratedTournament(socket);
@@ -2471,7 +2500,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
         ? tournament.games
         : [{ gameId: tournament.gameId, title: tournament.gameTitle, level: 'MEDIUM' as TournamentLevel }]
     ).map((g) => ({ ...g, gameType: ('gameType' in g && g.gameType) || ('GUESS_WHO' as TournamentGameType) }));
-    return games[pickRoundGameIndex(`${tournament.code}:${tournament.createdAt}`, round, games.length)];
+    return games[pickRoundGameIndex(`${tournament.code}:${tournament.createdAt}`, round, games.length, tournament.gameOverrides)];
   }
 
   /**

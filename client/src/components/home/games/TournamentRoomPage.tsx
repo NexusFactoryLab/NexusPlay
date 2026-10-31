@@ -110,6 +110,7 @@ function TournamentSession() {
     startTournament,
     closeTournament,
     endRound,
+    setNextGame,
     closed,
     sendMatchMessage,
     askQuestion,
@@ -358,7 +359,7 @@ function TournamentSession() {
 
   // El administrador no juega: ve el panel con la clasificación y las partidas en vivo.
   if (tournament.isModerator) {
-    return <TournamentModeratorPanel tournament={tournament} error={error} onClose={closeTournament} onEndRound={endRound} onExit={handleExit} />
+    return <TournamentModeratorPanel tournament={tournament} error={error} onClose={closeTournament} onEndRound={endRound} onSetNextGame={setNextGame} onExit={handleExit} />
   }
 
   return (

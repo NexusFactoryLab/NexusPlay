@@ -105,6 +105,11 @@ export function useGuessWhoTournament(token: string | null) {
     socketRef.current?.emit('tournament:start')
   }, [])
 
+  /** El administrador elige el juego de la siguiente ronda (`null` = volver al sorteo). */
+  const setNextGame = useCallback((gameIndex: number | null) => {
+    socketRef.current?.emit('tournament:set-next-game', { gameIndex })
+  }, [])
+
   const endRound = useCallback(() => {
     socketRef.current?.emit('tournament:end-round')
   }, [])
@@ -178,6 +183,7 @@ export function useGuessWhoTournament(token: string | null) {
     startTournament,
     closeTournament,
     endRound,
+    setNextGame,
     closed,
     updateTurnDuration,
     leaveTournament,

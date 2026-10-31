@@ -243,3 +243,48 @@ describe('Misión Galáctica en el torneo', () => {
     expect(JSON.stringify(emitted)).not.toContain('"answer":');
   });
 });
+
+describe('el administrador elige el juego de la siguiente ronda (#147)', () => {
+  type Internals = { gameForRound: (t: unknown, round: number) => { title: string } };
+  async function multiGame(totalRounds = 3) {
+    const h = await start(2, totalRounds);
+    h.tournament.games = [
+      { gameId: 'maze', title: 'Uno', level: 'MEDIUM', gameType: 'TRUE_FALSE_MAZE' },
+      { gameId: 'maze', title: 'Dos', level: 'EASY', gameType: 'TRUE_FALSE_MAZE' },
+      { gameId: 'maze', title: 'Tres', level: 'HARD', gameType: 'TRUE_FALSE_MAZE' },
+    ];
+    return h;
+  }
+  const titleOf = (gateway: unknown, tournament: unknown, round: number) => (gateway as Internals).gameForRound(tournament, round).title;
+
+  it('la ronda siguiente sale con el juego elegido y el administrador lo ve, los participantes no', async () => {
+    const { gateway, tournament, admin, emitted } = await multiGame();
+    gateway.handleTournamentSetNextGame(admin, { gameIndex: 2 });
+    expect(tournament.gameOverrides).toEqual({ 2: 2 });
+    expect(titleOf(gateway, tournament, 2)).toBe('Tres');
+    const last = (target: string) => [...emitted].reverse().find((e) => e.target === target && e.event === 'tournament:state')?.payload as { nextRoundGameIndex: number | null } | undefined;
+    expect(last('admin')?.nextRoundGameIndex).toBe(2);
+    // Cualquier otro envío (a participantes) no revela la elección.
+    expect(JSON.stringify(emitted.filter((e) => e.target !== 'admin').map((e) => e.payload))).not.toContain('"nextRoundGameIndex":2');
+  });
+
+  it('con `null` vuelve al sorteo', async () => {
+    const { gateway, tournament, admin } = await multiGame();
+    const drawn = titleOf(gateway, tournament, 2);
+    gateway.handleTournamentSetNextGame(admin, { gameIndex: 2 });
+    gateway.handleTournamentSetNextGame(admin, { gameIndex: null });
+    expect(tournament.gameOverrides).toEqual({});
+    expect(titleOf(gateway, tournament, 2)).toBe(drawn);
+  });
+
+  it('rechaza lo que no es válido: otra persona, un juego inexistente, torneo de un solo juego, última ronda', async () => {
+    const { gateway, tournament, admin, players } = await multiGame(3);
+    expect(() => gateway.handleTournamentSetNextGame(players[0], { gameIndex: 1 })).toThrow();
+    expect(() => gateway.handleTournamentSetNextGame(admin, { gameIndex: 7 })).toThrow(/no es de este torneo/);
+    expect(() => gateway.handleTournamentSetNextGame(admin, { gameIndex: 'x' as never })).toThrow(/no es de este torneo/);
+    tournament.currentRound = 3;
+    expect(() => gateway.handleTournamentSetNextGame(admin, { gameIndex: 1 })).toThrow(/última ronda/);
+    const single = await start(2, 3);
+    expect(() => single.gateway.handleTournamentSetNextGame(single.admin, { gameIndex: 0 })).toThrow(/un solo juego/);
+  });
+});

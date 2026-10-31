@@ -186,6 +186,8 @@ export type TournamentStateView = {
   /** El juego que se sorteó para la ronda en curso; `null` antes de que arranque la primera. */
   currentRoundGame: { title: string; level: TournamentLevel; gameType: TournamentGameType } | null
   totalRounds: number
+  /** Solo para el administrador: el juego que eligió para la siguiente ronda (posición en `games`), o null si queda al sorteo. */
+  nextRoundGameIndex?: number | null
   creatorUserId: string
   /** true para el administrador que modera: ve el panel y no juega. */
   isModerator: boolean

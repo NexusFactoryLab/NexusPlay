@@ -127,6 +127,33 @@ beforeEach(() => {
 })
 
 describe('TournamentModeratorPanel', () => {
+  describe('selector del juego de la siguiente ronda (#147)', () => {
+    const withSelector = (view: TournamentStateView) =>
+      renderToStaticMarkup(<TournamentModeratorPanel tournament={view} error={null} onClose={() => {}} onEndRound={() => {}} onSetNextGame={() => {}} onExit={() => {}} />)
+
+    it('ofrece el sorteo y cada juego del torneo con su tipo y nivel', () => {
+      const html = withSelector(build())
+      expect(html).toContain('Juego de la ronda 4')
+      expect(html).toContain('Sorteo (sorpresa)')
+      expect(html).toContain('Banderas · ¿Quién Es? · Medio')
+      expect(html).toContain('Dominexo · Dominó · Fácil')
+      expect(html).toContain('Si no eliges, se sortea y nunca repite el de la ronda anterior.')
+    })
+
+    it('marca lo elegido y avisa que los participantes no lo ven', () => {
+      const html = withSelector(build({ nextRoundGameIndex: 1 }))
+      expect(html).toMatch(/<option value="1" selected[^>]*>Dominexo/)
+      expect(html).toContain('Los participantes no ven tu elección')
+    })
+
+    it('no aparece en la última ronda, con el torneo terminado, con un solo juego ni sin el comando', () => {
+      expect(withSelector(build({ currentRound: 5, totalRounds: 5 }))).not.toContain('siguiente-juego')
+      expect(withSelector(build({ phase: 'FINISHED' }))).not.toContain('siguiente-juego')
+      expect(withSelector(build({ games: [{ title: 'Banderas', level: 'MEDIUM', gameType: 'GUESS_WHO' }] }))).not.toContain('siguiente-juego')
+      expect(render(build())).not.toContain('siguiente-juego')
+    })
+  })
+
   it('marca con un punto la conexión de cada persona y avisa arriba a quién se espera (#147)', () => {
     const view = build();
     view.liveMatches[0].players[0].connection = { state: 'waiting' };
