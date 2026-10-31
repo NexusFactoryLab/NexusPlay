@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CircleHelp, Copy, Link, LogOut, Play, Users } from 'lucide-react'
+import { CircleHelp, Copy, Link, LogOut, MonitorPlay, Play, Users } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { AvatarCircle } from '../../avatar/AvatarCircle'
 import { usePlayersAvatars } from '../../avatar/usePlayersAvatars'
@@ -8,6 +8,7 @@ import type { TournamentStateView } from './guessWhoTypes'
 import { GameInstructionsGate } from './GameInstructionsGate'
 import { TOURNAMENT_GAME_LABEL, TOURNAMENT_LEVEL_INFO } from './tournamentLevels'
 import { TournamentConfirmModal } from './TournamentConfirmModal'
+import { TournamentProjector } from './TournamentProjector'
 
 type Props = {
   tournament: TournamentStateView
@@ -26,6 +27,7 @@ export function TournamentLobby({ tournament, error, onStart, onClose, onExit }:
   const [copied, setCopied] = useState<string | null>(null)
   const [showGuide, setShowGuide] = useState(false)
   const [confirmingClose, setConfirmingClose] = useState(false)
+  const [projecting, setProjecting] = useState(false)
   const avatars = usePlayersAvatars(useMemo(() => tournament.participants.map((p) => p.userId), [tournament.participants]))
 
   const invitationUrl = new URL(`/quien-es/torneo/${encodeURIComponent(tournament.code)}`, window.location.origin).href
@@ -79,6 +81,14 @@ export function TournamentLobby({ tournament, error, onStart, onClose, onExit }:
               </div>
               <p className="truncate text-[12px] text-text">{invitationUrl}</p>
               <p className={`h-4 text-[12px] font-medium text-accent transition-opacity duration-300 ${copied ? 'opacity-100' : 'opacity-0'}`} role="status">{copied ?? ''}</p>
+              <button
+                type="button"
+                className="flex w-fit items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-[13px] font-medium text-text-h transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/50 hover:text-accent active:translate-y-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                onClick={() => setProjecting(true)}
+              >
+                <MonitorPlay className="h-4 w-4" strokeWidth={2} />
+                Modo proyector
+              </button>
             </div>
             <div className="rounded-xl bg-white p-2 shadow-[0_8px_24px_-12px_var(--accent)] transition-transform duration-300 hover:scale-105">
               <QRCodeSVG value={invitationUrl} size={112} />
@@ -187,6 +197,7 @@ export function TournamentLobby({ tournament, error, onStart, onClose, onExit }:
           </div>
         )}
       </div>
+      {projecting && <TournamentProjector tournament={tournament} onClose={() => setProjecting(false)} />}
       {confirmingClose && (
         <TournamentConfirmModal
           title="¿Cerrar el torneo?"

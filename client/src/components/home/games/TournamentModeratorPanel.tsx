@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Bot, Crown, Layers, LogOut, Medal, Radio, Swords, Trophy, Users } from 'lucide-react'
+import { Bot, Crown, Layers, LogOut, Medal, MonitorPlay, Radio, Swords, Trophy, Users } from 'lucide-react'
 import { AvatarCircle } from '../../avatar/AvatarCircle'
 import { usePlayersAvatars } from '../../avatar/usePlayersAvatars'
 import type { AvatarConfig } from '../../../services/avatar.service'
@@ -8,6 +8,7 @@ import { useFlip } from '../../../hooks/useFlip'
 import type { TournamentLiveMatch, TournamentStateView } from './guessWhoTypes'
 import { PointsValue } from './PointsValue'
 import { TournamentConfirmModal } from './TournamentConfirmModal'
+import { TournamentProjector } from './TournamentProjector'
 import { TournamentPodium } from './TournamentPodium'
 import { TournamentPointsChart } from './TournamentPointsChart'
 import { TOURNAMENT_GAME_LABEL, TOURNAMENT_LEVEL_INFO } from './tournamentLevels'
@@ -125,6 +126,7 @@ function MatchStatus({ match }: { match: TournamentLiveMatch }) {
  */
 export function TournamentModeratorPanel({ tournament, error, onClose, onEndRound, onExit }: Props) {
   const [confirming, setConfirming] = useState<'round' | 'close' | null>(null)
+  const [projecting, setProjecting] = useState(false)
   const ranking = useMemo(() => rankParticipants(tournament.participants), [tournament.participants])
   const history = useMemo(() => buildPointsHistory(tournament), [tournament])
   const finished = tournament.phase === 'FINISHED'
@@ -177,6 +179,15 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="flex items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-[13px] font-semibold text-text-h transition-all duration-200 hover:-translate-y-0.5 hover:border-accent"
+              title="Pantalla completa y oscura para mostrar el podio en el salón"
+              onClick={() => setProjecting(true)}
+            >
+              <MonitorPlay className="h-4 w-4" strokeWidth={2} />
+              Proyectar
+            </button>
             <button
               type="button"
               className="flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-2 text-[13px] font-medium text-text-h transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/50"
@@ -390,6 +401,7 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
           </section>
         </div>
       </div>
+      {projecting && <TournamentProjector tournament={tournament} onClose={() => setProjecting(false)} />}
       {confirming === 'round' && (
         <TournamentConfirmModal
           title={tournament.currentRound >= tournament.totalRounds ? '¿Terminar el torneo ahora?' : '¿Cerrar la ronda ahora?'}
