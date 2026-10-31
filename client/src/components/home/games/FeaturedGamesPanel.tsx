@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Search, Star, Swords } from 'lucide-react'
+import { History, Search, Star, Swords } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../../../hooks/useAuth'
 import { useToast } from '../../../hooks/useToast'
 import { listGames, setGameFeatured, type GameSummary } from '../../../services/game.service'
@@ -140,6 +141,13 @@ export function FeaturedGamesPanel() {
             <Swords className="h-4 w-4" strokeWidth={2} />
             {tournament?.enabled ? 'Torneo habilitado · Editar' : 'Habilitar torneo'}
           </button>
+          <Link
+            to="/torneos/historial"
+            className="flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-2 text-[13px] font-medium text-text-h transition-colors hover:border-accent/50 hover:text-accent"
+          >
+            <History className="h-4 w-4" strokeWidth={2} />
+            Historial de torneos
+          </Link>
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text/60" strokeWidth={2} />
             <input

@@ -100,7 +100,7 @@ function csvCell(value: string | number): string {
   return /[;"\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
 }
 
-const csvLine = (cells: Array<string | number>) => cells.map(csvCell).join(';')
+export const csvLine = (cells: Array<string | number>) => cells.map(csvCell).join(';')
 
 /** CSV con «;» (el separador que espera Excel en español) y marca de orden de bytes para las tildes. */
 export function reportToCsv(report: StudentReport): string {
