@@ -77,7 +77,7 @@ const TARGETS: Record<string, TargetSpec> = {
     usesImages: false,
     usesInfo: true,
     buildConfig: () => ({
-      layout: 'CLASSIC',
+      layout: 'CITY',
       lives: 3,
       enemySpeed: 2,
       collectorLabel: 'Explorador',

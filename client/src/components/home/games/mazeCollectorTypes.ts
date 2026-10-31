@@ -1,5 +1,6 @@
 import { DOMINO_ICON_LABELS, iconForConcept } from './dominoTypes'
 import { buildSostenibleCityLayout } from './sostenibleCityMap'
+import { buildAmazonLayout, buildOceanLayout, buildParamoLayout } from './mazeThemeMaps'
 
 export { DOMINO_ICON_LABELS as MAZE_ICON_LABELS, iconForConcept }
 
@@ -13,7 +14,15 @@ export type MazeCollectorItem = {
   fact?: string
 }
 
-export type MazeLayout = 'CLASSIC' | 'CROSS' | 'SPIRAL' | 'CITY'
+/** Los 4 mapas de "Salvando el mundo con sostenibilidad". Los valores viejos (CLASSIC, CROSS, SPIRAL) se leen como CITY. */
+export type MazeLayout = 'CITY' | 'AMAZON' | 'OCEAN' | 'PARAMO'
+
+export const MAZE_LAYOUT_IDS: readonly MazeLayout[] = ['CITY', 'AMAZON', 'OCEAN', 'PARAMO']
+
+/** Cualquier valor guardado (incluidos los layouts retirados) → un mapa que existe. */
+export function normalizeMazeLayout(value: unknown): MazeLayout {
+  return typeof value === 'string' && (MAZE_LAYOUT_IDS as readonly string[]).includes(value) ? (value as MazeLayout) : 'CITY'
+}
 
 export type MazeCollectorConfig = {
   layout: MazeLayout
@@ -26,7 +35,7 @@ export type MazeCollectorConfig = {
 }
 
 export const DEFAULT_MAZE_CONFIG: MazeCollectorConfig = {
-  layout: 'CLASSIC',
+  layout: 'CITY',
   lives: 3,
   enemySpeed: 2,
   collectorLabel: 'Recolector',
@@ -58,187 +67,25 @@ export type MazeLayoutDef = {
    * punta.
    */
   tunnelRows: number[]
-}
-
-const COLS = 15
-const ROWS = 11
-
-function emptyGrid(cols: number, rows: number): number[][] {
-  return Array.from({ length: rows }, () => Array(cols).fill(0))
-}
-
-function addBorder(grid: number[][]): void {
-  const rows = grid.length
-  const cols = grid[0].length
-  for (let c = 0; c < cols; c++) {
-    grid[0][c] = 1
-    grid[rows - 1][c] = 1
-  }
-  for (let r = 0; r < rows; r++) {
-    grid[r][0] = 1
-    grid[r][cols - 1] = 1
-  }
+  /**
+   * Multiplica la velocidad (celdas/seg) del jugador y las nubes. Los mapas de
+   * celda fina (Amazonia, Océano, Páramo) lo suben para que atravesarlos tarde
+   * lo mismo que la ciudad. Por defecto 1.
+   */
+  speedScale?: number
+  /** Multiplica el tamaño de los sprites respecto a la celda. Por defecto 1. */
+  spriteScale?: number
 }
 
 /**
- * "Peine" de dientes que nacen alternadamente del borde superior o inferior
- * (o izquierdo/derecho, según orientación) sin llegar nunca a la fila/columna
- * central — esa fila/columna central queda siempre abierta de punta a punta,
- * lo que garantiza que el laberinto entero quede conectado sin necesidad de
- * un solver: cualquier celda puede llegar a la fila/columna central bordeando
- * su diente, y desde ahí a cualquier otra.
- */
-function buildCombMaze(cols: number, rows: number, orientation: 'vertical' | 'horizontal'): number[][] {
-  const grid = emptyGrid(cols, rows)
-  addBorder(grid)
-
-  if (orientation === 'vertical') {
-    const spineRow = Math.floor(rows / 2)
-    let toothIndex = 0
-    for (let c = 2; c < cols - 1; c += 2) {
-      const attachTop = toothIndex % 2 === 0
-      if (attachTop) {
-        for (let r = 1; r <= spineRow - 1; r++) grid[r][c] = 1
-      } else {
-        for (let r = spineRow + 1; r <= rows - 2; r++) grid[r][c] = 1
-      }
-      toothIndex++
-    }
-  } else {
-    const spineCol = Math.floor(cols / 2)
-    let toothIndex = 0
-    for (let r = 2; r < rows - 1; r += 2) {
-      const attachLeft = toothIndex % 2 === 0
-      if (attachLeft) {
-        for (let c = 1; c <= spineCol - 1; c++) grid[r][c] = 1
-      } else {
-        for (let c = spineCol + 1; c <= cols - 2; c++) grid[r][c] = 1
-      }
-      toothIndex++
-    }
-  }
-
-  return grid
-}
-
-/** Una franja horizontal y una vertical, cruzadas por el centro; el resto son paredes sólidas. */
-function buildCrossMaze(cols: number, rows: number): number[][] {
-  const grid = Array.from({ length: rows }, () => Array(cols).fill(1))
-
-  const bandRowStart = Math.floor(rows / 2) - 1
-  const bandRowEnd = Math.floor(rows / 2) + 1
-  const bandColStart = Math.floor(cols / 2) - 1
-  const bandColEnd = Math.floor(cols / 2) + 1
-
-  for (let r = bandRowStart; r <= bandRowEnd; r++) {
-    for (let c = 1; c < cols - 1; c++) grid[r][c] = 0
-  }
-  for (let c = bandColStart; c <= bandColEnd; c++) {
-    for (let r = 1; r < rows - 1; r++) grid[r][c] = 0
-  }
-
-  addBorder(grid)
-  return grid
-}
-
-function openCells(grid: number[][]): CellPosition[] {
-  const cells: CellPosition[] = []
-  for (let row = 0; row < grid.length; row++) {
-    for (let col = 0; col < grid[0].length; col++) {
-      if (grid[row][col] === 0) cells.push({ row, col })
-    }
-  }
-  return cells
-}
-
-function closestOpenCell(grid: number[][], targetRow: number, targetCol: number, exclude: CellPosition[]): CellPosition {
-  const candidates = openCells(grid).filter(
-    (cell) => !exclude.some((used) => used.row === cell.row && used.col === cell.col),
-  )
-  let best = candidates[0]
-  let bestDistance = Infinity
-  for (const cell of candidates) {
-    const distance = Math.abs(cell.row - targetRow) + Math.abs(cell.col - targetCol)
-    if (distance < bestDistance) {
-      bestDistance = distance
-      best = cell
-    }
-  }
-  return best
-}
-
-/** Reparte, de forma fija y determinista, dónde nace el jugador, dónde nacen los enemigos y qué celdas pueden llevar un objeto. */
-function deriveSlots(grid: number[][], cols: number, rows: number, maxItems: number) {
-  const used: CellPosition[] = []
-
-  const playerStart = closestOpenCell(grid, Math.floor(rows / 2), Math.floor(cols / 2), used)
-  used.push(playerStart)
-
-  const corners: Array<[number, number]> = [
-    [1, 1],
-    [1, cols - 2],
-    [rows - 2, 1],
-    [rows - 2, cols - 2],
-  ]
-  const enemySpawns = corners.map(([r, c]) => {
-    const spawn = closestOpenCell(grid, r, c, used)
-    used.push(spawn)
-    return spawn
-  })
-
-  const remaining = openCells(grid).filter((cell) => !used.some((u) => u.row === cell.row && u.col === cell.col))
-  const stride = Math.max(1, Math.floor(remaining.length / maxItems))
-  const itemSlots: CellPosition[] = []
-  for (let i = 0; i < remaining.length && itemSlots.length < maxItems; i += stride) {
-    itemSlots.push(remaining[i])
-    used.push(remaining[i])
-  }
-
-  return { playerStart, enemySpawns, itemSlots }
-}
-
-/**
- * Busca TODAS las filas con calle abierta de punta a punta (columnas
- * 1..cols-2 transitables) y les abre la pared del borde en ambos extremos
- * — cada una pasa a ser una "puerta de teletransporte" (ver `tunnelRows`).
- * Si no hay ninguna, el layout simplemente no tiene túnel.
- */
-function carveTunnels(grid: number[][], cols: number, rows: number): number[] {
-  const tunnelRows: number[] = []
-  for (let row = 1; row < rows - 1; row++) {
-    let fullyOpen = true
-    for (let col = 1; col < cols - 1; col++) {
-      if (grid[row][col] !== 0) {
-        fullyOpen = false
-        break
-      }
-    }
-    if (fullyOpen) {
-      grid[row][0] = 0
-      grid[row][cols - 1] = 0
-      tunnelRows.push(row)
-    }
-  }
-  return tunnelRows
-}
-
-function buildLayout(grid: number[][], cols: number, rows: number): MazeLayoutDef {
-  const tunnelRows = carveTunnels(grid, cols, rows)
-  const { playerStart, enemySpawns, itemSlots } = deriveSlots(grid, cols, rows, MAX_MAZE_ITEMS)
-  return { cols, rows, grid, playerStart, enemySpawns, itemSlots, tunnelRows }
-}
-
-/**
- * Cuatro laberintos fijos (no editables por quien crea el juego — son datos
- * del motor, la temática la aportan los íconos/colores/nombres del contenido
- * y de `config`). Verificados por conectividad: cada celda libre es
- * alcanzable desde cualquier otra. CITY es el mapa real de "Ciudad
- * Sostenible" que ilustró el profesor (ver sostenibleCityMap.ts) — ya no es
- * una cuadrícula de calles genérica, así que no pasa por `buildLayout`.
+ * Los cuatro mapas (no editables por quien crea el juego — son datos del
+ * motor; la temática la aportan los sprites del mapa, en mazeMaps.ts, y el
+ * contenido). Cada trazado se verifica por conectividad en
+ * mazeCollectorTypes.spec.ts.
  */
 export const MAZE_LAYOUTS: Record<MazeLayout, MazeLayoutDef> = {
-  CLASSIC: buildLayout(buildCombMaze(COLS, ROWS, 'vertical'), COLS, ROWS),
-  SPIRAL: buildLayout(buildCombMaze(COLS, ROWS, 'horizontal'), COLS, ROWS),
-  CROSS: buildLayout(buildCrossMaze(COLS, ROWS), COLS, ROWS),
   CITY: buildSostenibleCityLayout(),
+  AMAZON: buildAmazonLayout(),
+  OCEAN: buildOceanLayout(),
+  PARAMO: buildParamoLayout(),
 }

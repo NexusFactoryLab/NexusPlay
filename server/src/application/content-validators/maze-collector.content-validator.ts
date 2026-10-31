@@ -18,8 +18,11 @@ export interface MazeCollectorItem {
   fact?: string;
 }
 
-export type MazeLayout = 'CLASSIC' | 'CROSS' | 'SPIRAL' | 'CITY';
-const VALID_LAYOUTS: readonly MazeLayout[] = ['CLASSIC', 'CROSS', 'SPIRAL', 'CITY'];
+/** Los 4 mapas de "Salvando el mundo con sostenibilidad" (issue #148). */
+export type MazeLayout = 'CITY' | 'AMAZON' | 'OCEAN' | 'PARAMO';
+const VALID_LAYOUTS: readonly MazeLayout[] = ['CITY', 'AMAZON', 'OCEAN', 'PARAMO'];
+/** Layouts retirados: los juegos ya guardados con ellos siguen siendo válidos y pasan a la Ciudad. */
+const LEGACY_LAYOUTS: readonly string[] = ['CLASSIC', 'CROSS', 'SPIRAL'];
 
 export interface MazeCollectorConfig {
   layout: MazeLayout;
@@ -57,7 +60,7 @@ const MAX_QUESTION_LENGTH = 160;
 const MAX_OPTION_LENGTH = 60;
 
 const DEFAULT_CONFIG: Omit<MazeCollectorConfig, 'collectorLabel' | 'collectorIcon' | 'enemyLabel' | 'enemyIcon'> = {
-  layout: 'CLASSIC',
+  layout: 'CITY',
   lives: 3,
   enemySpeed: 2,
 };
@@ -87,7 +90,8 @@ export class MazeCollectorContentValidator implements ContentValidator {
   validateConfig(config: unknown): Record<string, unknown> {
     const raw = (config ?? {}) as Partial<MazeCollectorConfig>;
 
-    const layout = raw.layout ?? DEFAULT_CONFIG.layout;
+    const requested = raw.layout ?? DEFAULT_CONFIG.layout;
+    const layout: MazeLayout = LEGACY_LAYOUTS.includes(requested) ? 'CITY' : requested;
     if (!VALID_LAYOUTS.includes(layout)) {
       throw new InvalidGameContentError(`layout debe ser uno de: ${VALID_LAYOUTS.join(', ')}.`);
     }

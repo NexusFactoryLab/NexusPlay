@@ -529,7 +529,7 @@ function advance(entity: Moving, speed: number, dt: number): boolean {
 
 function tickPlayer(state: InternalState, layout: MazeLayoutDef, now: number, dt: number) {
   const player = state.player
-  const speed = PLAYER_BASE_SPEED * (now < player.slowUntil ? SLOW_TRAP_FACTOR : 1)
+  const speed = PLAYER_BASE_SPEED * (layout.speedScale ?? 1) * (now < player.slowUntil ? SLOW_TRAP_FACTOR : 1)
   const arrived = advance(player, speed, dt)
 
   if (arrived || samePos(player.pos, player.nextPos)) {
@@ -632,7 +632,7 @@ function tickGhost(ghost: InternalGhost, state: InternalState, layout: MazeLayou
   const area = state.scenario?.area
   if (state.scenario?.purifier && ghost.mode === 'NORMAL') return
   const speedFactor = ghost.mode === 'FRIGHTENED' ? FRIGHTENED_SPEED_FACTOR : ghost.mode === 'EATEN' ? EATEN_SPEED_FACTOR : 1
-  const speed = ghostSpeed(state.level, state.baseEnemySpeed) * speedFactor
+  const speed = ghostSpeed(state.level, state.baseEnemySpeed) * (layout.speedScale ?? 1) * speedFactor
   const arrived = advance(ghost, speed, dt)
 
   if (arrived || samePos(ghost.pos, ghost.nextPos)) {

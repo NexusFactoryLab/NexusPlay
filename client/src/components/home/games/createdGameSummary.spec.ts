@@ -6,7 +6,7 @@ const EXPECTED: Record<CreatedGameKind, { typeLabel: string; isMultiplayer: bool
   OPPOSITES: { typeLabel: 'MatchMente: conceptos opuestos', isMultiplayer: false },
   GUESS_WHO: { typeLabel: 'Identidad Oculta', isMultiplayer: true },
   DOMINO: { typeLabel: 'Dominexo', isMultiplayer: true },
-  MAZE_COLLECTOR: { typeLabel: 'Laberinto recolector', isMultiplayer: false },
+  MAZE_COLLECTOR: { typeLabel: 'Salvando el mundo con sostenibilidad', isMultiplayer: false },
   SNAKES_LADDERS: { typeLabel: 'Escaleras y serpientes', isMultiplayer: true },
   DUAL_QUEST_PIXI: { typeLabel: 'Dúo Lógico', isMultiplayer: true },
   TRUE_FALSE_MAZE: { typeLabel: 'Laberinto Verdadero o Falso', isMultiplayer: false },
