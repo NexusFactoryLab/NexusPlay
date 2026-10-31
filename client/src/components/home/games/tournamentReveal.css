@@ -127,3 +127,28 @@
     transform: rotateY(180deg);
   }
 }
+
+/* Celular en horizontal (poca altura): el aviso con la pareja y el revelado tiene que caber sin cortarse. */
+@media (max-height: 520px) {
+  .round-reveal {
+    gap: 8px;
+  }
+  .round-reveal__card {
+    width: 46px;
+    height: 64px;
+    font-size: 22px;
+    border-radius: 10px;
+  }
+  .round-reveal__card--main {
+    width: 88px;
+    height: 118px;
+  }
+  .round-reveal__face {
+    gap: 4px;
+    padding: 6px;
+    border-radius: 12px;
+  }
+  .round-reveal__face--back {
+    font-size: 38px;
+  }
+}
