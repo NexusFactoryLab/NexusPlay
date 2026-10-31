@@ -138,6 +138,43 @@ describe('Misión Galáctica en el torneo', () => {
     expect(correctOf('p0')).toBe(1);
   });
 
+  it('quien llega con el torneo en marcha entra con 0 puntos y juega desde la siguiente ronda (#147)', async () => {
+    const { gateway, tournament, players } = await start(2, 2);
+    const late = client('tarde');
+    gateway.handleTournamentJoin(late, { code: tournament.code });
+    expect(tournament.participants.find((p) => p.userId === 'tarde')).toMatchObject({ points: 0, wins: 0, losses: 0 });
+    // En la ronda 1 no tiene partida.
+    expect(tournament.matches.filter((m) => m.round === 1).some((m) => m.playerUserIds.includes('tarde'))).toBe(false);
+    for (const p of players) {
+      await gateway.handleTournamentMazeAnswer(p, { questionId: 'q1', chosen: true });
+      await gateway.handleTournamentMazeAnswer(p, { questionId: 'q2', chosen: false });
+      await gateway.handleTournamentMazeAnswer(p, { questionId: 'q3', chosen: true });
+      gateway.handleTournamentMazeFinish(p);
+    }
+    // Arrancó la ronda 2 y ahora sí juega.
+    expect(tournament.currentRound).toBe(2);
+    expect(tournament.matches.filter((m) => m.round === 2).some((m) => m.playerUserIds.includes('tarde'))).toBe(true);
+  });
+
+  it('en la última ronda ya no se puede entrar, y con el torneo terminado tampoco (#147)', async () => {
+    const { gateway, tournament, players } = await start(2, 1);
+    expect(() => gateway.handleTournamentJoin(client('tarde'), { code: tournament.code })).toThrow(/última ronda/);
+    for (const p of players) {
+      await gateway.handleTournamentMazeAnswer(p, { questionId: 'q1', chosen: true });
+      await gateway.handleTournamentMazeAnswer(p, { questionId: 'q2', chosen: false });
+      await gateway.handleTournamentMazeAnswer(p, { questionId: 'q3', chosen: true });
+      gateway.handleTournamentMazeFinish(p);
+    }
+    expect(tournament.phase).toBe('FINISHED');
+    expect(() => gateway.handleTournamentJoin(client('otro'), { code: tournament.code })).toThrow(/ya terminó/);
+  });
+
+  it('no se pasa del cupo máximo aunque se entre tarde (#147)', async () => {
+    const { gateway, tournament } = await start(2, 3);
+    tournament.maxParticipants = 2;
+    expect(() => gateway.handleTournamentJoin(client('tarde'), { code: tournament.code })).toThrow(/cupo máximo/);
+  });
+
   it('terminar sin haber respondido todo (se quedó sin baterías) no suma', async () => {
     const { gateway, tournament, players } = await start(2, 1);
     await gateway.handleTournamentMazeAnswer(players[0], { questionId: 'q1', chosen: true });

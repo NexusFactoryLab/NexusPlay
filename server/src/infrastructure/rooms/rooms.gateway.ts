@@ -1825,7 +1825,12 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
 
     const existing = tournament.participants.find((p) => p.userId === socket.data.userId);
     // Quien ya estaba en el torneo puede reconectarse aunque ya haya iniciado.
-    if (tournament.phase !== 'WAITING' && !existing) throw new Error('El torneo ya inició.');
+    // Entrada tardía (issue #147): con el torneo en marcha entra con 0 puntos y juega desde la siguiente ronda.
+    // En la última ronda ya no tendría ninguna partida, así que ahí no se admite.
+    if (!existing && tournament.phase === 'FINISHED') throw new Error('El torneo ya terminó.');
+    if (!existing && tournament.phase === 'RUNNING' && tournament.currentRound >= tournament.totalRounds) {
+      throw new Error('El torneo está en su última ronda: ya no se puede entrar.');
+    }
     if (tournament.phase === 'FINISHED' && existing?.finalExit) {
       const { at, explicit } = existing.finalExit;
       if (explicit || Date.now() - at > TOURNAMENT_FINAL_REJOIN_MS) {

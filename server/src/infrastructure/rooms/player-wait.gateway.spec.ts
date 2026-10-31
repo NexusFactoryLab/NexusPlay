@@ -350,7 +350,10 @@ describe('Torneo: la partida espera al participante y puede volver ya iniciado',
     // El chat sí sigue.
     expect(() => h.gateway.handleMatchChat(client('s-ana', 'ana'), { text: '¿Sigues ahí?' })).not.toThrow();
 
-    expect(() => h.gateway.handleTournamentJoin(client('s-zoe', 'zoe'), { code: 'TORN01' })).toThrow('El torneo ya inició.');
+    // Quien llega con el torneo en marcha entra con 0 puntos y juega desde la siguiente ronda (#147); la partida en pausa no se toca.
+    h.gateway.handleTournamentJoin(client('s-zoe', 'zoe'), { code: 'TORN01' });
+    expect(t.participants.find((p) => p.userId === 'zoe')).toMatchObject({ points: 0, wins: 0, losses: 0 });
+    expect(match.awaiting).not.toEqual({});
     h.gateway.handleTournamentJoin(client('s-beto-2', 'beto'), { code: 'TORN01' });
     expect(match.awaiting).toEqual({});
     expect(match.turnDeadline).toBe(Date.now() + 18_000);

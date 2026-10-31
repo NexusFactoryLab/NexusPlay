@@ -33,11 +33,13 @@ export function TournamentRoundWaiting({ tournament, selfUserId }: Props) {
   const { done, total } = roundProgress(tournament)
   const percent = total > 0 ? Math.round((done / total) * 100) : 0
   const selfAvatar = self ? avatars[self.userId] : null
+  // Entró con el torneo en marcha: todavía no ha tenido ninguna partida y juega desde la siguiente ronda.
+  const joinedLate = Boolean(selfUserId) && !tournament.rounds.some((round) => round.matches.some((match) => match.playerUserIds.includes(selfUserId as string)))
 
   return (
     <div className="stagger-in flex w-full max-w-[520px] flex-col items-center gap-5 py-4 text-center">
       <p className="text-[12px] font-semibold tracking-[0.2em] text-accent uppercase">
-        Ronda {tournament.currentRound} de {tournament.totalRounds} · terminaste tu partida
+        {joinedLate ? `Entraste con el torneo en marcha · juegas desde la ronda ${tournament.currentRound + 1}` : `Ronda ${tournament.currentRound} de ${tournament.totalRounds} · terminaste tu partida`}
       </p>
 
       {self && (
@@ -59,7 +61,7 @@ export function TournamentRoundWaiting({ tournament, selfUserId }: Props) {
         <div className="mb-2 flex items-center justify-between text-[12.5px] font-medium text-text-h">
           <span className="flex items-center gap-2">
             <span className="live-dot" aria-hidden="true" />
-            Esperando a las demás
+            {joinedLate ? 'Esperando a que empiece la siguiente ronda' : 'Esperando a las demás'}
           </span>
           <span>
             {done} de {total} {total === 1 ? 'partida terminada' : 'partidas terminadas'}

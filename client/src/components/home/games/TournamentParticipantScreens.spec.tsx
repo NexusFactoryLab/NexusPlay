@@ -28,11 +28,13 @@ const person = (userId: string, displayName: string, points: number): Tournament
   correctAnswers: 0,
 })
 
-const match = (matchCode: string, phase: 'PLAYING' | 'FINISHED', winnerUserId: string | null = null) => ({
+// Por defecto todas las personas del torneo ya han jugado (nadie llegó tarde).
+const ALL = ['u0', 'u1', 'u2', 'u3', 'u4', 'u5', 'u6']
+const match = (matchCode: string, phase: 'PLAYING' | 'FINISHED', winnerUserId: string | null = null, playerUserIds: string[] = ALL) => ({
   matchCode,
   isBye: false,
   phase,
-  playerUserIds: [],
+  playerUserIds,
   winnerUserId,
   vsBot: false,
   gameType: 'GUESS_WHO' as const,
@@ -86,6 +88,18 @@ describe('TournamentRoundWaiting (#131)', () => {
     expect(html).toContain('Ronda 2 de 4')
     // Tu personaje de cuerpo entero (imagen SVG de Nexus Play).
     expect(html).toContain('data:image/svg+xml')
+  })
+
+  it('quien entró con el torneo en marcha lo ve claro: juega desde la siguiente ronda (#147)', () => {
+    const view = build({
+      rounds: [{ round: 2, matches: [match('C', 'FINISHED', 'u2', ['u2', 'u3']), match('D', 'PLAYING', null, ['u4', 'u5'])] }],
+    })
+    const html = renderToStaticMarkup(<TournamentRoundWaiting tournament={view} selfUserId="u6" />)
+    expect(html).toContain('Entraste con el torneo en marcha · juegas desde la ronda 3')
+    expect(html).toContain('Esperando a que empiece la siguiente ronda')
+    expect(html).not.toContain('terminaste tu partida')
+    // Quien ya jugó sí ve el texto de siempre.
+    expect(renderToStaticMarkup(<TournamentRoundWaiting tournament={view} selfUserId="u2" />)).toContain('terminaste tu partida')
   })
 
   it('la clasificación muestra los 5 primeros con personajes y tu fila aunque quedes fuera', () => {
