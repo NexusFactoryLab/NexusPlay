@@ -7399,7 +7399,8 @@ code {
   .rank-row {
     transition: none;
   }
-=======
+}
+
 /* Identidad Oculta: «¡Tu turno!» en un verde intenso que late (barra de turno y aviso en pantalla). */
 .turn-mine-glow {
   background: linear-gradient(120deg, #16a34a, #22c55e 45%, #84cc16);
