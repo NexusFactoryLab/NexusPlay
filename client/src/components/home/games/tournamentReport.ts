@@ -78,6 +78,18 @@ export function buildStudentReport(tournament: TournamentStateView, selfUserId: 
   }
 }
 
+/** Quien quedó entre los tres primeros con algún punto recibe diploma (issue #147). */
+export function qualifiesForDiploma(report: StudentReport): boolean {
+  return report.position <= 3 && report.points > 0
+}
+
+const PLACE_WORD = ['', 'Primer', 'Segundo', 'Tercer'] as const
+
+/** «Primer lugar», «Segundo lugar», «Tercer lugar»; vacío si no aplica. */
+export function diplomaPlaceText(report: StudentReport): string {
+  return qualifiesForDiploma(report) ? `${PLACE_WORD[report.position]} lugar` : ''
+}
+
 /**
  * Un nombre como «=HIPERVINCULO(...)» se ejecutaría como fórmula al abrir el CSV en Excel: se
  * antepone una comilla a lo que empieza con =, +, -, @ o un tabulador (inyección de fórmulas).

@@ -1,8 +1,8 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import type { TournamentParticipantView, TournamentRoundMatchSummary, TournamentStateView } from './guessWhoTypes'
-import { ReportDocument, TournamentStudentReport } from './TournamentStudentReport'
-import { buildStudentReport, reportFileName, reportToCsv } from './tournamentReport'
+import { DiplomaDocument, ReportDocument, TournamentStudentReport } from './TournamentStudentReport'
+import { buildStudentReport, diplomaPlaceText, qualifiesForDiploma, reportFileName, reportToCsv } from './tournamentReport'
 
 const person = (userId: string, displayName: string, points: number, losses = 0): TournamentParticipantView => ({
   userId,
@@ -152,5 +152,39 @@ describe('TournamentStudentReport (#147)', () => {
     expect(html).toContain('Ganaste: +1 punto')
     expect(html).toContain('class="is-self"')
     expect(html).toContain('No se guarda en Nexus Play')
+  })
+})
+
+describe('diploma del top 3 (#147)', () => {
+  const fixed = new Date(2026, 9, 31)
+  const reportOf = (userId: string) => buildStudentReport(build(), userId, fixed)!
+
+  it('lo reciben los tres primeros con algún punto, con su lugar escrito', () => {
+    expect([reportOf('u0'), reportOf('u1'), reportOf('u2')].map(qualifiesForDiploma)).toEqual([true, true, true])
+    expect([reportOf('u0'), reportOf('u1'), reportOf('u2')].map(diplomaPlaceText)).toEqual(['Primer lugar', 'Segundo lugar', 'Tercer lugar'])
+  })
+
+  it('no lo recibe quien quedó fuera del podio ni quien tiene cero puntos', () => {
+    const crowded = build({ participants: [person('u0', 'Ana', 4), person('u1', 'Beto', 3), person('u2', 'Camila', 2), person('u3', 'Diego', 1)] })
+    const fourth = buildStudentReport(crowded, 'u3', fixed)!
+    expect(qualifiesForDiploma(fourth)).toBe(false)
+    expect(diplomaPlaceText(fourth)).toBe('')
+    const zeros = buildStudentReport(build({ participants: [person('u0', 'Ana', 0), person('u1', 'Beto', 0)] }), 'u0', fixed)!
+    expect(qualifiesForDiploma(zeros)).toBe(false)
+  })
+
+  it('el documento lleva el nombre, el lugar, los puntos y avisa que no se guarda', () => {
+    const html = renderToStaticMarkup(<DiplomaDocument report={reportOf('u1')} />)
+    expect(html).toContain('Diploma')
+    expect(html).toContain('Beto')
+    expect(html).toContain('Segundo lugar')
+    expect(html).toContain('con 2 puntos entre 3 participantes')
+    expect(html).toContain('no se guarda en Nexus Play')
+  })
+
+  it('el botón del diploma solo aparece para quien lo merece', () => {
+    expect(renderToStaticMarkup(<TournamentStudentReport tournament={build()} selfUserId="u0" />)).toContain('Diploma (primer lugar)')
+    const crowded = build({ participants: [person('u0', 'Ana', 4), person('u1', 'Beto', 3), person('u2', 'Camila', 2), person('u3', 'Diego', 1)] })
+    expect(renderToStaticMarkup(<TournamentStudentReport tournament={crowded} selfUserId="u3" />)).not.toContain('Diploma')
   })
 })

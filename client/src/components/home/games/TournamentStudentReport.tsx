@@ -1,11 +1,12 @@
 import { useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { FileDown, Printer } from 'lucide-react'
+import { Award, FileDown, Printer } from 'lucide-react'
 import type { TournamentStateView } from './guessWhoTypes'
-import { buildStudentReport, reportFileName, reportToCsv, type StudentReport } from './tournamentReport'
+import { buildStudentReport, diplomaPlaceText, qualifiesForDiploma, reportFileName, reportToCsv, type StudentReport } from './tournamentReport'
 import './tournamentReport.css'
 
 const PRINT_CLASS = 'print-tournament-report'
+const DIPLOMA_CLASS = 'print-tournament-diploma'
 
 /** El documento que sale al imprimir o guardar como PDF (hoja limpia, sin la pantalla del juego). */
 export function ReportDocument({ report }: { report: StudentReport }) {
@@ -87,16 +88,37 @@ function downloadCsv(report: StudentReport) {
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
-/** Abre el diálogo de impresión (ahí se elige «Guardar como PDF») mostrando solo el reporte. */
-function printReport() {
+/** El diploma del top 3: una hoja sola, para guardar como PDF o imprimir. */
+export function DiplomaDocument({ report }: { report: StudentReport }) {
+  return (
+    <article className="tournament-diploma-print" aria-hidden="true">
+      <p className="kicker">Nexus Play · Torneo {report.code}</p>
+      <h1>Diploma</h1>
+      <p>se otorga a</p>
+      <p className="name">{report.name}</p>
+      <p className="place">{diplomaPlaceText(report)}</p>
+      <p>
+        con {report.points} {report.points === 1 ? 'punto' : 'puntos'} entre {report.total} {report.total === 1 ? 'participante' : 'participantes'}
+      </p>
+      <p>{report.date}</p>
+      <p className="small">Este diploma se generó al terminar el torneo y no se guarda en Nexus Play.</p>
+    </article>
+  )
+}
+
+/** Abre el diálogo de impresión (ahí se elige «Guardar como PDF») mostrando solo el documento pedido. */
+function printOnly(bodyClass: string) {
   const clear = () => {
-    document.body.classList.remove(PRINT_CLASS)
+    document.body.classList.remove(bodyClass)
     window.removeEventListener('afterprint', clear)
   }
-  document.body.classList.add(PRINT_CLASS)
+  document.body.classList.add(bodyClass)
   window.addEventListener('afterprint', clear)
   window.print()
 }
+
+const printReport = () => printOnly(PRINT_CLASS)
+const printDiploma = () => printOnly(DIPLOMA_CLASS)
 
 type Props = {
   tournament: TournamentStateView
@@ -114,7 +136,13 @@ export function TournamentStudentReport({ tournament, selfUserId, onSaved }: Pro
   const report = useMemo(() => (selfUserId ? buildStudentReport(tournament, selfUserId) : null), [tournament, selfUserId])
 
   // Por si se sale de la pantalla con el diálogo de impresión abierto.
-  useEffect(() => () => document.body.classList.remove(PRINT_CLASS), [])
+  useEffect(
+    () => () => {
+      document.body.classList.remove(PRINT_CLASS)
+      document.body.classList.remove(DIPLOMA_CLASS)
+    },
+    [],
+  )
 
   if (!report) return null
   return (
@@ -149,8 +177,22 @@ export function TournamentStudentReport({ tournament, selfUserId, onSaved }: Pro
           <Printer className="h-4 w-4" strokeWidth={2} />
           Guardar como PDF
         </button>
+        {qualifiesForDiploma(report) && (
+          <button
+            type="button"
+            className="flex items-center gap-1.5 rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-[13px] font-semibold text-text-h transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            onClick={() => {
+              printDiploma()
+              onSaved?.()
+            }}
+          >
+            <Award className="h-4 w-4" strokeWidth={2} />
+            Diploma ({diplomaPlaceText(report).toLowerCase()})
+          </button>
+        )}
       </div>
       {typeof document !== 'undefined' && createPortal(<ReportDocument report={report} />, document.body)}
+      {typeof document !== 'undefined' && qualifiesForDiploma(report) && createPortal(<DiplomaDocument report={report} />, document.body)}
     </section>
   )
 }
