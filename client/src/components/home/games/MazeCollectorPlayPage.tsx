@@ -10,6 +10,8 @@ import { MazeCollectorGame } from './MazeCollectorGame'
 import { MAZE_LAYOUTS, DEFAULT_MAZE_CONFIG, normalizeMazeLayout } from './mazeCollectorTypes'
 import type { MazeCollectorConfig, MazeCollectorItem } from './mazeCollectorTypes'
 import { questionsForGame } from './mazeCollectorQuestions'
+import { MazeExpedition } from './MazeExpedition'
+import { expeditionStations } from './mazeExpeditionStations'
 
 /**
  * Vista dedicada de Maze Collector en ruta propia (`/jugar/laberinto/:slug`,
@@ -82,6 +84,20 @@ export function MazeCollectorPlayPage() {
   const category = categories.find((c) => c.id === game.categoryId)
   const primaryColor = category ? colorForCategory(category.name) : DEFAULT_CATEGORY_COLOR
   const config = { ...DEFAULT_MAZE_CONFIG, ...(game.config as Partial<MazeCollectorConfig>) }
+  const stations = expeditionStations(config.stations)
+
+  if (stations.length > 0) {
+    return (
+      <MazeExpedition
+        title={game.title}
+        primaryColor={primaryColor}
+        items={game.content as MazeCollectorItem[]}
+        config={config}
+        stations={stations}
+        onExit={handleExit}
+      />
+    )
+  }
 
   return (
     <MazeCollectorGame

@@ -4655,7 +4655,10 @@ code {
 }
 
 @media (min-width: 1024px) {
-  .app-main:has(> .home-fit) {
+  /* La sección puede venir envuelta en PageTransition: sin el segundo selector
+   * el <main> conserva su relleno normal y el Inicio se desborda (scroll). */
+  .app-main:has(> .home-fit),
+  .app-main:has(> .page-transition > .home-fit) {
     padding-top: 16px;
     padding-bottom: 14px;
   }

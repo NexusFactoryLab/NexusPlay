@@ -32,6 +32,8 @@ export type MazeCollectorConfig = {
   collectorIcon: string
   enemyLabel: string
   enemyIcon: string
+  /** Modo expedición (issue #152): los mapas que se recorren en orden, uno por estación. */
+  stations?: MazeLayout[]
 }
 
 export const DEFAULT_MAZE_CONFIG: MazeCollectorConfig = {

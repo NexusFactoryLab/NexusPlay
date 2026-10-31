@@ -78,6 +78,17 @@ describe('MazeCollectorContentValidator', () => {
       }
     });
 
+    it('acepta una expedición de estaciones y la guarda en orden', () => {
+      const stations = ['AMAZON', 'OCEAN', 'PARAMO', 'CITY'];
+      expect(validator.validateConfig(validConfig({ stations }))).toMatchObject({ stations });
+    });
+
+    it('rechaza estaciones repetidas, desconocidas o una sola', () => {
+      for (const stations of [['AMAZON', 'AMAZON'], ['AMAZON', 'HEXAGON'], ['AMAZON'], 'AMAZON']) {
+        expect(() => validator.validateConfig(validConfig({ stations }))).toThrow(InvalidGameContentError);
+      }
+    });
+
     it('acepta el layout CITY', () => {
       const config = validator.validateConfig(validConfig({ layout: 'CITY' }));
       expect(config).toMatchObject({ layout: 'CITY' });

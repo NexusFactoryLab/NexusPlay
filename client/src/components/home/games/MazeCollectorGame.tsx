@@ -58,6 +58,14 @@ type MazeCollectorGameProps = {
   tutorial?: MazeTutorialPart
   /** Preguntas de opción múltiple (issue #103): sus respuestas se reparten por el mapa. */
   questions?: MazeQuestion[]
+  /**
+   * Modo expedición (issue #152): al ganar, en vez de "Jugar otra vez" sale un
+   * botón (`wonActionLabel`) que pasa a la siguiente estación.
+   */
+  onWon?: (result: { score: number; answeredCorrect: number }) => void
+  wonActionLabel?: string
+  /** No abrir la guía al empezar (las estaciones 2, 3 y 4 de una expedición). */
+  skipGuide?: boolean
 }
 
 /** Celda mínima: por debajo de esto los sprites dejan de leerse (en ese caso el tablero se desplaza). */
@@ -149,7 +157,7 @@ function clampCamera(position: number, maxOffset: number): number {
 export function MazeCollectorGame(props: MazeCollectorGameProps) {
   // En el torneo no se abre sola (issue #131); sigue disponible desde "Cómo se juega".
   const inTournamentPlay = useInTournamentPlay()
-  const [guideOpen, setGuideOpen] = useState(!props.tutorial && !inTournamentPlay)
+  const [guideOpen, setGuideOpen] = useState(!props.tutorial && !inTournamentPlay && !props.skipGuide)
   // Al final de la guía se ofrece el tutorial jugable (issue #93); al terminarlo
   // empieza una partida nueva (la sesión se vuelve a montar con otra clave).
   const [inTutorial, setInTutorial] = useState(false)
@@ -198,6 +206,8 @@ function MazeCollectorSession({
   onExit,
   tutorial,
   questions,
+  onWon,
+  wonActionLabel,
   guideOpen,
   onOpenGuide,
   onCloseGuide,
@@ -866,9 +876,9 @@ function MazeCollectorSession({
       {game.phase === 'won' && (
         <Overlay celebrate>
           <img src={mazeSpriteUrl('ui-trophy')} alt="" className="mx-auto h-20 w-20 animate-[maze-levelup-pop_0.4s_cubic-bezier(0.16,1,0.3,1)]" />
-          <h2 className="mt-1 text-[24px] font-bold text-white">¡Salvaste la ciudad!</h2>
+          <h2 className="mt-1 text-[24px] font-bold text-white">¡Salvaste {mapTheme.text.place}!</h2>
           <p className="mt-1 text-[14px] text-slate-300">
-            Limpiaste la ciudad {game.targetRounds === 1 ? 'en 1 ronda' : `en las ${game.targetRounds} rondas`}. ¡Gracias, reciclador!
+            Lo lograste {game.targetRounds === 1 ? 'en 1 ronda' : `en las ${game.targetRounds} rondas`}. ¡Gracias por cuidar {mapTheme.text.place}!
           </p>
           <p className="mt-3 mb-1 flex items-center justify-center gap-1.5 text-[14px] text-slate-300">
             <img src={mazeSpriteUrl('ui-star')} alt="" className="h-5 w-5" />
@@ -879,7 +889,23 @@ function MazeCollectorSession({
               Preguntas acertadas: <b className="text-white">{game.answeredCorrect}</b>
             </p>
           )}
-          <EndButtons onPlayAgain={onPlayAgain} onExit={onExit} />
+          {onWon ? (
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <button
+                type="button"
+                autoFocus
+                className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2.5 text-[14px] font-bold text-white"
+                onClick={() => onWon({ score: game.score, answeredCorrect: game.answeredCorrect })}
+              >
+                <Play className="h-4 w-4" fill="currentColor" /> {wonActionLabel ?? 'Continuar'}
+              </button>
+              <button type="button" className="rounded-2xl border border-white/15 px-5 py-2.5 text-[14px] font-medium text-slate-200 hover:bg-white/5" onClick={onExit}>
+                Salir
+              </button>
+            </div>
+          ) : (
+            <EndButtons onPlayAgain={onPlayAgain} onExit={onExit} />
+          )}
         </Overlay>
       )}
 

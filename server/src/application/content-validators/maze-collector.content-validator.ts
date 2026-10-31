@@ -120,6 +120,7 @@ export class MazeCollectorContentValidator implements ContentValidator {
     }
 
     const questions = this.validateQuestions(raw.questions);
+    const stations = this.validateStations((raw as { stations?: unknown }).stations);
 
     return {
       layout,
@@ -130,7 +131,24 @@ export class MazeCollectorContentValidator implements ContentValidator {
       enemyLabel: raw.enemyLabel!.trim(),
       enemyIcon: raw.enemyIcon!.trim(),
       ...(questions ? { questions } : {}),
+      ...(stations ? { stations } : {}),
     };
+  }
+
+  /** Modo expedición (issue #152): de 2 a 4 mapas distintos, recorridos en orden. */
+  private validateStations(value: unknown): MazeLayout[] | undefined {
+    if (value === undefined || value === null) return undefined;
+    if (!Array.isArray(value) || value.length < 2 || value.length > VALID_LAYOUTS.length) {
+      throw new InvalidGameContentError(`stations debe ser una lista de 2 a ${VALID_LAYOUTS.length} mapas.`);
+    }
+    const stations = value.map((item) => (LEGACY_LAYOUTS.includes(item) ? 'CITY' : item));
+    if (!stations.every((item): item is MazeLayout => VALID_LAYOUTS.includes(item))) {
+      throw new InvalidGameContentError(`stations solo puede tener: ${VALID_LAYOUTS.join(', ')}.`);
+    }
+    if (new Set(stations).size !== stations.length) {
+      throw new InvalidGameContentError('stations no puede repetir mapas.');
+    }
+    return stations;
   }
 
   private validateQuestions(value: unknown): MazeQuestion[] | undefined {
