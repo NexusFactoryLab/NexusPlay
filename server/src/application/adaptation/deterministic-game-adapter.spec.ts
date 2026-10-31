@@ -81,14 +81,14 @@ describe('DeterministicGameAdapter', () => {
 
     expect(draft.content).toHaveLength(8);
     expect(draft.content[0]).toMatchObject({ label: 'Mercurio', color: '#22c55e' });
-    expect(draft.config).toMatchObject({ layout: 'CLASSIC', collectorLabel: 'Explorador' });
+    expect(draft.config).toMatchObject({ layout: 'CITY', collectorLabel: 'Explorador' });
     expect(draft.notices.join(' ')).toContain('nombre temático');
   });
 
   it('Laberinto → Dominó usa el dato como descarte y respeta el máximo de 10 conceptos', () => {
     const maze = buildGame(
       'MAZE_COLLECTOR',
-      { layout: 'CLASSIC', lives: 3, enemySpeed: 2, collectorLabel: 'A', collectorIcon: 'star', enemyLabel: 'B', enemyIcon: 'star' },
+      { layout: 'CITY', lives: 3, enemySpeed: 2, collectorLabel: 'A', collectorIcon: 'star', enemyLabel: 'B', enemyIcon: 'star' },
       Array.from({ length: 12 }, (_, index) => ({
         itemId: `i-${index}`,
         label: `Concepto ${index}`,

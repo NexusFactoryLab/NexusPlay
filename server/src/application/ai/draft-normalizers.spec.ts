@@ -369,7 +369,7 @@ describe('normalizeDraft — Dominó y Laberinto recolector', () => {
         { label: 'Papel', icon: 'leaf', color: 'x', fact: '   ' },
       ],
     );
-    expect(config).toMatchObject({ layout: 'CLASSIC', lives: 1, enemySpeed: 3, collectorIcon: 'star', enemyIcon: 'star' });
+    expect(config).toMatchObject({ layout: 'CITY', lives: 1, enemySpeed: 3, collectorIcon: 'star', enemyIcon: 'star' });
     expect((config.collectorLabel as string).length).toBeLessThanOrEqual(60);
     const items = content as Array<Record<string, unknown>>;
     expect((items[0].fact as string).length).toBeLessThanOrEqual(200);
@@ -378,7 +378,7 @@ describe('normalizeDraft — Dominó y Laberinto recolector', () => {
   });
 
   it('MAZE_COLLECTOR: respeta un layout válido en minúsculas', () => {
-    expect(normalizeDraft({ gameType: 'MAZE_COLLECTOR' }, { layout: 'spiral' }, []).config.layout).toBe('SPIRAL');
+    expect(normalizeDraft({ gameType: 'MAZE_COLLECTOR' }, { layout: 'ocean' }, []).config.layout).toBe('OCEAN');
   });
 });
 

@@ -37,10 +37,6 @@ const CITY_MAP_ROWS_ASCII = [
 export const CITY_MAP_COLS = CITY_MAP_ROWS_ASCII[0].length
 export const CITY_MAP_ROWS = CITY_MAP_ROWS_ASCII.length
 
-function buildSostenibleCityGrid(): number[][] {
-  return CITY_MAP_ROWS_ASCII.map((row) => Array.from(row, (cell) => (cell === '#' ? 1 : 0)))
-}
-
 function openCells(grid: number[][]): CellPosition[] {
   const cells: CellPosition[] = []
   for (let row = 0; row < grid.length; row++) {
@@ -80,7 +76,7 @@ export const CITY_TUNNEL_ROWS = [6, 13]
  * entra por el otro); el borde se abre por si acaso, igual que
  * `carveTunnels` en mazeCollectorTypes.ts.
  */
-function findAndCarveTunnelRows(grid: number[][]): number[] {
+function findAndCarveTunnelRows(grid: number[][], allowedRows: number[]): number[] {
   const cols = grid[0].length
   const tunnelRows: number[] = []
   for (let row = 1; row < grid.length - 1; row++) {
@@ -91,7 +87,7 @@ function findAndCarveTunnelRows(grid: number[][]): number[] {
         break
       }
     }
-    if (fullyOpen && CITY_TUNNEL_ROWS.includes(row)) {
+    if (fullyOpen && allowedRows.includes(row)) {
       grid[row][0] = 0
       grid[row][cols - 1] = 0
       tunnelRows.push(row)
@@ -101,18 +97,22 @@ function findAndCarveTunnelRows(grid: number[][]): number[] {
 }
 
 /**
- * Layout completo del mapa "Ciudad Sostenible" — mismas 4 esquinas para
- * las nubes, mismo criterio de spawn del jugador cerca del centro, pero
- * sobre la cuadrícula del mapa en sprites en vez de una ciudad genérica.
+ * Layout completo a partir de un mapa ASCII (`#` pared, `.` calle): mismas 4
+ * esquinas para los enemigos y el jugador cerca del centro. Lo usan Ciudad
+ * Sostenible y los mapas temáticos de mazeThemeMaps.ts.
  */
-export function buildSostenibleCityLayout(): MazeLayoutDef {
-  const grid = buildSostenibleCityGrid()
-  const cols = CITY_MAP_COLS
-  const rows = CITY_MAP_ROWS
+export function buildLayoutFromAscii(
+  asciiRows: string[],
+  tunnelRowsAllowed: number[],
+  extras: Pick<MazeLayoutDef, 'speedScale' | 'spriteScale'> = {},
+): MazeLayoutDef {
+  const grid = asciiRows.map((row) => Array.from(row, (cell) => (cell === '#' ? 1 : 0)))
+  const cols = grid[0].length
+  const rows = grid.length
   // Se talla ANTES de repartir spawns, igual que buildLayout() en
   // mazeCollectorTypes.ts — así ningún spawn termina eligiéndose sin saber
   // que un par de celdas de borde ya se abrieron para las avenidas.
-  const tunnelRows = findAndCarveTunnelRows(grid)
+  const tunnelRows = findAndCarveTunnelRows(grid, tunnelRowsAllowed)
 
   const used: CellPosition[] = []
 
@@ -131,13 +131,9 @@ export function buildSostenibleCityLayout(): MazeLayoutDef {
     return spawn
   })
 
-  return {
-    cols,
-    rows,
-    grid,
-    playerStart,
-    enemySpawns,
-    itemSlots: [],
-    tunnelRows,
-  }
+  return { cols, rows, grid, playerStart, enemySpawns, itemSlots: [], tunnelRows, ...extras }
+}
+
+export function buildSostenibleCityLayout(): MazeLayoutDef {
+  return buildLayoutFromAscii(CITY_MAP_ROWS_ASCII, CITY_TUNNEL_ROWS)
 }

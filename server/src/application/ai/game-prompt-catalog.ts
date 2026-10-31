@@ -156,11 +156,12 @@ fuente. Extrae entre 4 y 16 objetos/conceptos temáticos del texto, cada uno con
 máximo 200 caracteres) que resuma por qué ese concepto importa. Para "icon" usa siempre el valor
 "star". También define "collectorLabel"/"enemyLabel" (nombres temáticos cortos acordes al tema del
 texto, ej. si el texto es sobre reciclaje: collectorLabel="Camión reciclador", enemyLabel="Nube de
-contaminación") y usa "star" también para "collectorIcon"/"enemyIcon". Deja "layout":"CLASSIC",
-"lives":3 y "enemySpeed":2 salvo que el texto sugiera claramente otra cosa.`,
+contaminación") y usa "star" también para "collectorIcon"/"enemyIcon". Elige "layout" según el tema del texto: "AMAZON" (selva, ríos, biodiversidad amazónica),
+"OCEAN" (mares, costas, manglares, plástico), "PARAMO" (páramos, humedales, montañas, agua)
+o "CITY" (ciudad, reciclaje, residuos urbanos; es el valor por defecto). Deja "lives":3 y "enemySpeed":2 salvo que el texto sugiera claramente otra cosa.`,
   jsonShapeExample: `{
   "config": {
-    "layout": "CLASSIC", "lives": 3, "enemySpeed": 2,
+    "layout": "CITY", "lives": 3, "enemySpeed": 2,
     "collectorLabel": "Camión reciclador", "collectorIcon": "star",
     "enemyLabel": "Nube de contaminación", "enemyIcon": "star"
   },
