@@ -17,13 +17,21 @@ export class InMemoryTournamentStore implements TournamentStore {
     this.tournaments.set(tournament.code, tournament);
   }
 
+  /** Torneos en memoria (los usa el store persistente para hidratar al arrancar). */
+  values(): TournamentState[] {
+    return [...this.tournaments.values()];
+  }
+
   delete(code: string): void {
     this.tournaments.delete(code);
   }
 
   findBySocketId(socketId: string): TournamentState | undefined {
     for (const tournament of this.tournaments.values()) {
-      if (tournament.participants.some((participant) => participant.socketId === socketId)) {
+      if (
+        tournament.moderatorSocketId === socketId ||
+        tournament.participants.some((participant) => participant.socketId === socketId)
+      ) {
         return tournament;
       }
     }

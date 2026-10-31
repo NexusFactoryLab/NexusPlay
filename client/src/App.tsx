@@ -53,6 +53,11 @@ const DuoLogicoPage = lazy(() =>
 const TrueFalseMazePlayPage = lazy(() =>
   import('./components/home/games/true-false-maze/TrueFalseMazePlayPage').then((m) => ({ default: m.TrueFalseMazePlayPage })),
 )
+const TrueFalseMazeTournamentPage = lazy(() =>
+  import('./components/home/games/true-false-maze/TrueFalseMazeTournamentPage').then((m) => ({
+    default: m.TrueFalseMazeTournamentPage,
+  })),
+)
 const TrueFalseMazeDemoPage = lazy(() =>
   import('./components/home/games/true-false-maze/TrueFalseMazeDemoPage').then((m) => ({ default: m.TrueFalseMazeDemoPage })),
 )
@@ -140,6 +145,15 @@ function App() {
         element={
           <Suspense fallback={<main className="flex flex-1 items-center justify-center">Cargando la nave…</main>}>
             <TrueFalseMazePlayPage />
+          </Suspense>
+        }
+      />
+      {/* Una ronda de Misión Galáctica dentro de un torneo (issue #102): cada persona juega sola. */}
+      <Route
+        path="/laberinto-vf/torneo/:code"
+        element={
+          <Suspense fallback={<main className="flex flex-1 items-center justify-center">Cargando la nave…</main>}>
+            <TrueFalseMazeTournamentPage />
           </Suspense>
         }
       />

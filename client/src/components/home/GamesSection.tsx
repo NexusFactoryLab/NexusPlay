@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { AlertTriangle, KeyRound, PlusCircle, Sparkles, Trash2, Trophy } from 'lucide-react'
+import { AlertTriangle, KeyRound, PlusCircle, Sparkles, Swords, Trash2, Trophy } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
 import { DEFAULT_CATEGORY_COLOR, colorForCategory, iconForCategory } from './gamesCatalogVisuals'
@@ -22,6 +22,7 @@ import {
   publishSubject,
   type SubjectWithGameCount as CategoryWithGameCount,
 } from '../../services/subject.service'
+import { getTournamentSettings } from '../../services/tournament-settings.service'
 import { ApiError } from '../../utils/http'
 import { trackEvent } from '../../services/analytics.service'
 import { GameCard } from './games/GameCard'
@@ -33,6 +34,7 @@ import { parseCreatedKind } from './games/create/justCreatedRedirect'
 import { GameDetailModal } from './games/GameDetailModal'
 import { Modal } from './games/Modal'
 import { JoinByCodeModal } from './games/JoinByCodeModal'
+import { TournamentCodeModal } from './games/TournamentCodeModal'
 import { resolveRoomCode, LIVE_ROOM_ROUTES, type ResolvedRoom } from './games/resolveRoomCode'
 import { GuessWhoRoom } from './games/GuessWhoRoom'
 import { GameFiltersPanel, type GameTypeFilterOption } from './games/GameFiltersPanel'
@@ -182,6 +184,23 @@ export function GamesSection({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token])
   const [joinByCodeOpen, setJoinByCodeOpen] = useState(false)
+  // Acceso temporal al torneo (issue #102): solo existe mientras un ADMIN tenga el torneo habilitado en Edición.
+  const [tournamentOpen, setTournamentOpen] = useState(false)
+  const [tournamentCodeOpen, setTournamentCodeOpen] = useState(false)
+  useEffect(() => {
+    if (!token) return
+    let cancelled = false
+    getTournamentSettings(token)
+      .then((settings) => {
+        if (!cancelled) setTournamentOpen(settings.enabled)
+      })
+      .catch(() => {
+        if (!cancelled) setTournamentOpen(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [token])
   const [deleting, setDeleting] = useState(false)
   const [deletingCategory, setDeletingCategory] = useState(false)
   const [pendingDeleteCategory, setPendingDeleteCategory] = useState<CategoryWithGameCount | null>(null)
@@ -1061,6 +1080,26 @@ export function GamesSection({
                   <span className="fx-emoji" aria-hidden="true">🔑</span>
                   Unirme con código
                 </button>
+                {tournamentOpen && (
+                  <button
+                    type="button"
+                    className="tournament-cta relative flex items-center gap-2 rounded-xl border-2 border-accent-2 bg-surface px-5 py-3 text-[14px] font-bold text-accent-2"
+                    onClick={() => setTournamentCodeOpen(true)}
+                  >
+                    <Swords className="h-[18px] w-[18px]" strokeWidth={2.5} />
+                    Entrar al torneo
+                  </button>
+                )}
+                {tournamentOpen && user?.role?.toUpperCase() === 'ADMIN' && (
+                  <button
+                    type="button"
+                    className="flex items-center gap-2 rounded-xl border border-border bg-surface px-5 py-3 text-[14px] font-semibold text-text-h transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/50 hover:text-accent"
+                    onClick={() => navigate('/quien-es/torneo?crear=1')}
+                  >
+                    <Trophy className="h-[18px] w-[18px]" strokeWidth={2} />
+                    Abrir sala del torneo
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1237,10 +1276,8 @@ export function GamesSection({
                 filteredGames.map((game, index) => (
                   <div
                     key={game.id}
-                    className={`animate-[fade-in-up_0.35s_ease-out_backwards] ${
-                      mode === 'all' ? 'games-carousel-item shrink-0 snap-start' : ''
-                    }`}
-                    style={{ animationDelay: `${Math.min(index, 8) * 40}ms` }}
+                    className={`stagger-in ${mode === 'all' ? 'games-carousel-item shrink-0 snap-start' : ''}`}
+                    style={{ '--stagger': index } as React.CSSProperties}
                   >
                     <GameCard
                       game={game}
@@ -1283,6 +1320,8 @@ export function GamesSection({
           }}
         />
       )}
+
+      {tournamentCodeOpen && <TournamentCodeModal onClose={() => setTournamentCodeOpen(false)} />}
 
       {renderGameOverlays()}
     </section>

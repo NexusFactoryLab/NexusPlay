@@ -32,10 +32,10 @@ export const gameInstructions: Record<InstructionKind, Instruction> = {
     caption: 'Usa las respuestas para reducir las opciones antes de adivinar.',
   },
   GUESS_WHO_GROUP: {
-    text: `En cada ronda juegas contra una persona del grupo. Pregunta y descarta tarjetas; tras descartar al menos ${MIN_DISCARDS_TO_ACCUSE}, intenta adivinar la tarjeta de tu rival. Si ganas, avanzas hasta la final.`,
-    exampleTitle: 'Ejemplo del torneo', labels: ['Pregunta', 'Descarta', 'Acierta', 'Avanza'],
-    icons: [MessageCircleQuestion, X, Check, Trophy],
-    caption: 'Adivina la tarjeta de tu rival para avanzar a la siguiente ronda.',
+    text: `Es un torneo por puntos: todos juegan todas las rondas y en cada una se sortea uno de los juegos que eligió el administrador. En los duelos (Identidad Oculta: pregunta, descarta y, tras descartar al menos ${MIN_DISCARDS_TO_ACCUSE}, adivina la tarjeta de tu rival) quien gana suma 1 punto; en el Laberinto V/F juegas solo y sumas 1 punto si respondes todo bien. Al final gana quien tenga más puntos.`,
+    exampleTitle: 'Ejemplo del torneo', labels: ['Juega', 'Gana', 'Suma', 'Lidera'],
+    icons: [Dice5, Check, Trophy, Flag],
+    caption: 'Cada ronda ganada suma un punto; al final gana quien más tenga.',
   },
   MAZE_COLLECTOR: {
     text: 'Muévete con las flechas, WASD o los controles de pantalla. Recoge todos los elementos del laberinto y evita a los enemigos: si te alcanzan, pierdes una vida.',

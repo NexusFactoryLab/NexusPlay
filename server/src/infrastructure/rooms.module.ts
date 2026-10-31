@@ -4,13 +4,16 @@ import { AnalyticsModule } from './analytics.module.js';
 import { GAME_REPOSITORY } from '../domain/ports/game.repository.port.js';
 import { ROOM_STORE } from '../domain/ports/room-store.port.js';
 import { TOURNAMENT_STORE } from '../domain/ports/tournament-store.port.js';
+import { TOURNAMENT_SETTINGS_REPOSITORY } from '../domain/ports/tournament-settings.repository.port.js';
+import { MongoTournamentSettingsRepository } from './persistence/mongo/mongo-tournament-settings.repository.js';
 import { DOMINO_ROOM_STORE } from '../domain/ports/domino-room-store.port.js';
 import { SNAKES_LADDERS_ROOM_STORE } from '../domain/ports/snakes-ladders-room-store.port.js';
 import { DUO_ROOM_STORE } from '../domain/ports/duo-room-store.port.js';
 import { MongoService } from './persistence/mongo/mongo.service.js';
 import { MongoGameRepository } from './persistence/mongo/mongo-game.repository.js';
 import { InMemoryRoomStore } from './rooms/in-memory-room.store.js';
-import { InMemoryTournamentStore } from './rooms/in-memory-tournament.store.js';
+import { PrismaTournamentStore } from './rooms/prisma-tournament.store.js';
+import { PrismaService } from './persistence/prisma/prisma.service.js';
 import { InMemoryDominoRoomStore } from './rooms/in-memory-domino-room.store.js';
 import { InMemorySnakesLaddersRoomStore } from './rooms/in-memory-snakes-ladders-room.store.js';
 import { InMemoryDuoRoomStore } from './rooms/in-memory-duo-room.store.js';
@@ -27,8 +30,11 @@ import { AiCoreModule } from './ai-core.module.js';
   providers: [
     MongoService,
     { provide: GAME_REPOSITORY, useClass: MongoGameRepository },
+    { provide: TOURNAMENT_SETTINGS_REPOSITORY, useClass: MongoTournamentSettingsRepository },
     { provide: ROOM_STORE, useClass: InMemoryRoomStore },
-    { provide: TOURNAMENT_STORE, useClass: InMemoryTournamentStore },
+    // Memoria como fuente viva + volcado a Postgres con soft delete (issue #102).
+    PrismaService,
+    { provide: TOURNAMENT_STORE, useClass: PrismaTournamentStore },
     { provide: DOMINO_ROOM_STORE, useClass: InMemoryDominoRoomStore },
     { provide: SNAKES_LADDERS_ROOM_STORE, useClass: InMemorySnakesLaddersRoomStore },
     { provide: DUO_ROOM_STORE, useClass: InMemoryDuoRoomStore },

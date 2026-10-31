@@ -4663,6 +4663,13 @@ code {
   .home-fit .home-hero-inner {
     flex-wrap: nowrap;
   }
+
+  /* PageTransition envuelve la página con `min-h-full`, que no es un alto
+   * definido: sin esto `lg:h-full` de la sección se pierde, el carrusel
+   * (container-type: size) colapsa a 0 de alto y las tarjetas no se ven. */
+  .page-transition:has(> .home-fit) {
+    height: 100%;
+  }
 }
 
 .home-fit .home-hero {
@@ -7086,6 +7093,312 @@ code {
   80% { transform: rotate(8deg); }
   85% { transform: rotate(-6deg); }
   90% { transform: rotate(4deg); }
+}
+
+/* ==================== Transiciones de página y torneo (issue #102) =============}
+
+ * Una sola curva suave (ease-out exponencial) para que nada se sienta brusco:
+ * las páginas entran con un fundido y un leve ascenso; los elementos del torneo
+ * aparecen en cascada. Los keyframes usan `backwards` (no `both`) a propósito:
+ * al terminar no queda ningún `transform`, que de otro modo crearía un bloque
+ * contenedor y descolocaría los modales `position: fixed` de la página. */
+:root {
+  --ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Páginas a pantalla completa (`fixed inset-0`): solo fundido, sin mover nada. */
+@keyframes page-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.page-transition {
+  animation: page-enter 0.34s var(--ease-smooth) backwards;
+}
+
+.page-fade {
+  animation: page-fade 0.3s var(--ease-smooth) backwards;
+}
+
+/* Elemento que entra en cascada: `--stagger` es su posición (0, 1, 2…). */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.stagger-in {
+  animation: rise-in 0.42s var(--ease-smooth) backwards;
+  animation-delay: calc(min(var(--stagger, 0), 14) * 38ms);
+}
+
+/* Salida de popups (Modal.tsx): lo contrario de la entrada, más corta, para que
+ * cerrar se sienta tan cuidado como abrir y no un corte seco. */
+@keyframes modal-backdrop-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes modal-panel-out {
+  to {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}
+
+/* Aviso a pantalla completa con tiempo propio (anuncio de duelo, de misión): entra,
+ * se queda y se desvanece justo antes de que el componente lo quite. La duración
+ * la fija `--overlay-ms`, que debe coincidir con el temporizador que lo retira;
+ * `pointer-events: none` por si queda invisible un instante de más. */
+@keyframes overlay-in-out {
+  0% {
+    opacity: 0;
+  }
+  10%,
+  86% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.overlay-timed {
+  pointer-events: none;
+  animation: overlay-in-out var(--overlay-ms, 3000ms) var(--ease-smooth) forwards;
+}
+
+/* Flechas del carrusel: aparecen y no "saltan" al pasar a la siguiente página.
+ * Solo opacidad: ya llevan su propio transform para centrarse. */
+@keyframes arrow-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.carousel-arrow-in {
+  animation: arrow-fade-in 0.3s var(--ease-smooth) backwards;
+}
+
+/* Participante que entra a la sala de espera. */
+@keyframes chip-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.chip-pop {
+  animation: chip-pop 0.42s var(--ease-smooth) backwards;
+}
+
+/* Barra de avance (cupo de la sala, rondas del torneo). */
+.progress-track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--code-bg);
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  transition: width 0.6s var(--ease-smooth);
+}
+
+/* Cifra que cambia (puntos): un "latido" corto para que se note sin distraer. */
+@keyframes value-bump {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.28);
+    color: var(--accent);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.value-bump {
+  display: inline-block;
+  animation: value-bump 0.5s var(--ease-smooth);
+}
+
+/* Turno en vivo: punto que respira, en vez de parpadear. */
+@keyframes live-dot {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 50%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 0%, transparent);
+  }
+}
+
+.live-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  animation: live-dot 1.8s ease-in-out infinite;
+}
+
+/* Anuncio de emparejamiento: fondo que se oscurece y duelo que entra desde los lados. */
+@keyframes versus-from-left {
+  from {
+    opacity: 0;
+    transform: translateX(-36px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes versus-from-right {
+  from {
+    opacity: 0;
+    transform: translateX(36px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes versus-badge {
+  0% {
+    opacity: 0;
+    transform: scale(0.4) rotate(-12deg);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.12) rotate(3deg);
+  }
+  100% {
+    transform: scale(1) rotate(0);
+  }
+}
+
+.versus-left {
+  animation: versus-from-left 0.55s var(--ease-smooth) 0.1s backwards;
+}
+
+.versus-right {
+  animation: versus-from-right 0.55s var(--ease-smooth) 0.1s backwards;
+}
+
+.versus-badge {
+  animation: versus-badge 0.5s var(--ease-smooth) 0.35s backwards;
+}
+
+/* Acceso "Entrar al torneo" del Inicio: halo suave, sin parpadeo de opacidad. */
+@keyframes tournament-cta-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 0 color-mix(in srgb, var(--accent-2) 45%, transparent),
+      0 10px 26px -12px color-mix(in srgb, var(--accent-2) 60%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 9px color-mix(in srgb, var(--accent-2) 0%, transparent),
+      0 12px 30px -10px color-mix(in srgb, var(--accent-2) 80%, transparent);
+  }
+}
+
+.tournament-cta {
+  animation:
+    rise-in 0.5s var(--ease-smooth) backwards,
+    tournament-cta-glow 2.4s ease-in-out 0.6s infinite;
+  transition:
+    transform 0.25s var(--ease-smooth),
+    background-color 0.25s ease;
+}
+
+.tournament-cta:hover {
+  transform: translateY(-2px);
+}
+
+/* Línea de la gráfica de puntos: se dibuja una sola vez al aparecer (`pathLength` = 1,
+ * así el trazo cabe en cualquier largo) y después solo crece con cada ronda. */
+@keyframes pts-line-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.pts-line {
+  stroke-dasharray: 1;
+  animation: pts-line-draw 0.9s var(--ease-smooth) backwards;
+}
+
+/* Fila de clasificación: el reordenamiento lo anima el hook useFlip. */
+.rank-row {
+  transition:
+    background-color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+.rank-row--top {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-transition,
+  .page-fade,
+  .stagger-in,
+  .pts-line,
+  .carousel-arrow-in,
+  .chip-pop,
+  .value-bump,
+  .live-dot,
+  .versus-left,
+  .versus-right,
+  .versus-badge,
+  .tournament-cta {
+    animation: none;
+  }
+
+  .progress-fill,
+  .tournament-cta,
+  .rank-row {
+    transition: none;
+  }
 }
 
 /* Identidad Oculta: «¡Tu turno!» en un verde intenso que late (barra de turno y aviso en pantalla). */

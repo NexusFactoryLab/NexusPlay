@@ -57,6 +57,8 @@ model UserModel {
   identityProviderAccounts IdentityProviderAccountModel[]
   gamePlayResults          GamePlayResultModel[]
   gameCreationDrafts       GameCreationDraftModel[]
+  tournamentsCreated       TournamentModel[]
+  tournamentParticipations TournamentParticipantModel[]
 
   @@map("users")
 }
@@ -439,4 +441,56 @@ model GameCreationDraftModel {
   @@index([userId, updatedAt])
   @@index([updatedAt])
   @@map("game_creation_drafts")
+}
+
+/// Issue #102: torneo grupal de "¿Quién Es?". El estado vivo (timers, sockets)
+/// sigue en memoria; esta tabla es el registro durable para trazabilidad y para
+/// que más adelante cada profesor tenga los suyos. Nunca se borra una fila:
+/// cerrar el torneo solo marca `deletedAt` (soft delete).
+model TournamentModel {
+  id              String    @id @default(uuid())
+  code            String    @unique
+  gameId          String    @map("game_id")
+  gameTitle       String    @map("game_title")
+  creatorUserId   String    @map("creator_user_id")
+  creator         UserModel @relation(fields: [creatorUserId], references: [id])
+  phase           String
+  maxParticipants Int       @map("max_participants")
+  totalRounds     Int       @map("total_rounds")
+  currentRound    Int       @default(0) @map("current_round")
+  winnerUserId    String?   @map("winner_user_id")
+  /// Foto del estado sin las cartas de cada match (ver PrismaTournamentStore).
+  snapshot        Json
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  startedAt       DateTime? @map("started_at")
+  finishedAt      DateTime? @map("finished_at")
+  deletedAt       DateTime? @map("deleted_at")
+  participants    TournamentParticipantModel[]
+
+  @@index([creatorUserId, createdAt])
+  @@index([deletedAt])
+  @@map("tournaments")
+}
+
+model TournamentParticipantModel {
+  id               String          @id @default(uuid())
+  tournamentId     String          @map("tournament_id")
+  tournament       TournamentModel @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  userId           String          @map("user_id")
+  user             UserModel       @relation(fields: [userId], references: [id])
+  displayName      String          @map("display_name")
+  points           Int             @default(0)
+  wins             Int             @default(0)
+  losses           Int             @default(0)
+  botMatches       Int             @default(0) @map("bot_matches")
+  questionsAsked   Int             @default(0) @map("questions_asked")
+  wrongAccusations Int             @default(0) @map("wrong_accusations")
+  joinedAt         DateTime        @default(now()) @map("joined_at")
+  /// Soft delete: se llena cuando la persona sale de la sala o se cierra el torneo.
+  deletedAt        DateTime?       @map("deleted_at")
+
+  @@unique([tournamentId, userId])
+  @@index([userId])
+  @@map("tournament_participants")
 }

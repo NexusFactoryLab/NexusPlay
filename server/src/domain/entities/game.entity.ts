@@ -117,7 +117,9 @@ export class Game {
     });
   }
 
-  static fromPersistence(props: Omit<GameProps, 'featured'> & { featured?: boolean }): Game {
+  static fromPersistence(
+    props: Omit<GameProps, 'featured'> & { featured?: boolean },
+  ): Game {
     return new Game({ ...props, featured: props.featured ?? false });
   }
 

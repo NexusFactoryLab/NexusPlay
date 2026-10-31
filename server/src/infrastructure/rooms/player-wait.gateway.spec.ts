@@ -302,6 +302,7 @@ describe('Torneo: la partida espera al participante y puede volver ya iniciado',
       gameTitle: 'Banderas',
       maxParticipants: 4,
       maxAccusationCount: 6,
+      totalRounds: 3,
       turnDurationSeconds: 30,
       phase: 'RUNNING',
       participants: [
@@ -317,7 +318,10 @@ describe('Torneo: la partida espera al participante y puede volver ya iniciado',
           playerUserIds: ['ana', 'beto'],
           isBye: false,
           phase: 'PLAYING',
-          cards: [],
+          cards: [
+            { cardId: 'c1', label: 'Uno', imageUrl: '', audioUrl: null },
+            { cardId: 'c2', label: 'Dos', imageUrl: '', audioUrl: null },
+          ],
           players: [
             { userId: 'ana', secretCardId: 'c1', discardedCardIds: [] },
             { userId: 'beto', secretCardId: 'c2', discardedCardIds: [] },
@@ -354,17 +358,48 @@ describe('Torneo: la partida espera al participante y puede volver ya iniciado',
     expect(match.activePlayerUserId).toBe('beto');
   });
 
-  it('si no vuelve a tiempo, la partida sigue como antes (su turno pasa solo)', () => {
+  it('si no vuelve a tiempo, abandona: la partida termina y la gana quien se queda (#131)', () => {
     const h = setup();
     const t = tournament();
+    t.totalRounds = 1;
     h.tournaments.create(t);
     const match = t.matches[0];
     h.internals.startTournamentMatchTurn(t, match, 'beto');
     h.gateway.handleDisconnect(client('s-beto', 'beto'));
     vi.advanceTimersByTime(PLAYER_WAIT_MS);
+    expect(match.phase).toBe('FINISHED');
+    expect(match.winnerUserId).toBe('ana');
+    expect(t.participants.find((p) => p.userId === 'ana')!.points).toBe(1);
+    expect(t.participants.find((p) => p.userId === 'beto')!.losses).toBe(1);
+    expect(h.lastState('s-ana', 'tournament:match-abandoned')?.message).toBe('Beto ha abandonado la partida.');
+  });
+
+  it('salir a propósito del torneo en plena partida la pierde al instante', () => {
+    const h = setup();
+    const t = tournament();
+    t.totalRounds = 1;
+    h.tournaments.create(t);
+    const match = t.matches[0];
+    h.internals.startTournamentMatchTurn(t, match, 'ana');
+    h.gateway.handleTournamentLeave(client('s-beto', 'beto'));
+    expect(match.phase).toBe('FINISHED');
+    expect(match.winnerUserId).toBe('ana');
+    expect(h.lastState('s-ana', 'tournament:match-abandoned')?.message).toBe('Beto ha abandonado la partida.');
+    // Ya terminada, salir de nuevo no cambia nada.
+    h.gateway.handleTournamentLeave(client('s-ana', 'ana'));
+    expect(match.winnerUserId).toBe('ana');
+  });
+
+  it('contra el bot, no volver a tiempo no cierra la partida: su turno pasa solo', () => {
+    const h = setup();
+    const t = tournament();
+    t.matches[0].vsBot = true;
+    h.tournaments.create(t);
+    const match = t.matches[0];
+    h.internals.startTournamentMatchTurn(t, match, 'beto');
+    h.gateway.handleDisconnect(client('s-beto', 'beto'));
+    vi.advanceTimersByTime(PLAYER_WAIT_MS);
+    expect(match.phase).toBe('PLAYING');
     expect(match.awaiting).toEqual({});
-    expect(match.turnDeadline).not.toBeNull();
-    vi.advanceTimersByTime(30_000);
-    expect(match.activePlayerUserId).toBe('ana');
   });
 });

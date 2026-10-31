@@ -284,12 +284,12 @@ export function GuessWhoTutorial({ tournament, onFinish }: { tournament: boolean
       render: play('open-guess', near),
     },
     {
-      title: tournament ? 'Elige y avanza en el torneo' : 'Elige la tarjeta y confirma',
+      title: tournament ? 'Elige y suma un punto en el torneo' : 'Elige la tarjeta y confirma',
       task: 'Vuela, sale de noche y tiene plumas: elige la tarjeta de tu rival y confirma con «Sí, confirmar».',
-      success: tournament ? '¡Acertaste! En el torneo pasarías a la siguiente ronda.' : '¡Acertaste! Gana quien adivina primero.',
+      success: tournament ? '¡Acertaste! En el torneo sumarías 1 punto.' : '¡Acertaste! Gana quien adivina primero.',
       art: <ArtGwGuess />,
       render: play('guess', near),
     },
   ]
-  return <TutorialRunner name={tournament ? 'el torneo de Identidad Oculta' : 'Identidad Oculta'} parts={parts} accent={tournament ? 'amber' : 'violet'} onFinish={onFinish} />
+  return <TutorialRunner name={tournament ? 'un duelo del torneo' : 'Identidad Oculta'} parts={parts} accent={tournament ? 'amber' : 'violet'} onFinish={onFinish} />
 }

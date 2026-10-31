@@ -1,10 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Search, Star } from 'lucide-react'
+import { Search, Star, Swords } from 'lucide-react'
 import { useAuth } from '../../../hooks/useAuth'
 import { useToast } from '../../../hooks/useToast'
 import { listGames, setGameFeatured, type GameSummary } from '../../../services/game.service'
+import {
+  clearTournamentSettings,
+  getTournamentSettings,
+  saveTournamentSettings,
+  type SaveTournamentSettingsInput,
+  type TournamentSettings,
+} from '../../../services/tournament-settings.service'
 import { ApiError } from '../../../utils/http'
 import { resolveGameTypeDisplayName } from './gameTypePublicNames'
+import { TournamentSettingsModal } from './TournamentSettingsModal'
+import { TOURNAMENT_GAME_TYPES } from './tournamentLevels'
 
 /**
  * Destacados del Inicio (issue #100): el ADMIN decide qué juegos publicados se
@@ -19,6 +28,10 @@ export function FeaturedGamesPanel() {
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [pendingId, setPendingId] = useState<string | null>(null)
+  // Torneo habilitado hoy (issue #102) y su modal de configuración.
+  const [tournament, setTournament] = useState<TournamentSettings | null>(null)
+  const [tournamentModalOpen, setTournamentModalOpen] = useState(false)
+  const [savingTournament, setSavingTournament] = useState(false)
 
   useEffect(() => {
     if (!token) return
@@ -33,10 +46,22 @@ export function FeaturedGamesPanel() {
       .finally(() => {
         if (!cancelled) setLoading(false)
       })
+    getTournamentSettings(token)
+      .then((settings) => {
+        if (!cancelled) setTournament(settings)
+      })
+      .catch(() => {
+        if (!cancelled) setTournament(null)
+      })
     return () => {
       cancelled = true
     }
   }, [token])
+
+  const tournamentGames = useMemo(
+    () => games.filter((game) => game.status === 'PUBLISHED' && (TOURNAMENT_GAME_TYPES as readonly string[]).includes(game.gameType)),
+    [games],
+  )
 
   const visible = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -62,6 +87,36 @@ export function FeaturedGamesPanel() {
     }
   }
 
+  // Torneo grupal (issue #102): mientras esté habilitado, el Inicio muestra a todos el acceso por código.
+  async function saveTournament(input: SaveTournamentSettingsInput) {
+    if (!token || savingTournament) return
+    setSavingTournament(true)
+    try {
+      setTournament(await saveTournamentSettings(token, input))
+      setTournamentModalOpen(false)
+      showToast('Torneo habilitado. El Inicio ya muestra el acceso a todos.', 'success')
+    } catch (err: unknown) {
+      showToast(err instanceof ApiError ? err.message : 'No se pudo habilitar el torneo.', 'error')
+    } finally {
+      setSavingTournament(false)
+    }
+  }
+
+  async function disableTournament() {
+    if (!token || savingTournament) return
+    setSavingTournament(true)
+    try {
+      await clearTournamentSettings(token)
+      setTournament(null)
+      setTournamentModalOpen(false)
+      showToast('Torneo deshabilitado.', 'success')
+    } catch (err: unknown) {
+      showToast(err instanceof ApiError ? err.message : 'No se pudo deshabilitar el torneo.', 'error')
+    } finally {
+      setSavingTournament(false)
+    }
+  }
+
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
@@ -71,16 +126,31 @@ export function FeaturedGamesPanel() {
             El Inicio muestra solo los juegos destacados. {featuredCount === 0 ? 'Aún no hay ninguno: el Inicio se ve vacío.' : `Hoy hay ${featuredCount}.`}
           </p>
         </div>
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text/60" strokeWidth={2} />
-          <input
-            type="text"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Buscar juego…"
-            aria-label="Buscar juego"
-            className="w-[200px] rounded-lg border border-border bg-surface py-2 pl-9 pr-3 text-[13px] text-text-h placeholder:text-text/60 focus:border-accent focus:outline-none"
-          />
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            aria-pressed={tournament?.enabled ?? false}
+            onClick={() => setTournamentModalOpen(true)}
+            className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-[13px] font-medium transition-colors ${
+              tournament?.enabled
+                ? 'border-accent-2 bg-accent-2/10 text-accent-2 hover:bg-accent-2/15'
+                : 'border-border bg-surface text-text-h hover:border-accent/50 hover:text-accent'
+            }`}
+          >
+            <Swords className="h-4 w-4" strokeWidth={2} />
+            {tournament?.enabled ? 'Torneo habilitado · Editar' : 'Habilitar torneo'}
+          </button>
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text/60" strokeWidth={2} />
+            <input
+              type="text"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Buscar juego…"
+              aria-label="Buscar juego"
+              className="w-[200px] rounded-lg border border-border bg-surface py-2 pl-9 pr-3 text-[13px] text-text-h placeholder:text-text/60 focus:border-accent focus:outline-none"
+            />
+          </div>
         </div>
       </div>
 
@@ -138,6 +208,18 @@ export function FeaturedGamesPanel() {
           </li>
         ))}
       </ul>
+
+      {tournamentModalOpen && (
+        <TournamentSettingsModal
+          games={tournamentGames}
+          loading={loading}
+          current={tournament?.enabled ? tournament : null}
+          saving={savingTournament}
+          onSubmit={saveTournament}
+          onDisable={disableTournament}
+          onCancel={() => setTournamentModalOpen(false)}
+        />
+      )}
     </div>
   )
 }

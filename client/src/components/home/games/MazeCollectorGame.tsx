@@ -20,6 +20,7 @@ import { BonusSprite, PetSprite, PowerPelletSprite, TrashBagSprite } from './maz
 import { SostenibleCityBackground } from './SostenibleCityBackground'
 import { SpriteStrip, mazeSpriteUrl } from './mazeSpriteStrip'
 import { MazeCollectorGuide } from './MazeCollectorGuide'
+import { useInTournamentPlay } from './tournamentPlay'
 import { MazeCollectorTutorial } from './tutorial/MazeCollectorTutorial'
 import { ConfettiBurst } from '../../kids/ConfettiBurst'
 import { CartoonClock } from './CartoonClock'
@@ -167,7 +168,9 @@ function hashCell(row: number, col: number): number {
  * desde el botón de ayuda.
  */
 export function MazeCollectorGame(props: MazeCollectorGameProps) {
-  const [guideOpen, setGuideOpen] = useState(!props.tutorial)
+  // En el torneo no se abre sola (issue #131); sigue disponible desde "Cómo se juega".
+  const inTournamentPlay = useInTournamentPlay()
+  const [guideOpen, setGuideOpen] = useState(!props.tutorial && !inTournamentPlay)
   // Al final de la guía se ofrece el tutorial jugable (issue #93); al terminarlo
   // empieza una partida nueva (la sesión se vuelve a montar con otra clave).
   const [inTutorial, setInTutorial] = useState(false)

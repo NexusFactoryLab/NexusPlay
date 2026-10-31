@@ -4,6 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import type { Server } from 'socket.io';
 import type { GameRepository } from '../../domain/ports/game.repository.port.js';
 import type { UserRepository } from '../../domain/ports/user.repository.port.js';
+import type { TournamentSettingsRepository } from '../../domain/ports/tournament-settings.repository.port.js';
 import type { AnalyticsTrackerService } from '../../application/services/analytics-tracker.service.js';
 import { questionsFor } from '../../domain/services/guided-questions.js';
 import { RoomsGateway } from './rooms.gateway.js';
@@ -18,8 +19,8 @@ beforeEach(() => vi.useFakeTimers());
 afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); });
 function setup() {
   const rooms = new InMemoryRoomStore(), tournaments = new InMemoryTournamentStore();
-  const game = { id: 'test', title: 'Test', gameType: { getName: () => 'GUESS_WHO' }, config: { turnDurationSeconds: 30 }, content: Array.from({ length: 6 }, (_, i) => ({ cardId: String(i), label: `Tarjeta ${i}`, imageUrl: '', audioUrl: null, info: null, traits: i < 3 ? [{ id: 't0', question: '¿Rasgo?' }] : [] })) };
-  const gateway = new RoomsGateway(new JwtService(), { findById: async () => game } as unknown as GameRepository, {} as UserRepository, rooms, tournaments, new InMemoryDominoRoomStore(), new InMemorySnakesLaddersRoomStore(), { track: async () => {} } as unknown as AnalyticsTrackerService);
+  const game = { id: 'test', title: 'Test', gameType: { getName: () => 'GUESS_WHO' }, status: { getName: () => 'PUBLISHED' }, config: { turnDurationSeconds: 30 }, content: Array.from({ length: 6 }, (_, i) => ({ cardId: String(i), label: `Tarjeta ${i}`, imageUrl: '', audioUrl: null, info: null, traits: i < 3 ? [{ id: 't0', question: '¿Rasgo?' }] : [] })) };
+  const gateway = new RoomsGateway(new JwtService(), { findById: async () => game } as unknown as GameRepository, { findById: async () => ({ isAdmin: () => true }) } as unknown as UserRepository, rooms, tournaments, new InMemoryDominoRoomStore(), new InMemorySnakesLaddersRoomStore(), { track: async () => {} } as unknown as AnalyticsTrackerService, undefined, undefined, { get: async () => ({ games: [{ gameId: 'test', level: 'MEDIUM' }], maxParticipants: 4, totalRounds: 3, updatedByUserId: 'admin', updatedAt: new Date() }) } as unknown as TournamentSettingsRepository);
   const events: { target: string; payload: unknown }[] = [];
   gateway.server = { to: (target: string) => ({ emit: (_event: string, payload: unknown) => events.push({ target, payload: structuredClone(payload) }) }) } as unknown as Server;
   return { gateway, rooms, tournaments, events };
@@ -27,11 +28,12 @@ function setup() {
 
 it('aísla preguntas, respuestas y mensajes entre dos enfrentamientos del torneo', async () => {
   const { gateway, tournaments, events } = setup();
+  const admin = client('admin');
   const clients = ['a', 'b', 'c', 'd'].map(client);
-  await gateway.handleTournamentCreate(clients[0], { gameId: 'test', maxParticipants: 4 });
-  const tournament = tournaments.findBySocketId('a')!;
-  for (const c of clients.slice(1)) gateway.handleTournamentJoin(c, { code: tournament.code });
-  for (const c of clients) gateway.handleTournamentReady(c, { ready: true });
+  await gateway.handleTournamentCreate(admin);
+  const tournament = tournaments.findBySocketId('admin')!;
+  for (const c of clients) gateway.handleTournamentJoin(c, { code: tournament.code });
+  gateway.handleTournamentStart(admin);
   const match = tournament.matches[0], other = tournament.matches[1];
   const asker = clients.find(c => c.data.userId === match.activePlayerUserId)!;
   const responder = clients.find(c => match.playerUserIds.includes(c.data.userId) && c !== asker)!;

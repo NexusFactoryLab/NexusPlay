@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { JwtService } from '@nestjs/jwt';
 import type { GameRepository } from '../../domain/ports/game.repository.port.js';
 import type { UserRepository } from '../../domain/ports/user.repository.port.js';
+import type { TournamentSettingsRepository } from '../../domain/ports/tournament-settings.repository.port.js';
 import type { AnalyticsTrackerService } from '../../application/services/analytics-tracker.service.js';
 import { RoomsGateway } from './rooms.gateway.js';
 import { InMemoryRoomStore } from './in-memory-room.store.js';
@@ -45,6 +46,7 @@ describe('RoomsGateway room code registry', () => {
         id: 'game-guess-who',
         title: 'Quién Es Demo',
         gameType: { getName: () => 'GUESS_WHO' },
+        status: { getName: () => 'PUBLISHED' },
         config: {},
         content: Array.from({ length: 6 }, (_, i) => ({
           cardId: `c${i}`,
@@ -79,12 +81,23 @@ describe('RoomsGateway room code registry', () => {
     const gateway = new RoomsGateway(
       new JwtService(),
       gameRepository,
-      {} as UserRepository,
+      { findById: async () => ({ isAdmin: () => true }) } as unknown as UserRepository,
       stores.room,
       stores.tournament,
       stores.domino,
       stores.snakes,
       { track: vi.fn().mockResolvedValue(undefined) } as unknown as AnalyticsTrackerService,
+      undefined,
+      undefined,
+      {
+        get: async () => ({
+          games: [{ gameId: 'game-guess-who', level: 'MEDIUM' }],
+          maxParticipants: 4,
+          totalRounds: 3,
+          updatedByUserId: 'u1',
+          updatedAt: new Date(),
+        }),
+      } as unknown as TournamentSettingsRepository,
     );
     gateway.server = { to: () => ({ emit: vi.fn() }) } as never;
 
@@ -136,12 +149,9 @@ describe('RoomsGateway room code registry', () => {
   });
 
   it('resuelve un torneo con kind "tournament"', async () => {
-    const { gateway, gameByType } = buildGateway();
+    const { gateway } = buildGateway();
     const socket = client('u1');
-    await gateway.handleTournamentCreate(socket, {
-      gameId: (gameByType.GUESS_WHO as { id: string }).id,
-      maxParticipants: 4,
-    });
+    await gateway.handleTournamentCreate(socket);
     const code = (socket.emit as ReturnType<typeof vi.fn>).mock.calls[0][1].code as string;
 
     const resolved = gateway.handleResolveCode({ code });

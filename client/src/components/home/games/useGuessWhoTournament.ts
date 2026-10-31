@@ -6,7 +6,7 @@ import type { TournamentMatchStateView, TournamentPairingAnnouncement, Tournamen
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:3000'
 
 /**
- * Conexión de socket para el modo grupo (torneo eliminatorio) de "¿Quién
+ * Conexión de socket para el torneo por puntos (modo grupo) de "¿Quién
  * Es?". Espeja el patrón de useGuessWhoRoom (un socket por montaje), pero
  * habla los eventos `tournament:*` en vez de `room:*` — el servidor los
  * mantiene separados para no chocar con las salas 1v1 sueltas.
@@ -19,7 +19,9 @@ export function useGuessWhoTournament(token: string | null) {
   const [error, setError] = useState<string | null>(null)
   const [connecting, setConnecting] = useState(true)
   const [pairingAnnouncement, setPairingAnnouncement] = useState<TournamentPairingAnnouncement | null>(null)
+  const [closed, setClosed] = useState(false)
   const [matchAccusationFailedMessage, setMatchAccusationFailedMessage] = useState<string | null>(null)
+  const [matchAbandonedMessage, setMatchAbandonedMessage] = useState<string | null>(null)
 
   useEffect(() => {
     if (!token) return
@@ -43,6 +45,12 @@ export function useGuessWhoTournament(token: string | null) {
       setTournament(state)
       setError(null)
     })
+    // El administrador cerró el torneo: todos salen de la sala.
+    socket.on('tournament:closed', () => {
+      waitingCodeRef.current = null
+      setTournament(null)
+      setClosed(true)
+    })
     socket.on('room:error', (payload: { message: string }) => setError(payload.message))
     // Anuncio de emparejamiento al arrancar una ronda: se muestra brevemente
     // "Tu compañero es: [nombre]" antes de que el match arranque de lleno.
@@ -64,6 +72,8 @@ export function useGuessWhoTournament(token: string | null) {
         setMatchAccusationFailedMessage('Bandera equivocada.')
       },
     )
+    // El rival abandonó el duelo (issue #131): la partida ya cerró y la ganó quien se queda.
+    socket.on('tournament:match-abandoned', (payload: { matchCode: string; message: string }) => setMatchAbandonedMessage(payload.message))
 
     return () => {
       socket.disconnect()
@@ -71,8 +81,36 @@ export function useGuessWhoTournament(token: string | null) {
     }
   }, [token])
 
-  const createTournament = useCallback((gameId: string, maxParticipants: number) => {
-    socketRef.current?.emit('tournament:create', { gameId, maxParticipants })
+  const createTournament = useCallback(
+    () => {
+      // Juegos, niveles, cupo y rondas los lee el servidor del torneo habilitado en Edición.
+      socketRef.current?.emit('tournament:create')
+    },
+    [],
+  )
+
+  /** Misión Galáctica: una respuesta de la persona; el servidor la califica. */
+  const sendMazeAnswer = useCallback((questionId: string, chosen: boolean) => {
+    socketRef.current?.emit('tournament:maze-answer', { questionId, chosen })
+  }, [])
+
+  /** Misión Galáctica: terminó su partida (o la abandonó). */
+  const sendMazeFinish = useCallback(() => {
+    socketRef.current?.emit('tournament:maze-finish')
+  }, [])
+
+  const clearError = useCallback(() => setError(null), [])
+
+  const startTournament = useCallback(() => {
+    socketRef.current?.emit('tournament:start')
+  }, [])
+
+  const endRound = useCallback(() => {
+    socketRef.current?.emit('tournament:end-round')
+  }, [])
+
+  const closeTournament = useCallback(() => {
+    socketRef.current?.emit('tournament:close')
   }, [])
 
   const joinTournament = useCallback((code: string) => {
@@ -92,10 +130,6 @@ export function useGuessWhoTournament(token: string | null) {
   }, [])
   const answerQuestion = useCallback((requestId: string, answer: boolean) => {
     if (socketRef.current?.connected) socketRef.current.emit('tournament:match-answer', { requestId, answer })
-  }, [])
-
-  const setReady = useCallback((ready: boolean) => {
-    if (socketRef.current?.connected) socketRef.current.emit('tournament:ready', { ready })
   }, [])
 
   const updateTurnDuration = useCallback((turnDurationSeconds: number) => {
@@ -134,9 +168,17 @@ export function useGuessWhoTournament(token: string | null) {
     clearPairingAnnouncement: () => setPairingAnnouncement(null),
     matchAccusationFailedMessage,
     clearMatchAccusationFailedMessage: () => setMatchAccusationFailedMessage(null),
+    matchAbandonedMessage,
+    clearMatchAbandonedMessage: () => setMatchAbandonedMessage(null),
     createTournament,
+    sendMazeAnswer,
+    sendMazeFinish,
+    clearError,
     joinTournament,
-    setReady,
+    startTournament,
+    closeTournament,
+    endRound,
+    closed,
     updateTurnDuration,
     leaveTournament,
     discardMatchCard,

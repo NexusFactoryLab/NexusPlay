@@ -7,6 +7,7 @@ import { gameInstructions, type InstructionKind } from './gameInstructions'
 import { DominoVisualDemo } from './DominoVisualDemo'
 import { TutorialQuestion } from './tutorial/TutorialQuestion'
 import { GameGuide } from './tutorial/GameGuide'
+import { useInTournamentPlay } from './tournamentPlay'
 import { guessWhoGuideSteps, memoryGuideSteps, tournamentGuideSteps } from './tutorial/guideSteps'
 import { duoGuideSteps } from './duo-logico/duoGuideSteps'
 
@@ -54,7 +55,9 @@ export function GameInstructionsGate({
   const [accepted, setAccepted] = useState(false)
   const [inTutorial, setInTutorial] = useState(false)
   const [seenBefore] = useState(() => wasSeen(kind))
-  if (accepted) return children
+  const inTournamentPlay = useInTournamentPlay()
+  // En una partida de torneo no se muestra la guía (issue #131).
+  if (accepted || inTournamentPlay) return children
   const content = gameInstructions[kind]
   const onContinue = () => {
     markSeen(kind)
@@ -71,7 +74,7 @@ export function GameInstructionsGate({
       <GameGuide
         steps={steps}
         label={kind === 'GUESS_WHO_GROUP' ? 'Guía del torneo' : 'Guía rápida'}
-        ariaLabel={kind === 'GUESS_WHO_GROUP' ? 'Guía del torneo de Identidad Oculta' : kind === 'GUESS_WHO' ? 'Guía de Identidad Oculta' : 'Guía de MatchMente'}
+        ariaLabel={kind === 'GUESS_WHO_GROUP' ? 'Guía del torneo' : kind === 'GUESS_WHO' ? 'Guía de Identidad Oculta' : 'Guía de MatchMente'}
         dataAttr={kind}
         accent={kind === 'GUESS_WHO_GROUP' ? 'amber' : 'violet'}
         onClose={onContinue}

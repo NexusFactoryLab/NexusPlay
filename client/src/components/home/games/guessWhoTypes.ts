@@ -88,7 +88,9 @@ export type GuessWhoChatMessage = {
   sentAt: number
 }
 
-// --- Modo grupo (torneo eliminatorio) ---
+// --- Modo grupo (torneo por puntos) ---
+
+import type { TournamentGameType, TournamentLevel } from './tournamentLevels'
 
 export type TournamentPhase = 'WAITING' | 'RUNNING' | 'FINISHED'
 
@@ -100,6 +102,24 @@ export type TournamentParticipantView = {
   eliminatedAtRound: number | null
   ready?: boolean
   isSelf: boolean
+  wins: number
+  losses: number
+  botMatches: number
+  questionsAsked: number
+  wrongAccusations: number
+}
+
+export type TournamentLiveMatch = {
+  matchCode: string
+  phase: RoomPhase
+  vsBot: boolean
+  activePlayerUserId: string | null
+  winnerUserId: string | null
+  players: { userId: string; displayName: string; discardedCount: number; handCount: number | null }[]
+  gameType: TournamentGameType
+  totalCards: number
+  /** Misión Galáctica: avance de la persona que juega (el match es de una sola). */
+  maze: { answered: number; total: number; wrong: number } | null
 }
 
 export type TournamentRoundMatchSummary = {
@@ -108,6 +128,8 @@ export type TournamentRoundMatchSummary = {
   phase: RoomPhase
   playerUserIds: string[]
   winnerUserId: string | null
+  vsBot: boolean
+  gameType: TournamentGameType
 }
 
 export type TournamentRoundSummary = {
@@ -121,6 +143,14 @@ export type TournamentMatchStateView = GuidedChatState & {
   round: number
   isBye: boolean
   gameTitle: string
+  level: TournamentLevel
+  /** En Dominó el match se juega en una sala de dominó (`dominoRoomCode`), no en el tablero de este torneo. */
+  gameType: TournamentGameType
+  /** Juego de la ronda (para cargarlo cuando se juega fuera de este tablero, como Misión Galáctica). */
+  gameId: string
+  dominoRoomCode: string | null
+  /** Misión Galáctica: su avance; el servidor califica y nunca envía las respuestas correctas. */
+  maze: { total: number; answered: number; wrong: number } | null
   cards: GuessWhoCard[]
   maxAccusationCount: number
   turnDurationSeconds: number
@@ -135,13 +165,22 @@ export type TournamentMatchStateView = GuidedChatState & {
 export type TournamentStateView = {
   code: string
   gameTitle: string
+  /** Juegos del torneo con su complejidad; cada ronda sortea uno al azar. */
+  games: { title: string; level: TournamentLevel; gameType: TournamentGameType }[]
   maxParticipants: number
   turnDurationSeconds: number
   phase: TournamentPhase
   currentRound: number
+  /** El juego que se sorteó para la ronda en curso; `null` antes de que arranque la primera. */
+  currentRoundGame: { title: string; level: TournamentLevel; gameType: TournamentGameType } | null
+  totalRounds: number
   creatorUserId: string
+  /** true para el administrador que modera: ve el panel y no juega. */
+  isModerator: boolean
   winnerUserId: string | null
   participants: TournamentParticipantView[]
+  /** Partidas de la ronda actual; solo llega al moderador. */
+  liveMatches: TournamentLiveMatch[]
   rounds: TournamentRoundSummary[]
   myMatch: TournamentMatchStateView | null
 }

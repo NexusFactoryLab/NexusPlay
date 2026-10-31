@@ -81,6 +81,21 @@ export function resolveTrueFalseMazeConfig(raw: unknown): TrueFalseMazeConfig {
   }
 }
 
+/**
+ * Complejidad de un torneo (issue #102) sobre el `config` del juego: Fácil
+ * baja la presión, Difícil la sube, y Medio lo deja como lo configuró su autor.
+ * Las baterías y las afirmaciones no cambian: en el torneo cuenta responder bien.
+ */
+export function applyTournamentLevel(config: TrueFalseMazeConfig, level: 'EASY' | 'MEDIUM' | 'HARD'): TrueFalseMazeConfig {
+  if (level === 'EASY') {
+    return { ...config, enemyCount: Math.min(config.enemyCount, 2), enemySpeed: 1, relocateSeconds: 30 }
+  }
+  if (level === 'HARD') {
+    return { ...config, enemyCount: 4, enemySpeed: 3, relocateSeconds: 12 }
+  }
+  return config
+}
+
 /** Filtra del contenido guardado lo que no tenga forma de afirmación (defensivo, igual que el config). */
 export function resolveTrueFalseMazeQuestions(raw: unknown): TrueFalseMazeQuestion[] {
   if (!Array.isArray(raw)) return []
