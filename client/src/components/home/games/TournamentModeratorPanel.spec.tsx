@@ -126,6 +126,26 @@ beforeEach(() => {
 })
 
 describe('TournamentModeratorPanel', () => {
+  it('marca con un punto la conexión de cada persona y avisa arriba a quién se espera (#147)', () => {
+    const view = build();
+    view.liveMatches[0].players[0].connection = { state: 'waiting' };
+    view.liveMatches[0].players[1].connection = { state: 'connected' };
+    view.liveMatches[1].players[0].connection = { state: 'away' };
+    const html = render(view);
+    expect(html).toContain('Sin conexión:');
+    expect(html).toContain('Ana: se cayó su conexión, se la espera');
+    expect(html).toContain('Beto: conectada');
+    expect(html).toContain('Camila: aún no está en la partida');
+    // Solo se espera a Ana: quien aún no entró no dispara el aviso.
+    expect(html.match(/Sin conexión:<\/strong> ([^.]*)\./)?.[1]).toBe('Ana');
+  });
+
+  it('sin nadie desconectado no hay aviso y el bot no lleva punto de conexión (#147)', () => {
+    const html = render(build());
+    expect(html).not.toContain('Sin conexión:');
+    expect(html).not.toContain('Bot Nexus (medio): ');
+  });
+
   it('el título es «Torneo» (no el de un solo juego) y no hay confirmaciones abiertas de entrada (#131)', () => {
     const html = render(build())
     expect(html).toContain('>Torneo</h2>')

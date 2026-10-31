@@ -287,6 +287,26 @@ function buildRoundsSummary(tournament: TournamentState) {
     }));
 }
 
+/**
+ * Si una persona de una partida del torneo está conectada, se la espera (corte de red) o no está en la
+ * partida (issue #147). `null` cuando no aplica o no se puede saber: bots y Laberinto (juega solo).
+ */
+function liveConnection(
+  match: TournamentMatch,
+  userId: string,
+  dominoLookup?: (code: string) => DominoRoomState | undefined,
+): { state: 'connected' | 'waiting' | 'away' } | null {
+  if (userId.startsWith('bot:') || match.maze) return null;
+  if (match.dominoRoomCode) {
+    const player = dominoLookup?.(match.dominoRoomCode)?.players.find((p) => p.userId === userId);
+    if (!player) return null;
+    if (isWaitingSocketId(player.socketId)) return { state: 'waiting' };
+    if (player.socketId.startsWith('pending:')) return { state: 'away' };
+    return { state: 'connected' };
+  }
+  return { state: match.awaiting?.[userId] !== undefined ? 'waiting' : 'connected' };
+}
+
 /** Partidas de la ronda actual para el panel del moderador: quién juega, de quién es el turno y cómo va. */
 function buildLiveMatches(tournament: TournamentState, dominoLookup?: (code: string) => DominoRoomState | undefined) {
   const nameOf = (userId: string) =>
@@ -310,6 +330,7 @@ function buildLiveMatches(tournament: TournamentState, dominoLookup?: (code: str
         handCount: match.dominoRoomCode
           ? dominoLookup?.(match.dominoRoomCode)?.players.find((p) => p.userId === player.userId)?.hand.length ?? null
           : null,
+        connection: liveConnection(match, player.userId, dominoLookup),
       })),
       gameType: match.gameType ?? 'GUESS_WHO',
       totalCards: match.maze?.total ?? match.cards.length,
@@ -866,6 +887,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
         if (leaving) leaving.socketId = `pending:${leaving.userId}`;
         this.dominoRoomStore.set(dominoRoom);
       }
+      this.refreshModerator(dominoRoom.tournamentCode);
     } else if (dominoRoom) {
       const player = dominoRoom.players.find((p) => p.socketId === socket.id);
       if (wait && player && dominoRoom.phase === 'PLAYING' && hasOtherHuman(dominoRoom.players, player)) this.waitForDominoPlayer(dominoRoom, player);
@@ -2484,6 +2506,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     }
     participant.socketId = waitingSocketId(participant.userId);
     this.broadcastMatchState(tournament, match);
+    this.sendTournamentStateToModerator(tournament);
     this.scheduleWait('tournament:' + match.matchCode, match, () => this.expireTournamentWaits(tournament.code, match.matchCode));
   }
 
@@ -2523,6 +2546,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     if (back.resumed) this.resumeTournamentMatch(tournament, match, back.remainingMs);
     else this.scheduleWait('tournament:' + match.matchCode, match, () => this.expireTournamentWaits(tournament.code, match.matchCode));
     this.broadcastMatchState(tournament, match);
+    this.sendTournamentStateToModerator(tournament);
   }
 
   private advanceTournamentMatchTurn(tournament: TournamentState, match: TournamentMatch) {
@@ -2716,6 +2740,13 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   }
 
   /** Solo el panel del moderador: con 40 personas respondiendo, avisar a todas en cada respuesta sería ruido. */
+  /** Avisa al panel del moderador de un torneo (por su código) de que algo cambió, p. ej. quién está conectado. */
+  private refreshModerator(tournamentCode: string | undefined) {
+    if (!tournamentCode) return;
+    const tournament = this.tournamentStore.get(tournamentCode);
+    if (tournament) this.sendTournamentStateToModerator(tournament);
+  }
+
   private sendTournamentStateToModerator(tournament: TournamentState) {
     if (!tournament.moderatorSocketId) return;
     this.server
@@ -2833,6 +2864,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     this.dominoRoomStore.set(room);
     socket.join(`domino:${code}`);
     this.broadcastDominoState(room);
+    this.refreshModerator(room.tournamentCode);
   }
 
   /** Compatibilidad: Iniciar solo confirma al emisor, nunca a toda la sala. */

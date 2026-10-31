@@ -304,3 +304,55 @@ describe('torneo con Dominó: la espera del torneo (#120) y volver a la sala del
     expect(tournament.phase).toBe('FINISHED');
   });
 });
+
+describe('torneo con Dominó: el panel del administrador ve la conexión de cada persona (#147)', () => {
+  it('muestra quién no ha entrado, quién está conectado y a quién se espera, y se actualiza solo', async () => {
+    const { tournament, domino, gateway } = await start(2);
+    const states: Array<{ liveMatches: Array<{ players: Array<{ userId: string; connection: { state: string } | null }> }> }> = [];
+    gateway.server = {
+      to: (target: string) => ({ emit: (event: string, payload: never) => target === 'admin' && event === 'tournament:state' && states.push(payload) }),
+      in: () => ({ socketsLeave: () => {} }),
+    } as unknown as Server;
+    vi.advanceTimersByTime(3000);
+    const room = domino.get(tournament.matches[0].dominoRoomCode!)!;
+    const [first, second] = tournament.matches[0].playerUserIds as [string, string];
+    const seen = () => Object.fromEntries(states.at(-1)!.liveMatches[0].players.map((p) => [p.userId, p.connection?.state ?? null]));
+
+    const a = client('conn-a');
+    a.data.userId = first;
+    gateway.handleDominoJoin(a, { code: room.code });
+    expect(seen()).toEqual({ [first]: 'connected', [second]: 'away' });
+
+    const b = client('conn-b');
+    b.data.userId = second;
+    gateway.handleDominoJoin(b, { code: room.code });
+    expect(seen()).toEqual({ [first]: 'connected', [second]: 'connected' });
+
+    gateway.handleDisconnect(a);
+    expect(seen()).toEqual({ [first]: 'waiting', [second]: 'connected' });
+
+    const again = client('conn-a2');
+    again.data.userId = first;
+    gateway.handleDominoJoin(again, { code: room.code });
+    expect(seen()).toEqual({ [first]: 'connected', [second]: 'connected' });
+  });
+
+  it('contra el bot no se muestra conexión para el bot', async () => {
+    const { tournament, domino, gateway } = await start(3);
+    const states: Array<{ liveMatches: Array<{ vsBot: boolean; players: Array<{ userId: string; connection: { state: string } | null }> }> }> = [];
+    gateway.server = {
+      to: (target: string) => ({ emit: (event: string, payload: never) => target === 'admin' && event === 'tournament:state' && states.push(payload) }),
+      in: () => ({ socketsLeave: () => {} }),
+    } as unknown as Server;
+    vi.advanceTimersByTime(3000);
+    const botMatch = tournament.matches.find((m) => m.vsBot)!;
+    const room = domino.get(botMatch.dominoRoomCode!)!;
+    const humanId = botMatch.playerUserIds.find((id) => !id.startsWith('bot:'))!;
+    const mine = client('conn-h');
+    mine.data.userId = humanId;
+    gateway.handleDominoJoin(mine, { code: room.code });
+    const live = states.at(-1)!.liveMatches.find((m) => m.vsBot)!;
+    expect(live.players.find((p) => p.userId === humanId)!.connection).toEqual({ state: 'connected' });
+    expect(live.players.find((p) => p.userId.startsWith('bot:'))!.connection).toBeNull();
+  });
+});

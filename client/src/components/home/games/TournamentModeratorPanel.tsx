@@ -25,6 +25,19 @@ const MEDAL_TONES = ['text-[#d4a017]', 'text-[#9aa3b2]', 'text-[#b4753c]']
 
 const CARD = 'rounded-2xl border border-border bg-surface p-4 shadow-[var(--shadow)]'
 
+/** Punto de conexión de cada persona en su partida (issue #147). */
+const CONNECTION_DOT = {
+  connected: 'bg-emerald-500',
+  waiting: 'animate-pulse bg-amber-500',
+  away: 'bg-slate-400',
+} as const
+
+const CONNECTION_LABEL = {
+  connected: 'conectada',
+  waiting: 'se cayó su conexión, se la espera',
+  away: 'aún no está en la partida',
+} as const
+
 const stagger = (index: number) => ({ '--stagger': index }) as React.CSSProperties
 
 /** Avatar de una persona o, si es el bot, su icono (no tiene avatar). */
@@ -117,6 +130,7 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
   const finished = tournament.phase === 'FINISHED'
   const winner = tournament.participants.find((p) => p.userId === tournament.winnerUserId)
   const playing = tournament.liveMatches.filter((m) => m.phase === 'PLAYING').length
+  const waitingFor = tournament.liveMatches.flatMap((m) => (m.phase === 'PLAYING' ? m.players.filter((p) => p.connection?.state === 'waiting') : []))
   const roundsDone = finished ? tournament.totalRounds : Math.max(0, tournament.currentRound - 1)
   const progress = Math.round((roundsDone / tournament.totalRounds) * 100)
   const rowsRef = useFlip<HTMLDivElement>()
@@ -194,6 +208,12 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
         {error && (
           <p className="rounded-lg border border-danger/35 bg-danger/10 px-3 py-2 text-sm text-danger" role="alert">
             {error}
+          </p>
+        )}
+
+        {waitingFor.length > 0 && (
+          <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[13px] text-text-h" role="status">
+            <strong>Sin conexión:</strong> {waitingFor.map((player) => player.displayName).join(', ')}. Su partida está en pausa mientras vuelve{waitingFor.length === 1 ? '' : 'n'}.
           </p>
         )}
 
@@ -339,13 +359,22 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
                   <div className="mb-1.5 flex items-center gap-2">
                     <div className="flex shrink-0 -space-x-2">
                       {match.players.map((player) => (
-                        <PlayerAvatar
-                          key={player.userId}
-                          userId={player.userId}
-                          name={player.displayName}
-                          avatars={avatars}
-                          className="h-7 w-7 border-2 border-surface text-[10px]"
-                        />
+                        <span key={player.userId} className="relative">
+                          <PlayerAvatar
+                            userId={player.userId}
+                            name={player.displayName}
+                            avatars={avatars}
+                            className="h-7 w-7 border-2 border-surface text-[10px]"
+                          />
+                          {match.phase === 'PLAYING' && player.connection && (
+                            <span
+                              className={`absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-surface ${CONNECTION_DOT[player.connection.state]}`}
+                              title={`${player.displayName}: ${CONNECTION_LABEL[player.connection.state]}`}
+                              role="img"
+                              aria-label={`${player.displayName}: ${CONNECTION_LABEL[player.connection.state]}`}
+                            />
+                          )}
+                        </span>
                       ))}
                     </div>
                     <p className="min-w-0 flex-1 truncate font-medium">{match.players.map((p) => p.displayName).join(' vs ')}</p>

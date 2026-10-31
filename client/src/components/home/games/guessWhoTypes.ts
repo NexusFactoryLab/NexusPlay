@@ -115,7 +115,14 @@ export type TournamentLiveMatch = {
   vsBot: boolean
   activePlayerUserId: string | null
   winnerUserId: string | null
-  players: { userId: string; displayName: string; discardedCount: number; handCount: number | null }[]
+  players: {
+    userId: string
+    displayName: string
+    discardedCount: number
+    handCount: number | null
+    /** Conexión de la persona en esta partida (issue #147); `null` para el bot o si no se puede saber. */
+    connection?: { state: 'connected' | 'waiting' | 'away' } | null
+  }[]
   gameType: TournamentGameType
   totalCards: number
   /** Misión Galáctica: avance de la persona que juega (el match es de una sola). */
