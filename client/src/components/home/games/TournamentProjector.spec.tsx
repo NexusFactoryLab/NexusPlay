@@ -23,6 +23,7 @@ const person = (userId: string, displayName: string, points: number): Tournament
   botMatches: 0,
   questionsAsked: 0,
   wrongAccusations: 0,
+  correctAnswers: 0,
 })
 
 const NAMES = ['Ana', 'Beto', 'Camila', 'Diego', 'Elena', 'Fabio', 'Gala', 'Hugo']

@@ -33,6 +33,7 @@ const person = (userId: string, displayName: string, points: number, wrongAccusa
   botMatches: 0,
   questionsAsked: 3,
   wrongAccusations,
+  correctAnswers: 0,
 })
 
 const winnerMatch = (matchCode: string, winnerUserId: string | null, gameType: TournamentLiveMatch['gameType'] = 'GUESS_WHO') => ({

@@ -25,6 +25,7 @@ const person = (userId: string, displayName: string, points: number): Tournament
   botMatches: 0,
   questionsAsked: 0,
   wrongAccusations: 0,
+  correctAnswers: 0,
 })
 
 const match = (matchCode: string, phase: 'PLAYING' | 'FINISHED', winnerUserId: string | null = null) => ({

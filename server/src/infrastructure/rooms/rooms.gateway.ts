@@ -12,6 +12,7 @@ import {
 } from '@nestjs/websockets';
 import type { Server, Socket } from 'socket.io';
 import { pickRoundGameIndex } from './tournament-round-game.js';
+import { rankTournamentParticipants } from '../../domain/services/tournament-ranking.js';
 import { GAME_REPOSITORY, type GameRepository } from '../../domain/ports/game.repository.port.js';
 import {
   TOURNAMENT_SETTINGS_REPOSITORY,
@@ -251,6 +252,7 @@ function toTournamentClientView(
       botMatches: participant.botMatches ?? 0,
       questionsAsked: participant.questionsAsked ?? 0,
       wrongAccusations: participant.wrongAccusations ?? 0,
+      correctAnswers: participant.correctAnswers ?? 0,
     })),
     liveMatches: tournament.creatorUserId === forUserId ? buildLiveMatches(tournament, dominoLookup) : [],
     // Rondas ya jugadas o en curso, para armar el ranking/progreso del
@@ -1838,6 +1840,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
         botMatches: 0,
         questionsAsked: 0,
         wrongAccusations: 0,
+        correctAnswers: 0,
       });
     }
 
@@ -2212,6 +2215,11 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     maze.answeredIds.push(questionId);
     if (body.chosen === correctAnswer) maze.correct += 1;
     else maze.wrong += 1;
+    if (body.chosen === correctAnswer) {
+      // Crédito parcial: cada acierto cuenta para el desempate aunque no se complete el laberinto.
+      const answering = tournament.participants.find((p) => p.userId === match.playerUserIds[0]);
+      if (answering) answering.correctAnswers = (answering.correctAnswers ?? 0) + 1;
+    }
     this.tournamentStore.set(tournament);
     this.sendTournamentStateToModerator(tournament);
   }
@@ -2685,10 +2693,8 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     if (!allFinished) return;
 
     if (tournament.currentRound >= tournament.totalRounds) {
-      // Gana quien más puntos acumuló; ante empate, quien tuvo menos acusaciones fallidas.
-      const ranking = [...tournament.participants].sort(
-        (a, b) => b.points - a.points || (a.wrongAccusations ?? 0) - (b.wrongAccusations ?? 0),
-      );
+      // Gana quien más puntos acumuló; el desempate es común a todos los juegos (ver tournament-ranking.ts).
+      const ranking = rankTournamentParticipants(tournament.participants);
       tournament.phase = 'FINISHED';
       this.disposeTournamentDominoRooms(tournament);
       tournament.winnerUserId = ranking[0]?.userId ?? null;

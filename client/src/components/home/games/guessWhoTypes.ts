@@ -107,6 +107,8 @@ export type TournamentParticipantView = {
   botMatches: number
   questionsAsked: number
   wrongAccusations: number
+  /** Afirmaciones del Laberinto acertadas (desempata: más es mejor). */
+  correctAnswers: number
 }
 
 export type TournamentLiveMatch = {

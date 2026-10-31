@@ -336,6 +336,9 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
                       <span className="rounded-md bg-code-bg px-1.5 py-0.5" title="Preguntas hechas">
                         {participant.questionsAsked} preg.
                       </span>
+                      <span className="rounded-md bg-code-bg px-1.5 py-0.5" title="Afirmaciones acertadas en el Laberinto (desempata: más es mejor)">
+                        {participant.correctAnswers} aciertos
+                      </span>
                       <span className="rounded-md bg-code-bg px-1.5 py-0.5" title="Acusaciones equivocadas (desempata: menos es mejor)">
                         {participant.wrongAccusations} fallos
                       </span>
@@ -352,7 +355,7 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
               })}
               {ranking.length === 0 && <p className="text-[13px] text-text">Todavía no hay participantes.</p>}
             </div>
-            <p className="mt-3 text-[11.5px] text-text">G = ganadas · P = perdidas · Fallos = acusaciones equivocadas (desempata: menos es mejor) · Bot = partidas contra el bot</p>
+            <p className="mt-3 text-[11.5px] text-text">G = ganadas · P = perdidas · Aciertos = afirmaciones acertadas del Laberinto · Fallos = acusaciones equivocadas · Bot = partidas contra el bot. Desempate: menos derrotas, más aciertos, menos fallos.</p>
           </section>
 
           <section className={`stagger-in ${CARD}`} style={stagger(9)} aria-labelledby="partidas-titulo">

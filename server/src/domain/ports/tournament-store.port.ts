@@ -62,6 +62,8 @@ export interface TournamentParticipant {
   botMatches?: number;
   questionsAsked?: number;
   wrongAccusations?: number;
+  /** Afirmaciones del Laberinto V/F acertadas: crédito parcial para el desempate (issue #147). */
+  correctAnswers?: number;
 }
 
 /**

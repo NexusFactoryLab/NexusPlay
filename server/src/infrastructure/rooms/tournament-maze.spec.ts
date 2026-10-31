@@ -125,6 +125,19 @@ describe('Misión Galáctica en el torneo', () => {
     expect(tournament.matches.filter((m) => m.round === 2 && m.phase === 'PLAYING')).toHaveLength(2);
   });
 
+  it('cada afirmación acertada suma crédito parcial para el desempate, aunque no se complete el laberinto (#147)', async () => {
+    const { gateway, tournament, players } = await start(2, 1);
+    const correctOf = (id: string) => tournament.participants.find((p) => p.userId === id)!.correctAnswers ?? 0;
+    await gateway.handleTournamentMazeAnswer(players[0], { questionId: 'q1', chosen: true });
+    await gateway.handleTournamentMazeAnswer(players[0], { questionId: 'q2', chosen: true }); // la correcta es false
+    await gateway.handleTournamentMazeAnswer(players[1], { questionId: 'q1', chosen: false }); // la correcta es true
+    expect(correctOf('p0')).toBe(1);
+    expect(correctOf('p1')).toBe(0);
+    // Responder dos veces la misma afirmación no suma otra vez.
+    await gateway.handleTournamentMazeAnswer(players[0], { questionId: 'q1', chosen: true });
+    expect(correctOf('p0')).toBe(1);
+  });
+
   it('terminar sin haber respondido todo (se quedó sin baterías) no suma', async () => {
     const { gateway, tournament, players } = await start(2, 1);
     await gateway.handleTournamentMazeAnswer(players[0], { questionId: 'q1', chosen: true });
