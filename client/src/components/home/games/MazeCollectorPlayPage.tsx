@@ -7,7 +7,7 @@ import { trackEvent } from '../../../services/analytics.service'
 import { colorForCategory, DEFAULT_CATEGORY_COLOR } from '../gamesCatalogVisuals'
 import { listSubjects as listCategories, type SubjectWithGameCount } from '../../../services/subject.service'
 import { MazeCollectorGame } from './MazeCollectorGame'
-import { MAZE_LAYOUTS, DEFAULT_MAZE_CONFIG } from './mazeCollectorTypes'
+import { MAZE_LAYOUTS, DEFAULT_MAZE_CONFIG, normalizeMazeLayout } from './mazeCollectorTypes'
 import type { MazeCollectorConfig, MazeCollectorItem } from './mazeCollectorTypes'
 import { questionsForGame } from './mazeCollectorQuestions'
 
@@ -87,10 +87,10 @@ export function MazeCollectorPlayPage() {
     <MazeCollectorGame
       title={game.title}
       primaryColor={primaryColor}
-      layout={MAZE_LAYOUTS[config.layout]}
+      layout={MAZE_LAYOUTS[normalizeMazeLayout(config.layout)]}
       items={game.content as MazeCollectorItem[]}
       config={config}
-      questions={questionsForGame((game.config as { questions?: unknown } | null)?.questions)}
+      questions={questionsForGame((game.config as { questions?: unknown } | null)?.questions, normalizeMazeLayout(config.layout))}
       onExit={handleExit}
     />
   )

@@ -31,7 +31,7 @@ type SeedGame = {
   categorySlug: string;
   theme: { primaryColor: string; coverImageUrl: null };
   config: {
-    layout: 'CLASSIC' | 'CROSS' | 'SPIRAL' | 'CITY';
+    layout: 'CITY' | 'AMAZON' | 'OCEAN' | 'PARAMO';
     lives: number;
     enemySpeed: number;
     collectorLabel: string;
@@ -130,7 +130,7 @@ const GAMES: SeedGame[] = [
     categorySlug: 'tecnologia',
     theme: { primaryColor: '#3b82f6', coverImageUrl: null },
     config: {
-      layout: 'CROSS',
+      layout: 'PARAMO',
       lives: 3,
       enemySpeed: 2,
       collectorLabel: 'Antivirus',

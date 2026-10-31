@@ -21,6 +21,8 @@ type PollutionGhostSpriteProps = {
   facing?: Direction
   /** true cuando ya casi se acaba el estado energizado — dispara el parpadeo de aviso. */
   warning?: boolean
+  /** Prefijo de los sprites del mapa (ver mazeMaps.ts); vacío = nubes de la Ciudad. */
+  prefix?: string
 }
 
 /**
@@ -28,16 +30,16 @@ type PollutionGhostSpriteProps = {
  * parpadea en blanco cuando el purificador está por acabarse; "comida" son
  * solo los ojos volviendo a casa, mirando hacia donde van.
  */
-export function PollutionGhostSprite({ personality, mode, size, facing = 'UP', warning }: PollutionGhostSpriteProps) {
+export function PollutionGhostSprite({ personality, mode, size, facing = 'UP', warning, prefix = '' }: PollutionGhostSpriteProps) {
   if (mode === 'EATEN') {
-    return <SpriteStrip name="cloud-eyes" frames={4} size={size} frame={EYES_FRAME[facing]} />
+    return <SpriteStrip name={`${prefix}cloud-eyes`} frames={4} size={size} frame={EYES_FRAME[facing]} />
   }
   if (mode === 'FRIGHTENED') {
     return warning ? (
-      <SpriteStrip name="cloud-warning" frames={2} size={size} durationMs={350} />
+      <SpriteStrip name={`${prefix}cloud-warning`} frames={2} size={size} durationMs={350} />
     ) : (
-      <SpriteStrip name="cloud-frightened" frames={2} size={size} durationMs={500} />
+      <SpriteStrip name={`${prefix}cloud-frightened`} frames={2} size={size} durationMs={500} />
     )
   }
-  return <SpriteStrip name={PERSONALITY_STRIP[personality]} frames={4} size={size} durationMs={900} />
+  return <SpriteStrip name={`${prefix}${PERSONALITY_STRIP[personality]}`} frames={4} size={size} durationMs={900} />
 }

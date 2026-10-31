@@ -14,7 +14,7 @@ function validItem(overrides: Record<string, unknown> = {}) {
 
 function validConfig(overrides: Record<string, unknown> = {}) {
   return {
-    layout: 'CLASSIC',
+    layout: 'CITY',
     lives: 3,
     enemySpeed: 2,
     collectorLabel: 'Camión de reciclaje',
@@ -47,7 +47,7 @@ describe('MazeCollectorContentValidator', () => {
       });
 
       expect(config).toEqual({
-        layout: 'CLASSIC',
+        layout: 'CITY',
         lives: 3,
         enemySpeed: 2,
         collectorLabel: 'Camión de reciclaje',
@@ -58,12 +58,24 @@ describe('MazeCollectorContentValidator', () => {
     });
 
     it('acepta un config completo válido', () => {
-      const config = validator.validateConfig(validConfig({ layout: 'SPIRAL', lives: 5, enemySpeed: 3 }));
-      expect(config).toEqual(validConfig({ layout: 'SPIRAL', lives: 5, enemySpeed: 3 }));
+      const config = validator.validateConfig(validConfig({ layout: 'OCEAN', lives: 5, enemySpeed: 3 }));
+      expect(config).toEqual(validConfig({ layout: 'OCEAN', lives: 5, enemySpeed: 3 }));
     });
 
     it('rechaza un layout desconocido', () => {
       expect(() => validator.validateConfig(validConfig({ layout: 'HEXAGON' }))).toThrow(InvalidGameContentError);
+    });
+
+    it('acepta los 4 mapas', () => {
+      for (const layout of ['CITY', 'AMAZON', 'OCEAN', 'PARAMO']) {
+        expect(validator.validateConfig(validConfig({ layout }))).toMatchObject({ layout });
+      }
+    });
+
+    it('lee los layouts retirados como CITY, para no romper juegos ya guardados', () => {
+      for (const layout of ['CLASSIC', 'CROSS', 'SPIRAL']) {
+        expect(validator.validateConfig(validConfig({ layout }))).toMatchObject({ layout: 'CITY' });
+      }
     });
 
     it('acepta el layout CITY', () => {

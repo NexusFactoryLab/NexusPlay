@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { MAZE_LAYOUTS } from './mazeCollectorTypes'
+import { MAZE_LAYOUTS, MAZE_LAYOUT_IDS, normalizeMazeLayout } from './mazeCollectorTypes'
+import { MAZE_MAPS } from './mazeMaps'
 
 /** BFS desde una celda abierta cualquiera — cuenta cuántas celdas abiertas son alcanzables. */
 function countReachableOpenCells(grid: number[][]): number {
@@ -45,8 +46,8 @@ function totalOpenCells(grid: number[][]): number {
 }
 
 describe('MAZE_LAYOUTS — puertas de teletransporte', () => {
-  it('los 4 layouts tienen al menos una fila de túnel con los dos extremos abiertos', () => {
-    for (const name of ['CLASSIC', 'CROSS', 'SPIRAL', 'CITY'] as const) {
+  it('los 4 mapas tienen al menos una fila de túnel con los dos extremos abiertos', () => {
+    for (const name of MAZE_LAYOUT_IDS) {
       const layout = MAZE_LAYOUTS[name]
       expect(layout.tunnelRows.length).toBeGreaterThan(0)
       for (const row of layout.tunnelRows) {
@@ -71,15 +72,47 @@ describe('MAZE_LAYOUTS — puertas de teletransporte', () => {
   })
 
   it('las 4 esquinas de nubes siguen siendo exactamente 4 en los 4 layouts', () => {
-    for (const name of ['CLASSIC', 'CROSS', 'SPIRAL', 'CITY'] as const) {
+    for (const name of MAZE_LAYOUT_IDS) {
       expect(MAZE_LAYOUTS[name].enemySpawns).toHaveLength(4)
     }
   })
 })
 
+describe('mapas temáticos (issue #148)', () => {
+  it('Amazonia, Océano y Páramo tienen la avenida central como único túnel', () => {
+    for (const name of ['AMAZON', 'OCEAN', 'PARAMO'] as const) {
+      expect(MAZE_LAYOUTS[name].tunnelRows).toEqual([18])
+    }
+  })
+
+  it('el jugador y las 4 esquinas de enemigos caen en calle transitable en los 4 mapas', () => {
+    for (const name of MAZE_LAYOUT_IDS) {
+      const layout = MAZE_LAYOUTS[name]
+      expect(layout.grid[layout.playerStart.row][layout.playerStart.col]).toBe(0)
+      for (const spawn of layout.enemySpawns) expect(layout.grid[spawn.row][spawn.col]).toBe(0)
+    }
+  })
+
+  it('los mapas de celda fina escalan velocidad y sprites; la ciudad no', () => {
+    expect(MAZE_LAYOUTS.CITY.speedScale).toBeUndefined()
+    for (const name of ['AMAZON', 'OCEAN', 'PARAMO'] as const) {
+      expect(MAZE_LAYOUTS[name].speedScale).toBeGreaterThan(1)
+      expect(MAZE_LAYOUTS[name].spriteScale).toBeGreaterThan(1)
+    }
+  })
+
+  it('cada mapa tiene su tema y los valores retirados (CLASSIC, CROSS, SPIRAL) se leen como Ciudad', () => {
+    for (const name of MAZE_LAYOUT_IDS) expect(MAZE_MAPS[name].id).toBe(name)
+    for (const legacy of ['CLASSIC', 'CROSS', 'SPIRAL', 'otra-cosa', undefined, 3]) {
+      expect(normalizeMazeLayout(legacy)).toBe('CITY')
+    }
+    expect(normalizeMazeLayout('OCEAN')).toBe('OCEAN')
+  })
+})
+
 describe('MAZE_LAYOUTS — conectividad', () => {
   it('cada celda libre es alcanzable desde cualquier otra en los 4 layouts (sin bolsones aislados)', () => {
-    for (const name of ['CLASSIC', 'CROSS', 'SPIRAL', 'CITY'] as const) {
+    for (const name of MAZE_LAYOUT_IDS) {
       const { grid } = MAZE_LAYOUTS[name]
       expect(countReachableOpenCells(grid)).toBe(totalOpenCells(grid))
     }

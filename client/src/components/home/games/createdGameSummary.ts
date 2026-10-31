@@ -27,7 +27,7 @@ const CREATED_GAME_KINDS: Record<CreatedGameKind, { label: string; gameType: str
   OPPOSITES: { label: 'MatchMente: conceptos opuestos', gameType: 'MEMORY_MATCH', instructionKind: 'OPPOSITES' },
   GUESS_WHO: { label: 'Identidad Oculta', gameType: 'GUESS_WHO', instructionKind: 'GUESS_WHO' },
   DOMINO: { label: 'Dominexo', gameType: 'DOMINO', instructionKind: 'DOMINO' },
-  MAZE_COLLECTOR: { label: 'Laberinto recolector', gameType: 'MAZE_COLLECTOR', instructionKind: 'MAZE_COLLECTOR' },
+  MAZE_COLLECTOR: { label: 'Salvando el mundo con sostenibilidad', gameType: 'MAZE_COLLECTOR', instructionKind: 'MAZE_COLLECTOR' },
   SNAKES_LADDERS: { label: 'Escaleras y serpientes', gameType: 'SNAKES_LADDERS', instructionKind: 'SNAKES_LADDERS' },
   DUAL_QUEST_PIXI: { label: 'Dúo Lógico', gameType: 'DUAL_QUEST_PIXI', instructionKind: 'DUAL_QUEST_PIXI' },
   TRUE_FALSE_MAZE: {
