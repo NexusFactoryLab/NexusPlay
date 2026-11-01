@@ -1,0 +1,225 @@
+/*
+ * Guía del torneo con el estilo del tema activo (issue #147). La carcasa (`GameGuide` con `themed`) y las
+ * escenas (`tournamentGuideSteps`) solo usan clases `tg-*`; los colores, la tipografía y las formas salen de
+ * las variables de abajo, que se redefinen en cada tema (`:root[data-theme]`): Claro (base), Oscuro, Fantasía,
+ * Pradera y Kids. Así quien cambia de tema no siente que la guía es de otra página.
+ */
+.tg {
+  --tg-overlay: rgba(31, 27, 46, 0.55);
+  --tg-panel: #ffffff;
+  --tg-panel-2: #f6f2ff;
+  --tg-border: 1px solid #ded9cd;
+  --tg-radius: 24px;
+  --tg-shadow: 0 30px 80px -30px rgba(76, 29, 149, 0.45);
+  --tg-ink: #14121c;
+  --tg-soft: #4b4a57;
+  --tg-a: #7c3aed;
+  --tg-a-text: #6d28d9;
+  --tg-gold: #b45309;
+  --tg-card: #ffffff;
+  --tg-card-line: #d9d2f0;
+  --tg-scene: linear-gradient(160deg, #f3eeff, #e8f3ff);
+  --tg-cta-from: #7c3aed;
+  --tg-cta-to: #9333ea;
+  --tg-cta-ink: #ffffff;
+  --tg-cta-line: transparent;
+  --tg-font: var(--heading, var(--font-heading));
+  --tg-title-ink: var(--tg-ink);
+  --tg-pod1: #f59e0b;
+  --tg-pod1-ink: #3b2200;
+  --tg-pod2: #94a3b8;
+  --tg-pod2-ink: #0f172a;
+  --tg-pod3: #c2763a;
+  --tg-pod3-ink: #2b1405;
+  color: var(--tg-ink);
+}
+
+:root[data-theme='dark'] .tg {
+  --tg-overlay: rgba(3, 4, 12, 0.82);
+  --tg-panel: #16161f;
+  --tg-panel-2: #0f0f18;
+  --tg-border: 1px solid #2b2b38;
+  --tg-shadow: 0 40px 120px -30px rgba(166, 133, 245, 0.55);
+  --tg-ink: #f1f0f8;
+  --tg-soft: #b6b4c9;
+  --tg-a: #a685f5;
+  --tg-a-text: #c4b5fd;
+  --tg-gold: #fbbf24;
+  --tg-card: #1e1e2a;
+  --tg-card-line: #3a3550;
+  --tg-scene: linear-gradient(160deg, #1b1730, #0f1424);
+  --tg-cta-from: #a685f5;
+  --tg-cta-to: #8b6cf0;
+  --tg-cta-ink: #14121c;
+}
+
+:root[data-theme='fantasy'] .tg {
+  --tg-overlay: rgba(10, 6, 30, 0.86);
+  --tg-panel: #2b2450;
+  --tg-panel-2: #17123a;
+  --tg-border: 2px solid #ffc83d;
+  --tg-radius: 20px;
+  --tg-shadow: inset 0 0 0 3px #3f230e, 0 30px 90px -30px rgba(123, 92, 255, 0.7);
+  --tg-ink: #fbf8ff;
+  --tg-soft: #ddd7f7;
+  --tg-a: #7b5cff;
+  --tg-a-text: #ffc83d;
+  --tg-gold: #ffc83d;
+  --tg-card: #393350;
+  --tg-card-line: #b8730f;
+  --tg-scene: radial-gradient(2px 2px at 18% 22%, #ffe58a, transparent), radial-gradient(1.5px 1.5px at 72% 14%, #ffe58a, transparent),
+    radial-gradient(1.5px 1.5px at 88% 60%, #ffe58a, transparent), linear-gradient(160deg, #221d33, #17123a);
+  --tg-cta-from: #9a6534;
+  --tg-cta-to: #7a4a24;
+  --tg-cta-ink: #fff4cc;
+  --tg-cta-line: #ffc83d;
+  --tg-title-ink: #ffe58a;
+  --tg-pod1-ink: #3b2200;
+}
+
+:root[data-theme='meadow'] .tg {
+  --tg-overlay: rgba(70, 110, 160, 0.5);
+  --tg-panel: #ffffff;
+  --tg-panel-2: #fff9f0;
+  --tg-border: 5px solid #ffffff;
+  --tg-radius: 32px;
+  --tg-shadow: 0 0 0 3px #8aa3bb, 0 30px 70px -28px rgba(50, 90, 140, 0.7);
+  --tg-ink: #2b1a0e;
+  --tg-soft: #5a4129;
+  --tg-a: #2563c0;
+  --tg-a-text: #1d4f9a;
+  --tg-gold: #b45309;
+  --tg-card: #ffffff;
+  --tg-card-line: #b8cce0;
+  --tg-scene: radial-gradient(130% 38% at 50% 112%, #a5d58f 0 62%, transparent 63%), linear-gradient(180deg, #bfe0f7, #e8f4fd);
+  --tg-cta-from: #4f8fe0;
+  --tg-cta-to: #2f6fc4;
+  --tg-cta-ink: #ffffff;
+}
+
+:root[data-theme='kids'] .tg {
+  --tg-overlay: rgba(58, 42, 109, 0.5);
+  --tg-panel: #ffffff;
+  --tg-panel-2: #fff8e7;
+  --tg-border: 5px solid #ffe0a3;
+  --tg-radius: 32px;
+  --tg-shadow: 0 30px 70px -28px rgba(255, 122, 26, 0.55);
+  --tg-ink: #3a2a6d;
+  --tg-soft: #5b4636;
+  --tg-a: #ff7a1a;
+  --tg-a-text: #c2410c;
+  --tg-gold: #c2410c;
+  --tg-card: #ffffff;
+  --tg-card-line: #ffd08a;
+  --tg-scene: linear-gradient(160deg, #e6f7ff, #fff8e7);
+  --tg-cta-from: #ff8a33;
+  --tg-cta-to: #ff7a1a;
+  --tg-cta-ink: #3a2a6d;
+}
+
+/* ---------- Carcasa ---------- */
+.tg-overlay { background: var(--tg-overlay); }
+.tg-panel {
+  border: var(--tg-border);
+  border-radius: var(--tg-radius);
+  background: linear-gradient(180deg, var(--tg-panel), var(--tg-panel-2));
+  box-shadow: var(--tg-shadow);
+  color: var(--tg-ink);
+}
+.tg-label { color: var(--tg-a-text); }
+.tg-title { font-family: var(--tg-font); color: var(--tg-title-ink); }
+.tg-body { color: var(--tg-soft); }
+.tg-ink { color: var(--tg-ink); }
+.tg-lead { font-size: 1.15em; color: var(--tg-ink); }
+.tg-foot { border-top: 1px solid var(--tg-card-line); }
+
+.tg-btn {
+  border: 1px solid var(--tg-card-line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--tg-ink) 5%, transparent);
+  color: var(--tg-ink);
+  transition: background 0.2s, border-color 0.2s;
+}
+.tg-btn:hover { background: color-mix(in srgb, var(--tg-ink) 11%, transparent); border-color: var(--tg-a); }
+.tg-btn--sm { padding: 6px 12px; }
+.tg-btn:focus-visible, .tg-cta:focus-visible, .tg-dot:focus-visible { outline: 2px solid var(--tg-a-text); outline-offset: 2px; }
+
+.tg-cta {
+  border: 1px solid var(--tg-cta-line);
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--tg-cta-from), var(--tg-cta-to));
+  color: var(--tg-cta-ink);
+  box-shadow: 0 10px 24px -12px var(--tg-a);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.tg-cta:hover { transform: translateY(-2px); box-shadow: 0 14px 28px -12px var(--tg-a); }
+
+.tg-dot { background: color-mix(in srgb, var(--tg-ink) 22%, transparent); }
+.tg-dot:hover { background: color-mix(in srgb, var(--tg-ink) 40%, transparent); }
+.tg-dot--on, .tg-dot--on:hover { background: var(--tg-a); }
+
+/* ---------- Escenas ---------- */
+.tg-scene {
+  position: relative;
+  overflow: hidden;
+  container-type: inline-size;
+  border-radius: 18px;
+  border: 1px solid var(--tg-card-line);
+  background: var(--tg-scene);
+}
+.tg-floor {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--tg-ink) 9%, transparent) 1px, transparent 1.6px);
+  background-size: 4cqw 4cqw;
+}
+.tg-row {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--tg-card-line);
+  background: var(--tg-card);
+  color: var(--tg-ink);
+  font-weight: 700;
+  box-shadow: 0 0.6cqw 1.6cqw -0.8cqw rgba(0, 0, 0, 0.3);
+}
+.tg-row--self {
+  border-color: var(--tg-gold);
+  background: color-mix(in srgb, var(--tg-gold) 16%, var(--tg-card));
+}
+.tg-gold { color: var(--tg-gold); }
+.tg-qbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--tg-a);
+  background: var(--tg-card);
+  color: var(--tg-a-text);
+  font-weight: 900;
+  box-shadow: 0 0.6cqw 1.6cqw -0.8cqw rgba(0, 0, 0, 0.3);
+}
+.tg-pod {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  align-items: flex-start;
+  justify-content: center;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 0.8cqw 0.8cqw 0 0;
+  font-weight: 900;
+}
+.tg-pod--1 { background: var(--tg-pod1); color: var(--tg-pod1-ink); }
+.tg-pod--2 { background: var(--tg-pod2); color: var(--tg-pod2-ink); }
+.tg-pod--3 { background: var(--tg-pod3); color: var(--tg-pod3-ink); }
+.tg-tag {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  border-radius: 999px;
+  border: 1px solid var(--tg-a);
+  background: var(--tg-card);
+  color: var(--tg-ink);
+  font-weight: 700;
+  box-shadow: 0 0.6cqw 1.4cqw -0.8cqw rgba(0, 0, 0, 0.3);
+}

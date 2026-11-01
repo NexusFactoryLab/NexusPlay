@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { FitScale } from '../true-false-maze/FitScale'
 import '../true-false-maze/trueFalseMazeGuide.css'
+import './tournamentGuide.css'
 
 /** Colores de cada acento (la guía y el tutorial del mismo juego comparten paleta). */
 export const GUIDE_ACCENTS = {
@@ -30,6 +31,7 @@ export function GameGuide({
   accent = 'violet',
   onClose,
   onTutorial,
+  themed = false,
 }: {
   steps: GuideStep[]
   /** Texto de la cabecera: «Guía rápida», «Guía del torneo»… */
@@ -40,11 +42,52 @@ export function GameGuide({
   accent?: GuideAccent
   onClose: () => void
   onTutorial?: () => void
+  /**
+   * Toma los colores, la tipografía y las formas del tema activo (Claro, Oscuro, Fantasía, Pradera, Kids) en vez
+   * de la pantalla oscura fija de las demás guías. Hoy solo la guía del torneo (issue #147).
+   */
+  themed?: boolean
 }) {
   const [index, setIndex] = useState(0)
   const last = index === steps.length - 1
   const step = steps[index]
   const colors = GUIDE_ACCENTS[accent]
+  // Clases de cada pieza: la guía clásica (pantalla oscura fija) o la del tema activo (ver tournamentGuide.css).
+  const ui = themed
+    ? {
+        overlay: 'tg tg-overlay fixed inset-0 z-[70] flex items-center justify-center overflow-hidden p-2 backdrop-blur-md sm:p-5',
+        panel: 'tg-panel relative flex max-h-full min-h-0 w-full max-w-[1080px] flex-col overflow-hidden',
+        panelStyle: { height: 'min(100%, 680px)' } as CSSProperties,
+        label: 'tg-label min-w-0 flex-1 truncate text-[11px] font-semibold uppercase tracking-[0.2em]',
+        skip: 'tg-btn tg-btn--sm flex items-center gap-1 text-[12.5px] font-medium',
+        body: 'tg-body flex flex-col gap-3 text-[clamp(0.95rem,2.4dvh+0.3vw,1.25rem)] leading-snug',
+        title: 'tg-title text-[clamp(1.15rem,3.4dvh+0.6vw,1.9rem)] font-bold leading-tight tracking-tight',
+        foot: 'tg-foot flex shrink-0 items-center gap-2 px-3 py-3 sm:gap-3 sm:px-6',
+        back: 'tg-btn flex items-center gap-1 px-2.5 py-2 text-[13px] font-semibold disabled:invisible sm:px-3.5',
+        dotOn: 'tg-dot tg-dot--on h-2.5 w-6 rounded-full transition-all',
+        dotOff: 'tg-dot h-2.5 w-2.5 rounded-full transition-all',
+        ask: 'tg-ink text-[13px] font-semibold max-sm:hidden',
+        cta: 'tg-cta flex shrink-0 items-center gap-1.5 px-4 py-2 text-[13.5px] font-bold',
+        ctaStyle: undefined as CSSProperties | undefined,
+        no: 'tg-btn px-4 py-2 text-[13.5px] font-semibold',
+      }
+    : {
+        overlay: 'fixed inset-0 z-[70] flex items-center justify-center overflow-hidden bg-[#03040c]/90 p-2 text-slate-100 backdrop-blur-md sm:p-5',
+        panel: `relative flex max-h-full min-h-0 w-full max-w-[1080px] flex-col overflow-hidden rounded-[28px] border border-white/15 bg-gradient-to-b from-slate-900/95 ${colors.bg}`,
+        panelStyle: { height: 'min(100%, 680px)', boxShadow: `0 40px 120px -30px ${colors.glow}` } as CSSProperties,
+        label: `min-w-0 flex-1 truncate text-[11px] font-semibold uppercase tracking-[0.2em] ${colors.text}`,
+        skip: 'flex items-center gap-1 rounded-xl border border-white/12 bg-white/5 px-3 py-1.5 text-[12.5px] font-medium text-slate-200 transition-colors hover:bg-white/10',
+        body: 'flex flex-col gap-3 text-[clamp(0.95rem,2.4dvh+0.3vw,1.25rem)] leading-snug text-slate-300',
+        title: 'font-heading text-[clamp(1.15rem,3.4dvh+0.6vw,1.9rem)] font-bold leading-tight tracking-tight text-white',
+        foot: 'flex shrink-0 items-center gap-2 border-t border-white/10 px-3 py-3 sm:gap-3 sm:px-6',
+        back: 'flex items-center gap-1 rounded-xl border border-white/12 px-2.5 py-2 text-[13px] font-semibold text-slate-200 transition-colors hover:bg-white/8 disabled:invisible sm:px-3.5',
+        dotOn: `h-2.5 w-6 rounded-full transition-all ${colors.dot}`,
+        dotOff: 'h-2.5 w-2.5 rounded-full bg-white/25 transition-all hover:bg-white/45',
+        ask: 'text-[13px] font-semibold text-white max-sm:hidden',
+        cta: `flex shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-r ${colors.button} px-4 py-2 text-[13.5px] font-bold text-white transition-transform hover:-translate-y-0.5`,
+        ctaStyle: { boxShadow: `0 10px 26px -10px ${colors.shadow}` } as CSSProperties | undefined,
+        no: 'rounded-xl border border-white/15 px-4 py-2 text-[13.5px] font-semibold text-slate-100 transition-colors hover:bg-white/10',
+      }
 
   const next = useCallback(() => {
     // Con la pregunta del tutorial, el último paso se responde con Sí o No (no con Enter).
@@ -78,23 +121,23 @@ export function GameGuide({
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center overflow-hidden bg-[#03040c]/90 p-2 text-slate-100 backdrop-blur-md sm:p-5"
+      className={ui.overlay}
       role="dialog"
       aria-modal="true"
       aria-label={ariaLabel}
       data-game-guide={dataAttr}
     >
       <div
-        className={`relative flex max-h-full min-h-0 w-full max-w-[1080px] flex-col overflow-hidden rounded-[28px] border border-white/15 bg-gradient-to-b from-slate-900/95 ${colors.bg}`}
-        style={{ height: 'min(100%, 680px)', boxShadow: `0 40px 120px -30px ${colors.glow}` }}
+        className={ui.panel}
+        style={ui.panelStyle}
       >
         <header className="flex shrink-0 items-center gap-3 px-4 pt-3 sm:px-6 sm:pt-4">
-          <p className={`min-w-0 flex-1 truncate text-[11px] font-semibold uppercase tracking-[0.2em] ${colors.text}`}>
+          <p className={ui.label}>
             {label} · Paso {index + 1} de {steps.length}
           </p>
           <button
             type="button"
-            className="flex items-center gap-1 rounded-xl border border-white/12 bg-white/5 px-3 py-1.5 text-[12.5px] font-medium text-slate-200 transition-colors hover:bg-white/10"
+            className={ui.skip}
             onClick={onClose}
           >
             Saltar guía <X className="h-3.5 w-3.5" />
@@ -111,19 +154,19 @@ export function GameGuide({
             className="h-full"
             fitKey={step.id}
             minScale={0.55}
-            contentClassName="flex flex-col gap-3 text-[clamp(0.95rem,2.4dvh+0.3vw,1.25rem)] leading-snug text-slate-300"
+            contentClassName={ui.body}
           >
-            <h2 className="font-heading text-[clamp(1.15rem,3.4dvh+0.6vw,1.9rem)] font-bold leading-tight tracking-tight text-white">{step.title}</h2>
+            <h2 className={ui.title}>{step.title}</h2>
             {step.body}
           </FitScale>
         </div>
 
-        <footer className="flex shrink-0 items-center gap-2 border-t border-white/10 px-3 py-3 sm:gap-3 sm:px-6">
+        <footer className={ui.foot}>
           <button
             type="button"
             disabled={index === 0}
             aria-label="Paso anterior"
-            className="flex items-center gap-1 rounded-xl border border-white/12 px-2.5 py-2 text-[13px] font-semibold text-slate-200 transition-colors hover:bg-white/8 disabled:invisible sm:px-3.5"
+            className={ui.back}
             onClick={back}
           >
             <ChevronLeft className="h-4 w-4" /> <span className="max-sm:hidden">Atrás</span>
@@ -136,26 +179,26 @@ export function GameGuide({
                 role="tab"
                 aria-selected={i === index}
                 aria-label={`Paso ${i + 1}: ${item.title}`}
-                className={`h-2.5 rounded-full transition-all ${i === index ? `w-6 ${colors.dot}` : 'w-2.5 bg-white/25 hover:bg-white/45'}`}
+                className={i === index ? ui.dotOn : ui.dotOff}
                 onClick={() => setIndex(i)}
               />
             ))}
           </div>
           {last && onTutorial ? (
             <div className="flex shrink-0 items-center gap-2" role="group" aria-label="¿Deseas jugar un tutorial?">
-              <span className="text-[13px] font-semibold text-white max-sm:hidden">¿Deseas jugar un tutorial?</span>
+              <span className={ui.ask}>¿Deseas jugar un tutorial?</span>
               <button
                 type="button"
                 autoFocus
-                className={`flex shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-r ${colors.button} px-4 py-2 text-[13.5px] font-bold text-white transition-transform hover:-translate-y-0.5`}
-                style={{ boxShadow: `0 10px 26px -10px ${colors.shadow}` }}
+                className={ui.cta}
+                style={ui.ctaStyle}
                 onClick={onTutorial}
               >
                 <span className="sm:hidden">Tutorial:</span> Sí
               </button>
               <button
                 type="button"
-                className="rounded-xl border border-white/15 px-4 py-2 text-[13.5px] font-semibold text-slate-100 transition-colors hover:bg-white/10"
+                className={ui.no}
                 onClick={onClose}
               >
                 No, jugar
@@ -165,8 +208,8 @@ export function GameGuide({
             <button
               type="button"
               autoFocus
-              className={`flex shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-r ${colors.button} px-4 py-2 text-[13.5px] font-bold text-white transition-transform hover:-translate-y-0.5 sm:px-5`}
-              style={{ boxShadow: `0 10px 26px -10px ${colors.shadow}` }}
+              className={`${ui.cta} sm:px-5`}
+              style={ui.ctaStyle}
               onClick={next}
             >
               {last ? '¡A jugar!' : 'Siguiente'} {!last && <ChevronRight className="h-4 w-4" />}
