@@ -50,6 +50,7 @@ describe('historial de torneos: resumen de la lista (#147)', () => {
   it('resume el torneo terminado: estado, ganador, participantes sin expulsados y juegos sin repetir', () => {
     expect(buildHistoryItem(row())).toEqual({
       code: 'ABC123',
+      name: null,
       status: 'FINISHED',
       totalRounds: 2,
       roundsStarted: 2,
@@ -73,6 +74,13 @@ describe('historial de torneos: resumen de la lista (#147)', () => {
     expect(buildHistoryItem(row({}, { winnerUserId: 'u2' })).winnerName).toBeNull();
     expect(buildHistoryItem(row({ snapshot: {} }))).toMatchObject({ participants: 0, winnerName: null, games: [] });
     expect(buildHistoryItem(row({ snapshot: null }))).toMatchObject({ participants: 0 });
+  });
+
+  it('lleva el nombre que le puso el administrador, y null si no le puso ninguno o quedó en blanco', () => {
+    expect(buildHistoryItem(row({}, { name: 'Repaso de ciencias' })).name).toBe('Repaso de ciencias');
+    expect(buildHistoryItem(row()).name).toBeNull();
+    expect(buildHistoryItem(row({}, { name: '   ' })).name).toBeNull();
+    expect(buildHistoryDetail(row({}, { name: 'Repaso de ciencias' })).name).toBe('Repaso de ciencias');
   });
 });
 

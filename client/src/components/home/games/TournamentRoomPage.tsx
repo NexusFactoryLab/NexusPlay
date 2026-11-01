@@ -317,9 +317,9 @@ function TournamentSession() {
     return (
       <TournamentCreateConfirm
         onCancel={handleExit}
-        onCreate={() => {
+        onCreate={(name) => {
           startedRef.current = true
-          createTournament()
+          createTournament(name)
         }}
       />
     )
@@ -378,7 +378,7 @@ function TournamentSession() {
 
   // El administrador no juega: ve el panel con la clasificación y las partidas en vivo.
   if (tournament.isModerator) {
-    return <TournamentModeratorPanel tournament={tournament} error={error} onClose={closeTournament} onEndRound={endRound} onSetNextGame={setNextGame} onKick={kickParticipant} onPause={setPaused} onAddTime={addTime} onExit={handleExit} />
+    return <TournamentModeratorPanel tournament={tournament} error={error} onClose={closeTournament} onEndRound={endRound} onSetNextGame={setNextGame} onKick={kickParticipant} onPause={setPaused} onAddTime={addTime} onOpenHistory={() => navigate(`/torneos/historial/${encodeURIComponent(tournament.code)}`)} onExit={handleExit} />
   }
 
   return (

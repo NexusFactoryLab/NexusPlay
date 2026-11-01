@@ -43,6 +43,7 @@ export function buildHistoryItem(row: TournamentHistoryRow): TournamentHistoryIt
   const games = [...new Set((state.games ?? []).map((g) => g.title))];
   return {
     code: row.code,
+    name: state.name?.trim() || null,
     status: statusOf(row),
     totalRounds: row.totalRounds,
     roundsStarted: row.currentRound,

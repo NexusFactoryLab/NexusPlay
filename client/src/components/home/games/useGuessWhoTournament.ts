@@ -89,9 +89,9 @@ export function useGuessWhoTournament(token: string | null) {
   }, [token])
 
   const createTournament = useCallback(
-    () => {
-      // Juegos, niveles, cupo y rondas los lee el servidor del torneo habilitado en Edición.
-      socketRef.current?.emit('tournament:create')
+    (name?: string) => {
+      // Juegos, niveles, cupo y rondas los lee el servidor del torneo habilitado; el nombre es opcional.
+      socketRef.current?.emit('tournament:create', { name })
     },
     [],
   )

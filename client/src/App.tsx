@@ -6,7 +6,7 @@ import { HomeLayout } from './components/home/HomeLayout'
 import { HomePage } from './components/home/sections/HomePage'
 import { CategoriesPage } from './components/home/sections/CategoriesPage'
 import { EditionPage } from './components/home/sections/EditionPage'
-import { TournamentHistoryPage } from './components/home/sections/TournamentHistoryPage'
+import { TournamentsAdminPage } from './components/home/sections/TournamentsAdminPage'
 import { LegacyGameTypeRedirect } from './components/home/games/LegacyGameTypeRedirect'
 import { CommunityPage } from './components/home/sections/CommunityPage'
 import { MyGamesPage } from './components/home/sections/MyGamesPage'
@@ -190,7 +190,8 @@ function App() {
         <Route path="areas" element={<CategoriesPage />} />
         <Route path="areas/:slug" element={<CategoriesPage />} />
         <Route path="edicion" element={<EditionPage />} />
-        <Route path="torneos/historial/:code?" element={<TournamentHistoryPage />} />
+        <Route path="torneos" element={<TournamentsAdminPage />} />
+        <Route path="torneos/historial/:code?" element={<TournamentsAdminPage />} />
         <Route path="tipos-de-juego" element={<Navigate to="/edicion?tab=tipos" replace />} />
         <Route path="tipos-de-juego/:gameType" element={<LegacyGameTypeRedirect />} />
         <Route path="tipos-de-juego/:gameType/:slug" element={<LegacyGameTypeRedirect />} />

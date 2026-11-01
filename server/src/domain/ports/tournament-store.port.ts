@@ -130,6 +130,8 @@ export interface TournamentState {
   code: string;
   gameId: string;
   gameTitle: string;
+  /** Nombre opcional que el administrador le puso al abrir la sala (issue #147); sin él, el torneo se identifica por su código y su fecha. */
+  name?: string;
   /** Cupo máximo configurado por el creador (límite superior 10, ver validación en el gateway). */
   maxParticipants: number;
   maxAccusationCount: number;

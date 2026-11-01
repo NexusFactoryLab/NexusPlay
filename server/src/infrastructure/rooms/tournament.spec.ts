@@ -77,6 +77,20 @@ describe('torneo grupal administrado', () => {
     await expect(h.gateway.handleTournamentCreate(client('p0'))).rejects.toThrow(/administrador/);
   });
 
+  it('el nombre del torneo es opcional: se limpia y queda guardado; sin nombre no se guarda nada (#147)', async () => {
+    const h = setup({ games: [{ gameId: 'g', level: 'MEDIUM' }], maxParticipants: 40, totalRounds: 1 });
+    await h.gateway.handleTournamentCreate(client('admin'), { name: '  Repaso   de ciencias \n 8° A ' });
+    expect(h.tournaments.findBySocketId('admin')!.name).toBe('Repaso de ciencias 8° A');
+
+    const sinNombre = setup({ games: [{ gameId: 'g', level: 'MEDIUM' }], maxParticipants: 40, totalRounds: 1 });
+    await sinNombre.gateway.handleTournamentCreate(client('admin'), { name: '   ' });
+    expect(sinNombre.tournaments.findBySocketId('admin')!.name).toBeUndefined();
+
+    const sinCuerpo = setup({ games: [{ gameId: 'g', level: 'MEDIUM' }], maxParticipants: 40, totalRounds: 1 });
+    await sinCuerpo.gateway.handleTournamentCreate(client('admin'));
+    expect(sinCuerpo.tournaments.findBySocketId('admin')!.name).toBeUndefined();
+  });
+
   it('el administrador modera: no es participante y solo él arranca', async () => {
     const { gateway, admin, players, tournament } = await start(4);
     expect(tournament.participants.map((p) => p.userId)).not.toContain('admin');
@@ -238,7 +252,7 @@ describe('complejidad por juego', () => {
 describe('torneo habilitado desde Edición', () => {
   it('no se puede crear si el administrador no habilitó el torneo', async () => {
     const h = setup(null);
-    await expect(h.gateway.handleTournamentCreate(client('admin'))).rejects.toThrow(/No hay un torneo habilitado/);
+    await expect(h.gateway.handleTournamentCreate(client('admin'))).rejects.toThrow(/No hay un torneo preparado/);
   });
 
   it('usa el cupo y las rondas guardados, no los del cliente', async () => {

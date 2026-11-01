@@ -27,6 +27,8 @@ type Props = {
   onPause?: (paused: boolean) => void
   /** Sumar segundos a los turnos en curso. Si falta, el panel no muestra el botón. */
   onAddTime?: (seconds: number) => void
+  /** Al terminar el torneo, lleva a sus resultados completos en el historial. Si falta, el panel no muestra el botón. */
+  onOpenHistory?: () => void
   onExit: () => void
 }
 
@@ -132,7 +134,7 @@ function MatchStatus({ match }: { match: TournamentLiveMatch }) {
  * podio con avatares, gráfica de puntos por ronda, clasificación y las partidas
  * de la ronda en curso. Todo se recalcula con cada estado que llega por socket.
  */
-export function TournamentModeratorPanel({ tournament, error, onClose, onEndRound, onSetNextGame, onKick, onPause, onAddTime, onExit }: Props) {
+export function TournamentModeratorPanel({ tournament, error, onClose, onEndRound, onSetNextGame, onKick, onPause, onAddTime, onOpenHistory, onExit }: Props) {
   const [confirming, setConfirming] = useState<'round' | 'close' | null>(null)
   const [projecting, setProjecting] = useState(false)
   const [kicking, setKicking] = useState<{ userId: string; displayName: string } | null>(null)
@@ -166,7 +168,9 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
         <header className="stagger-in flex flex-wrap items-start justify-between gap-3" style={stagger(0)}>
           <div className="min-w-0">
             <p className="text-[11px] font-semibold tracking-[0.18em] text-accent uppercase">Panel del administrador</p>
-            <h2 className="truncate text-[26px] font-bold tracking-tight text-text-h">Torneo</h2>
+            <h2 className="truncate text-[26px] font-bold tracking-tight text-text-h" title={tournament.name ?? undefined}>
+              {tournament.name ?? 'Torneo'}
+            </h2>
             <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-text">
               <span>
                 Código <strong className="tracking-widest text-text-h">{tournament.code}</strong>
@@ -333,9 +337,20 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
             >
               <Trophy className="h-6 w-6" strokeWidth={1.75} />
             </span>
-            <p className="text-[16px] font-semibold text-text-h">
+            <p className="min-w-0 flex-1 text-[16px] font-semibold text-text-h">
               Ganó el torneo {winner.displayName} con {winner.points} {winner.points === 1 ? 'punto' : 'puntos'}
             </p>
+            {onOpenHistory && (
+              <button
+                type="button"
+                className="shrink-0 rounded-lg px-4 py-2 text-[13px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)] transition-all duration-200 hover:-translate-y-0.5"
+                style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
+                title="Clasificación completa, rondas y lo que más se falló, con descarga en CSV y PDF"
+                onClick={onOpenHistory}
+              >
+                Ver resultados completos
+              </button>
+            )}
           </div>
         )}
 

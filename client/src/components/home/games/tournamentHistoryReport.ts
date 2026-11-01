@@ -14,6 +14,16 @@ export function formatHistoryDate(iso: string): string {
   return new Date(iso).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
+/** «31 de octubre de 2026, 3:00 p. m.»: la fecha y la hora en que se abrió la sala, tomadas solas. */
+export function formatHistoryDateTime(iso: string): string {
+  return new Date(iso).toLocaleString('es-CO', { day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
+/** Cómo se llama el torneo en pantalla: el nombre que le puso el administrador o, si no, «Torneo ABC123». */
+export function historyTitle(item: { name: string | null; code: string }): string {
+  return item.name ?? `Torneo ${item.code}`
+}
+
 /** «Banderas · ¿Quién Es? · Medio», o «—» si la ronda no llegó a tener juego. */
 export function describeRoundGame(game: TournamentHistoryDetail['rounds'][number]['game']): string {
   if (!game) return '—'
@@ -33,8 +43,9 @@ export function describeMissRate(insight: TournamentHistoryDetail['insights'][nu
 export function historyToCsv(detail: TournamentHistoryDetail): string {
   const lines = [
     csvLine(['Torneo', detail.code]),
+    ...(detail.name ? [csvLine(['Nombre', detail.name])] : []),
     csvLine(['Estado', HISTORY_STATUS_LABEL[detail.status]]),
-    csvLine(['Fecha', formatHistoryDate(detail.createdAt)]),
+    csvLine(['Fecha', formatHistoryDateTime(detail.createdAt)]),
     csvLine(['Rondas', `${detail.roundsStarted} de ${detail.totalRounds}`]),
     csvLine(['Participantes', detail.participants]),
     csvLine(['Ganó', detail.winnerName ?? '—']),

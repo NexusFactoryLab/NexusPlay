@@ -6,6 +6,7 @@ import { TournamentHistoryController } from './tournament-history.controller.js'
 
 const item = (code: string): TournamentHistoryItem => ({
   code,
+  name: null,
   status: 'FINISHED',
   totalRounds: 3,
   roundsStarted: 3,

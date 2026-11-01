@@ -70,12 +70,12 @@ export function TournamentSettingsModal({ games, loading, current, saving, onSub
   const atLimit = picks.length >= TOURNAMENT_MAX_GAMES
 
   return (
-    <Modal onClose={onCancel} maxWidthClassName="max-w-[620px]" ariaLabel="Habilitar torneo">
+    <Modal onClose={onCancel} maxWidthClassName="max-w-[620px]" ariaLabel="Preparar torneo">
       <div className="flex flex-col gap-4">
         <div>
           <p className="text-[11px] font-semibold tracking-[0.18em] text-accent uppercase">Administrador</p>
           <h2 className="mt-1 text-[22px] font-bold tracking-tight text-text-h">
-            {current?.enabled ? 'Editar torneo' : 'Habilitar torneo'}
+            {current?.enabled ? 'Cambiar la preparación del torneo' : 'Preparar torneo'}
           </h2>
           <p className="mt-0.5 text-[13px] text-text">
             Elige los juegos del torneo y la complejidad de cada uno. En cada ronda se sortea uno de ellos al azar y nunca se repite el de la ronda anterior (con 2 o más juegos), para que no se vuelva monótono.
@@ -240,7 +240,7 @@ export function TournamentSettingsModal({ games, loading, current, saving, onSub
               })
             }
           >
-            {picks.length === 0 ? 'Elige al menos un juego' : saving ? 'Guardando…' : current?.enabled ? 'Guardar cambios' : 'Habilitar torneo'}
+            {picks.length === 0 ? 'Elige al menos un juego' : saving ? 'Guardando…' : current?.enabled ? 'Guardar cambios' : 'Preparar torneo'}
           </button>
         </div>
       </div>

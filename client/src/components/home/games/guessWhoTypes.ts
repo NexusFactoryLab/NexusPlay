@@ -178,6 +178,8 @@ export type TournamentMatchStateView = GuidedChatState & {
 
 export type TournamentStateView = {
   code: string
+  /** Nombre que el administrador le puso al abrir la sala (issue #147); `null` si no le puso ninguno. */
+  name?: string | null
   gameTitle: string
   /** Juegos del torneo con su complejidad; cada ronda sortea uno al azar. */
   games: { title: string; level: TournamentLevel; gameType: TournamentGameType }[]

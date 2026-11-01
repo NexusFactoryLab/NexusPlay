@@ -9,6 +9,8 @@ export type TournamentHistoryStatus = 'WAITING' | 'RUNNING' | 'FINISHED' | 'CLOS
 
 export interface TournamentHistoryItem {
   code: string;
+  /** Nombre que el administrador le puso al abrir la sala; `null` si no le puso ninguno. */
+  name: string | null;
   /** `CLOSED`: el administrador lo cerró antes de que terminara. */
   status: TournamentHistoryStatus;
   totalRounds: number;

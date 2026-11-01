@@ -13,6 +13,7 @@ import {
 import type { Server, Socket } from 'socket.io';
 import { pickRoundGameIndex } from './tournament-round-game.js';
 import { rankTournamentParticipants } from '../../domain/services/tournament-ranking.js';
+import { sanitizeTournamentName } from '../../domain/services/tournament-name.js';
 import { GAME_REPOSITORY, type GameRepository } from '../../domain/ports/game.repository.port.js';
 import {
   TOURNAMENT_SETTINGS_REPOSITORY,
@@ -248,6 +249,7 @@ function toTournamentClientView(
 ) {
   return {
     code: tournament.code,
+    name: tournament.name ?? null,
     gameTitle: tournament.gameTitle,
     games: (tournament.games ?? [{ title: tournament.gameTitle, level: 'MEDIUM' as TournamentLevel }]).map((g) => ({
       title: g.title,
@@ -1762,7 +1764,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   // ---------------------------------------------------------------------
 
   @SubscribeMessage('tournament:create')
-  async handleTournamentCreate(@ConnectedSocket() socket: AuthenticatedSocket) {
+  async handleTournamentCreate(@ConnectedSocket() socket: AuthenticatedSocket, @MessageBody() body?: { name?: unknown }) {
     // Solo el administrador de la plataforma crea y modera torneos (issue #102).
     const requester = await this.userRepository.findById(socket.data.userId);
     if (!requester?.isAdmin()) throw new Error('Solo un administrador puede crear torneos.');
@@ -1770,7 +1772,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     // El torneo lo habilita el administrador desde Edición: juegos, complejidad,
     // cupo y rondas salen de ahí, no del cliente (issue #102).
     const settings = await this.tournamentSettings?.get();
-    if (!settings) throw new Error('No hay un torneo habilitado. Habilítalo en Edición.');
+    if (!settings) throw new Error('No hay un torneo preparado. Prepáralo en Torneos.');
 
     const loaded = await Promise.all(settings.games.map((pick) => this.gameRepository.findById(pick.gameId)));
     // Un juego borrado, despublicado o de otro tipo desde que se habilitó se omite en vez de tumbar el torneo.
@@ -1781,7 +1783,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
         ? [{ game: candidate, level: pick.level }]
         : [];
     });
-    if (available.length === 0) throw new Error('Los juegos del torneo ya no están disponibles. Vuelve a habilitarlo en Edición.');
+    if (available.length === 0) throw new Error('Los juegos del torneo ya no están disponibles. Vuelve a prepararlo en Torneos.');
 
     const games = available.map((entry) => entry.game);
     const picks = available.map((entry) => ({ level: entry.level }));
@@ -1789,11 +1791,13 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     const { maxParticipants, totalRounds } = settings;
 
     const code = this.generateUniqueRoomCode();
+    const name = sanitizeTournamentName(body?.name);
 
     const tournament: TournamentState = {
       code,
       gameId: game.id,
       gameTitle: games.map((g) => g.title).join(' + '),
+      ...(name ? { name } : {}),
       games: games.map((g, index) => ({
         gameId: g.id,
         title: g.title,

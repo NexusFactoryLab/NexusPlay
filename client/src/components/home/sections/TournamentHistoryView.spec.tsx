@@ -6,6 +6,7 @@ import { HistoryPrintDocument, TournamentHistoryDetailView, TournamentHistoryLis
 
 const item = (overrides: Partial<TournamentHistoryItem> = {}): TournamentHistoryItem => ({
   code: 'ABC123',
+  name: null,
   status: 'FINISHED',
   totalRounds: 3,
   roundsStarted: 3,
@@ -35,13 +36,32 @@ const detail = (overrides: Partial<TournamentHistoryDetail> = {}): TournamentHis
 describe('TournamentHistoryList (#147)', () => {
   it('lista cada torneo con su código, estado, fecha, participantes, juegos y ganador', () => {
     const html = renderToStaticMarkup(<TournamentHistoryList items={[item(), item({ code: 'ZZZ999', status: 'CLOSED', winnerName: null })]} onOpen={() => {}} />)
-    expect(html).toContain('ABC123')
+    expect(html).toContain('Torneo ABC123')
     expect(html).toContain('Terminado')
     expect(html).toContain('12 participantes')
     expect(html).toContain('3 de 3 rondas')
     expect(html).toContain('Banderas · Dominexo · Ganó Ana')
     expect(html).toContain('Cerrado antes de terminar')
     expect(html).toContain('2026')
+  })
+
+  it('un torneo con nombre lo muestra como título y deja el código aparte, junto a la fecha y la hora', () => {
+    const html = renderToStaticMarkup(<TournamentHistoryList items={[item({ name: 'Repaso de ciencias · 8° A' })]} onOpen={() => {}} />)
+    expect(html).toContain('Repaso de ciencias · 8° A')
+    expect(html).toContain('Código ABC123')
+    expect(html).not.toContain('Torneo ABC123')
+    expect(html).toMatch(/\d{1,2}:\d{2}/)
+  })
+
+  it('con pocos torneos no muestra buscador ni filtros; con varios sí', () => {
+    const few = renderToStaticMarkup(<TournamentHistoryList items={[item(), item({ code: 'B' })]} onOpen={() => {}} />)
+    expect(few).not.toContain('Buscar torneo')
+    const many = renderToStaticMarkup(
+      <TournamentHistoryList items={['A', 'B', 'C', 'D'].map((code) => item({ code }))} onOpen={() => {}} />,
+    )
+    expect(many).toContain('Buscar torneo')
+    expect(many).toContain('Terminados')
+    expect(many).toContain('En curso')
   })
 
   it('sin torneos lo dice y explica cómo aparecen', () => {
@@ -56,7 +76,10 @@ describe('TournamentHistoryDetailView (#147)', () => {
   it('muestra quién ganó, la clasificación, las rondas y los botones de descarga', () => {
     const html = render()
     expect(html).toContain('Ganó Ana')
+    expect(html).toContain('Torneo ABC123')
     expect(html).toContain('>Ana<')
+    expect(html).toContain('Ganadas')
+    expect(html).toContain('Perdidas')
     expect(html).toContain('Ronda 2')
     expect(html).toContain('Misión · Laberinto V/F · Difícil')
     expect(html).toContain('Beto (solo) — sin punto')
@@ -92,6 +115,8 @@ describe('exportar el historial (#147)', () => {
     const csv = historyToCsv(detail())
     expect(csv.startsWith('﻿')).toBe(true)
     expect(csv).toContain('Torneo;ABC123\r\n')
+    expect(csv).not.toMatch(/(^|\n)Nombre;/)
+    expect(historyToCsv(detail({ name: 'Repaso de ciencias' }))).toContain('\r\nNombre;Repaso de ciencias\r\n')
     expect(csv).toContain('Estado;Terminado\r\n')
     expect(csv).toContain('Puesto;Nombre;Puntos;Victorias;Derrotas;Aciertos del Laberinto;Acusaciones equivocadas\r\n')
     expect(csv).toContain('2;Beto;1;1;2;9;2\r\n')
@@ -123,5 +148,6 @@ describe('exportar el historial (#147)', () => {
     expect(html).toContain('Fotosíntesis')
     expect(html).toContain('Beto (solo) — sin punto')
     expect(html).toContain('tournament-report-print')
+    expect(renderToStaticMarkup(<HistoryPrintDocument detail={detail({ name: 'Repaso' })} />)).toContain('<h1>Repaso</h1>')
   })
 })

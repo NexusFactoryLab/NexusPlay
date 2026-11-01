@@ -6,9 +6,12 @@ import { getTournamentSettings, type TournamentSettings } from '../../../service
 import { TOURNAMENT_GAME_LABEL, TOURNAMENT_LEVEL_INFO, type TournamentGameType } from './tournamentLevels'
 
 type Props = {
-  onCreate: () => void
+  /** `name` llega sin espacios sobrantes y solo si la persona escribió algo. */
+  onCreate: (name?: string) => void
   onCancel: () => void
 }
+
+const MAX_NAME_LENGTH = 60
 
 /**
  * Antes de abrir la sala, el administrador ve con qué torneo va a abrirla: los
@@ -18,6 +21,7 @@ export function TournamentCreateConfirm({ onCreate, onCancel }: Props) {
   const { token } = useAuth()
   const [settings, setSettings] = useState<TournamentSettings | null>(null)
   const [loading, setLoading] = useState(true)
+  const [name, setName] = useState('')
 
   useEffect(() => {
     if (!token) return
@@ -46,19 +50,33 @@ export function TournamentCreateConfirm({ onCreate, onCancel }: Props) {
           <p className="text-[11px] font-semibold tracking-[0.18em] text-accent uppercase">Administrador</p>
           <h2 className="mt-1 text-[22px] font-bold tracking-tight text-text-h">Abrir sala del torneo</h2>
           <p className="mt-0.5 text-[13px] text-text">
-            Se abre con lo que habilitaste en Edición. Los participantes entran con el código que te daremos.
+            Se abre con lo que preparaste en Torneos. Los participantes entran con el código que te daremos.
           </p>
         </div>
 
         {loading && <p className="text-[13px] text-text">Cargando el torneo…</p>}
         {!loading && !enabled && (
           <p className="rounded-xl border border-border p-3 text-[13px] text-text">
-            No hay un torneo habilitado. Habilítalo en Edición con «Habilitar torneo».
+            No hay un torneo preparado. Prepáralo en Torneos con «Preparar torneo».
           </p>
         )}
 
         {enabled && settings && (
           <>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-[13px] font-semibold text-text-h">
+                Nombre del torneo <span className="font-normal text-text">(opcional)</span>
+              </span>
+              <input
+                type="text"
+                value={name}
+                maxLength={MAX_NAME_LENGTH}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="Ej.: Repaso de ciencias · 8° A"
+                className="rounded-lg border border-border bg-surface px-3 py-2 text-[14px] text-text-h placeholder:text-text/60 focus:border-accent focus:outline-none"
+              />
+              <span className="text-[12px] text-text">Te ayuda a reconocerlo en el historial. La fecha y la hora se guardan solas.</span>
+            </label>
             <ul className="flex flex-col gap-2">
               {settings.games.map((game) => (
                 <li key={game.gameId} className="flex items-center gap-3 rounded-xl border border-border p-3">
@@ -92,7 +110,7 @@ export function TournamentCreateConfirm({ onCreate, onCancel }: Props) {
             disabled={!enabled}
             className="flex-1 rounded-lg px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)] transition-all duration-200 enabled:hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
             style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
-            onClick={onCreate}
+            onClick={() => onCreate(name.trim() || undefined)}
           >
             Crear sala
           </button>

@@ -5,6 +5,8 @@ export type TournamentHistoryStatus = 'WAITING' | 'RUNNING' | 'FINISHED' | 'CLOS
 
 export type TournamentHistoryItem = {
   code: string
+  /** Nombre que el administrador le puso al abrir la sala; `null` si no le puso ninguno. */
+  name: string | null
   status: TournamentHistoryStatus
   totalRounds: number
   roundsStarted: number

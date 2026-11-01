@@ -41,7 +41,8 @@ function printDetail() {
 /**
  * Historial de torneos del administrador (issue #147): la lista de los que creó y, al abrir uno, su
  * clasificación, sus rondas y lo que más se falló, con descarga en CSV y en PDF (imprimir).
- * Ruta `/torneos/historial/:code?`. Solo ve los suyos: el servidor filtra por quien lo pide.
+ * Es la pestaña «Historial» de `TournamentsAdminPage` (ruta `/torneos/historial/:code?`). Solo ve los suyos:
+ * el servidor filtra por quien lo pide.
  */
 export function TournamentHistoryPage() {
   const { code } = useParams<{ code?: string }>()
@@ -77,22 +78,18 @@ export function TournamentHistoryPage() {
   useEffect(() => () => document.body.classList.remove(PRINT_CLASS), [])
 
   return (
-    <div className="mx-auto flex w-full max-w-[900px] flex-col gap-4 p-5 sm:p-8">
-      <div>
+    <div className="flex w-full max-w-[900px] flex-col gap-4">
+      {code ? (
         <Link
-          to={code ? '/torneos/historial' : '/edicion'}
-          className="mb-2 inline-flex items-center gap-1.5 text-[13px] font-medium text-text transition-colors hover:text-accent"
+          to="/torneos/historial"
+          className="inline-flex w-fit items-center gap-1.5 text-[13px] font-medium text-text transition-colors hover:text-accent"
         >
           <ArrowLeft className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
-          {code ? 'Volver al historial' : 'Volver a Edición'}
+          Volver al historial
         </Link>
-        {!code && (
-          <>
-            <h1 className="text-[22px] font-bold tracking-tight text-text-h">Historial de torneos</h1>
-            <p className="text-[13px] text-text">Los torneos que has creado, con su clasificación, sus rondas y lo que más se falló.</p>
-          </>
-        )}
-      </div>
+      ) : (
+        <p className="text-[13px] text-text">Los torneos que has creado, con su clasificación, sus rondas y lo que más se falló.</p>
+      )}
 
       {error && (
         <p className="rounded-lg border border-danger/35 bg-danger/10 px-3 py-2 text-[13px] text-danger" role="alert">

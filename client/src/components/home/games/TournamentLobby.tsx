@@ -51,7 +51,7 @@ export function TournamentLobby({ tournament, error, onStart, onClose, onExit }:
             <p className="text-[11px] font-semibold tracking-[0.18em] text-accent uppercase">
               {tournament.isModerator ? 'Torneo · Administrador' : 'Torneo'}
             </p>
-            <h2 className="mt-1 text-[22px] font-bold tracking-tight text-text-h">Torneo</h2>
+            <h2 className="mt-1 text-[22px] font-bold tracking-tight text-text-h">{tournament.name ?? 'Torneo'}</h2>
             <p className="text-[12.5px] text-text">{tournament.totalRounds} rondas · 1 punto por ronda ganada</p>
           </div>
           <button
