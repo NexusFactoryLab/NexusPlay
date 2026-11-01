@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { DoorOpen, Pencil, Shuffle, Swords } from 'lucide-react'
+import { DoorOpen, Pencil, PowerOff, Shuffle, Swords } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../hooks/useAuth'
 import { useToast } from '../../../hooks/useToast'
@@ -12,6 +12,7 @@ import {
   type TournamentSettings,
 } from '../../../services/tournament-settings.service'
 import { ApiError } from '../../../utils/http'
+import { TournamentConfirmModal } from './TournamentConfirmModal'
 import { TournamentSettingsModal } from './TournamentSettingsModal'
 import { TOURNAMENT_GAME_LABEL, TOURNAMENT_GAME_TYPES, TOURNAMENT_LEVEL_INFO, type TournamentGameType } from './tournamentLevels'
 
@@ -63,6 +64,7 @@ export function TournamentSetupPanel() {
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [confirmingDisable, setConfirmingDisable] = useState(false)
 
   useEffect(() => {
     if (!token) return
@@ -184,7 +186,19 @@ export function TournamentSetupPanel() {
                 <Pencil className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
                 Cambiar la preparación
               </button>
+              <button
+                type="button"
+                disabled={saving}
+                className="flex items-center gap-2 rounded-lg border border-danger/40 px-4 py-2.5 text-[14px] font-semibold text-danger transition-all duration-200 hover:-translate-y-0.5 hover:bg-danger/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger disabled:opacity-60 sm:ml-auto"
+                onClick={() => setConfirmingDisable(true)}
+              >
+                <PowerOff className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+                Deshabilitar torneo
+              </button>
             </div>
+            <p className="text-[12.5px] text-text">
+              Mientras esté preparado, el Inicio muestra a todos el acceso con código. Deshabilítalo cuando termines la prueba.
+            </p>
           </div>
         ) : (
           <div className="flex flex-col items-start gap-3">
@@ -208,6 +222,19 @@ export function TournamentSetupPanel() {
           </div>
         )}
       </section>
+
+      {confirmingDisable && (
+        <TournamentConfirmModal
+          title="¿Deshabilitar el torneo?"
+          message="El Inicio dejará de mostrar a todos el acceso con código. Los torneos ya jugados siguen en el historial; podrás volver a prepararlo cuando quieras."
+          confirmLabel="Deshabilitar"
+          onCancel={() => setConfirmingDisable(false)}
+          onConfirm={async () => {
+            await disable()
+            setConfirmingDisable(false)
+          }}
+        />
+      )}
 
       {modalOpen && (
         <TournamentSettingsModal
