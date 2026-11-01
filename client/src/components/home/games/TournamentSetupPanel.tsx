@@ -11,42 +11,71 @@ import {
   type SaveTournamentSettingsInput,
   type TournamentSettings,
 } from '../../../services/tournament-settings.service'
+import { listTournamentHistory, type TournamentHistoryItem } from '../../../services/tournament-history.service'
 import { ApiError } from '../../../utils/http'
+import { historyTitle } from './tournamentHistoryReport'
 import { TournamentConfirmModal } from './TournamentConfirmModal'
 import { TournamentSettingsModal } from './TournamentSettingsModal'
 import { TOURNAMENT_GAME_LABEL, TOURNAMENT_GAME_TYPES, TOURNAMENT_LEVEL_INFO, type TournamentGameType } from './tournamentLevels'
 
 const STEPS = [
   { title: 'Prepara', text: 'Elige los juegos, la dificultad, el cupo y las rondas.' },
-  { title: 'Abre la sala', text: 'Pon un nombre si quieres y comparte el código con el grupo.' },
-  { title: 'Modera y revisa', text: 'Dirige las rondas y, al terminar, consulta los resultados en el historial.' },
+  { title: 'Abre y modera la sala', text: 'Pon un nombre si quieres, comparte el código y dirige las rondas desde la sala.' },
+  { title: 'Revisa los resultados', text: 'Al terminar, mira la clasificación y descarga el reporte en el Historial.' },
 ] as const
 
-/** Los tres pasos de un torneo, para que quien llega por primera vez sepa por dónde empezar. */
-export function TournamentSteps({ current }: { current: 0 | 1 | 2 }) {
+/**
+ * Los tres pasos de un torneo, para que quien llega por primera vez sepa por dónde empezar. Moderar ocurre dentro
+ * de la sala, así que el único paso que lleva a otro lugar de esta sección es el último (`onOpenHistory`).
+ */
+export function TournamentSteps({ current, onOpenHistory }: { current: 0 | 1 | 2; onOpenHistory?: () => void }) {
   return (
     <ol className="grid gap-2 sm:grid-cols-3" aria-label="Pasos de un torneo">
-      {STEPS.map((step, index) => (
-        <li
-          key={step.title}
-          aria-current={index === current ? 'step' : undefined}
-          className={`flex gap-3 rounded-xl border p-3 ${index === current ? 'border-accent/60 bg-accent/5' : 'border-border'}`}
-        >
-          <span
-            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[12px] font-bold ${
-              index === current ? 'bg-accent text-white' : 'bg-code-bg text-text'
-            }`}
-            aria-hidden="true"
-          >
-            {index + 1}
-          </span>
-          <span className="min-w-0">
-            <span className="block text-[13px] font-semibold text-text-h">{step.title}</span>
-            <span className="block text-[12px] leading-snug text-text">{step.text}</span>
-          </span>
-        </li>
-      ))}
+      {STEPS.map((step, index) => {
+        const body = (
+          <>
+            <span
+              className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[12px] font-bold ${
+                index === current ? 'bg-accent text-white' : 'bg-code-bg text-text'
+              }`}
+              aria-hidden="true"
+            >
+              {index + 1}
+            </span>
+            <span className="min-w-0 text-left">
+              <span className="block text-[13px] font-semibold text-text-h">{step.title}</span>
+              <span className="block text-[12px] leading-snug text-text">{step.text}</span>
+            </span>
+          </>
+        )
+        const box = `flex gap-3 rounded-xl border p-3 ${index === current ? 'border-accent/60 bg-accent/5' : 'border-border'}`
+        return (
+          <li key={step.title} aria-current={index === current ? 'step' : undefined}>
+            {index === 2 && onOpenHistory ? (
+              <button
+                type="button"
+                className={`${box} w-full transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent`}
+                onClick={onOpenHistory}
+              >
+                {body}
+              </button>
+            ) : (
+              <div className={`${box} h-full`}>{body}</div>
+            )}
+          </li>
+        )
+      })}
     </ol>
+  )
+}
+
+/** Una sala abierta hace más que esto sin terminar se da por perdida (p. ej. el servidor se reinició con ella en marcha). */
+const ROOM_MAX_AGE_MS = 12 * 60 * 60 * 1000
+
+/** La sala que el administrador tiene abierta ahora: la más reciente en espera o en curso, si es de hoy. */
+export function findOpenRoom(items: TournamentHistoryItem[], now = Date.now()): TournamentHistoryItem | null {
+  return (
+    items.find((item) => (item.status === 'WAITING' || item.status === 'RUNNING') && now - new Date(item.createdAt).getTime() < ROOM_MAX_AGE_MS) ?? null
   )
 }
 
@@ -65,6 +94,7 @@ export function TournamentSetupPanel() {
   const [modalOpen, setModalOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [confirmingDisable, setConfirmingDisable] = useState(false)
+  const [openRoom, setOpenRoom] = useState<TournamentHistoryItem | null>(null)
 
   useEffect(() => {
     if (!token) return
@@ -78,6 +108,13 @@ export function TournamentSetupPanel() {
       })
       .finally(() => {
         if (!cancelled) setGamesLoading(false)
+      })
+    listTournamentHistory(token)
+      .then((items) => {
+        if (!cancelled) setOpenRoom(findOpenRoom(items))
+      })
+      .catch(() => {
+        if (!cancelled) setOpenRoom(null)
       })
     getTournamentSettings(token)
       .then((settings) => {
@@ -132,7 +169,32 @@ export function TournamentSetupPanel() {
 
   return (
     <div className="flex flex-col gap-4">
-      <TournamentSteps current={enabled ? 1 : 0} />
+      <TournamentSteps current={openRoom ? 1 : enabled ? 1 : 0} onOpenHistory={() => navigate('/torneos/historial')} />
+
+      {openRoom && (
+        <section className="rounded-2xl border border-accent/50 bg-accent/5 p-4 sm:p-5" aria-labelledby="sala-abierta">
+          <p className="flex items-center gap-2 text-[11px] font-semibold tracking-[0.14em] text-accent uppercase">
+            <span className="live-dot" aria-hidden="true" />
+            {openRoom.status === 'RUNNING' ? 'Torneo en curso' : 'Sala abierta, esperando participantes'}
+          </p>
+          <h2 id="sala-abierta" className="mt-1 text-[18px] font-bold tracking-tight text-text-h">
+            {historyTitle(openRoom)}
+          </h2>
+          <p className="mt-0.5 text-[12.5px] text-text">
+            Código {openRoom.code} · {openRoom.participants} {openRoom.participants === 1 ? 'participante' : 'participantes'}
+            {openRoom.status === 'RUNNING' ? ` · ronda ${openRoom.roundsStarted} de ${openRoom.totalRounds}` : ''}
+          </p>
+          <button
+            type="button"
+            className="mt-3 flex items-center gap-2 rounded-lg px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)] transition-all duration-200 hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
+            onClick={() => navigate(`/quien-es/torneo/${encodeURIComponent(openRoom.code)}`)}
+          >
+            <DoorOpen className="h-4 w-4" strokeWidth={2.25} aria-hidden="true" />
+            Volver a la sala
+          </button>
+        </section>
+      )}
 
       <section className="rounded-2xl border border-border bg-surface p-4 sm:p-5" aria-labelledby="torneo-preparado">
         {loading ? (
