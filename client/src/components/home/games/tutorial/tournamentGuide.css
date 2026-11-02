@@ -223,3 +223,79 @@
   font-weight: 700;
   box-shadow: 0 0.6cqw 1.4cqw -0.8cqw rgba(0, 0, 0, 0.3);
 }
+
+/* =====================================================================
+ * Neón alrededor de la guía (issue #147). Cada tema pone sus dos colores de neón; el anillo recorre el borde
+ * por dentro del marco (no lo recorta el overflow del panel) y el resplandor exterior «respira» despacio.
+ * Sin movimiento (prefers-reduced-motion) queda fijo.
+ * ===================================================================== */
+@property --tg-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.tg {
+  --tg-neon-a: #8b5cf6;
+  --tg-neon-b: #ec4899;
+  --tg-glow-strength: 38%;
+}
+:root[data-theme='dark'] .tg { --tg-neon-a: #a685f5; --tg-neon-b: #22d3ee; --tg-glow-strength: 62%; }
+:root[data-theme='fantasy'] .tg { --tg-neon-a: #ffc83d; --tg-neon-b: #ff3d7f; --tg-glow-strength: 58%; }
+:root[data-theme='meadow'] .tg { --tg-neon-a: #4f8fe0; --tg-neon-b: #ec6450; --tg-glow-strength: 42%; }
+:root[data-theme='kids'] .tg { --tg-neon-a: #ff7a1a; --tg-neon-b: #06b6d4; --tg-glow-strength: 46%; }
+
+.tg {
+  --tg-glow-a: color-mix(in srgb, var(--tg-neon-a) var(--tg-glow-strength), transparent);
+  --tg-glow-b: color-mix(in srgb, var(--tg-neon-b) calc(var(--tg-glow-strength) * 0.7), transparent);
+  --tg-glow-a-hi: color-mix(in srgb, var(--tg-neon-a) calc(var(--tg-glow-strength) * 1.45), transparent);
+  --tg-glow-b-hi: color-mix(in srgb, var(--tg-neon-b) calc(var(--tg-glow-strength) * 1.05), transparent);
+}
+
+.tg-panel {
+  position: relative;
+  box-shadow: var(--tg-shadow), 0 0 12px 0 var(--tg-glow-a), 0 0 38px 2px var(--tg-glow-b);
+}
+
+/* Anillo de neón: un degradado de dos colores visible solo en una franja de 2 px por el borde interior. */
+.tg-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(from var(--tg-angle), var(--tg-neon-a), var(--tg-neon-b), var(--tg-neon-a));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  pointer-events: none;
+}
+
+/* La escena y sus piezas heredan un neón más discreto. */
+.tg-scene {
+  border-color: color-mix(in srgb, var(--tg-neon-a) 55%, var(--tg-card-line));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--tg-neon-a) 16%, transparent), 0 0 14px -2px var(--tg-glow-a), inset 0 0 26px -10px var(--tg-glow-b);
+}
+.tg-tag, .tg-qbox { box-shadow: 0 0 10px -2px var(--tg-glow-a), 0 0.6cqw 1.4cqw -0.8cqw rgba(0, 0, 0, 0.3); }
+.tg-row--self { box-shadow: 0 0 12px -2px color-mix(in srgb, var(--tg-gold) 55%, transparent), 0 0.6cqw 1.6cqw -0.8cqw rgba(0, 0, 0, 0.3); }
+.tg-cta { box-shadow: 0 0 16px -2px var(--tg-glow-a), 0 10px 24px -12px var(--tg-a); }
+.tg-cta:hover { box-shadow: 0 0 24px 0 var(--tg-glow-a-hi), 0 14px 28px -12px var(--tg-a); }
+.tg-dot--on { box-shadow: 0 0 10px 1px var(--tg-glow-a-hi); }
+
+/* En los temas oscuros el título también brilla un poco. */
+:root[data-theme='dark'] .tg-title,
+:root[data-theme='fantasy'] .tg-title { text-shadow: 0 0 16px var(--tg-glow-a); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .tg-panel { animation: tg-breathe 4s ease-in-out infinite; }
+  .tg-panel::before { animation: tg-spin 9s linear infinite; }
+}
+
+@keyframes tg-spin {
+  to { --tg-angle: 360deg; }
+}
+@keyframes tg-breathe {
+  0%, 100% { box-shadow: var(--tg-shadow), 0 0 12px 0 var(--tg-glow-a), 0 0 38px 2px var(--tg-glow-b); }
+  50% { box-shadow: var(--tg-shadow), 0 0 20px 2px var(--tg-glow-a-hi), 0 0 62px 6px var(--tg-glow-b-hi); }
+}
