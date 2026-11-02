@@ -1080,27 +1080,38 @@ export function GamesSection({
                   <span className="fx-emoji" aria-hidden="true">🔑</span>
                   Unirme con código
                 </button>
-                {tournamentOpen && (
+              </div>
+              {/* Torneo: una sola franja compacta bajo las acciones principales, para que no compita con ellas por espacio. */}
+              {tournamentOpen && (
+                <div
+                  className="home-hero-tournament mt-3 inline-flex max-w-full flex-wrap items-center gap-1.5 rounded-full border border-border bg-surface p-1"
+                  role="group"
+                  aria-label="Torneo"
+                >
+                  <span className="flex items-center gap-1.5 pr-1 pl-3 text-[11.5px] font-semibold tracking-wide text-text uppercase">
+                    <Trophy className="h-3.5 w-3.5 text-accent-2" strokeWidth={2.25} />
+                    Torneo
+                  </span>
                   <button
                     type="button"
-                    className="tournament-cta relative flex items-center gap-2 rounded-xl border-2 border-accent-2 bg-surface px-5 py-3 text-[14px] font-bold text-accent-2"
+                    className="tournament-cta relative flex items-center gap-1.5 rounded-full border border-accent-2 bg-surface px-3.5 py-1.5 text-[13px] font-bold text-accent-2"
                     onClick={() => setTournamentCodeOpen(true)}
                   >
-                    <Swords className="h-[18px] w-[18px]" strokeWidth={2.5} />
+                    <Swords className="h-4 w-4" strokeWidth={2.5} />
                     Entrar al torneo
                   </button>
-                )}
-                {tournamentOpen && user?.role?.toUpperCase() === 'ADMIN' && (
-                  <button
-                    type="button"
-                    className="flex items-center gap-2 rounded-xl border border-border bg-surface px-5 py-3 text-[14px] font-semibold text-text-h transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/50 hover:text-accent"
-                    onClick={() => navigate('/quien-es/torneo?crear=1')}
-                  >
-                    <Trophy className="h-[18px] w-[18px]" strokeWidth={2} />
-                    Abrir sala del torneo
-                  </button>
-                )}
-              </div>
+                  {user?.role?.toUpperCase() === 'ADMIN' && (
+                    <button
+                      type="button"
+                      className="flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-semibold text-text-h transition-colors duration-200 hover:bg-accent/10 hover:text-accent"
+                      onClick={() => navigate('/quien-es/torneo?crear=1')}
+                    >
+                      <Trophy className="h-4 w-4" strokeWidth={2} />
+                      Abrir sala del torneo
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* En Fantasía el ícono se cambia por un trofeo dorado con destellos (solo CSS + emoji, ver .home-hero-trophy en index.css). */}
