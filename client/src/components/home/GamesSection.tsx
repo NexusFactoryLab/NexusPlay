@@ -1088,7 +1088,7 @@ export function GamesSection({
                   role="group"
                   aria-label="Torneo"
                 >
-                  <span className="flex items-center gap-1.5 pr-1 pl-3 text-[11.5px] font-semibold tracking-wide text-text uppercase">
+                  <span className="tournament-label flex items-center gap-1.5 pr-1 pl-3 text-[11.5px] font-semibold tracking-wide text-text uppercase">
                     <Trophy className="h-3.5 w-3.5 text-accent-2" strokeWidth={2.25} />
                     Torneo
                   </span>
@@ -1103,7 +1103,7 @@ export function GamesSection({
                   {user?.role?.toUpperCase() === 'ADMIN' && (
                     <button
                       type="button"
-                      className="flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-semibold text-text-h transition-colors duration-200 hover:bg-accent/10 hover:text-accent"
+                      className="tournament-open flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-semibold text-text-h transition-colors duration-200 hover:bg-accent/10 hover:text-accent"
                       onClick={() => navigate('/quien-es/torneo?crear=1')}
                     >
                       <Trophy className="h-4 w-4" strokeWidth={2} />
