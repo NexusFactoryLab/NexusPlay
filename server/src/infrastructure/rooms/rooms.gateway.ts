@@ -12,6 +12,8 @@ import {
 } from '@nestjs/websockets';
 import type { Server, Socket } from 'socket.io';
 import { pickRoundGameIndex } from './tournament-round-game.js';
+import { rankTournamentParticipants } from '../../domain/services/tournament-ranking.js';
+import { sanitizeTournamentName } from '../../domain/services/tournament-name.js';
 import { GAME_REPOSITORY, type GameRepository } from '../../domain/ports/game.repository.port.js';
 import {
   TOURNAMENT_SETTINGS_REPOSITORY,
@@ -70,12 +72,15 @@ import { GuessWhoBotRunner } from '../bots/guess-who-bot-runner.js';
 import {
   assertNotPaused,
   awaitingView,
+  ADMIN_PAUSE_KEY,
   clearWaiting,
   expiredWaits,
+  isPaused,
   isWaitingSocketId,
   nextWaitDeadline,
   startWaiting,
   stopWaiting,
+  pauseByAdmin,
   waitingSocketId,
   type PausableGame,
 } from '../../domain/services/player-wait.js';
@@ -141,6 +146,8 @@ const MAX_CHAT_MESSAGE_LENGTH = 500;
 
 /** Espera antes de repartir una partida de dominó del torneo: es lo que dura el anuncio del duelo. */
 const TOURNAMENT_DOMINO_DEAL_DELAY_MS = 2800;
+/** Con el torneo terminado, quien pierde la conexión puede volver a ver su reporte durante este margen (issue #147). */
+const TOURNAMENT_FINAL_REJOIN_MS = 60_000;
 
 /** Nivel de dominó para una complejidad del torneo; si el contenido no puede ofrecerlo, baja al más alto disponible. */
 export function resolveTournamentDominoLevel(concepts: DominoConcept[], level: TournamentLevel): DominoLevel {
@@ -190,6 +197,27 @@ function mazeAnswerKey(content: unknown): Map<string, boolean> {
   return answers;
 }
 
+/** Texto de cada afirmación de un Laberinto Verdadero o Falso (para el resumen pedagógico). */
+function mazeStatementKey(content: unknown): Map<string, string> {
+  const statements = new Map<string, string>();
+  if (!Array.isArray(content)) return statements;
+  content.forEach((item, index) => {
+    const value = (item ?? {}) as Record<string, unknown>;
+    if (typeof value.statement !== 'string' || typeof value.answer !== 'boolean') return;
+    const id = typeof value.questionId === 'string' && value.questionId ? value.questionId : `q-${index + 1}`;
+    statements.set(id, value.statement);
+  });
+  return statements;
+}
+
+/** Suma un intento (y un fallo, si lo hubo) a un concepto o afirmación del torneo. */
+function recordInsight(tournament: TournamentState, key: string, kind: 'DOMINO' | 'MAZE', label: string, missed: boolean) {
+  const insights = (tournament.insights ??= {});
+  const item = (insights[key] ??= { kind, label: label.slice(0, 160), attempts: 0, misses: 0 });
+  item.attempts += 1;
+  if (missed) item.misses += 1;
+}
+
 /** Juego y nivel de la ronda en curso, tomados de sus partidas; `null` antes de que arranque la primera. */
 function currentRoundGameOf(tournament: TournamentState) {
   const match = tournament.matches.find((m) => m.round === tournament.currentRound);
@@ -221,6 +249,7 @@ function toTournamentClientView(
 ) {
   return {
     code: tournament.code,
+    name: tournament.name ?? null,
     gameTitle: tournament.gameTitle,
     games: (tournament.games ?? [{ title: tournament.gameTitle, level: 'MEDIUM' as TournamentLevel }]).map((g) => ({
       title: g.title,
@@ -234,11 +263,19 @@ function toTournamentClientView(
     // El juego que se sorteó para la ronda en curso (con el sorteo, ya no es `games[ronda % n]`).
     currentRoundGame: currentRoundGameOf(tournament),
     totalRounds: tournament.totalRounds,
+    paused: tournament.pausedByAdmin === true,
+    // Lo que eligió el administrador para la siguiente ronda (posición en `games`); a los demás no se les revela.
+    nextRoundGameIndex: tournament.creatorUserId === forUserId ? tournament.gameOverrides?.[tournament.currentRound + 1] ?? null : null,
     creatorUserId: tournament.creatorUserId,
     /** El administrador modera: ve el panel completo y no juega. */
     isModerator: tournament.creatorUserId === forUserId,
     winnerUserId: tournament.winnerUserId,
-    participants: tournament.participants.map((participant) => ({
+    // Quien fue expulsado ya no aparece entre los participantes (ni en el ranking); el administrador los ve aparte.
+    kickedParticipants:
+      tournament.creatorUserId === forUserId
+        ? tournament.participants.filter((p) => p.kicked).map((p) => ({ userId: p.userId, displayName: p.displayName }))
+        : [],
+    participants: tournament.participants.filter((p) => !p.kicked).map((participant) => ({
       userId: participant.userId,
       displayName: participant.displayName,
       ready: participant.ready === true,
@@ -251,6 +288,7 @@ function toTournamentClientView(
       botMatches: participant.botMatches ?? 0,
       questionsAsked: participant.questionsAsked ?? 0,
       wrongAccusations: participant.wrongAccusations ?? 0,
+      correctAnswers: participant.correctAnswers ?? 0,
     })),
     liveMatches: tournament.creatorUserId === forUserId ? buildLiveMatches(tournament, dominoLookup) : [],
     // Rondas ya jugadas o en curso, para armar el ranking/progreso del
@@ -280,11 +318,36 @@ function buildRoundsSummary(tournament: TournamentState) {
         isBye: match.isBye,
         phase: match.phase,
         playerUserIds: match.playerUserIds,
+        playerNames: Object.fromEntries(
+          match.playerUserIds.filter((id) => !id.startsWith('bot:')).map((id) => [id, tournament.participants.find((p) => p.userId === id)?.displayName ?? '—']),
+        ),
         winnerUserId: match.winnerUserId,
         vsBot: match.vsBot === true,
         gameType: match.gameType ?? 'GUESS_WHO',
+        gameTitle: match.gameTitle ?? tournament.gameTitle,
+        level: match.level ?? 'MEDIUM',
       })),
     }));
+}
+
+/**
+ * Si una persona de una partida del torneo está conectada, se la espera (corte de red) o no está en la
+ * partida (issue #147). `null` cuando no aplica o no se puede saber: bots y Laberinto (juega solo).
+ */
+function liveConnection(
+  match: TournamentMatch,
+  userId: string,
+  dominoLookup?: (code: string) => DominoRoomState | undefined,
+): { state: 'connected' | 'waiting' | 'away' } | null {
+  if (userId.startsWith('bot:') || match.maze) return null;
+  if (match.dominoRoomCode) {
+    const player = dominoLookup?.(match.dominoRoomCode)?.players.find((p) => p.userId === userId);
+    if (!player) return null;
+    if (isWaitingSocketId(player.socketId)) return { state: 'waiting' };
+    if (player.socketId.startsWith('pending:')) return { state: 'away' };
+    return { state: 'connected' };
+  }
+  return { state: match.awaiting?.[userId] !== undefined ? 'waiting' : 'connected' };
 }
 
 /** Partidas de la ronda actual para el panel del moderador: quién juega, de quién es el turno y cómo va. */
@@ -310,6 +373,7 @@ function buildLiveMatches(tournament: TournamentState, dominoLookup?: (code: str
         handCount: match.dominoRoomCode
           ? dominoLookup?.(match.dominoRoomCode)?.players.find((p) => p.userId === player.userId)?.hand.length ?? null
           : null,
+        connection: liveConnection(match, player.userId, dominoLookup),
       })),
       gameType: match.gameType ?? 'GUESS_WHO',
       totalCards: match.maze?.total ?? match.cards.length,
@@ -848,6 +912,10 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       this.handleTournamentLeave(socket);
     } else if (tournament) {
       if (wait) this.waitForTournamentParticipant(tournament, socket.id);
+      if (tournament.phase === 'FINISHED') {
+        const leaving = tournament.participants.find((p) => p.socketId === socket.id);
+        if (leaving && !leaving.finalExit?.explicit) leaving.finalExit = { at: Date.now(), explicit: false };
+      }
       this.tournamentStore.set(tournament);
     }
 
@@ -866,6 +934,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
         if (leaving) leaving.socketId = `pending:${leaving.userId}`;
         this.dominoRoomStore.set(dominoRoom);
       }
+      this.refreshModerator(dominoRoom.tournamentCode);
     } else if (dominoRoom) {
       const player = dominoRoom.players.find((p) => p.socketId === socket.id);
       if (wait && player && dominoRoom.phase === 'PLAYING' && hasOtherHuman(dominoRoom.players, player)) this.waitForDominoPlayer(dominoRoom, player);
@@ -1695,7 +1764,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   // ---------------------------------------------------------------------
 
   @SubscribeMessage('tournament:create')
-  async handleTournamentCreate(@ConnectedSocket() socket: AuthenticatedSocket) {
+  async handleTournamentCreate(@ConnectedSocket() socket: AuthenticatedSocket, @MessageBody() body?: { name?: unknown }) {
     // Solo el administrador de la plataforma crea y modera torneos (issue #102).
     const requester = await this.userRepository.findById(socket.data.userId);
     if (!requester?.isAdmin()) throw new Error('Solo un administrador puede crear torneos.');
@@ -1703,7 +1772,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     // El torneo lo habilita el administrador desde Edición: juegos, complejidad,
     // cupo y rondas salen de ahí, no del cliente (issue #102).
     const settings = await this.tournamentSettings?.get();
-    if (!settings) throw new Error('No hay un torneo habilitado. Habilítalo en Edición.');
+    if (!settings) throw new Error('No hay un torneo preparado. Prepáralo en Torneos.');
 
     const loaded = await Promise.all(settings.games.map((pick) => this.gameRepository.findById(pick.gameId)));
     // Un juego borrado, despublicado o de otro tipo desde que se habilitó se omite en vez de tumbar el torneo.
@@ -1714,7 +1783,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
         ? [{ game: candidate, level: pick.level }]
         : [];
     });
-    if (available.length === 0) throw new Error('Los juegos del torneo ya no están disponibles. Vuelve a habilitarlo en Edición.');
+    if (available.length === 0) throw new Error('Los juegos del torneo ya no están disponibles. Vuelve a prepararlo en Torneos.');
 
     const games = available.map((entry) => entry.game);
     const picks = available.map((entry) => ({ level: entry.level }));
@@ -1722,11 +1791,13 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     const { maxParticipants, totalRounds } = settings;
 
     const code = this.generateUniqueRoomCode();
+    const name = sanitizeTournamentName(body?.name);
 
     const tournament: TournamentState = {
       code,
       gameId: game.id,
       gameTitle: games.map((g) => g.title).join(' + '),
+      ...(name ? { name } : {}),
       games: games.map((g, index) => ({
         gameId: g.id,
         title: g.title,
@@ -1757,6 +1828,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
         });
       } else if (type === 'TRUE_FALSE_MAZE') {
         this.tournamentMazeGames.set(g.id, mazeAnswerKey(g.content));
+        this.tournamentMazeStatements.set(g.id, mazeStatementKey(g.content));
       } else {
         this.lastCreatedGameCards.set(g.id, g.content as GuessWhoCard[]);
       }
@@ -1792,15 +1864,28 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     }
 
     const existing = tournament.participants.find((p) => p.userId === socket.data.userId);
+    if (existing?.kicked) throw new Error('El administrador te sacó de este torneo.');
     // Quien ya estaba en el torneo puede reconectarse aunque ya haya iniciado.
-    if (tournament.phase !== 'WAITING' && !existing) throw new Error('El torneo ya inició.');
+    // Entrada tardía (issue #147): con el torneo en marcha entra con 0 puntos y juega desde la siguiente ronda.
+    // En la última ronda ya no tendría ninguna partida, así que ahí no se admite.
+    if (!existing && tournament.phase === 'FINISHED') throw new Error('El torneo ya terminó.');
+    if (!existing && tournament.phase === 'RUNNING' && tournament.currentRound >= tournament.totalRounds) {
+      throw new Error('El torneo está en su última ronda: ya no se puede entrar.');
+    }
+    if (tournament.phase === 'FINISHED' && existing?.finalExit) {
+      const { at, explicit } = existing.finalExit;
+      if (explicit || Date.now() - at > TOURNAMENT_FINAL_REJOIN_MS) {
+        throw new Error('El torneo ya terminó y saliste de la sala: el reporte solo se puede descargar mientras estás en ella.');
+      }
+    }
 
     if (existing) {
+      existing.finalExit = undefined;
       if (tournament.phase === 'WAITING' && existing.socketId !== socket.id) existing.ready = false;
       existing.socketId = socket.id;
       if (tournament.phase === 'RUNNING') this.resumeTournamentParticipant(tournament, existing.userId);
     } else {
-      if (tournament.participants.length >= tournament.maxParticipants) {
+      if (tournament.participants.filter((p) => !p.kicked).length >= tournament.maxParticipants) {
         throw new Error('La sala ya alcanzó su cupo máximo.');
       }
       tournament.participants.push({
@@ -1816,6 +1901,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
         botMatches: 0,
         questionsAsked: 0,
         wrongAccusations: 0,
+        correctAnswers: 0,
       });
     }
 
@@ -1862,9 +1948,10 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   handleTournamentStart(@ConnectedSocket() socket: AuthenticatedSocket) {
     const tournament = this.requireModeratedTournament(socket);
     if (tournament.phase !== 'WAITING') throw new Error('El torneo ya inició.');
-    if (tournament.participants.length < 2) throw new Error('Se necesitan al menos 2 participantes para iniciar.');
+    const active = tournament.participants.filter((p) => !p.kicked);
+    if (active.length < 2) throw new Error('Se necesitan al menos 2 participantes para iniciar.');
     tournament.phase = 'RUNNING';
-    this.startTournamentRound(tournament, tournament.participants.map((p) => p.userId));
+    this.startTournamentRound(tournament, active.map((p) => p.userId));
   }
 
   /**
@@ -1872,6 +1959,152 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
    * quedó inactivo): esas partidas terminan sin ganador ni puntos y el torneo
    * avanza a la siguiente ronda o, si era la última, termina.
    */
+  /**
+   * El administrador elige el juego de la siguiente ronda (o vuelve al sorteo con `null`). La elección no se
+   * revela a los participantes y el sorteo de las rondas que siguen respeta que no se repita el elegido.
+   */
+  @SubscribeMessage('tournament:set-next-game')
+  handleTournamentSetNextGame(@ConnectedSocket() socket: AuthenticatedSocket, @MessageBody() body: { gameIndex?: unknown }) {
+    const tournament = this.requireModeratedTournament(socket);
+    if (tournament.phase !== 'RUNNING') throw new Error('El torneo no está en curso.');
+    const round = tournament.currentRound + 1;
+    if (round > tournament.totalRounds) throw new Error('Ya es la última ronda: no hay una siguiente que elegir.');
+    const games = tournament.games ?? [];
+    if (games.length < 2) throw new Error('Este torneo tiene un solo juego: no hay nada que elegir.');
+    const overrides = { ...tournament.gameOverrides };
+    const index = body?.gameIndex;
+    if (index === null || index === undefined) {
+      delete overrides[round];
+    } else {
+      if (typeof index !== 'number' || !Number.isInteger(index) || index < 0 || index >= games.length) {
+        throw new Error('Ese juego no es de este torneo.');
+      }
+      overrides[round] = index;
+    }
+    tournament.gameOverrides = overrides;
+    this.tournamentStore.set(tournament);
+    this.sendTournamentStateToModerator(tournament);
+  }
+
+  /**
+   * El administrador expulsa a una persona (issue #147). En la sala de espera sale sin más; con el torneo en
+   * marcha pierde su partida en curso (su rival suma el punto), no entra en las rondas que siguen, no cuenta
+   * en la clasificación y no puede volver a entrar.
+   */
+  @SubscribeMessage('tournament:kick')
+  handleTournamentKick(@ConnectedSocket() socket: AuthenticatedSocket, @MessageBody() body: { userId?: unknown }) {
+    const tournament = this.requireModeratedTournament(socket);
+    if (tournament.phase === 'FINISHED') throw new Error('El torneo ya terminó.');
+    const userId = body?.userId;
+    if (typeof userId !== 'string') throw new Error('Participante no válido.');
+    const participant = tournament.participants.find((p) => p.userId === userId);
+    if (!participant || participant.kicked) throw new Error('Esa persona no está en el torneo.');
+
+    const socketId = participant.socketId;
+    // Primero se marca: así, al cerrarse su partida y arrancar la ronda siguiente, ya no se la empareja.
+    // También en la sala de espera: se la marca (no se la borra) para que no pueda volver con el código.
+    participant.kicked = true;
+    if (tournament.phase === 'WAITING') {
+      participant.socketId = '';
+    } else {
+      this.forfeitParticipantMatches(tournament, userId);
+      // El Laberinto es una partida solitaria: simplemente se cierra sin punto.
+      const solo = this.playingTournamentMatch(tournament, userId);
+      if (solo?.maze) {
+        solo.phase = 'FINISHED';
+        solo.winnerUserId = null;
+      }
+      participant.socketId = '';
+    }
+    this.server.to(socketId).emit('tournament:kicked', { message: 'El administrador te sacó del torneo.' });
+    this.server.in(socketId).socketsLeave(`tournament:${tournament.code}`);
+    this.tournamentStore.set(tournament);
+    this.broadcastTournamentState(tournament);
+    if (tournament.phase === 'RUNNING') this.maybeAdvanceTournamentRound(tournament);
+  }
+
+  /**
+   * El administrador pausa o reanuda la ronda (issue #147). Congela los relojes de Identidad Oculta y de
+   * Dominó, que dejan de aceptar jugadas hasta que se reanude; el Laberinto es a ritmo propio y no se pausa.
+   */
+  @SubscribeMessage('tournament:pause')
+  handleTournamentPause(@ConnectedSocket() socket: AuthenticatedSocket, @MessageBody() body: { paused?: unknown }) {
+    const tournament = this.requireModeratedTournament(socket);
+    if (tournament.phase !== 'RUNNING') throw new Error('El torneo no está en curso.');
+    if (typeof body?.paused !== 'boolean') throw new Error('Indica si se pausa o se reanuda.');
+    if (body.paused === (tournament.pausedByAdmin === true)) return;
+    tournament.pausedByAdmin = body.paused;
+    const now = Date.now();
+    for (const match of tournament.matches.filter((m) => m.round === tournament.currentRound && m.phase === 'PLAYING')) {
+      if (this.isGuessWhoTournamentMatch(match)) {
+        if (body.paused) {
+          if (pauseByAdmin(match, now, match.turnDeadline)) {
+            this.clearTournamentTurnTimer(match.matchCode);
+            match.turnDeadline = null;
+          }
+          this.tournamentBotRunner.forget(match.matchCode);
+        } else {
+          const back = stopWaiting(match, ADMIN_PAUSE_KEY);
+          if (back?.resumed) this.resumeTournamentMatch(tournament, match, back.remainingMs);
+        }
+        this.broadcastMatchState(tournament, match);
+      } else if (match.dominoRoomCode) {
+        const room = this.dominoRoomStore.get(match.dominoRoomCode);
+        if (!room || room.phase !== 'PLAYING') continue;
+        if (body.paused) {
+          if (pauseByAdmin(room, now, room.turnDeadline)) {
+            this.clearDominoTurnTimer(room.code);
+            room.turnDeadline = null;
+          }
+          this.clearDominoBotTimer(room.code);
+        } else {
+          this.resumeDominoPlayer(room, ADMIN_PAUSE_KEY);
+        }
+        this.dominoRoomStore.set(room);
+        this.broadcastDominoState(room);
+      }
+    }
+    this.tournamentStore.set(tournament);
+    this.broadcastTournamentState(tournament);
+  }
+
+  /** El administrador suma segundos a los turnos en curso de Identidad Oculta y Dominó (issue #147). */
+  @SubscribeMessage('tournament:add-time')
+  handleTournamentAddTime(@ConnectedSocket() socket: AuthenticatedSocket, @MessageBody() body: { seconds?: unknown }) {
+    const tournament = this.requireModeratedTournament(socket);
+    if (tournament.phase !== 'RUNNING') throw new Error('El torneo no está en curso.');
+    const seconds = body?.seconds;
+    if (typeof seconds !== 'number' || !Number.isInteger(seconds) || seconds < 5 || seconds > 120) {
+      throw new Error('Elige entre 5 y 120 segundos.');
+    }
+    const extra = seconds * 1000;
+    const now = Date.now();
+    for (const match of tournament.matches.filter((m) => m.round === tournament.currentRound && m.phase === 'PLAYING')) {
+      if (this.isGuessWhoTournamentMatch(match)) {
+        if (match.pausedTurnMs != null) {
+          match.pausedTurnMs += extra;
+        } else if (match.turnDeadline && match.activePlayerUserId) {
+          match.turnDeadline += extra;
+          this.armTournamentTurnTimer(tournament, match, match.activePlayerUserId, match.turnDeadline - now);
+        } else continue;
+        this.broadcastMatchState(tournament, match);
+      } else if (match.dominoRoomCode) {
+        const room = this.dominoRoomStore.get(match.dominoRoomCode);
+        if (!room || room.phase !== 'PLAYING') continue;
+        if (room.pausedTurnMs != null) {
+          room.pausedTurnMs += extra;
+        } else if (room.turnDeadline && room.activePlayerUserId) {
+          room.turnDeadline += extra;
+          this.startDominoTurnTimer(room, room.activePlayerUserId, room.turnDeadline - now);
+        } else continue;
+        this.dominoRoomStore.set(room);
+        this.broadcastDominoState(room);
+      }
+    }
+    this.tournamentStore.set(tournament);
+    this.sendTournamentStateToModerator(tournament);
+  }
+
   @SubscribeMessage('tournament:end-round')
   handleTournamentEndRound(@ConnectedSocket() socket: AuthenticatedSocket) {
     const tournament = this.requireModeratedTournament(socket);
@@ -1937,6 +2170,13 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       const leaving = tournament.participants.find((p) => p.socketId === socket.id);
       if (leaving) this.forfeitParticipantMatches(tournament, leaving.userId);
     }
+    if (tournament.phase === 'FINISHED') {
+      const leaving = tournament.participants.find((p) => p.socketId === socket.id);
+      if (leaving) {
+        leaving.finalExit = { at: Date.now(), explicit: true };
+        this.tournamentStore.set(tournament);
+      }
+    }
   }
 
   /**
@@ -1947,6 +2187,8 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
    */
   private startTournamentRound(tournament: TournamentState, userIds: string[]) {
     tournament.currentRound += 1;
+    // Una ronda nueva empieza siempre sin pausa del administrador (issue #147).
+    tournament.pausedByAdmin = false;
     // Las salas de dominó de la ronda anterior ya cumplieron: se liberan.
     this.disposeTournamentDominoRooms(tournament, tournament.currentRound - 1);
     const shuffledIds = shuffle(userIds);
@@ -2190,6 +2432,13 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     maze.answeredIds.push(questionId);
     if (body.chosen === correctAnswer) maze.correct += 1;
     else maze.wrong += 1;
+    const gameKey = match.gameId ?? tournament.gameId;
+    recordInsight(tournament, `MAZE:${gameKey}:${questionId}`, 'MAZE', this.tournamentMazeStatements.get(gameKey)?.get(questionId) ?? questionId, body.chosen !== correctAnswer);
+    if (body.chosen === correctAnswer) {
+      // Crédito parcial: cada acierto cuenta para el desempate aunque no se complete el laberinto.
+      const answering = tournament.participants.find((p) => p.userId === match.playerUserIds[0]);
+      if (answering) answering.correctAnswers = (answering.correctAnswers ?? 0) + 1;
+    }
     this.tournamentStore.set(tournament);
     this.sendTournamentStateToModerator(tournament);
   }
@@ -2239,6 +2488,14 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     const match = tournament?.matches.find((m) => m.matchCode === room.tournamentMatchCode);
     if (!tournament || !match || match.phase === 'FINISHED') return;
 
+    // Resumen pedagógico: solo hay preguntas en los niveles que las usan (el fácil no pregunta).
+    if (room.level !== 'EASY') {
+      const missed = new Set(room.missedConceptIndexes ?? []);
+      for (const index of new Set(room.seenConceptIndexes ?? [])) {
+        const concept = room.concepts[index];
+        if (concept) recordInsight(tournament, `DOMINO:${room.gameId}:${concept.conceptId ?? index}`, 'DOMINO', concept.label, missed.has(index));
+      }
+    }
     match.phase = 'FINISHED';
     match.winnerUserId = room.winnerUserId;
     // Empate (bloqueo con las mismas fichas): nadie suma ni pierde.
@@ -2269,7 +2526,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
   private driveDominoBot(room: DominoRoomState) {
     const bot = room.players.find((p) => p.socketId.startsWith('bot:'));
     if (!bot) return;
-    if (room.phase !== 'PLAYING' || room.activePlayerUserId !== bot.userId) {
+    if (room.phase !== 'PLAYING' || room.activePlayerUserId !== bot.userId || isPaused(room)) {
       this.clearDominoBotTimer(room.code);
       return;
     }
@@ -2414,7 +2671,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
         ? tournament.games
         : [{ gameId: tournament.gameId, title: tournament.gameTitle, level: 'MEDIUM' as TournamentLevel }]
     ).map((g) => ({ ...g, gameType: ('gameType' in g && g.gameType) || ('GUESS_WHO' as TournamentGameType) }));
-    return games[pickRoundGameIndex(`${tournament.code}:${tournament.createdAt}`, round, games.length)];
+    return games[pickRoundGameIndex(`${tournament.code}:${tournament.createdAt}`, round, games.length, tournament.gameOverrides)];
   }
 
   /**
@@ -2432,6 +2689,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
    * por `questionId`. El servidor es quien califica: el navegador solo dice qué eligió.
    */
   private readonly tournamentMazeGames = new Map<string, Map<string, boolean>>();
+  private readonly tournamentMazeStatements = new Map<string, Map<string, string>>();
 
   /** La clave de respuestas de un juego; si el servidor se reinició y la perdió, se vuelve a leer del juego. */
   private async mazeAnswers(gameId: string): Promise<Map<string, boolean>> {
@@ -2440,6 +2698,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     const game = await this.gameRepository.findById(gameId);
     const answers = mazeAnswerKey(game?.content);
     this.tournamentMazeGames.set(gameId, answers);
+    this.tournamentMazeStatements.set(gameId, mazeStatementKey(game?.content));
     return answers;
   }
 
@@ -2484,6 +2743,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     }
     participant.socketId = waitingSocketId(participant.userId);
     this.broadcastMatchState(tournament, match);
+    this.sendTournamentStateToModerator(tournament);
     this.scheduleWait('tournament:' + match.matchCode, match, () => this.expireTournamentWaits(tournament.code, match.matchCode));
   }
 
@@ -2523,6 +2783,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     if (back.resumed) this.resumeTournamentMatch(tournament, match, back.remainingMs);
     else this.scheduleWait('tournament:' + match.matchCode, match, () => this.expireTournamentWaits(tournament.code, match.matchCode));
     this.broadcastMatchState(tournament, match);
+    this.sendTournamentStateToModerator(tournament);
   }
 
   private advanceTournamentMatchTurn(tournament: TournamentState, match: TournamentMatch) {
@@ -2661,10 +2922,8 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     if (!allFinished) return;
 
     if (tournament.currentRound >= tournament.totalRounds) {
-      // Gana quien más puntos acumuló; ante empate, quien tuvo menos acusaciones fallidas.
-      const ranking = [...tournament.participants].sort(
-        (a, b) => b.points - a.points || (a.wrongAccusations ?? 0) - (b.wrongAccusations ?? 0),
-      );
+      // Gana quien más puntos acumuló; el desempate es común a todos los juegos (ver tournament-ranking.ts).
+      const ranking = rankTournamentParticipants(tournament.participants.filter((p) => !p.kicked));
       tournament.phase = 'FINISHED';
       this.disposeTournamentDominoRooms(tournament);
       tournament.winnerUserId = ranking[0]?.userId ?? null;
@@ -2673,8 +2932,17 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       return;
     }
 
-    // Nadie queda eliminado: todos vuelven a emparejarse al azar para la siguiente ronda.
-    this.startTournamentRound(tournament, tournament.participants.map((p) => p.userId));
+    // Nadie queda eliminado: todos vuelven a emparejarse al azar para la siguiente ronda (menos quien fue expulsado).
+    const active = tournament.participants.filter((p) => !p.kicked);
+    if (active.length === 0) {
+      tournament.phase = 'FINISHED';
+      this.disposeTournamentDominoRooms(tournament);
+      tournament.winnerUserId = null;
+      this.tournamentStore.set(tournament);
+      this.broadcastTournamentState(tournament);
+      return;
+    }
+    this.startTournamentRound(tournament, active.map((p) => p.userId));
   }
 
   /** Como requireActiveTournamentMatch, pero la partida además no puede estar en pausa (issue #120). */
@@ -2709,13 +2977,20 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       this.server.to(participant.socketId).emit('tournament:match-state', toMatchClientView(match, tournament, userId));
     }
     // El bot reacciona a cada cambio de su match (le toca preguntar, responder, descartar...).
-    if (match.vsBot && match.phase === 'PLAYING') {
+    if (match.vsBot && match.phase === 'PLAYING' && !isPaused(match)) {
       const room = this.tournamentBotRooms.get(match.matchCode);
       if (room) this.tournamentBotRunner.onRoomChanged(room);
     }
   }
 
   /** Solo el panel del moderador: con 40 personas respondiendo, avisar a todas en cada respuesta sería ruido. */
+  /** Avisa al panel del moderador de un torneo (por su código) de que algo cambió, p. ej. quién está conectado. */
+  private refreshModerator(tournamentCode: string | undefined) {
+    if (!tournamentCode) return;
+    const tournament = this.tournamentStore.get(tournamentCode);
+    if (tournament) this.sendTournamentStateToModerator(tournament);
+  }
+
   private sendTournamentStateToModerator(tournament: TournamentState) {
     if (!tournament.moderatorSocketId) return;
     this.server
@@ -2725,6 +3000,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
 
   private broadcastTournamentState(tournament: TournamentState) {
     for (const participant of tournament.participants) {
+      if (participant.kicked) continue;
       this.server
         .to(participant.socketId)
         .emit('tournament:state', toTournamentClientView(tournament, participant.userId, (c) => this.dominoRoomStore.get(c)));
@@ -2833,6 +3109,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     this.dominoRoomStore.set(room);
     socket.join(`domino:${code}`);
     this.broadcastDominoState(room);
+    this.refreshModerator(room.tournamentCode);
   }
 
   /** Compatibilidad: Iniciar solo confirma al emisor, nunca a toda la sala. */

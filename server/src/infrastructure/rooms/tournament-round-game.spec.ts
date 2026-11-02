@@ -78,3 +78,52 @@ describe('pickRoundGameIndex', () => {
     expect(a).not.toEqual(b);
   });
 });
+
+describe('pickRoundGameIndex con el juego elegido por el administrador (#147)', () => {
+  const seed = 'ABC123:1700000000000';
+
+  it('la ronda elegida sale exactamente como se eligió', () => {
+    for (const forced of [0, 1, 2, 3]) {
+      expect(pickRoundGameIndex(seed, 3, 4, { 3: forced })).toBe(forced);
+    }
+  });
+
+  it('las rondas anteriores no cambian por lo que se elija para una futura', () => {
+    for (let round = 1; round <= 3; round += 1) {
+      expect(pickRoundGameIndex(seed, round, 4, { 4: 2 })).toBe(pickRoundGameIndex(seed, round, 4));
+    }
+  });
+
+  it('la ronda siguiente a una elegida nunca repite el juego elegido', () => {
+    for (const gameCount of [2, 3, 4, 5]) {
+      for (let forced = 0; forced < gameCount; forced += 1) {
+        for (let round = 1; round <= 12; round += 1) {
+          const after = pickRoundGameIndex(seed, round + 1, gameCount, { [round]: forced });
+          expect(after).not.toBe(forced);
+          expect(after).toBeGreaterThanOrEqual(0);
+          expect(after).toBeLessThan(gameCount);
+        }
+      }
+    }
+  });
+
+  it('sin repetir seguidos en toda la secuencia aunque haya varias rondas elegidas', () => {
+    const overrides = { 2: 1, 3: 0, 6: 2 };
+    let previous = pickRoundGameIndex(seed, 1, 3, overrides);
+    for (let round = 2; round <= 30; round += 1) {
+      const index = pickRoundGameIndex(seed, round, 3, overrides);
+      // Solo se permite repetir si el administrador eligió justo el mismo juego dos rondas seguidas.
+      if (!(round in overrides)) expect(index).not.toBe(previous);
+      previous = index;
+    }
+  });
+
+  it('ignora elecciones fuera de rango y vuelve al sorteo normal', () => {
+    expect(pickRoundGameIndex(seed, 3, 3, { 3: 9 })).toBe(pickRoundGameIndex(seed, 3, 3));
+    expect(pickRoundGameIndex(seed, 3, 3, { 3: -1 })).toBe(pickRoundGameIndex(seed, 3, 3));
+  });
+
+  it('con un solo juego no hay nada que elegir', () => {
+    expect(pickRoundGameIndex(seed, 3, 1, { 3: 0 })).toBe(0);
+  });
+});

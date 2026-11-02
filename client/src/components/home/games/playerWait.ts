@@ -6,7 +6,10 @@ export const PLAYER_WAIT_MS = 90_000
 /** A quién se espera porque se desconectó (issue #120); llega con cada estado de la sala. */
 export type AwaitingPlayerView = { userId: string; displayName: string; remainingMs: number }
 
-export type PlayerWait = { names: string[]; deadline: number }
+/** Clave con la que el servidor marca que el administrador pausó la ronda (issue #147). */
+export const ADMIN_PAUSE_ID = '__admin__'
+
+export type PlayerWait = { names: string[]; deadline: number; /** La pausa la puso el administrador: no hay cuenta regresiva. */ byAdmin?: boolean }
 
 /**
  * Lo que necesita la ventana «Esperando a …»: los nombres de quienes faltan
@@ -17,7 +20,10 @@ export function usePlayerWait(awaiting: AwaitingPlayerView[] | undefined, selfUs
   const [wait, setWait] = useState<PlayerWait | null>(null)
   useEffect(() => {
     const others = (awaiting ?? []).filter((a) => a.userId !== selfUserId)
-    setWait(others.length === 0 ? null : { names: others.map((a) => a.displayName), deadline: Date.now() + Math.max(...others.map((a) => a.remainingMs)) })
+    const people = others.filter((a) => a.userId !== ADMIN_PAUSE_ID)
+    if (others.length === 0) setWait(null)
+    else if (people.length < others.length) setWait({ names: people.map((a) => a.displayName), deadline: Date.now(), byAdmin: true })
+    else setWait({ names: people.map((a) => a.displayName), deadline: Date.now() + Math.max(...people.map((a) => a.remainingMs)) })
   }, [awaiting, selfUserId])
   return wait
 }

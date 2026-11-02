@@ -1,0 +1,127 @@
+/* Reporte personal del torneo (issue #147): en pantalla no se ve; al imprimir o guardar como PDF es lo único que sale. */
+.tournament-report-print,
+.tournament-diploma-print {
+  display: none;
+}
+
+@media print {
+  body.print-tournament-report #root,
+  body.print-tournament-diploma #root {
+    display: none !important;
+  }
+
+  body.print-tournament-diploma .tournament-diploma-print {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    min-height: 90vh;
+    margin: 12px;
+    padding: 40px 32px;
+    border: 10px double #b45309;
+    color: #1f2937;
+    background: #fffbeb;
+    text-align: center;
+    font-family: Georgia, 'Times New Roman', serif;
+  }
+
+  .tournament-diploma-print .kicker {
+    font-size: 13pt;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: #b45309;
+  }
+
+  .tournament-diploma-print h1 {
+    margin: 0;
+    font-size: 34pt;
+    line-height: 1.1;
+  }
+
+  .tournament-diploma-print .name {
+    margin: 6px 0;
+    font-size: 30pt;
+    font-weight: 700;
+    color: #92400e;
+  }
+
+  .tournament-diploma-print .place {
+    font-size: 24pt;
+    font-weight: 700;
+  }
+
+  .tournament-diploma-print p {
+    margin: 0;
+    font-size: 14pt;
+  }
+
+  .tournament-diploma-print .small {
+    margin-top: 24px;
+    font-size: 10.5pt;
+    color: #6b7280;
+  }
+
+
+  body.print-tournament-report .tournament-report-print {
+    display: block;
+    padding: 24px;
+    color: #111827;
+    background: #ffffff;
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    font-size: 12pt;
+  }
+
+  .tournament-report-print h1 {
+    margin: 0 0 4px;
+    font-size: 20pt;
+  }
+
+  .tournament-report-print h2 {
+    margin: 18px 0 6px;
+    font-size: 13pt;
+  }
+
+  .tournament-report-print dl {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 2px 14px;
+    margin: 10px 0;
+  }
+
+  .tournament-report-print dt {
+    font-weight: 700;
+  }
+
+  .tournament-report-print dd {
+    margin: 0;
+  }
+
+  .tournament-report-print table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 4px;
+  }
+
+  .tournament-report-print th,
+  .tournament-report-print td {
+    border: 1px solid #9ca3af;
+    padding: 5px 8px;
+    text-align: left;
+  }
+
+  .tournament-report-print th {
+    background: #e5e7eb;
+  }
+
+  .tournament-report-print tr.is-self td {
+    font-weight: 700;
+    background: #fef3c7;
+  }
+
+  .tournament-report-print p.note {
+    margin-top: 18px;
+    font-size: 10pt;
+    color: #4b5563;
+  }
+}

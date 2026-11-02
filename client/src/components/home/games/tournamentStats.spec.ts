@@ -15,6 +15,7 @@ const person = (userId: string, points: number, wrongAccusations = 0, displayNam
   botMatches: 0,
   questionsAsked: 0,
   wrongAccusations,
+  correctAnswers: 0,
 })
 
 const match = (winnerUserId: string | null, gameType: 'GUESS_WHO' | 'TRUE_FALSE_MAZE' = 'GUESS_WHO') => ({
@@ -31,6 +32,34 @@ describe('rankParticipants', () => {
   it('ordena por puntos, luego menos acusaciones fallidas, luego nombre', () => {
     const ranked = rankParticipants([person('c', 1), person('a', 2, 3), person('b', 2, 1), person('d', 1, 0, 'A-primero')])
     expect(ranked.map((p) => p.userId)).toEqual(['b', 'a', 'd', 'c'])
+  })
+
+  // Mismos casos que domain/services/tournament-ranking.spec.ts: si una regla cambia en un lado, falla el otro.
+  describe('paridad con el servidor (#147)', () => {
+    const p = (userId: string, extra: Partial<TournamentParticipantView> = {}) => ({ ...person(userId, 0, 0, userId.toUpperCase()), wins: 0, ...extra })
+    const order = (list: TournamentParticipantView[]) => rankParticipants(list).map((x) => x.userId)
+
+    it('más puntos; con los mismos, menos derrotas; luego más aciertos del Laberinto; luego menos acusaciones', () => {
+      expect(order([p('a', { points: 1 }), p('b', { points: 3 }), p('c', { points: 2 })])).toEqual(['b', 'c', 'a'])
+      expect(order([p('a', { points: 2, losses: 3 }), p('b', { points: 2, losses: 1 })])).toEqual(['b', 'a'])
+      expect(order([p('a', { points: 2, losses: 1, correctAnswers: 4 }), p('b', { points: 2, losses: 1, correctAnswers: 9 })])).toEqual(['b', 'a'])
+      expect(order([p('a', { points: 2, wrongAccusations: 3 }), p('b', { points: 2, wrongAccusations: 1 })])).toEqual(['b', 'a'])
+    })
+
+    it('una derrota pesa más que un acierto, y un acierto más que una acusación', () => {
+      const list = [
+        p('a', { points: 2, losses: 2, correctAnswers: 99 }),
+        p('b', { points: 2, losses: 1, correctAnswers: 0, wrongAccusations: 9 }),
+        p('c', { points: 2, losses: 1, correctAnswers: 5, wrongAccusations: 9 }),
+      ]
+      expect(order(list)).toEqual(['c', 'b', 'a'])
+    })
+
+    it('si todo empata, el orden es estable por nombre sin importar el orden de llegada', () => {
+      const list = [p('c'), p('a'), p('b')]
+      expect(order(list)).toEqual(['a', 'b', 'c'])
+      expect(order([...list].reverse())).toEqual(['a', 'b', 'c'])
+    })
   })
 
   it('no modifica el arreglo original', () => {

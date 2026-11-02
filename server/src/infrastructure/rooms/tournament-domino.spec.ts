@@ -304,3 +304,213 @@ describe('torneo con Dominó: la espera del torneo (#120) y volver a la sala del
     expect(tournament.phase).toBe('FINISHED');
   });
 });
+
+describe('torneo con Dominó: el panel del administrador ve la conexión de cada persona (#147)', () => {
+  it('muestra quién no ha entrado, quién está conectado y a quién se espera, y se actualiza solo', async () => {
+    const { tournament, domino, gateway } = await start(2);
+    const states: Array<{ liveMatches: Array<{ players: Array<{ userId: string; connection: { state: string } | null }> }> }> = [];
+    gateway.server = {
+      to: (target: string) => ({ emit: (event: string, payload: never) => target === 'admin' && event === 'tournament:state' && states.push(payload) }),
+      in: () => ({ socketsLeave: () => {} }),
+    } as unknown as Server;
+    vi.advanceTimersByTime(3000);
+    const room = domino.get(tournament.matches[0].dominoRoomCode!)!;
+    const [first, second] = tournament.matches[0].playerUserIds as [string, string];
+    const seen = () => Object.fromEntries(states.at(-1)!.liveMatches[0].players.map((p) => [p.userId, p.connection?.state ?? null]));
+
+    const a = client('conn-a');
+    a.data.userId = first;
+    gateway.handleDominoJoin(a, { code: room.code });
+    expect(seen()).toEqual({ [first]: 'connected', [second]: 'away' });
+
+    const b = client('conn-b');
+    b.data.userId = second;
+    gateway.handleDominoJoin(b, { code: room.code });
+    expect(seen()).toEqual({ [first]: 'connected', [second]: 'connected' });
+
+    gateway.handleDisconnect(a);
+    expect(seen()).toEqual({ [first]: 'waiting', [second]: 'connected' });
+
+    const again = client('conn-a2');
+    again.data.userId = first;
+    gateway.handleDominoJoin(again, { code: room.code });
+    expect(seen()).toEqual({ [first]: 'connected', [second]: 'connected' });
+  });
+
+  it('contra el bot no se muestra conexión para el bot', async () => {
+    const { tournament, domino, gateway } = await start(3);
+    const states: Array<{ liveMatches: Array<{ vsBot: boolean; players: Array<{ userId: string; connection: { state: string } | null }> }> }> = [];
+    gateway.server = {
+      to: (target: string) => ({ emit: (event: string, payload: never) => target === 'admin' && event === 'tournament:state' && states.push(payload) }),
+      in: () => ({ socketsLeave: () => {} }),
+    } as unknown as Server;
+    vi.advanceTimersByTime(3000);
+    const botMatch = tournament.matches.find((m) => m.vsBot)!;
+    const room = domino.get(botMatch.dominoRoomCode!)!;
+    const humanId = botMatch.playerUserIds.find((id) => !id.startsWith('bot:'))!;
+    const mine = client('conn-h');
+    mine.data.userId = humanId;
+    gateway.handleDominoJoin(mine, { code: room.code });
+    const live = states.at(-1)!.liveMatches.find((m) => m.vsBot)!;
+    expect(live.players.find((p) => p.userId === humanId)!.connection).toEqual({ state: 'connected' });
+    expect(live.players.find((p) => p.userId.startsWith('bot:'))!.connection).toBeNull();
+  });
+});
+
+describe('torneo terminado: el reporte solo se puede ver estando en la sala (#147)', () => {
+  async function finished() {
+    const h = await start(2);
+    vi.advanceTimersByTime(3000);
+    const room = h.domino.get(h.tournament.matches[0].dominoRoomCode!)!;
+    (h.gateway as unknown as { finishDominoGame: FinishFn }).finishDominoGame(room, 'p1', false);
+    expect(h.tournament.phase).toBe('FINISHED');
+    return h;
+  }
+  const rejoin = (id: string) => {
+    const c = client(`${id}-nuevo`);
+    c.data.userId = id;
+    return c;
+  };
+
+  it('quien sale a propósito ya no puede volver a entrar', async () => {
+    const { gateway, tournament } = await finished();
+    gateway.handleTournamentLeave(client('p0'));
+    expect(() => gateway.handleTournamentJoin(rejoin('p0'), { code: tournament.code })).toThrow(/solo se puede descargar mientras estás en ella/);
+  });
+
+  it('quien se queda en la sala no pierde nada y quien nunca salió puede reconectarse', async () => {
+    const { gateway, tournament } = await finished();
+    expect(() => gateway.handleTournamentJoin(rejoin('p1'), { code: tournament.code })).not.toThrow();
+  });
+
+  it('un corte de red tiene un margen corto para volver; pasado ese margen, ya no', async () => {
+    const { gateway, tournament } = await finished();
+    gateway.handleDisconnect(client('p0'));
+    vi.advanceTimersByTime(30_000);
+    expect(() => gateway.handleTournamentJoin(rejoin('p0'), { code: tournament.code })).not.toThrow();
+    // Volvió: la marca de salida se borra. Si se corta otra vez y tarda más del margen, ya no vuelve.
+    gateway.handleDisconnect(client('p0-nuevo'));
+    vi.advanceTimersByTime(61_000);
+    expect(() => gateway.handleTournamentJoin(rejoin('p0'), { code: tournament.code })).toThrow(/reporte/);
+  });
+
+  it('el administrador siempre puede volver a su panel', async () => {
+    const { gateway, tournament, admin } = await finished();
+    gateway.handleTournamentLeave(admin);
+    const back = client('admin-nuevo');
+    back.data.userId = 'admin';
+    expect(() => gateway.handleTournamentJoin(back, { code: tournament.code })).not.toThrow();
+  });
+
+  it('lo que se envía a las pantallas no revela cuándo ni cómo salió nadie', async () => {
+    const { gateway, tournament } = await finished();
+    const sent: string[] = [];
+    gateway.server = {
+      to: () => ({ emit: (_event: string, payload: unknown) => sent.push(JSON.stringify(payload)) }),
+      in: () => ({ socketsLeave: () => {} }),
+    } as unknown as Server;
+    gateway.handleTournamentLeave(client('p0'));
+    gateway.handleTournamentJoin(rejoin('p1'), { code: tournament.code });
+    expect(sent.length).toBeGreaterThan(0);
+    expect(sent.join('')).not.toContain('finalExit');
+  });
+});
+
+describe('expulsar a alguien que está jugando un dominó (#147)', () => {
+  it('pierde la partida sin desarmar la sala y su rival suma el punto', async () => {
+    const h = await start(4);
+    vi.advanceTimersByTime(3000);
+    const match = h.tournament.matches.find((m) => !m.vsBot)!;
+    const room = h.domino.get(match.dominoRoomCode!)!;
+    const [first, second] = match.playerUserIds as [string, string];
+    h.gateway.handleTournamentKick(h.admin, { userId: first });
+    const after = h.domino.get(room.code)!;
+    expect(after).toBeDefined();
+    expect(after.phase).toBe('FINISHED');
+    expect(after.abandonedByUserId).toBe(first);
+    expect(after.winnerUserId).toBe(second);
+    expect(h.tournament.participants.find((p) => p.userId === second)!.points).toBe(1);
+    expect(h.tournament.participants.find((p) => p.userId === first)!.kicked).toBe(true);
+  });
+});
+
+describe('el administrador pausa un dominó del torneo y suma tiempo (#147)', () => {
+  async function playing() {
+    const h = await start(2);
+    vi.advanceTimersByTime(3000);
+    const room = h.domino.get(h.tournament.matches[0].dominoRoomCode!)!;
+    expect(room.phase).toBe('PLAYING');
+    return { ...h, room };
+  }
+
+  it('pausar congela el reloj del turno y bloquea la partida; reanudar sigue con lo que quedaba', async () => {
+    const { gateway, admin, room } = await playing();
+    const active = room.activePlayerUserId;
+    vi.advanceTimersByTime(10_000);
+    gateway.handleTournamentPause(admin, { paused: true });
+    expect(room.turnDeadline).toBeNull();
+    expect(Object.keys(room.awaiting ?? {})).toEqual(['__admin__']);
+    expect(room.pausedTurnMs).toBeGreaterThan(0);
+    // Pasa mucho más de un turno: nadie lo pierde.
+    vi.advanceTimersByTime(10 * room.turnDurationSeconds * 1000);
+    expect(room.activePlayerUserId).toBe(active);
+
+    const remaining = room.pausedTurnMs!;
+    gateway.handleTournamentPause(admin, { paused: false });
+    expect(room.awaiting).toEqual({});
+    expect(room.turnDeadline).toBe(Date.now() + remaining);
+    vi.advanceTimersByTime(remaining + 50);
+    expect(room.activePlayerUserId).not.toBe(active);
+  });
+
+  it('contra el bot, el bot no mueve mientras dure la pausa', async () => {
+    const h = await start(3);
+    vi.advanceTimersByTime(3000);
+    const botMatch = h.tournament.matches.find((m) => m.vsBot)!;
+    const room = h.domino.get(botMatch.dominoRoomCode!)!;
+    h.gateway.handleTournamentPause(h.admin, { paused: true });
+    const before = JSON.stringify([room.board, room.players.map((p) => p.hand.length), room.activePlayerUserId]);
+    vi.advanceTimersByTime(60_000);
+    expect(JSON.stringify([room.board, room.players.map((p) => p.hand.length), room.activePlayerUserId])).toBe(before);
+  });
+
+  it('sumar tiempo alarga el turno en curso', async () => {
+    const { gateway, admin, room } = await playing();
+    const active = room.activePlayerUserId;
+    const before = room.turnDeadline!;
+    gateway.handleTournamentAddTime(admin, { seconds: 20 });
+    expect(room.turnDeadline).toBe(before + 20_000);
+    // El reloj original ya habría vencido; con el tiempo extra el turno sigue siendo del mismo jugador.
+    vi.advanceTimersByTime(room.turnDurationSeconds * 1000 + 100);
+    expect(room.activePlayerUserId).toBe(active);
+    vi.advanceTimersByTime(20_000);
+    expect(room.activePlayerUserId).not.toBe(active);
+  });
+});
+
+describe('resumen pedagógico: qué conceptos se fallan en el dominó (#147)', () => {
+  type RoomWithSeen = { seenConceptIndexes?: number[]; missedConceptIndexes?: number[] };
+  it('al terminar la partida cuenta cada concepto que apareció y los que se fallaron', async () => {
+    const { tournament, domino, gateway } = await start(2, 'MEDIUM');
+    vi.advanceTimersByTime(3000);
+    const room = domino.get(tournament.matches[0].dominoRoomCode!)!;
+    expect(room.level).not.toBe('EASY');
+    (room as RoomWithSeen).seenConceptIndexes = [0, 1, 2];
+    (room as RoomWithSeen).missedConceptIndexes = [1];
+    (gateway as unknown as { finishDominoGame: FinishFn }).finishDominoGame(room, 'p1', false);
+    const byLabel = Object.fromEntries(Object.values(tournament.insights ?? {}).map((item) => [item.label, item]));
+    expect(byLabel['Sol']).toMatchObject({ kind: 'DOMINO', attempts: 1, misses: 0 });
+    expect(byLabel['Agua']).toMatchObject({ kind: 'DOMINO', attempts: 1, misses: 1 });
+    expect(byLabel['Aire']).toMatchObject({ attempts: 1, misses: 0 });
+    expect(byLabel['Tierra']).toBeUndefined();
+  });
+
+  it('en el nivel fácil no hay preguntas: no se registra nada', async () => {
+    const { tournament, domino, gateway } = await start(2, 'EASY');
+    vi.advanceTimersByTime(3000);
+    const room = domino.get(tournament.matches[0].dominoRoomCode!)!;
+    (room as RoomWithSeen).seenConceptIndexes = [0, 1];
+    (gateway as unknown as { finishDominoGame: FinishFn }).finishDominoGame(room, 'p1', false);
+    expect(tournament.insights ?? {}).toEqual({});
+  });
+});

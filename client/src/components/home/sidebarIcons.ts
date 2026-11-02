@@ -1,5 +1,5 @@
 import { createElement } from 'react'
-import { Bot, Building2, ChartColumn, Gamepad2, GraduationCap, House, LibraryBig, SquarePen, Users, UserRoundCog } from 'lucide-react'
+import { Bot, Building2, ChartColumn, Gamepad2, GraduationCap, House, LibraryBig, SquarePen, Swords, Users, UserRoundCog } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { Theme } from '../../hooks/useTheme'
 
@@ -16,6 +16,7 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   'nav-own-games': Gamepad2,
   'nav-users': UserRoundCog,
   'nav-edition': SquarePen,
+  'nav-tournaments': Swords,
   'nav-ai-providers': Bot,
   'nav-organization': Building2,
 }

@@ -33,6 +33,7 @@ const person = (userId: string, displayName: string, points: number, wrongAccusa
   botMatches: 0,
   questionsAsked: 3,
   wrongAccusations,
+  correctAnswers: 0,
 })
 
 const winnerMatch = (matchCode: string, winnerUserId: string | null, gameType: TournamentLiveMatch['gameType'] = 'GUESS_WHO') => ({
@@ -126,6 +127,76 @@ beforeEach(() => {
 })
 
 describe('TournamentModeratorPanel', () => {
+  describe('expulsar participantes (#147)', () => {
+    const withKick = (view: TournamentStateView) =>
+      renderToStaticMarkup(<TournamentModeratorPanel tournament={view} error={null} onClose={() => {}} onEndRound={() => {}} onKick={() => {}} onExit={() => {}} />)
+
+    it('cada persona de la clasificación lleva su botón de expulsar, con su nombre para los lectores de pantalla', () => {
+      const html = withKick(build())
+      for (const name of NAMES) expect(html).toContain(`aria-label="Expulsar a ${name}"`)
+      expect(html).not.toContain('<strong class="text-text-h">Expulsados:')
+    })
+
+    it('lista a quienes ya expulsó y avisa que no cuentan ni pueden volver', () => {
+      const html = withKick(build({ kickedParticipants: [{ userId: 'x1', displayName: 'Zoe' }, { userId: 'x2', displayName: 'Yago' }] }))
+      expect(html).toContain('Expulsados:')
+      expect(html).toContain('Zoe, Yago')
+      expect(html).toContain('No cuentan en la clasificación ni pueden volver')
+    })
+
+    it('sin el comando o con el torneo terminado no hay botón de expulsar', () => {
+      expect(render(build())).not.toContain('Expulsar a ')
+      expect(withKick(build({ phase: 'FINISHED' }))).not.toContain('Expulsar a ')
+    })
+  })
+
+  describe('selector del juego de la siguiente ronda (#147)', () => {
+    const withSelector = (view: TournamentStateView) =>
+      renderToStaticMarkup(<TournamentModeratorPanel tournament={view} error={null} onClose={() => {}} onEndRound={() => {}} onSetNextGame={() => {}} onExit={() => {}} />)
+
+    it('ofrece el sorteo y cada juego del torneo con su tipo y nivel', () => {
+      const html = withSelector(build())
+      expect(html).toContain('Juego de la ronda 4')
+      expect(html).toContain('Sorteo (sorpresa)')
+      expect(html).toContain('Banderas · ¿Quién Es? · Medio')
+      expect(html).toContain('Dominexo · Dominó · Fácil')
+      expect(html).toContain('Si no eliges, se sortea y nunca repite el de la ronda anterior.')
+    })
+
+    it('marca lo elegido y avisa que los participantes no lo ven', () => {
+      const html = withSelector(build({ nextRoundGameIndex: 1 }))
+      expect(html).toMatch(/<option value="1" selected[^>]*>Dominexo/)
+      expect(html).toContain('Los participantes no ven tu elección')
+    })
+
+    it('no aparece en la última ronda, con el torneo terminado, con un solo juego ni sin el comando', () => {
+      expect(withSelector(build({ currentRound: 5, totalRounds: 5 }))).not.toContain('siguiente-juego')
+      expect(withSelector(build({ phase: 'FINISHED' }))).not.toContain('siguiente-juego')
+      expect(withSelector(build({ games: [{ title: 'Banderas', level: 'MEDIUM', gameType: 'GUESS_WHO' }] }))).not.toContain('siguiente-juego')
+      expect(render(build())).not.toContain('siguiente-juego')
+    })
+  })
+
+  it('marca con un punto la conexión de cada persona y avisa arriba a quién se espera (#147)', () => {
+    const view = build();
+    view.liveMatches[0].players[0].connection = { state: 'waiting' };
+    view.liveMatches[0].players[1].connection = { state: 'connected' };
+    view.liveMatches[1].players[0].connection = { state: 'away' };
+    const html = render(view);
+    expect(html).toContain('Sin conexión:');
+    expect(html).toContain('Ana: se cayó su conexión, se la espera');
+    expect(html).toContain('Beto: conectada');
+    expect(html).toContain('Camila: aún no está en la partida');
+    // Solo se espera a Ana: quien aún no entró no dispara el aviso.
+    expect(html.match(/Sin conexión:<\/strong> ([^.]*)\./)?.[1]).toBe('Ana');
+  });
+
+  it('sin nadie desconectado no hay aviso y el bot no lleva punto de conexión (#147)', () => {
+    const html = render(build());
+    expect(html).not.toContain('Sin conexión:');
+    expect(html).not.toContain('Bot Nexus (medio): ');
+  });
+
   it('el título es «Torneo» (no el de un solo juego) y no hay confirmaciones abiertas de entrada (#131)', () => {
     const html = render(build())
     expect(html).toContain('>Torneo</h2>')

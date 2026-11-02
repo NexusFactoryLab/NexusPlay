@@ -350,7 +350,10 @@ describe('Torneo: la partida espera al participante y puede volver ya iniciado',
     // El chat sí sigue.
     expect(() => h.gateway.handleMatchChat(client('s-ana', 'ana'), { text: '¿Sigues ahí?' })).not.toThrow();
 
-    expect(() => h.gateway.handleTournamentJoin(client('s-zoe', 'zoe'), { code: 'TORN01' })).toThrow('El torneo ya inició.');
+    // Quien llega con el torneo en marcha entra con 0 puntos y juega desde la siguiente ronda (#147); la partida en pausa no se toca.
+    h.gateway.handleTournamentJoin(client('s-zoe', 'zoe'), { code: 'TORN01' });
+    expect(t.participants.find((p) => p.userId === 'zoe')).toMatchObject({ points: 0, wins: 0, losses: 0 });
+    expect(match.awaiting).not.toEqual({});
     h.gateway.handleTournamentJoin(client('s-beto-2', 'beto'), { code: 'TORN01' });
     expect(match.awaiting).toEqual({});
     expect(match.turnDeadline).toBe(Date.now() + 18_000);
@@ -402,4 +405,131 @@ describe('Torneo: la partida espera al participante y puede volver ya iniciado',
     expect(match.phase).toBe('PLAYING');
     expect(match.awaiting).toEqual({});
   });
+});
+
+describe('Torneo: el administrador pausa la ronda y suma tiempo (#147)', () => {
+  function adminTournament(): TournamentState {
+    return {
+      code: 'TORN01',
+      gameId: 'g',
+      gameTitle: 'Banderas',
+      maxParticipants: 4,
+      maxAccusationCount: 6,
+      totalRounds: 1,
+      turnDurationSeconds: 30,
+      phase: 'RUNNING',
+      participants: [
+        { socketId: 's-ana', userId: 'ana', displayName: 'Ana', points: 0, eliminated: false, eliminatedAtRound: null },
+        { socketId: 's-beto', userId: 'beto', displayName: 'Beto', points: 0, eliminated: false, eliminatedAtRound: null },
+      ],
+      creatorUserId: 'admin',
+      moderatorSocketId: 's-admin',
+      currentRound: 1,
+      matches: [
+        {
+          matchCode: 'TORN01-R1-M1',
+          round: 1,
+          playerUserIds: ['ana', 'beto'],
+          isBye: false,
+          phase: 'PLAYING',
+          cards: [
+            { cardId: 'c1', label: 'Uno', imageUrl: '', audioUrl: null },
+            { cardId: 'c2', label: 'Dos', imageUrl: '', audioUrl: null },
+          ],
+          players: [
+            { userId: 'ana', secretCardId: 'c1', discardedCardIds: [] },
+            { userId: 'beto', secretCardId: 'c2', discardedCardIds: [] },
+          ],
+          winnerUserId: null,
+          activePlayerUserId: null,
+          turnDeadline: null,
+        },
+      ],
+      winnerUserId: null,
+      createdAt: 0,
+    };
+  }
+  const admin = () => client('s-admin', 'admin');
+
+  it('pausar congela el turno y bloquea las jugadas; reanudar sigue con el tiempo que quedaba', () => {
+    const h = setup();
+    const t = adminTournament();
+    h.tournaments.create(t);
+    const match = t.matches[0];
+    h.internals.startTournamentMatchTurn(t, match, 'ana');
+    vi.advanceTimersByTime(12_000);
+
+    h.gateway.handleTournamentPause(admin(), { paused: true });
+    expect(t.pausedByAdmin).toBe(true);
+    expect(match.turnDeadline).toBeNull();
+    expect(h.lastState('s-ana', 'tournament:match-state')?.awaiting).toEqual([{ userId: '__admin__', displayName: 'el administrador', remainingMs: 0 }]);
+    expect(() => h.gateway.handleTournamentMatchPassTurn(client('s-ana', 'ana'))).toThrow('la pausó el administrador');
+    // Con la ronda en pausa el reloj no corre: pasa más que un turno y nadie pierde el suyo.
+    vi.advanceTimersByTime(90_000);
+    expect(match.activePlayerUserId).toBe('ana');
+
+    h.gateway.handleTournamentPause(admin(), { paused: false });
+    expect(t.pausedByAdmin).toBe(false);
+    expect(match.awaiting).toEqual({});
+    expect(match.turnDeadline).toBe(Date.now() + 18_000);
+    vi.advanceTimersByTime(18_000);
+    expect(match.activePlayerUserId).toBe('beto');
+  });
+
+  it('pausar dos veces seguidas no cambia nada, y solo el administrador puede', () => {
+    const h = setup();
+    const t = adminTournament();
+    h.tournaments.create(t);
+    h.internals.startTournamentMatchTurn(t, t.matches[0], 'ana');
+    h.gateway.handleTournamentPause(admin(), { paused: true });
+    const deadlineWhilePaused = t.matches[0].pausedTurnMs;
+    h.gateway.handleTournamentPause(admin(), { paused: true });
+    expect(t.matches[0].pausedTurnMs).toBe(deadlineWhilePaused);
+    expect(() => h.gateway.handleTournamentPause(client('s-ana', 'ana'), { paused: false })).toThrow(/Solo el administrador/);
+    expect(() => h.gateway.handleTournamentPause(admin(), { paused: 'si' as never })).toThrow(/pausa/);
+  });
+
+  it('el bot no juega durante la pausa', () => {
+    const h = setup();
+    const t = adminTournament();
+    t.matches[0].vsBot = true;
+    h.tournaments.create(t);
+    h.internals.startTournamentMatchTurn(t, t.matches[0], 'ana');
+    h.gateway.handleTournamentPause(admin(), { paused: true });
+    vi.advanceTimersByTime(120_000);
+    expect(t.matches[0].activePlayerUserId).toBe('ana');
+  });
+
+  it('sumar tiempo alarga el turno en curso, también durante una pausa', () => {
+    const h = setup();
+    const t = adminTournament();
+    h.tournaments.create(t);
+    const match = t.matches[0];
+    h.internals.startTournamentMatchTurn(t, match, 'ana');
+    vi.advanceTimersByTime(10_000);
+    h.gateway.handleTournamentAddTime(admin(), { seconds: 15 });
+    expect(match.turnDeadline).toBe(Date.now() + 35_000);
+    vi.advanceTimersByTime(34_000);
+    expect(match.activePlayerUserId).toBe('ana');
+    vi.advanceTimersByTime(1_000);
+    expect(match.activePlayerUserId).toBe('beto');
+
+    // En pausa, el tiempo extra se guarda para cuando se reanude.
+    h.internals.startTournamentMatchTurn(t, match, 'ana');
+    h.gateway.handleTournamentPause(admin(), { paused: true });
+    h.gateway.handleTournamentAddTime(admin(), { seconds: 30 });
+    h.gateway.handleTournamentPause(admin(), { paused: false });
+    expect(match.turnDeadline).toBe(Date.now() + 60_000);
+  });
+
+  it('sumar tiempo valida los segundos y a quién se le pide', () => {
+    const h = setup();
+    const t = adminTournament();
+    h.tournaments.create(t);
+    expect(() => h.gateway.handleTournamentAddTime(admin(), { seconds: 2 })).toThrow(/entre 5 y 120/);
+    expect(() => h.gateway.handleTournamentAddTime(admin(), { seconds: 999 })).toThrow(/entre 5 y 120/);
+    expect(() => h.gateway.handleTournamentAddTime(admin(), { seconds: '30' as never })).toThrow(/entre 5 y 120/);
+    expect(() => h.gateway.handleTournamentAddTime(client('s-beto', 'beto'), { seconds: 30 })).toThrow(/Solo el administrador/);
+  });
+
 });

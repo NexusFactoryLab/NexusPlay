@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Bot, Crown, Layers, LogOut, Medal, Radio, Swords, Trophy, Users } from 'lucide-react'
+import { Bot, Crown, Layers, LogOut, Medal, MonitorPlay, Pause, Play, Radio, Swords, Timer, Trophy, UserX, Users } from 'lucide-react'
 import { AvatarCircle } from '../../avatar/AvatarCircle'
 import { usePlayersAvatars } from '../../avatar/usePlayersAvatars'
 import type { AvatarConfig } from '../../../services/avatar.service'
@@ -8,6 +8,7 @@ import { useFlip } from '../../../hooks/useFlip'
 import type { TournamentLiveMatch, TournamentStateView } from './guessWhoTypes'
 import { PointsValue } from './PointsValue'
 import { TournamentConfirmModal } from './TournamentConfirmModal'
+import { TournamentProjector } from './TournamentProjector'
 import { TournamentPodium } from './TournamentPodium'
 import { TournamentPointsChart } from './TournamentPointsChart'
 import { TOURNAMENT_GAME_LABEL, TOURNAMENT_LEVEL_INFO } from './tournamentLevels'
@@ -18,12 +19,35 @@ type Props = {
   error: string | null
   onClose: () => void
   onEndRound: () => void
+  /** Elegir el juego de la siguiente ronda (`null` = sorteo). Si falta, el panel no muestra el selector. */
+  onSetNextGame?: (gameIndex: number | null) => void
+  /** Expulsar a una persona del torneo. Si falta, el panel no muestra el botón. */
+  onKick?: (userId: string) => void
+  /** Pausar o reanudar la ronda. Si falta, el panel no muestra el botón. */
+  onPause?: (paused: boolean) => void
+  /** Sumar segundos a los turnos en curso. Si falta, el panel no muestra el botón. */
+  onAddTime?: (seconds: number) => void
+  /** Al terminar el torneo, lleva a sus resultados completos en el historial. Si falta, el panel no muestra el botón. */
+  onOpenHistory?: () => void
   onExit: () => void
 }
 
 const MEDAL_TONES = ['text-[#d4a017]', 'text-[#9aa3b2]', 'text-[#b4753c]']
 
 const CARD = 'rounded-2xl border border-border bg-surface p-4 shadow-[var(--shadow)]'
+
+/** Punto de conexión de cada persona en su partida (issue #147). */
+const CONNECTION_DOT = {
+  connected: 'bg-emerald-500',
+  waiting: 'animate-pulse bg-amber-500',
+  away: 'bg-slate-400',
+} as const
+
+const CONNECTION_LABEL = {
+  connected: 'conectada',
+  waiting: 'se cayó su conexión, se la espera',
+  away: 'aún no está en la partida',
+} as const
 
 const stagger = (index: number) => ({ '--stagger': index }) as React.CSSProperties
 
@@ -110,13 +134,16 @@ function MatchStatus({ match }: { match: TournamentLiveMatch }) {
  * podio con avatares, gráfica de puntos por ronda, clasificación y las partidas
  * de la ronda en curso. Todo se recalcula con cada estado que llega por socket.
  */
-export function TournamentModeratorPanel({ tournament, error, onClose, onEndRound, onExit }: Props) {
+export function TournamentModeratorPanel({ tournament, error, onClose, onEndRound, onSetNextGame, onKick, onPause, onAddTime, onOpenHistory, onExit }: Props) {
   const [confirming, setConfirming] = useState<'round' | 'close' | null>(null)
+  const [projecting, setProjecting] = useState(false)
+  const [kicking, setKicking] = useState<{ userId: string; displayName: string } | null>(null)
   const ranking = useMemo(() => rankParticipants(tournament.participants), [tournament.participants])
   const history = useMemo(() => buildPointsHistory(tournament), [tournament])
   const finished = tournament.phase === 'FINISHED'
   const winner = tournament.participants.find((p) => p.userId === tournament.winnerUserId)
   const playing = tournament.liveMatches.filter((m) => m.phase === 'PLAYING').length
+  const waitingFor = tournament.liveMatches.flatMap((m) => (m.phase === 'PLAYING' ? m.players.filter((p) => p.connection?.state === 'waiting') : []))
   const roundsDone = finished ? tournament.totalRounds : Math.max(0, tournament.currentRound - 1)
   const progress = Math.round((roundsDone / tournament.totalRounds) * 100)
   const rowsRef = useFlip<HTMLDivElement>()
@@ -141,7 +168,9 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
         <header className="stagger-in flex flex-wrap items-start justify-between gap-3" style={stagger(0)}>
           <div className="min-w-0">
             <p className="text-[11px] font-semibold tracking-[0.18em] text-accent uppercase">Panel del administrador</p>
-            <h2 className="truncate text-[26px] font-bold tracking-tight text-text-h">Torneo</h2>
+            <h2 className="truncate text-[26px] font-bold tracking-tight text-text-h" title={tournament.name ?? undefined}>
+              {tournament.name ?? 'Torneo'}
+            </h2>
             <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-text">
               <span>
                 Código <strong className="tracking-widest text-text-h">{tournament.code}</strong>
@@ -165,12 +194,43 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
+              className="flex items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-[13px] font-semibold text-text-h transition-all duration-200 hover:-translate-y-0.5 hover:border-accent"
+              title="Pantalla completa y oscura para mostrar el podio en el salón"
+              onClick={() => setProjecting(true)}
+            >
+              <MonitorPlay className="h-4 w-4" strokeWidth={2} />
+              Proyectar
+            </button>
+            <button
+              type="button"
               className="flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-2 text-[13px] font-medium text-text-h transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/50"
               onClick={onExit}
             >
               <LogOut className="h-4 w-4" strokeWidth={2} />
               Salir del panel
             </button>
+            {!finished && tournament.phase === 'RUNNING' && onPause && (
+              <button
+                type="button"
+                className="flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-2 text-[13px] font-semibold text-text-h transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/50"
+                title="Detiene los relojes de Identidad Oculta y Dominó. El Laberinto es a ritmo propio y no se pausa."
+                onClick={() => onPause(!tournament.paused)}
+              >
+                {tournament.paused ? <Play className="h-4 w-4" strokeWidth={2} /> : <Pause className="h-4 w-4" strokeWidth={2} />}
+                {tournament.paused ? 'Reanudar ronda' : 'Pausar ronda'}
+              </button>
+            )}
+            {!finished && tournament.phase === 'RUNNING' && onAddTime && (
+              <button
+                type="button"
+                className="flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-2 text-[13px] font-semibold text-text-h transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/50"
+                title="Suma 30 segundos al turno en curso de cada partida de Identidad Oculta y Dominó"
+                onClick={() => onAddTime(30)}
+              >
+                <Timer className="h-4 w-4" strokeWidth={2} />
+                +30 s
+              </button>
+            )}
             {!finished && (
               <button
                 type="button"
@@ -194,6 +254,18 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
         {error && (
           <p className="rounded-lg border border-danger/35 bg-danger/10 px-3 py-2 text-sm text-danger" role="alert">
             {error}
+          </p>
+        )}
+
+        {tournament.paused && (
+          <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[13px] text-text-h" role="status">
+            <strong>Ronda en pausa.</strong> Identidad Oculta y Dominó están detenidos; el Laberinto sigue a su ritmo. Pulsa «Reanudar ronda» para seguir.
+          </p>
+        )}
+
+        {waitingFor.length > 0 && (
+          <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[13px] text-text-h" role="status">
+            <strong>Sin conexión:</strong> {waitingFor.map((player) => player.displayName).join(', ')}. Su partida está en pausa mientras vuelve{waitingFor.length === 1 ? '' : 'n'}.
           </p>
         )}
 
@@ -228,6 +300,32 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
           </div>
         </div>
 
+        {onSetNextGame && !finished && tournament.currentRound < tournament.totalRounds && tournament.games.length > 1 && (
+          <div className="stagger-in flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-border bg-surface px-4 py-3" style={stagger(5)}>
+            <label htmlFor="siguiente-juego" className="text-[13px] font-semibold text-text-h">
+              Juego de la ronda {tournament.currentRound + 1}
+            </label>
+            <select
+              id="siguiente-juego"
+              className="min-w-[200px] max-w-full flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-[13px] font-medium text-text-h focus-visible:outline-2 focus-visible:outline-accent sm:flex-none"
+              value={tournament.nextRoundGameIndex ?? ''}
+              onChange={(event) => onSetNextGame(event.target.value === '' ? null : Number(event.target.value))}
+            >
+              <option value="">Sorteo (sorpresa)</option>
+              {tournament.games.map((game, index) => (
+                <option key={`${game.title}-${index}`} value={index}>
+                  {game.title} · {TOURNAMENT_GAME_LABEL[game.gameType]} · {TOURNAMENT_LEVEL_INFO[game.level].label}
+                </option>
+              ))}
+            </select>
+            <p className="min-w-0 flex-1 text-[12px] text-text">
+              {tournament.nextRoundGameIndex === null || tournament.nextRoundGameIndex === undefined
+                ? 'Si no eliges, se sortea y nunca repite el de la ronda anterior.'
+                : 'Los participantes no ven tu elección: se revela al empezar la ronda.'}
+            </p>
+          </div>
+        )}
+
         {finished && winner && (
           <div
             className="stagger-in flex items-center gap-4 rounded-2xl border border-accent/30 p-4"
@@ -239,9 +337,20 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
             >
               <Trophy className="h-6 w-6" strokeWidth={1.75} />
             </span>
-            <p className="text-[16px] font-semibold text-text-h">
+            <p className="min-w-0 flex-1 text-[16px] font-semibold text-text-h">
               Ganó el torneo {winner.displayName} con {winner.points} {winner.points === 1 ? 'punto' : 'puntos'}
             </p>
+            {onOpenHistory && (
+              <button
+                type="button"
+                className="shrink-0 rounded-lg px-4 py-2 text-[13px] font-semibold text-white shadow-[0_8px_20px_-8px_var(--accent)] transition-all duration-200 hover:-translate-y-0.5"
+                style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
+                title="Clasificación completa, rondas y lo que más se falló, con descarga en CSV y PDF"
+                onClick={onOpenHistory}
+              >
+                Ver resultados completos
+              </button>
+            )}
           </div>
         )}
 
@@ -305,6 +414,9 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
                       <span className="rounded-md bg-code-bg px-1.5 py-0.5" title="Preguntas hechas">
                         {participant.questionsAsked} preg.
                       </span>
+                      <span className="rounded-md bg-code-bg px-1.5 py-0.5" title="Afirmaciones acertadas en el Laberinto (desempata: más es mejor)">
+                        {participant.correctAnswers} aciertos
+                      </span>
                       <span className="rounded-md bg-code-bg px-1.5 py-0.5" title="Acusaciones equivocadas (desempata: menos es mejor)">
                         {participant.wrongAccusations} fallos
                       </span>
@@ -312,6 +424,17 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
                         {participant.botMatches} bot
                       </span>
                     </div>
+                    {onKick && !finished && (
+                      <button
+                        type="button"
+                        className="shrink-0 rounded-md p-1.5 text-text transition-colors hover:bg-danger/10 hover:text-danger focus-visible:outline-2 focus-visible:outline-danger"
+                        aria-label={`Expulsar a ${participant.displayName}`}
+                        title={`Expulsar a ${participant.displayName}`}
+                        onClick={() => setKicking({ userId: participant.userId, displayName: participant.displayName })}
+                      >
+                        <UserX className="h-4 w-4" strokeWidth={2} />
+                      </button>
+                    )}
                     <span className="w-[46px] shrink-0 text-right text-[18px] leading-none font-bold">
                       <PointsValue value={participant.points} />
                       <span className="block text-[10px] font-medium text-text">{participant.points === 1 ? 'punto' : 'puntos'}</span>
@@ -321,7 +444,12 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
               })}
               {ranking.length === 0 && <p className="text-[13px] text-text">Todavía no hay participantes.</p>}
             </div>
-            <p className="mt-3 text-[11.5px] text-text">G = ganadas · P = perdidas · Fallos = acusaciones equivocadas (desempata: menos es mejor) · Bot = partidas contra el bot</p>
+            {(tournament.kickedParticipants?.length ?? 0) > 0 && (
+              <p className="mt-3 rounded-lg bg-code-bg px-3 py-2 text-[12px] text-text">
+                <strong className="text-text-h">Expulsados:</strong> {tournament.kickedParticipants?.map((person) => person.displayName).join(', ')}. No cuentan en la clasificación ni pueden volver.
+              </p>
+            )}
+            <p className="mt-3 text-[11.5px] text-text">G = ganadas · P = perdidas · Aciertos = afirmaciones acertadas del Laberinto · Fallos = acusaciones equivocadas · Bot = partidas contra el bot. Desempate: menos derrotas, más aciertos, menos fallos.</p>
           </section>
 
           <section className={`stagger-in ${CARD}`} style={stagger(9)} aria-labelledby="partidas-titulo">
@@ -339,13 +467,22 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
                   <div className="mb-1.5 flex items-center gap-2">
                     <div className="flex shrink-0 -space-x-2">
                       {match.players.map((player) => (
-                        <PlayerAvatar
-                          key={player.userId}
-                          userId={player.userId}
-                          name={player.displayName}
-                          avatars={avatars}
-                          className="h-7 w-7 border-2 border-surface text-[10px]"
-                        />
+                        <span key={player.userId} className="relative">
+                          <PlayerAvatar
+                            userId={player.userId}
+                            name={player.displayName}
+                            avatars={avatars}
+                            className="h-7 w-7 border-2 border-surface text-[10px]"
+                          />
+                          {match.phase === 'PLAYING' && player.connection && (
+                            <span
+                              className={`absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-surface ${CONNECTION_DOT[player.connection.state]}`}
+                              title={`${player.displayName}: ${CONNECTION_LABEL[player.connection.state]}`}
+                              role="img"
+                              aria-label={`${player.displayName}: ${CONNECTION_LABEL[player.connection.state]}`}
+                            />
+                          )}
+                        </span>
                       ))}
                     </div>
                     <p className="min-w-0 flex-1 truncate font-medium">{match.players.map((p) => p.displayName).join(' vs ')}</p>
@@ -361,6 +498,25 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
           </section>
         </div>
       </div>
+      {projecting && <TournamentProjector tournament={tournament} onClose={() => setProjecting(false)} />}
+      {kicking && onKick && (
+        <TournamentConfirmModal
+          title={`¿Expulsar a ${kicking.displayName}?`}
+          message={
+            tournament.phase === 'WAITING'
+              ? 'Sale del torneo y no podrá volver a entrar con el código.'
+              : 'Pierde la partida que tenga en curso (su rival suma el punto), no entra en las rondas que siguen, no cuenta en la clasificación y no puede volver. No se puede deshacer.'
+          }
+          confirmLabel="Sí, expulsar"
+          cancelLabel="Cancelar"
+          onConfirm={() => {
+            const { userId } = kicking
+            setKicking(null)
+            onKick(userId)
+          }}
+          onCancel={() => setKicking(null)}
+        />
+      )}
       {confirming === 'round' && (
         <TournamentConfirmModal
           title={tournament.currentRound >= tournament.totalRounds ? '¿Terminar el torneo ahora?' : '¿Cerrar la ronda ahora?'}

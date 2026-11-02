@@ -6,10 +6,19 @@ import type { TournamentParticipantView, TournamentStateView } from './guessWhoT
  * Todo sale del mismo estado que llega por socket, así que se recalcula solo.
  */
 
-/** Mismo orden que el servidor para el ranking final: más puntos, menos acusaciones fallidas, nombre. */
+/**
+ * Mismo orden que el servidor (domain/services/tournament-ranking.ts): más puntos, menos derrotas,
+ * más aciertos del Laberinto, menos acusaciones equivocadas, nombre. Hay una prueba de paridad.
+ */
 export function rankParticipants(participants: readonly TournamentParticipantView[]): TournamentParticipantView[] {
   return [...participants].sort(
-    (a, b) => b.points - a.points || a.wrongAccusations - b.wrongAccusations || a.displayName.localeCompare(b.displayName),
+    (a, b) =>
+      b.points - a.points ||
+      a.losses - b.losses ||
+      b.correctAnswers - a.correctAnswers ||
+      a.wrongAccusations - b.wrongAccusations ||
+      a.displayName.localeCompare(b.displayName, 'es') ||
+      a.userId.localeCompare(b.userId),
   )
 }
 

@@ -8,7 +8,8 @@ import { DominoVisualDemo } from './DominoVisualDemo'
 import { TutorialQuestion } from './tutorial/TutorialQuestion'
 import { GameGuide } from './tutorial/GameGuide'
 import { useInTournamentPlay } from './tournamentPlay'
-import { guessWhoGuideSteps, memoryGuideSteps, tournamentGuideSteps } from './tutorial/guideSteps'
+import { guessWhoGuideSteps, memoryGuideSteps } from './tutorial/guideSteps'
+import { tournamentGuideSteps } from './tutorial/tournamentGuideSteps'
 import { duoGuideSteps } from './duo-logico/duoGuideSteps'
 
 const SEEN_KEY_PREFIX = 'nexusplay:guia-vista:'
@@ -77,6 +78,7 @@ export function GameInstructionsGate({
         ariaLabel={kind === 'GUESS_WHO_GROUP' ? 'Guía del torneo' : kind === 'GUESS_WHO' ? 'Guía de Identidad Oculta' : 'Guía de MatchMente'}
         dataAttr={kind}
         accent={kind === 'GUESS_WHO_GROUP' ? 'amber' : 'violet'}
+        themed={kind === 'GUESS_WHO_GROUP'}
         onClose={onContinue}
         onTutorial={onTutorial}
       />

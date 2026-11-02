@@ -266,6 +266,15 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
             )}
             {canManageUsers && (
               <SidebarItem
+                tourTarget="nav-tournaments"
+                label="Torneos"
+                collapsed={collapsed}
+                active={location.pathname.startsWith('/torneos')}
+                onClick={() => navigate('/torneos')}
+              />
+            )}
+            {canManageUsers && (
+              <SidebarItem
                 tourTarget="nav-ai-providers"
                 label="Proveedores de IA"
                 collapsed={collapsed}

@@ -22,6 +22,7 @@ export function useGuessWhoTournament(token: string | null) {
   const [closed, setClosed] = useState(false)
   const [matchAccusationFailedMessage, setMatchAccusationFailedMessage] = useState<string | null>(null)
   const [matchAbandonedMessage, setMatchAbandonedMessage] = useState<string | null>(null)
+  const [kickedMessage, setKickedMessage] = useState<string | null>(null)
 
   useEffect(() => {
     if (!token) return
@@ -74,6 +75,12 @@ export function useGuessWhoTournament(token: string | null) {
     )
     // El rival abandonó el duelo (issue #131): la partida ya cerró y la ganó quien se queda.
     socket.on('tournament:match-abandoned', (payload: { matchCode: string; message: string }) => setMatchAbandonedMessage(payload.message))
+    // El administrador te sacó del torneo (issue #147): no hay vuelta atrás, se limpia todo.
+    socket.on('tournament:kicked', (payload: { message: string }) => {
+      waitingCodeRef.current = null
+      setTournament(null)
+      setKickedMessage(payload.message)
+    })
 
     return () => {
       socket.disconnect()
@@ -82,9 +89,9 @@ export function useGuessWhoTournament(token: string | null) {
   }, [token])
 
   const createTournament = useCallback(
-    () => {
-      // Juegos, niveles, cupo y rondas los lee el servidor del torneo habilitado en Edición.
-      socketRef.current?.emit('tournament:create')
+    (name?: string) => {
+      // Juegos, niveles, cupo y rondas los lee el servidor del torneo habilitado; el nombre es opcional.
+      socketRef.current?.emit('tournament:create', { name })
     },
     [],
   )
@@ -103,6 +110,26 @@ export function useGuessWhoTournament(token: string | null) {
 
   const startTournament = useCallback(() => {
     socketRef.current?.emit('tournament:start')
+  }, [])
+
+  /** El administrador elige el juego de la siguiente ronda (`null` = volver al sorteo). */
+  const setNextGame = useCallback((gameIndex: number | null) => {
+    socketRef.current?.emit('tournament:set-next-game', { gameIndex })
+  }, [])
+
+  /** El administrador expulsa a una persona del torneo. */
+  const kickParticipant = useCallback((userId: string) => {
+    socketRef.current?.emit('tournament:kick', { userId })
+  }, [])
+
+  /** El administrador pausa o reanuda la ronda. */
+  const setPaused = useCallback((paused: boolean) => {
+    socketRef.current?.emit('tournament:pause', { paused })
+  }, [])
+
+  /** El administrador suma segundos a los turnos en curso. */
+  const addTime = useCallback((seconds: number) => {
+    socketRef.current?.emit('tournament:add-time', { seconds })
   }, [])
 
   const endRound = useCallback(() => {
@@ -169,6 +196,10 @@ export function useGuessWhoTournament(token: string | null) {
     matchAccusationFailedMessage,
     clearMatchAccusationFailedMessage: () => setMatchAccusationFailedMessage(null),
     matchAbandonedMessage,
+    kickedMessage,
+    kickParticipant,
+    setPaused,
+    addTime,
     clearMatchAbandonedMessage: () => setMatchAbandonedMessage(null),
     createTournament,
     sendMazeAnswer,
@@ -178,6 +209,7 @@ export function useGuessWhoTournament(token: string | null) {
     startTournament,
     closeTournament,
     endRound,
+    setNextGame,
     closed,
     updateTurnDuration,
     leaveTournament,

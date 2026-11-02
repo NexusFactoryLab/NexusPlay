@@ -12,13 +12,23 @@
  * sorteo sale de una semilla del torneo (código + creación) y del número de
  * ronda, estable durante toda la sesión y distinto entre torneos.
  */
-export function pickRoundGameIndex(seed: string, round: number, gameCount: number): number {
+export function pickRoundGameIndex(
+  seed: string,
+  round: number,
+  gameCount: number,
+  /** Rondas en las que el administrador eligió el juego (ronda → posición en la lista de juegos). */
+  overrides?: Readonly<Record<number, number>>,
+): number {
   if (gameCount <= 1) return 0;
   let previous = -1;
   let index = 0;
   // Se arma la secuencia desde la ronda 1: cada ronda depende de la anterior.
   for (let current = 1; current <= round; current += 1) {
-    if (previous === -1) {
+    const forced = overrides?.[current];
+    if (forced !== undefined && Number.isInteger(forced) && forced >= 0 && forced < gameCount) {
+      // El juego elegido manda; la ronda siguiente se sortea entre los demás, así que nunca repite el elegido.
+      index = forced;
+    } else if (previous === -1) {
       index = hashToRange(seed, current, gameCount);
     } else {
       // Se sortea entre los demás juegos (gameCount - 1) y se salta el anterior.

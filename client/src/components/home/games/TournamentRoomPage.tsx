@@ -4,8 +4,10 @@ import { TournamentLobby } from './TournamentLobby'
 import { TournamentModeratorPanel } from './TournamentModeratorPanel'
 import { TournamentCodeEntry } from './TournamentCodeEntry'
 import { TournamentCreateConfirm } from './TournamentCreateConfirm'
+import { invalidateTournamentHistory } from '../../../services/tournament-history.service'
 import { TournamentConfirmModal } from './TournamentConfirmModal'
 import { TournamentFinalResults } from './TournamentFinalResults'
+import { TournamentRoundReveal, type RevealedGame } from './TournamentRoundReveal'
 import { TournamentRoundWaiting } from './TournamentRoundWaiting'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -103,12 +105,17 @@ function TournamentSession() {
     matchAccusationFailedMessage,
     clearMatchAccusationFailedMessage,
     matchAbandonedMessage,
+    kickedMessage,
+    kickParticipant,
+    setPaused,
+    addTime,
     clearMatchAbandonedMessage,
     createTournament,
     joinTournament,
     startTournament,
     closeTournament,
     endRound,
+    setNextGame,
     closed,
     sendMatchMessage,
     askQuestion,
@@ -125,7 +132,16 @@ function TournamentSession() {
   const [joinCodeInput, setJoinCodeInput] = useState('')
   const [showPairingOverlay, setShowPairingOverlay] = useState(false)
   const [showStandings, setShowStandings] = useState(false)
-  const [confirmingExit, setConfirmingExit] = useState(false)
+  // Qué confirma el aviso de salida: abandonar una partida en curso, o irse sin haber descargado el reporte.
+  const [confirmingExit, setConfirmingExit] = useState<'match' | 'report' | null>(null)
+  const [reportSaved, setReportSaved] = useState(false)
+
+  // El historial guardado (issue #147) se descarta cuando esta sala cambia de fase y al salir de ella, para que
+  // «Torneos» muestre la sala abierta y los resultados al día.
+  useEffect(() => {
+    invalidateTournamentHistory()
+  }, [tournament?.code, tournament?.phase])
+  useEffect(() => invalidateTournamentHistory, [])
 
   // Arranque de la sala: si la URL trae un código en el path, se une a esa
   // sala — mismo patrón de reconexión que Dominó/Escaleras/GuessWho.
@@ -217,6 +233,13 @@ function TournamentSession() {
     return () => clearTimeout(timeout)
   }, [matchAbandonedMessage, clearMatchAbandonedMessage])
 
+  /** Salir pide confirmación solo si cuesta algo: abandonar una partida o perder el reporte sin descargarlo. */
+  function requestExit() {
+    if (tournament?.phase === 'RUNNING' && tournament.myMatch?.phase === 'PLAYING') setConfirmingExit('match')
+    else if (tournament?.phase === 'FINISHED' && !tournament.isModerator && !reportSaved && tournament.participants.some((p) => p.isSelf)) setConfirmingExit('report')
+    else handleExit()
+  }
+
   function handleExit() {
     leaveTournament()
     navigate('/')
@@ -235,6 +258,21 @@ function TournamentSession() {
     startedRef.current = false
     setJoinCodeInput('')
     navigate('/quien-es/torneo', { replace: true })
+  }
+
+  // El administrador te sacó del torneo (issue #147).
+  if (kickedMessage) {
+    return (
+      <Modal onClose={() => navigate('/')} dismissible={false}>
+        <div className="flex flex-col items-center gap-3 py-4 text-center">
+          <p className="text-[15px] font-semibold text-text-h">{kickedMessage}</p>
+          <p className="text-[13px] text-text">Ya no puedes volver a entrar a este torneo.</p>
+          <button type="button" className="rounded-lg border border-border px-4 py-2 text-[14px] font-medium text-text-h" onClick={() => navigate('/')}>
+            Volver al inicio
+          </button>
+        </div>
+      </Modal>
+    )
   }
 
   // El administrador cerró el torneo.
@@ -287,9 +325,9 @@ function TournamentSession() {
     return (
       <TournamentCreateConfirm
         onCancel={handleExit}
-        onCreate={() => {
+        onCreate={(name) => {
           startedRef.current = true
-          createTournament()
+          createTournament(name)
         }}
       />
     )
@@ -348,7 +386,7 @@ function TournamentSession() {
 
   // El administrador no juega: ve el panel con la clasificación y las partidas en vivo.
   if (tournament.isModerator) {
-    return <TournamentModeratorPanel tournament={tournament} error={error} onClose={closeTournament} onEndRound={endRound} onExit={handleExit} />
+    return <TournamentModeratorPanel tournament={tournament} error={error} onClose={closeTournament} onEndRound={endRound} onSetNextGame={setNextGame} onKick={kickParticipant} onPause={setPaused} onAddTime={addTime} onOpenHistory={() => navigate(`/torneos/historial/${encodeURIComponent(tournament.code)}`)} onExit={handleExit} />
   }
 
   return (
@@ -357,16 +395,17 @@ function TournamentSession() {
         <PairingAnnouncementOverlay
           announcement={{ round: dominoMatch.round, pairing: dominoMatch.players.map((p) => ({ userId: p.userId, displayName: p.displayName })) }}
           selfUserId={user?.id ?? null}
+          game={tournament.currentRoundGame}
           durationMs={MATCH_ENTRY_DELAY_MS}
         />
       )}
       {playerWait && tournament.myMatch?.phase === 'PLAYING' && <PlayerWaitOverlay wait={playerWait} onLeave={handleExit} />}
-      {mazeMatch && <MazeRoundAnnouncement round={mazeMatch.round} title={mazeMatch.gameTitle} />}
+      {mazeMatch && <MazeRoundAnnouncement round={mazeMatch.round} title={mazeMatch.gameTitle} game={tournament.currentRoundGame} />}
       {showStandings && (
         <StandingsOverlay participants={tournament.participants} selfUserId={user?.id ?? null} round={Math.max(tournament.currentRound - (tournament.myMatch ? 1 : 0), 1)} />
       )}
       {!dominoMatch && showPairingOverlay && pairingAnnouncement && (
-        <PairingAnnouncementOverlay announcement={pairingAnnouncement} selfUserId={user?.id ?? null} />
+        <PairingAnnouncementOverlay announcement={pairingAnnouncement} selfUserId={user?.id ?? null} game={tournament.currentRoundGame} />
       )}
 
       <div className={tournament.myMatch?.phase === 'PLAYING' ? 'guess-who-play-shell' : 'mx-auto flex min-h-full max-w-[1560px] flex-col p-5 sm:p-8'}>
@@ -396,7 +435,7 @@ function TournamentSession() {
             type="button"
             className="flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-2 text-[13px] font-medium text-text-h transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/50 hover:text-accent"
             // En plena partida, salir es abandonarla (la gana tu rival): se confirma antes.
-            onClick={() => (tournament.phase === 'RUNNING' && tournament.myMatch?.phase === 'PLAYING' ? setConfirmingExit(true) : handleExit())}
+            onClick={requestExit}
           >
             <LogOut className="h-4 w-4" strokeWidth={2} />
             Salir
@@ -485,21 +524,25 @@ function TournamentSession() {
 
         {tournament.phase === 'FINISHED' && (
           <div className="flex justify-center">
-            <TournamentFinalResults tournament={tournament} selfUserId={user?.id ?? null} onExit={handleExit} />
+            <TournamentFinalResults tournament={tournament} selfUserId={user?.id ?? null} onExit={requestExit} onReportSaved={() => setReportSaved(true)} />
           </div>
         )}
       </div>
       {confirmingExit && (
         <TournamentConfirmModal
-          title="¿Salir del torneo?"
-          message="Estás en medio de una partida. Si sales, la abandonas: la gana tu rival y tú no sumas puntos."
+          title={confirmingExit === 'report' ? '¿Salir sin descargar tu reporte?' : '¿Salir del torneo?'}
+          message={
+            confirmingExit === 'report'
+              ? 'Si sales de la sala, ya no podrás descargar tu reporte: no se guarda en Nexus Play.'
+              : 'Estás en medio de una partida. Si sales, la abandonas: la gana tu rival y tú no sumas puntos.'
+          }
           confirmLabel="Sí, salir"
-          cancelLabel="Seguir jugando"
+          cancelLabel={confirmingExit === 'report' ? 'Volver al reporte' : 'Seguir jugando'}
           onConfirm={() => {
-            setConfirmingExit(false)
+            setConfirmingExit(null)
             handleExit()
           }}
-          onCancel={() => setConfirmingExit(false)}
+          onCancel={() => setConfirmingExit(null)}
         />
       )}
     </div>
@@ -661,16 +704,20 @@ function StandingsOverlay({
 }
 
 /** Aviso de una ronda de Misión Galáctica: no hay pareja, cada persona juega sola. */
-function MazeRoundAnnouncement({ round, title }: { round: number; title: string }) {
+function MazeRoundAnnouncement({ round, title, game }: { round: number; title: string; game: RevealedGame | null }) {
   return (
     <div
       className="overlay-timed fixed inset-0 z-[70] flex flex-col items-center justify-center gap-4 bg-black/75 px-5 text-center text-white backdrop-blur-md"
       style={{ '--overlay-ms': `${MAZE_ENTRY_DELAY_MS}ms` } as React.CSSProperties}
     >
       <p className="stagger-in text-[13px] font-semibold tracking-[0.22em] text-white/70 uppercase">Ronda {round}</p>
-      <p className="stagger-in text-[26px] font-bold sm:text-[32px]" style={{ '--stagger': 1 } as React.CSSProperties}>
-        {title}
-      </p>
+      {game ? (
+        <TournamentRoundReveal game={game} />
+      ) : (
+        <p className="stagger-in text-[26px] font-bold sm:text-[32px]" style={{ '--stagger': 1 } as React.CSSProperties}>
+          {title}
+        </p>
+      )}
       <p className="stagger-in max-w-[420px] text-[14px] text-white/80" style={{ '--stagger': 2 } as React.CSSProperties}>
         Juegas solo. Respondiendo <b>todas</b> bien sumas un punto.
       </p>
@@ -681,10 +728,13 @@ function MazeRoundAnnouncement({ round, title }: { round: number; title: string 
 function PairingAnnouncementOverlay({
   announcement,
   selfUserId,
+  game,
   durationMs = PAIRING_OVERLAY_MS,
 }: {
   announcement: { round: number; pairing: { userId: string; displayName: string }[] }
   selfUserId: string | null
+  /** El juego sorteado de la ronda; se revela antes de mostrar la pareja. */
+  game: RevealedGame | null
   /** Cuánto se muestra: coincide con el temporizador que lo retira o que navega a la partida. */
   durationMs?: number
 }) {
@@ -698,6 +748,7 @@ function PairingAnnouncementOverlay({
       style={{ '--overlay-ms': `${durationMs}ms` } as React.CSSProperties}
     >
       <p className="stagger-in text-[13px] font-semibold tracking-[0.22em] text-white/70 uppercase">Ronda {announcement.round}</p>
+      {game && <TournamentRoundReveal game={game} />}
       <div className="flex w-full max-w-[640px] items-center justify-center gap-4 sm:gap-8">
         <div className="versus-left min-w-0 flex-1 rounded-2xl border border-white/15 bg-white/10 px-4 py-5 text-white">
           <p className="truncate text-[18px] font-bold sm:text-[22px]">{self?.displayName ?? 'Tú'}</p>

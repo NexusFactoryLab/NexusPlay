@@ -62,6 +62,15 @@ export interface TournamentParticipant {
   botMatches?: number;
   questionsAsked?: number;
   wrongAccusations?: number;
+  /** Afirmaciones del Laberinto V/F acertadas: crédito parcial para el desempate (issue #147). */
+  correctAnswers?: number;
+  /**
+   * Cómo salió de la sala con el torneo ya terminado (issue #147). El reporte final solo se ve estando en la sala:
+   * si salió a propósito no puede volver, y si solo se le cortó la conexión tiene un margen corto para volver.
+   */
+  finalExit?: { at: number; explicit: boolean };
+  /** Expulsado por el administrador (issue #147): no entra en las rondas siguientes, no cuenta en la clasificación y no puede volver. */
+  kicked?: boolean;
 }
 
 /**
@@ -109,10 +118,20 @@ export interface TournamentMatch extends PausableGame {
   turnDeadline: number | null;
 }
 
+/** Cuántas veces apareció un concepto o afirmación y cuántas se falló. */
+export interface TournamentInsight {
+  kind: 'DOMINO' | 'MAZE';
+  label: string;
+  attempts: number;
+  misses: number;
+}
+
 export interface TournamentState {
   code: string;
   gameId: string;
   gameTitle: string;
+  /** Nombre opcional que el administrador le puso al abrir la sala (issue #147); sin él, el torneo se identifica por su código y su fecha. */
+  name?: string;
   /** Cupo máximo configurado por el creador (límite superior 10, ver validación en el gateway). */
   maxParticipants: number;
   maxAccusationCount: number;
@@ -121,6 +140,15 @@ export interface TournamentState {
   participants: TournamentParticipant[];
   /** Juegos del torneo: cada ronda sortea uno sin repetir el de la ronda anterior (ver `pickRoundGameIndex`). Vacío = solo `gameId`. */
   games?: { gameId: string; title: string; level: TournamentLevel; gameType?: TournamentGameType }[];
+  /**
+   * Qué conceptos (Dominó) y afirmaciones (Laberinto) se acertaron o fallaron en el torneo, para el resumen
+   * pedagógico del historial (issue #147). Clave estable por juego y concepto/afirmación.
+   */
+  insights?: Record<string, TournamentInsight>;
+  /** El administrador tiene la ronda en pausa (issue #147). Se apaga solo al empezar la ronda siguiente. */
+  pausedByAdmin?: boolean;
+  /** Rondas cuyo juego eligió el administrador en vez del sorteo: ronda → posición en `games` (issue #147). */
+  gameOverrides?: Record<number, number>;
   /** Administrador que modera el torneo: no juega ni entra al emparejamiento. */
   creatorUserId: string;
   /** Socket del moderador, para enviarle el panel en vivo (null si se desconectó). */

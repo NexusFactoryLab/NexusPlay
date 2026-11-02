@@ -107,6 +107,8 @@ export type TournamentParticipantView = {
   botMatches: number
   questionsAsked: number
   wrongAccusations: number
+  /** Afirmaciones del Laberinto acertadas (desempata: más es mejor). */
+  correctAnswers: number
 }
 
 export type TournamentLiveMatch = {
@@ -115,7 +117,14 @@ export type TournamentLiveMatch = {
   vsBot: boolean
   activePlayerUserId: string | null
   winnerUserId: string | null
-  players: { userId: string; displayName: string; discardedCount: number; handCount: number | null }[]
+  players: {
+    userId: string
+    displayName: string
+    discardedCount: number
+    handCount: number | null
+    /** Conexión de la persona en esta partida (issue #147); `null` para el bot o si no se puede saber. */
+    connection?: { state: 'connected' | 'waiting' | 'away' } | null
+  }[]
   gameType: TournamentGameType
   totalCards: number
   /** Misión Galáctica: avance de la persona que juega (el match es de una sola). */
@@ -130,6 +139,11 @@ export type TournamentRoundMatchSummary = {
   winnerUserId: string | null
   vsBot: boolean
   gameType: TournamentGameType
+  /** Nombre de cada persona de la partida (sirve aunque ya no esté entre los participantes, p. ej. si fue expulsada). */
+  playerNames?: Record<string, string>
+  /** Juego y nivel de esta partida (para el reporte de cada estudiante). */
+  gameTitle?: string
+  level?: TournamentLevel
 }
 
 export type TournamentRoundSummary = {
@@ -164,6 +178,8 @@ export type TournamentMatchStateView = GuidedChatState & {
 
 export type TournamentStateView = {
   code: string
+  /** Nombre que el administrador le puso al abrir la sala (issue #147); `null` si no le puso ninguno. */
+  name?: string | null
   gameTitle: string
   /** Juegos del torneo con su complejidad; cada ronda sortea uno al azar. */
   games: { title: string; level: TournamentLevel; gameType: TournamentGameType }[]
@@ -174,6 +190,12 @@ export type TournamentStateView = {
   /** El juego que se sorteó para la ronda en curso; `null` antes de que arranque la primera. */
   currentRoundGame: { title: string; level: TournamentLevel; gameType: TournamentGameType } | null
   totalRounds: number
+  /** El administrador tiene la ronda en pausa (Identidad Oculta y Dominó; el Laberinto sigue a su ritmo). */
+  paused?: boolean
+  /** Solo para el administrador: el juego que eligió para la siguiente ronda (posición en `games`), o null si queda al sorteo. */
+  nextRoundGameIndex?: number | null
+  /** Solo para el administrador: quienes expulsó (ya no aparecen entre los participantes). */
+  kickedParticipants?: { userId: string; displayName: string }[]
   creatorUserId: string
   /** true para el administrador que modera: ve el panel y no juega. */
   isModerator: boolean
