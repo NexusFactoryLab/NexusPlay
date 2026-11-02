@@ -3,10 +3,11 @@ import { Check, DoorOpen, Flag, Gamepad2, Pencil, PowerOff, Shuffle, Swords, Use
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../hooks/useAuth'
 import { useToast } from '../../../hooks/useToast'
-import { listGames, type GameSummary } from '../../../services/game.service'
+import type { GameSummary } from '../../../services/game.service'
 import {
   clearTournamentSettings,
   getTournamentSettings,
+  listTournamentCandidateGames,
   saveTournamentSettings,
   type TournamentSettings,
 } from '../../../services/tournament-settings.service'
@@ -136,9 +137,9 @@ export function TournamentSetupPanel() {
   useEffect(() => {
     if (!token) return
     let cancelled = false
-    listGames(token, { community: true, pageSize: 200 })
-      .then((result) => {
-        if (!cancelled) setGames(result.items)
+    listTournamentCandidateGames(token)
+      .then((items) => {
+        if (!cancelled) setGames(items)
       })
       .catch(() => {
         if (!cancelled) setGames([])

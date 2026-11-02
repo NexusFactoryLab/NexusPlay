@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/commo
 import type { TournamentState, TournamentStore } from '../../domain/ports/tournament-store.port.js';
 import { PrismaService } from '../persistence/prisma/prisma.service.js';
 import { InMemoryTournamentStore } from './in-memory-tournament.store.js';
+import { tournamentHistoryCache } from '../persistence/cache/cached-tournament-history.repository.js';
 
 /** Cada cuánto se vuelca a la BD un torneo que cambia seguido (descartes, preguntas…). */
 const PERSIST_DEBOUNCE_MS = 2_000;
@@ -76,6 +77,7 @@ export class PrismaTournamentStore implements TournamentStore, OnModuleInit, OnM
         where: { code },
         data: { deletedAt, participants: { updateMany: { where: { deletedAt: null }, data: { deletedAt } } } },
       });
+      tournamentHistoryCache.invalidate(tournament.creatorUserId, code);
     });
   }
 
@@ -166,5 +168,7 @@ export class PrismaTournamentStore implements TournamentStore, OnModuleInit, OnM
       where: { tournamentId: row.id, deletedAt: null, userId: { notIn: [...present] } },
       data: { deletedAt: new Date() },
     });
+    // Ya está en la base: el historial del administrador debe leerlo de nuevo, no de la caché.
+    tournamentHistoryCache.invalidate(tournament.creatorUserId, tournament.code);
   }
 }

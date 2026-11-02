@@ -6,6 +6,7 @@ import { ROOM_STORE } from '../domain/ports/room-store.port.js';
 import { TOURNAMENT_STORE } from '../domain/ports/tournament-store.port.js';
 import { TOURNAMENT_SETTINGS_REPOSITORY } from '../domain/ports/tournament-settings.repository.port.js';
 import { MongoTournamentSettingsRepository } from './persistence/mongo/mongo-tournament-settings.repository.js';
+import { CachedTournamentSettingsRepository } from './persistence/cache/cached-tournament-settings.repository.js';
 import { DOMINO_ROOM_STORE } from '../domain/ports/domino-room-store.port.js';
 import { SNAKES_LADDERS_ROOM_STORE } from '../domain/ports/snakes-ladders-room-store.port.js';
 import { DUO_ROOM_STORE } from '../domain/ports/duo-room-store.port.js';
@@ -30,7 +31,12 @@ import { AiCoreModule } from './ai-core.module.js';
   providers: [
     MongoService,
     { provide: GAME_REPOSITORY, useClass: MongoGameRepository },
-    { provide: TOURNAMENT_SETTINGS_REPOSITORY, useClass: MongoTournamentSettingsRepository },
+    // Con caché (issue #147): la sala lee el torneo habilitado al abrirse; las escrituras del HTTP lo descartan.
+    {
+      provide: TOURNAMENT_SETTINGS_REPOSITORY,
+      useFactory: (mongo: MongoService) => new CachedTournamentSettingsRepository(new MongoTournamentSettingsRepository(mongo)),
+      inject: [MongoService],
+    },
     { provide: ROOM_STORE, useClass: InMemoryRoomStore },
     // Memoria como fuente viva + volcado a Postgres con soft delete (issue #102).
     PrismaService,

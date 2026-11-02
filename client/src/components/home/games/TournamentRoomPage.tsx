@@ -4,6 +4,7 @@ import { TournamentLobby } from './TournamentLobby'
 import { TournamentModeratorPanel } from './TournamentModeratorPanel'
 import { TournamentCodeEntry } from './TournamentCodeEntry'
 import { TournamentCreateConfirm } from './TournamentCreateConfirm'
+import { invalidateTournamentHistory } from '../../../services/tournament-history.service'
 import { TournamentConfirmModal } from './TournamentConfirmModal'
 import { TournamentFinalResults } from './TournamentFinalResults'
 import { TournamentRoundReveal, type RevealedGame } from './TournamentRoundReveal'
@@ -134,6 +135,13 @@ function TournamentSession() {
   // Qué confirma el aviso de salida: abandonar una partida en curso, o irse sin haber descargado el reporte.
   const [confirmingExit, setConfirmingExit] = useState<'match' | 'report' | null>(null)
   const [reportSaved, setReportSaved] = useState(false)
+
+  // El historial guardado (issue #147) se descarta cuando esta sala cambia de fase y al salir de ella, para que
+  // «Torneos» muestre la sala abierta y los resultados al día.
+  useEffect(() => {
+    invalidateTournamentHistory()
+  }, [tournament?.code, tournament?.phase])
+  useEffect(() => invalidateTournamentHistory, [])
 
   // Arranque de la sala: si la URL trae un código en el path, se une a esa
   // sala — mismo patrón de reconexión que Dominó/Escaleras/GuessWho.

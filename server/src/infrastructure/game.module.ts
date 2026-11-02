@@ -44,6 +44,8 @@ import { TOURNAMENT_HISTORY_REPOSITORY } from '../domain/ports/tournament-histor
 import { PrismaTournamentHistoryRepository } from './persistence/prisma/prisma-tournament-history.repository.js';
 import { TOURNAMENT_SETTINGS_REPOSITORY } from '../domain/ports/tournament-settings.repository.port.js';
 import { MongoTournamentSettingsRepository } from './persistence/mongo/mongo-tournament-settings.repository.js';
+import { CachedTournamentSettingsRepository } from './persistence/cache/cached-tournament-settings.repository.js';
+import { CachedTournamentHistoryRepository } from './persistence/cache/cached-tournament-history.repository.js';
 import { DeleteGameUseCase } from '../application/use-cases/delete-game.use-case.js';
 import { DonateGameToOrganizationUseCase } from '../application/use-cases/donate-game-to-organization.use-case.js';
 import { ImportGamesBatchUseCase } from '../application/use-cases/import-games-batch.use-case.js';
@@ -121,8 +123,17 @@ import { AiProviderAttemptsController } from './http/controllers/ai-provider-att
     GameCreationDraftService,
     GameCreationDraftExpirationJob,
     { provide: GAME_REPOSITORY, useClass: MongoGameRepository },
-    { provide: TOURNAMENT_SETTINGS_REPOSITORY, useClass: MongoTournamentSettingsRepository },
-    { provide: TOURNAMENT_HISTORY_REPOSITORY, useClass: PrismaTournamentHistoryRepository },
+    // Con caché (issue #147): el Inicio de cada persona lee el torneo habilitado y el historial repite consultas.
+    {
+      provide: TOURNAMENT_SETTINGS_REPOSITORY,
+      useFactory: (mongo: MongoService) => new CachedTournamentSettingsRepository(new MongoTournamentSettingsRepository(mongo)),
+      inject: [MongoService],
+    },
+    {
+      provide: TOURNAMENT_HISTORY_REPOSITORY,
+      useFactory: (prisma: PrismaService) => new CachedTournamentHistoryRepository(new PrismaTournamentHistoryRepository(prisma)),
+      inject: [PrismaService],
+    },
     { provide: GAME_TYPE_SETTING_REPOSITORY, useClass: PrismaGameTypeSettingRepository },
     { provide: GAME_IMPORT_JOB_REPOSITORY, useClass: MongoGameImportJobRepository },
     { provide: TRANSACTION_RUNNER, useClass: MongoSessionFactory },
