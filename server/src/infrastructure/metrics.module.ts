@@ -4,6 +4,8 @@ import { OrganizationCoreModule } from './organization-core.module.js';
 import { ClassCoreModule } from './class-core.module.js';
 import { GAME_PLAY_RESULT_REPOSITORY } from '../domain/ports/game-play-result.repository.port.js';
 import { PrismaService } from './persistence/prisma/prisma.service.js';
+import { PUBLIC_RANKING_REPOSITORY } from '../domain/ports/public-ranking.repository.port.js';
+import { PrismaPublicRankingRepository } from './persistence/prisma/prisma-public-ranking.repository.js';
 import { PrismaGamePlayResultRepository } from './persistence/prisma/prisma-game-play-result.repository.js';
 import { RequesterAdminResolver } from '../application/services/requester-admin-resolver.service.js';
 import { ClassAccessResolver } from '../application/services/class-access-resolver.service.js';
@@ -14,6 +16,8 @@ import { GetClassRankingUseCase } from '../application/use-cases/get-class-ranki
 import { GetStudentMetricsUseCase } from '../application/use-cases/get-student-metrics.use-case.js';
 import { GetMyMetricsUseCase } from '../application/use-cases/get-my-metrics.use-case.js';
 import { RecordGamePlayResultUseCase } from '../application/use-cases/record-game-play-result.use-case.js';
+import { GetPublicLandingRankingUseCase } from '../application/use-cases/get-public-landing-ranking.use-case.js';
+import { PublicRankingController } from './http/controllers/public-ranking.controller.js';
 import { MetricsController } from './http/controllers/metrics.controller.js';
 
 /**
@@ -24,7 +28,7 @@ import { MetricsController } from './http/controllers/metrics.controller.js';
  */
 @Module({
   imports: [UserModule, OrganizationCoreModule, ClassCoreModule],
-  controllers: [MetricsController],
+  controllers: [MetricsController, PublicRankingController],
   providers: [
     PrismaService,
     { provide: GAME_PLAY_RESULT_REPOSITORY, useClass: PrismaGamePlayResultRepository },

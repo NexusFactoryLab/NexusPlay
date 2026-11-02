@@ -5,7 +5,6 @@ import {
   Check,
   Crown,
   GraduationCap,
-  KeyRound,
   Medal,
   Swords,
   Trophy,
@@ -13,13 +12,17 @@ import {
   Zap,
 } from 'lucide-react'
 import { AvatarCircle } from '../avatar/AvatarCircle'
-import { CHALLENGES, TOP_STUDENTS, TOP_UNIVERSITIES, formatPoints, type Competitor } from './landingData'
+import { CHALLENGES, formatPoints, type Competitor, type LandingRanking } from './landingData'
+import { useLandingRanking } from './useLandingRanking'
 import './landing.css'
 
 /** Fondo de las fotos redondas sobre el cielo nocturno (el mismo de Fantasía/Oscuro en avatar.css). */
 const AVATAR_BG = { background: 'radial-gradient(circle at 50% 30%, #4b3c86 0%, #2b2259 70%, #1d1742 100%)' }
 
 const MEDAL_CLASS = ['lp-medal-1', 'lp-medal-2', 'lp-medal-3']
+
+/** Con datos reales dice cuál es la ventana; con datos de ejemplo lo avisa. */
+const liveBadge = (isSample: boolean, live: string) => (isSample ? 'Vista previa' : live)
 
 function Face({ person, size = 36 }: { person: Competitor; size?: number }) {
   return (
@@ -32,12 +35,8 @@ function Face({ person, size = 36 }: { person: Competitor; size?: number }) {
   )
 }
 
-function GradientButton({ to, children }: { to: string; children: React.ReactNode }) {
-  return (
-    <Link to={to} className="lp-btn lp-btn-main">
-      {children}
-    </Link>
-  )
+function affiliation(person: Competitor): string | null {
+  return [person.university, person.career].filter(Boolean).join(' · ') || null
 }
 
 function Header() {
@@ -69,7 +68,8 @@ function Header() {
   )
 }
 
-function Hero() {
+function Hero({ ranking }: { ranking: LandingRanking }) {
+  const { students, studentsAreSample } = ranking
   return (
     <header className="lp-hero">
       <div className="lp-wrap">
@@ -87,16 +87,13 @@ function Hero() {
             tiempo real.
           </p>
           <div className="lp-cta">
-            <GradientButton to="/register">
+            <Link to="/register" className="lp-btn lp-btn-main">
               Crear mi cuenta gratis <ArrowRight size={16} aria-hidden="true" />
-            </GradientButton>
-            <Link to="/login" className="lp-btn lp-btn-ghost">
-              <KeyRound size={16} aria-hidden="true" /> Unirme con código
             </Link>
           </div>
           <div className="lp-faces">
             <div className="lp-faces-stack">
-              {TOP_STUDENTS.map((person) => (
+              {students.map((person) => (
                 <Face key={person.id} person={person} size={38} />
               ))}
             </div>
@@ -117,11 +114,11 @@ function Hero() {
           </div>
         </div>
 
-        <aside className="lp-card" aria-label="Vista previa del ranking">
+        <aside className="lp-card" aria-label={studentsAreSample ? 'Vista previa del ranking' : 'Ranking de la semana'}>
           <h3 className="lp-card-title">
-            Top de la semana <span className="lp-badge">Vista previa</span>
+            Top de la semana <span className="lp-badge">{liveBadge(studentsAreSample, 'Últimos 7 días')}</span>
           </h3>
-          {TOP_STUDENTS.map((person, index) => (
+          {students.map((person, index) => (
             <div key={person.id} className={`lp-row ${index === 0 ? 'lp-row-top' : ''}`}>
               <span className={`lp-pos ${MEDAL_CLASS[index] ?? ''}`}>
                 {index < 3 ? <Medal size={20} aria-label={`Puesto ${index + 1}`} /> : index + 1}
@@ -129,9 +126,7 @@ function Hero() {
               <Face person={person} />
               <span className="lp-who">
                 {person.name}
-                <small>
-                  {person.university} · {person.career}
-                </small>
+                {affiliation(person) && <small>{affiliation(person)}</small>}
               </span>
               <span className="lp-pts">{formatPoints(person.points)}</span>
             </div>
@@ -168,7 +163,7 @@ function HowItWorks() {
         <p className="lp-eyebrow">Cómo funciona</p>
         <h2>De tu apunte a una partida, en tres pasos</h2>
         <p className="lp-lead">
-          Sin instalar nada. Entras con tu cuenta o con un código de sala y juegas desde el navegador.
+          Sin instalar nada. Creas tu cuenta y juegas desde el navegador, en clase o por tu cuenta.
         </p>
         <div className="lp-steps">
           {STEPS.map(({ icon: Icon, title, text }, index) => (
@@ -189,14 +184,16 @@ function HowItWorks() {
   )
 }
 
-function Ranking() {
-  // El podio se dibuja en orden visual 2 - 1 - 3.
-  const [first, second, third, ...rest] = TOP_STUDENTS
+function Ranking({ ranking }: { ranking: LandingRanking }) {
+  const { students, universities, studentsAreSample, universitiesAreSample } = ranking
+  const [first, second, third, ...rest] = students
+  // El podio se dibuja en orden visual 2 - 1 - 3 y solo con los puestos que existen.
   const podium = [
     { person: second, place: 2 },
     { person: first, place: 1 },
     { person: third, place: 3 },
-  ]
+  ].filter((slot): slot is { person: Competitor; place: number } => slot.person !== undefined)
+
   return (
     <section id="ranking" className="lp-section">
       <div className="lp-wrap">
@@ -206,7 +203,7 @@ function Ranking() {
         <div className="lp-rank-grid">
           <div className="lp-card">
             <h3 className="lp-card-title">
-              Mejores estudiantes <span className="lp-badge">Vista previa</span>
+              Mejores estudiantes <span className="lp-badge">{liveBadge(studentsAreSample, 'Esta semana')}</span>
             </h3>
             <div className="lp-podium">
               {podium.map(({ person, place }) => (
@@ -233,9 +230,9 @@ function Ranking() {
 
           <div className="lp-card">
             <h3 className="lp-card-title">
-              Universidades <span className="lp-badge">Vista previa</span>
+              Universidades <span className="lp-badge">{liveBadge(universitiesAreSample, 'Acumulado')}</span>
             </h3>
-            {TOP_UNIVERSITIES.map((uni, index) => (
+            {universities.map((uni, index) => (
               <div key={uni.id} className={`lp-row ${index === 0 ? 'lp-row-top' : ''}`}>
                 <span className={`lp-pos ${index === 0 ? 'lp-medal-1' : ''}`}>
                   {index === 0 ? <Crown size={20} aria-label="Puesto 1" /> : index + 1}
@@ -249,7 +246,10 @@ function Ranking() {
                 <span className="lp-pts">{formatPoints(uni.points)}</span>
               </div>
             ))}
-            <p className="lp-note">Puntaje por universidad = suma de los puntos de sus estudiantes. Datos de ejemplo.</p>
+            <p className="lp-note">
+              Puntaje por universidad = suma de los puntos de sus estudiantes.
+              {universitiesAreSample && ' Datos de ejemplo.'}
+            </p>
           </div>
         </div>
       </div>
@@ -275,7 +275,11 @@ function Challenges() {
                 <span>VS</span>
                 <span>{challenge.right}</span>
               </div>
-              <div className="lp-meter" role="img" aria-label={`${challenge.left} ${challenge.leftShare}% contra ${challenge.right} ${100 - challenge.leftShare}%`}>
+              <div
+                className="lp-meter"
+                role="img"
+                aria-label={`${challenge.left} ${challenge.leftShare}% contra ${challenge.right} ${100 - challenge.leftShare}%`}
+              >
                 <i style={{ width: `${challenge.leftShare}%`, background: '#7b5cff' }} />
                 <i style={{ width: `${100 - challenge.leftShare}%`, background: '#ff3d7f' }} />
               </div>
@@ -295,6 +299,7 @@ function Challenges() {
             </div>
           ))}
         </div>
+        <p className="lp-note">Vista previa: los retos entre carreras y universidades llegan pronto.</p>
       </div>
     </section>
   )
@@ -338,7 +343,9 @@ function Universities() {
           <p style={{ marginBottom: 20 }}>
             Súmala al ranking y deja que sus estudiantes compitan por el primer lugar.
           </p>
-          <GradientButton to="/register">Registrar mi universidad</GradientButton>
+          <Link to="/register" className="lp-btn lp-btn-main">
+            Registrar mi universidad
+          </Link>
         </div>
       </div>
     </section>
@@ -351,11 +358,10 @@ function FinalCall() {
       <div className="lp-wrap">
         <div className="lp-final">
           <h2>¿Listo para subir de nivel?</h2>
-          <p className="lp-lead">Crea tu cuenta en un minuto o entra con el código que te dio tu profesor.</p>
+          <p className="lp-lead">Crea tu cuenta en un minuto y empieza a competir con tu clase.</p>
           <div className="lp-cta">
-            <GradientButton to="/register">¡Empezar a jugar!</GradientButton>
-            <Link to="/login" className="lp-btn lp-btn-ghost">
-              <KeyRound size={16} aria-hidden="true" /> Unirme con código
+            <Link to="/register" className="lp-btn lp-btn-main">
+              ¡Empezar a jugar!
             </Link>
           </div>
         </div>
@@ -365,13 +371,14 @@ function FinalCall() {
 }
 
 export function LandingPage() {
+  const ranking = useLandingRanking()
   return (
     <div className="landing">
       <Header />
       <main>
-        <Hero />
+        <Hero ranking={ranking} />
         <HowItWorks />
-        <Ranking />
+        <Ranking ranking={ranking} />
         <Challenges />
         <Universities />
         <FinalCall />

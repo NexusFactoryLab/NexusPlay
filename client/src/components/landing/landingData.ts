@@ -1,11 +1,12 @@
 import type { AvatarConfig } from '../../services/avatar.service'
-import { DEFAULT_AVATAR } from '../avatar/avatarConfig'
+import type { PublicRanking } from '../../services/public-ranking.service'
+import { DEFAULT_AVATAR, normalizeAvatar } from '../avatar/avatarConfig'
 
 /**
- * Datos de ejemplo de la landing pública. Todavía no hay ranking global ni
- * retos entre universidades en el servidor: estas listas son una vista previa
- * ilustrativa (nombres y puntajes ficticios) y la página lo rotula así.
- * Cuando exista el endpoint público, solo cambia de dónde salen estas listas.
+ * Datos de la landing pública. El ranking sale de la base de datos
+ * (GET /public/ranking); solo cuando no hay ni un dato —base vacía, o el
+ * servidor no responde— se usan los datos de ejemplo de este archivo (nombres
+ * y puntajes ficticios), y la página lo rotula como "Vista previa".
  */
 
 const avatar = (overrides: Partial<AvatarConfig>): AvatarConfig => ({ ...DEFAULT_AVATAR, ...overrides })
@@ -13,13 +14,18 @@ const avatar = (overrides: Partial<AvatarConfig>): AvatarConfig => ({ ...DEFAULT
 export type Competitor = {
   id: string
   name: string
-  career: string
-  university: string
+  /** Universidad (organización) a la que pertenece, si se conoce. */
+  university: string | null
+  /** Carrera: solo los datos de ejemplo la traen; la base de datos aún no la guarda. */
+  career: string | null
   points: number
-  avatar: AvatarConfig
+  /** Null cuando la cuenta aún no armó su avatar: se muestran sus iniciales. */
+  avatar: AvatarConfig | null
 }
 
-export const TOP_STUDENTS: Competitor[] = [
+export type UniversityEntry = { id: string; name: string; players: number; matches: number; points: number }
+
+export const SAMPLE_STUDENTS: Competitor[] = [
   {
     id: 'valentina',
     name: 'Valentina C.',
@@ -62,15 +68,14 @@ export const TOP_STUDENTS: Competitor[] = [
   },
 ]
 
-export type UniversityEntry = { id: string; name: string; players: number; matches: number; points: number }
-
-export const TOP_UNIVERSITIES: UniversityEntry[] = [
+export const SAMPLE_UNIVERSITIES: UniversityEntry[] = [
   { id: 'horizonte', name: 'U. Horizonte', players: 1240, matches: 18420, points: 96300 },
   { id: 'sol', name: 'U. del Sol', players: 980, matches: 14100, points: 88750 },
   { id: 'nexus', name: 'U. Nexus', players: 760, matches: 11390, points: 71020 },
   { id: 'andina', name: 'U. Andina', players: 540, matches: 8020, points: 52600 },
 ]
 
+/** Los retos entre carreras y universidades aún no existen en el servidor: siempre son de ejemplo. */
 export type Challenge = {
   id: string
   status: string
@@ -85,6 +90,54 @@ export const CHALLENGES: Challenge[] = [
   { id: 'hor-sol', status: 'En curso · 5 días', left: 'U. Horizonte', right: 'U. del Sol', leftShare: 51, players: 2310 },
   { id: 'der-eco', status: 'Nuevo · empieza el lunes', left: 'Derecho', right: 'Economía', leftShare: 50, players: null },
 ]
+
+export type LandingRanking = {
+  students: Competitor[]
+  universities: UniversityEntry[]
+  /** true = los estudiantes mostrados son de ejemplo (no hay datos reales). */
+  studentsAreSample: boolean
+  universitiesAreSample: boolean
+}
+
+/** Estado inicial y de respaldo: todo de ejemplo. */
+export const SAMPLE_RANKING: LandingRanking = {
+  students: SAMPLE_STUDENTS,
+  universities: SAMPLE_UNIVERSITIES,
+  studentsAreSample: true,
+  universitiesAreSample: true,
+}
+
+/**
+ * Une la respuesta del servidor con los datos de ejemplo: cada lista usa los
+ * datos reales si hay al menos uno, y los de ejemplo solo si está vacía (o si
+ * no hubo respuesta).
+ */
+export function buildLandingRanking(api: PublicRanking | null): LandingRanking {
+  if (!api) return SAMPLE_RANKING
+
+  const students: Competitor[] = api.students.map((row) => ({
+    id: `student-${row.rank}`,
+    name: row.name,
+    university: row.university,
+    career: null,
+    points: row.points,
+    avatar: normalizeAvatar(row.avatarConfig),
+  }))
+  const universities: UniversityEntry[] = api.universities.map((row) => ({
+    id: `university-${row.rank}`,
+    name: row.name,
+    players: row.players,
+    matches: row.gamesPlayed,
+    points: row.points,
+  }))
+
+  return {
+    students: students.length > 0 ? students : SAMPLE_STUDENTS,
+    universities: universities.length > 0 ? universities : SAMPLE_UNIVERSITIES,
+    studentsAreSample: students.length === 0,
+    universitiesAreSample: universities.length === 0,
+  }
+}
 
 const numberFormat = new Intl.NumberFormat('es-CO')
 export const formatPoints = (value: number) => numberFormat.format(value)
