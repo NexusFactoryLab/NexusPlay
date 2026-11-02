@@ -4724,9 +4724,14 @@ code {
   container-type: inline-size;
 }
 
+/* Sin barra de desplazamiento: quitaba alto a las tarjetas. Se sigue deslizando con el dedo, Shift + rueda, el teclado y las flechas. */
 .games-carousel-track {
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--accent) 55%, transparent) transparent;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.games-carousel-track::-webkit-scrollbar {
+  display: none;
 }
 
 /* ============================================================
