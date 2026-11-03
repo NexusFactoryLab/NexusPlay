@@ -53,7 +53,7 @@ export class PrismaPublicRankingRepository implements PublicRankingRepository {
           ORDER BY m.joined_at ASC
           LIMIT 1
         ) AS organization_name,
-        SUM(r.score)::int AS total_score,
+        SUM(r.points)::int AS total_score,
         COUNT(*)::int AS games_played
       FROM game_play_results r
       JOIN users u ON u.id = r.student_user_id
@@ -62,7 +62,7 @@ export class PrismaPublicRankingRepository implements PublicRankingRepository {
         AND u.is_active
         AND (u.birth_date IS NULL OR u.birth_date <= ${adultBornOnOrBefore})
       GROUP BY r.student_user_id, u.id
-      HAVING SUM(r.score) > 0
+      HAVING SUM(r.points) > 0
       ORDER BY total_score DESC, games_played DESC, r.student_user_id ASC
       LIMIT ${limit}
     `);
@@ -85,14 +85,14 @@ export class PrismaPublicRankingRepository implements PublicRankingRepository {
         o.name,
         COUNT(DISTINCT m.user_id)::int AS players,
         COUNT(r.id)::int AS games_played,
-        SUM(r.score)::int AS total_score
+        SUM(r.points)::int AS total_score
       FROM organizations o
       JOIN organization_memberships m ON m.organization_id = o.id
       JOIN users u ON u.id = m.user_id AND u.is_active
       JOIN game_play_results r ON r.student_user_id = m.user_id AND r.played_at < ${until}
       WHERE o.is_active
       GROUP BY o.id
-      HAVING SUM(r.score) > 0
+      HAVING SUM(r.points) > 0
       ORDER BY total_score DESC, games_played DESC, o.id ASC
       LIMIT ${limit}
     `);

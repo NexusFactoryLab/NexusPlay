@@ -6,7 +6,13 @@ import {
   GAME_PLAY_RESULT_REPOSITORY,
   type GamePlayResultRepository,
 } from '../../domain/ports/game-play-result.repository.port.js';
+import { startOfColombiaDay } from '../../domain/services/colombia-day.js';
 import { validatePlayResult } from '../../domain/services/play-result-rules.js';
+import {
+  ANSWER_BASED_GAME_TYPES,
+  applyDailyCap,
+  pointsForAnswers,
+} from '../../domain/services/play-points.js';
 import {
   GameNotFoundError,
   GamePlayResultRateLimitedError,
@@ -29,8 +35,10 @@ export interface RecordGamePlayResultCommand {
 }
 
 export interface RecordGamePlayResultOutcome {
-  /** false = la partida es válida pero no suma al ranking (ver `eligibility`). */
+  /** false = la partida se guardó pero no puede sumar al ranking (juego propio, borrador ajeno o tipo que puntúa por otra vía). */
   counted: boolean;
+  /** Puntos de plataforma otorgados, ya recortados al tope diario del juego. */
+  pointsAwarded: number;
 }
 
 /** Mínimo entre dos resultados del mismo juego de la misma persona. */
@@ -79,14 +87,18 @@ export class RecordGamePlayResultUseCase {
     });
     if (rejection) throw new GamePlayResultRejectedError(rejection);
 
-    if (!(await this.countsForRanking(game, command.requestingUserId))) {
-      return { counted: false };
-    }
-
     await this.assertNotTooFast(command, now);
+
+    // La partida siempre se guarda (alimenta las métricas de clase), pero solo suma al
+    // ranking general si el juego puntúa por respuestas en este endpoint (los
+    // multijugador y los torneos los registra el servidor al terminar) y es elegible.
+    const eligible =
+      ANSWER_BASED_GAME_TYPES.has(game.gameType.getName()) &&
+      (await this.countsForRanking(game, command.requestingUserId));
 
     const classId = await this.enrolledClassIdOrNull(command.classId, command.requestingUserId);
     const subject = await this.subjectRepository.findById(game.categoryId);
+    const points = eligible ? await this.pointsToAward(command, now) : 0;
 
     await this.recordGamePlayResultService.record({
       studentUserId: command.requestingUserId,
@@ -99,8 +111,19 @@ export class RecordGamePlayResultUseCase {
       correctCount: command.correctCount,
       incorrectCount: command.incorrectCount,
       timePlayedMs: command.timePlayedMs,
+      points,
     });
-    return { counted: true };
+    return { counted: eligible, pointsAwarded: points };
+  }
+
+  /** Puntos de plataforma de la partida (por respuestas) recortados al tope diario del juego. */
+  private async pointsToAward(command: RecordGamePlayResultCommand, now: Date): Promise<number> {
+    const earnedToday = await this.gamePlayResultRepository.sumPointsForGameSince(
+      command.requestingUserId,
+      command.gameId,
+      startOfColombiaDay(now),
+    );
+    return applyDailyCap(pointsForAnswers(command.correctCount, command.incorrectCount), earnedToday);
   }
 
   /** Sin puntos por jugar tu propio juego (se podría fabricar uno trivial) ni por borradores ajenos. */

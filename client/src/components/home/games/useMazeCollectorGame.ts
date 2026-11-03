@@ -120,8 +120,8 @@ type InternalState = {
   levelUpUntil: number | null
   /** Reloj de juego en que se movió por primera vez (null mientras está en "listo"). */
   startedAtMs: number | null
-  /** Todo lo recogido en la partida (puntos, purificadores y bonus): los "aciertos" que se reportan. */
-  collectedCount: number
+  /** Conceptos educativos recogidos (los bonus): los "aciertos" que se reportan. Las botellas no cuentan. */
+  conceptsCollected: number
   /** Vidas perdidas: los "errores" que se reportan. */
   livesLost: number
 }
@@ -208,7 +208,7 @@ function createInitialState(layout: MazeLayoutDef, items: MazeCollectorItem[], c
     lastCollected: null,
     levelUpUntil: null,
     startedAtMs: null,
-    collectedCount: 0,
+    conceptsCollected: 0,
     livesLost: 0,
   }
 }
@@ -253,7 +253,6 @@ function resolvePlayerArrival(state: InternalState, now: number) {
   const pickupIndex = state.pickups.findIndex((p) => samePos(p.pos, pos))
   if (pickupIndex !== -1) {
     const [picked] = state.pickups.splice(pickupIndex, 1)
-    state.collectedCount += 1
     if (picked.kind === 'PET') {
       state.score += POINTS_PET
       state.petCollectedThisLevel += 1
@@ -279,7 +278,7 @@ function resolvePlayerArrival(state: InternalState, now: number) {
 
   if (state.activeBonus && samePos(state.activeBonus.pos, pos)) {
     state.score += POINTS_BONUS
-    state.collectedCount += 1
+    state.conceptsCollected += 1
     state.lastCollected = state.activeBonus.item
     state.activeBonus = null
     celebrateMatch()
@@ -447,7 +446,7 @@ export type MazeGameSnapshot = {
   totalPet: number
   collectedPet: number
   /** Para reportar la partida: lo recogido, las vidas perdidas y el tiempo jugado (sin contar pausas ni la espera inicial). */
-  collectedCount: number
+  conceptsCollected: number
   livesLost: number
   playedMs: number
 }
@@ -480,7 +479,7 @@ function toSnapshot(state: InternalState, now: number): MazeGameSnapshot {
     lastCollected: state.lastCollected,
     totalPet: state.petTotalThisLevel,
     collectedPet: state.petCollectedThisLevel,
-    collectedCount: state.collectedCount,
+    conceptsCollected: state.conceptsCollected,
     livesLost: state.livesLost,
     playedMs: state.startedAtMs === null ? 0 : Math.max(0, Math.round(now - state.startedAtMs)),
   }

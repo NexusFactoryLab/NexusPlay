@@ -64,8 +64,21 @@ export function validatePlayResult(facts: PlayResultFacts): string | null {
   if (facts.correctCount > MAX_COUNT || facts.incorrectCount > MAX_COUNT) {
     return 'los conteos de aciertos o errores superan lo permitido.';
   }
+  // Nadie acierta ni falla más de dos veces por segundo: frena conteos inflados en partidas cortas.
+  const seconds = Math.ceil(facts.timePlayedMs / 1000);
+  if (facts.correctCount + facts.incorrectCount > 2 * seconds + 5) {
+    return 'hay más respuestas de las que caben en ese tiempo.';
+  }
   if (facts.gameType === 'MEMORY_MATCH' && facts.contentSize > 0 && facts.correctCount > facts.contentSize) {
     return 'hay más aciertos que parejas en el juego.';
+  }
+  // Verdadero o Falso: cada afirmación se responde una sola vez.
+  if (
+    facts.gameType === 'TRUE_FALSE_MAZE' &&
+    facts.contentSize > 0 &&
+    facts.correctCount + facts.incorrectCount > facts.contentSize
+  ) {
+    return 'hay más respuestas que afirmaciones en el juego.';
   }
   if (facts.score > maxPlausibleScore(facts)) return 'el puntaje no es posible para esa partida.';
   return null;

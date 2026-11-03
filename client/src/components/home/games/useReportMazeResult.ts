@@ -7,7 +7,7 @@ type Options = {
   token: string | null | undefined
   gameId: string | undefined
   title: string
-  game: Pick<MazeGameSnapshot, 'phase' | 'score' | 'collectedCount' | 'livesLost' | 'playedMs'>
+  game: Pick<MazeGameSnapshot, 'phase' | 'score' | 'conceptsCollected' | 'livesLost' | 'playedMs'>
 }
 
 /** El servidor rechaza partidas de menos de un segundo. */
@@ -29,13 +29,14 @@ export function useReportMazeResult({ token, gameId, title, game }: Options): ()
       gameId,
       gameTitle: title,
       score: game.score,
-      correctCount: game.collectedCount,
+      // En el Laberinto los "aciertos" son los conceptos recogidos y los "errores" las vidas perdidas.
+      correctCount: game.conceptsCollected,
       incorrectCount: game.livesLost,
       timePlayedMs: Math.max(game.playedMs, MIN_REPORTED_MS),
     }).catch((err: unknown) => {
       console.error('No se pudo registrar el resultado de la partida:', err)
     })
-  }, [token, gameId, title, game.score, game.collectedCount, game.livesLost, game.playedMs])
+  }, [token, gameId, title, game.score, game.conceptsCollected, game.livesLost, game.playedMs])
 
   useEffect(() => {
     if (game.phase === 'lost') report()

@@ -12,6 +12,8 @@ export interface GamePlayResultProps {
   correctCount: number;
   incorrectCount: number;
   timePlayedMs: number;
+  /** Puntos de plataforma que suma la partida al ranking general (los calcula el servidor). */
+  points: number;
   playedAt: Date;
 }
 
@@ -27,6 +29,8 @@ export interface RecordGamePlayResultProps {
   correctCount: number;
   incorrectCount: number;
   timePlayedMs: number;
+  /** Puntos de plataforma ya calculados (por defecto 0: la partida no suma al ranking general). */
+  points?: number;
 }
 
 /**
@@ -49,6 +53,9 @@ export class GamePlayResultEntity {
     if (props.timePlayedMs < 0) {
       throw new InvalidGamePlayResultError('el tiempo jugado no puede ser negativo.');
     }
+    if ((props.points ?? 0) < 0) {
+      throw new InvalidGamePlayResultError('los puntos de plataforma no pueden ser negativos.');
+    }
 
     return new GamePlayResultEntity({
       id: props.id,
@@ -62,6 +69,7 @@ export class GamePlayResultEntity {
       correctCount: props.correctCount,
       incorrectCount: props.incorrectCount,
       timePlayedMs: props.timePlayedMs,
+      points: props.points ?? 0,
       playedAt: new Date(),
     });
   }

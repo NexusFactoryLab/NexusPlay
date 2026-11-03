@@ -48,8 +48,20 @@ describe('validatePlayResult', () => {
   });
 
   it('Laberinto: el tope crece con el tiempo jugado', () => {
-    expect(validatePlayResult(maze({ timePlayedMs: 2_000, score: 20_000 }))).toMatch(/puntaje/);
+    expect(validatePlayResult(maze({ timePlayedMs: 2_000, score: 20_000, correctCount: 1 }))).toMatch(/puntaje/);
     expect(validatePlayResult(maze({ timePlayedMs: 300_000, score: 20_000 }))).toBeNull();
+  });
+
+  it('no caben más respuestas que dos por segundo', () => {
+    expect(validatePlayResult(maze({ timePlayedMs: 10_000, correctCount: 40, incorrectCount: 0, score: 100 }))).toMatch(/respuestas/);
+    expect(validatePlayResult(maze({ timePlayedMs: 10_000, correctCount: 20, incorrectCount: 0, score: 100 }))).toBeNull();
+  });
+
+  it('Verdadero o Falso: cada afirmación se responde una sola vez', () => {
+    const tf = (overrides: Partial<PlayResultFacts> = {}) =>
+      maze({ gameType: 'TRUE_FALSE_MAZE', contentSize: 10, correctCount: 7, incorrectCount: 3, timePlayedMs: 90_000, score: 900, ...overrides });
+    expect(validatePlayResult(tf())).toBeNull();
+    expect(validatePlayResult(tf({ correctCount: 9, incorrectCount: 3 }))).toMatch(/afirmaciones/);
   });
 
   it('rechaza partidas demasiado cortas o demasiado largas', () => {
@@ -62,7 +74,9 @@ describe('validatePlayResult', () => {
   });
 
   it('un tipo de juego sin regla propia usa el tope genérico', () => {
-    expect(validatePlayResult(maze({ gameType: 'DOMINO', timePlayedMs: 10_000, score: 100_000 }))).toMatch(/puntaje/);
-    expect(validatePlayResult(maze({ gameType: 'DOMINO', timePlayedMs: 10_000, score: 500 }))).toBeNull();
+    const domino = (overrides: Partial<PlayResultFacts>) =>
+      maze({ gameType: 'DOMINO', timePlayedMs: 10_000, correctCount: 1, incorrectCount: 0, ...overrides });
+    expect(validatePlayResult(domino({ score: 100_000 }))).toMatch(/puntaje/);
+    expect(validatePlayResult(domino({ score: 500 }))).toBeNull();
   });
 });

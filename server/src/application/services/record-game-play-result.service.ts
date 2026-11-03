@@ -17,6 +17,8 @@ export interface RecordGamePlayResultInput {
   correctCount: number;
   incorrectCount: number;
   timePlayedMs: number;
+  /** Puntos de plataforma ya calculados; sin ellos la partida se guarda pero no suma al ranking general. */
+  points?: number;
 }
 
 /**

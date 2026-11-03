@@ -386,16 +386,23 @@ model GamePlayResultModel {
   /// Denormalizado por el mismo motivo que `gameTitle`, y porque un área
   /// puede eliminarse (soft-delete) sin que eso rompa el historial agregado.
   subjectName    String?    @map("subject_name")
+  /// Puntaje dentro del juego (lo que ve el jugador y alimenta las métricas de clase).
   score          Int
   correctCount   Int        @map("correct_count")
   incorrectCount Int        @map("incorrect_count")
   timePlayedMs   Int        @map("time_played_ms")
+  /// Puntos de plataforma que suma esta partida al ranking general: los calcula el
+  /// servidor (participación + aciertos − errores, con tope diario por juego), no el
+  /// cliente. El ranking público suma esta columna, no `score`.
+  points         Int        @default(0)
   playedAt       DateTime   @default(now()) @map("played_at")
 
   @@index([studentUserId, playedAt])
   @@index([classId, playedAt])
   @@index([studentUserId, subjectId])
   @@index([gameId])
+  @@index([playedAt])
+  @@index([studentUserId, gameId, playedAt], map: "game_play_results_student_game_played_idx")
   @@map("game_play_results")
 }
 

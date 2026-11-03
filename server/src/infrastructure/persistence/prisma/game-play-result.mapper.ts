@@ -15,6 +15,7 @@ export class GamePlayResultMapper {
       correctCount: record.correctCount,
       incorrectCount: record.incorrectCount,
       timePlayedMs: record.timePlayedMs,
+      points: record.points,
       playedAt: record.playedAt,
     });
   }
@@ -34,6 +35,7 @@ export class GamePlayResultMapper {
       correctCount: props.correctCount,
       incorrectCount: props.incorrectCount,
       timePlayedMs: props.timePlayedMs,
+      points: props.points,
       playedAt: props.playedAt,
     };
   }

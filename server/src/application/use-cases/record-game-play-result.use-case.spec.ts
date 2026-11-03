@@ -25,7 +25,16 @@ function fakeGame(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function build(options: { game?: unknown; enrolledClassIds?: string[]; classesWithGame?: string[]; lastPlayedAt?: Date | null; lastHourCount?: number } = {}) {
+function build(
+  options: {
+    game?: unknown;
+    enrolledClassIds?: string[];
+    classesWithGame?: string[];
+    lastPlayedAt?: Date | null;
+    lastHourCount?: number;
+    earnedToday?: number;
+  } = {},
+) {
   const record = vi.fn().mockResolvedValue(undefined);
   const classRepository = {
     findClassIdsContainingGame: vi.fn().mockResolvedValue(options.classesWithGame ?? []),
@@ -35,6 +44,7 @@ function build(options: { game?: unknown; enrolledClassIds?: string[]; classesWi
   const results = {
     findLastPlayedAt: vi.fn().mockResolvedValue(options.lastPlayedAt ?? null),
     countByStudentSince: vi.fn().mockResolvedValue(options.lastHourCount ?? 0),
+    sumPointsForGameSince: vi.fn().mockResolvedValue(options.earnedToday ?? 0),
   };
   const useCase = new RecordGamePlayResultUseCase(
     { record } as never,
@@ -61,10 +71,34 @@ describe('RecordGamePlayResultUseCase', () => {
   it('guarda la partida con el título y el área reales del juego, no los del cliente', async () => {
     const { useCase, record } = build();
     const outcome = await useCase.execute(command({ subjectName: 'Inventada' }), NOW);
-    expect(outcome).toEqual({ counted: true });
+    expect(outcome.counted).toBe(true);
     expect(record).toHaveBeenCalledWith(
       expect.objectContaining({ studentUserId: 'student', gameId: 'game-1', gameTitle: 'Parejas reales', subjectId: 'subject-1', subjectName: 'Biología', score: 500 }),
     );
+  });
+
+  it('los puntos de plataforma salen de aciertos y errores, no del puntaje del cliente', async () => {
+    // 10 de participación + 5 × 5 aciertos − 2 × 1 error = 33
+    const { useCase, record } = build();
+    const outcome = await useCase.execute(command({ score: 3000 }), NOW);
+    expect(outcome.pointsAwarded).toBe(33);
+    expect(record).toHaveBeenCalledWith(expect.objectContaining({ points: 33, score: 3000 }));
+  });
+
+  it('respeta el tope diario por juego: solo suma lo que cabe', async () => {
+    const { useCase, record, results } = build({ earnedToday: 190 });
+    const outcome = await useCase.execute(command(), NOW);
+    expect(outcome.pointsAwarded).toBe(10);
+    expect(record).toHaveBeenCalledWith(expect.objectContaining({ points: 10 }));
+    // el día se mide desde la medianoche de Colombia (05:00 UTC)
+    expect((results.sumPointsForGameSince.mock.calls[0][2] as Date).toISOString()).toBe('2026-11-01T05:00:00.000Z');
+  });
+
+  it('con el tope lleno la partida se guarda con 0 puntos', async () => {
+    const { useCase, record } = build({ earnedToday: 200 });
+    const outcome = await useCase.execute(command(), NOW);
+    expect(outcome).toEqual({ counted: true, pointsAwarded: 0 });
+    expect(record).toHaveBeenCalledWith(expect.objectContaining({ points: 0 }));
   });
 
   it('el juego debe existir', async () => {
@@ -79,20 +113,27 @@ describe('RecordGamePlayResultUseCase', () => {
     expect(record).not.toHaveBeenCalled();
   });
 
-  it('jugar tu propio juego es válido pero no suma', async () => {
+  it('jugar tu propio juego se guarda para las métricas pero suma 0 puntos', async () => {
     const { useCase, record } = build({ game: fakeGame({ creatorUserId: 'student' }) });
-    expect(await useCase.execute(command(), NOW)).toEqual({ counted: false });
-    expect(record).not.toHaveBeenCalled();
+    expect(await useCase.execute(command(), NOW)).toEqual({ counted: false, pointsAwarded: 0 });
+    expect(record).toHaveBeenCalledWith(expect.objectContaining({ points: 0 }));
   });
 
-  it('un borrador ajeno no suma, salvo que estés matriculado en una clase que lo incluye', async () => {
+  it('un borrador ajeno suma 0, salvo que estés matriculado en una clase que lo incluye', async () => {
     const draft = fakeGame({ status: { isPublished: () => false } });
 
     const outside = build({ game: draft });
-    expect(await outside.useCase.execute(command(), NOW)).toEqual({ counted: false });
+    expect((await outside.useCase.execute(command(), NOW)).counted).toBe(false);
 
     const enrolled = build({ game: draft, classesWithGame: ['c1'], enrolledClassIds: ['c1'] });
-    expect(await enrolled.useCase.execute(command(), NOW)).toEqual({ counted: true });
+    expect((await enrolled.useCase.execute(command(), NOW)).counted).toBe(true);
+  });
+
+  it('los juegos que no puntúan por respuestas (dominó, serpientes…) no suman por este endpoint', async () => {
+    const domino = build({ game: fakeGame({ gameType: { getName: () => 'DOMINO' } }) });
+    const outcome = await domino.useCase.execute(command({ score: 100, correctCount: 0, incorrectCount: 0 }), NOW);
+    expect(outcome).toEqual({ counted: false, pointsAwarded: 0 });
+    expect(domino.results.sumPointsForGameSince).not.toHaveBeenCalled();
   });
 
   it('la clase solo se guarda si estás matriculado; si no, queda sin clase', async () => {
@@ -113,7 +154,7 @@ describe('RecordGamePlayResultUseCase', () => {
 
   it('permite repetir el juego pasado el intervalo', async () => {
     const { useCase } = build({ lastPlayedAt: new Date(NOW.getTime() - 60_000) });
-    expect(await useCase.execute(command(), NOW)).toEqual({ counted: true });
+    expect((await useCase.execute(command(), NOW)).counted).toBe(true);
   });
 
   it('frena el exceso de partidas en una hora', async () => {

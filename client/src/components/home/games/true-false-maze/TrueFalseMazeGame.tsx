@@ -33,6 +33,7 @@ import { INTRO_MS, type Direction, type TfAnswerRecord } from './trueFalseMazeEn
 import type { Insets } from './TrueFalseMazeRenderer'
 import { TrueFalseMazeGuide } from './TrueFalseMazeGuide'
 import { useTrueFalseMazeSession, type TrueFalseMazeHud } from './useTrueFalseMazeSession'
+import { useReportTrueFalseResult } from './useReportTrueFalseResult'
 import type { TrueFalseMazeConfig, TrueFalseMazeQuestion } from './trueFalseMazeTypes'
 
 export type TrueFalseMazeGameProps = {
@@ -40,6 +41,9 @@ export type TrueFalseMazeGameProps = {
   questions: TrueFalseMazeQuestion[]
   config: TrueFalseMazeConfig
   onExit: () => void
+  /** Si vienen, el resultado de la partida suma puntos (POST /me/game-results). La demo y las vistas previas no los pasan. */
+  gameId?: string
+  token?: string | null
 }
 
 /** Movimiento mínimo (px) para que un toque sobre el mapa cuente como deslizar. */
@@ -128,6 +132,8 @@ function TrueFalseMazeSession({
   questions,
   config,
   onExit,
+  gameId,
+  token,
   guideOpen,
   onOpenGuide,
   onCloseGuide,
@@ -179,6 +185,7 @@ function TrueFalseMazeSession({
       if (wantFullscreen) enterFullscreen()
     },
   })
+  useReportTrueFalseResult({ token, gameId, title, hud })
   // Celular en horizontal: el HUD pasa a una columna lateral para que la nave use toda la altura.
   const compactLandscape = useMediaQuery('(orientation: landscape) and (max-height: 520px)')
   // La cruceta aparece en cualquier pantalla táctil, no según el ancho.

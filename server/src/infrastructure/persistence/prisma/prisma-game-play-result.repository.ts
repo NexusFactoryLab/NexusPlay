@@ -28,6 +28,14 @@ export class PrismaGamePlayResultRepository implements GamePlayResultRepository 
     return last?.playedAt ?? null;
   }
 
+  async sumPointsForGameSince(studentUserId: string, gameId: string, since: Date): Promise<number> {
+    const total = await this.prisma.gamePlayResultModel.aggregate({
+      where: { studentUserId, gameId, playedAt: { gte: since } },
+      _sum: { points: true },
+    });
+    return total._sum.points ?? 0;
+  }
+
   countByStudentSince(studentUserId: string, since: Date): Promise<number> {
     return this.prisma.gamePlayResultModel.count({
       where: { studentUserId, playedAt: { gte: since } },
