@@ -5073,28 +5073,10 @@ code {
   box-shadow: inset 0 -2px 0 rgba(255, 255, 255, 0.06), 0 4px 10px -4px rgba(0, 0, 0, 0.6);
 }
 
-/* Logo en forma de escudo dorado con centro violeta. */
+/* Isotipo un poco más grande, a juego con el nombre. */
 [data-theme='fantasy'] .sidebar-logo {
-  position: relative;
   width: 44px;
-  height: 50px;
-  border-radius: 0;
-  background: var(--fx-gold-grad) !important;
-  clip-path: polygon(50% 0, 100% 16%, 100% 58%, 50% 100%, 0 58%, 0 16%);
-  color: #ffd84a;
-}
-
-[data-theme='fantasy'] .sidebar-logo::before {
-  content: '';
-  position: absolute;
-  inset: 3px;
-  clip-path: polygon(50% 0, 100% 16%, 100% 58%, 50% 100%, 0 58%, 0 16%);
-  background: linear-gradient(160deg, #a78bfa, #6d28d9 55%, #3b0764);
-}
-
-[data-theme='fantasy'] .sidebar-logo svg {
-  position: relative;
-  z-index: 1;
+  height: 44px;
 }
 
 [data-theme='fantasy'] .sidebar-brand {
@@ -6261,11 +6243,6 @@ code {
   background-clip: text;
   color: transparent;
   filter: drop-shadow(1.5px 0 0 #ffffff) drop-shadow(-1.5px 0 0 #ffffff) drop-shadow(0 1.5px 0 #ffffff) drop-shadow(0 -1.5px 0 #ffffff);
-}
-
-[data-theme='meadow'] .sidebar-logo {
-  border-radius: 14px;
-  box-shadow: 0 0 0 2px #ffffff;
 }
 
 [data-theme='meadow'] [data-tour='menu-toggle'] {

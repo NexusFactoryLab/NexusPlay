@@ -1,8 +1,8 @@
-import { Zap } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { LoginForm } from './LoginForm'
 import { ThemeToggle } from './ThemeToggle'
 import { useAuth } from '../hooks/useAuth'
+import { LogoMark, LogoWordmark } from './BrandLogo'
 
 type LoginPageProps = {
   onSwitchToRegister: () => void
@@ -31,14 +31,8 @@ export function LoginPage({ onSwitchToRegister }: LoginPageProps) {
         style={{ boxShadow: 'var(--shadow), var(--glow)' }}
       >
         <header className="mb-5 text-center">
-          <span
-            className="inline-flex h-13 w-13 items-center justify-center rounded-2xl text-white"
-            style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
-            aria-hidden="true"
-          >
-            <Zap className="h-6 w-6" fill="currentColor" strokeWidth={0} />
-          </span>
-          <h1 className="mt-3 mb-1.5 text-[26px] tracking-tight text-text-h">NexusPlay</h1>
+          <LogoMark className="h-14 w-14" />
+          <h1 className="mt-3 mb-1.5 flex justify-center"><LogoWordmark className="h-8 w-auto" /></h1>
           <p className="text-[15px]">Inicia sesión para continuar tu partida.</p>
         </header>
 

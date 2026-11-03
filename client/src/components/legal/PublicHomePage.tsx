@@ -1,20 +1,14 @@
 import { Link } from 'react-router-dom'
-import { Zap } from 'lucide-react'
 import { ThemeToggle } from '../ThemeToggle'
+import { LogoMark, LogoWordmark } from '../BrandLogo'
 
 export function PublicHomePage() {
   return (
     <div className="flex min-h-screen flex-col bg-bg text-text">
       <header className="flex items-center justify-between px-5 py-5 sm:px-8">
         <span className="flex items-center gap-2.5">
-          <span
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-white"
-            style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
-            aria-hidden="true"
-          >
-            <Zap className="h-5 w-5" fill="currentColor" strokeWidth={0} />
-          </span>
-          <span className="font-heading text-lg font-semibold text-text-h">NexusPlay</span>
+          <LogoMark className="h-9 w-9" />
+          <LogoWordmark className="h-5 w-auto" />
         </span>
         <ThemeToggle />
       </header>
@@ -30,16 +24,8 @@ export function PublicHomePage() {
         />
 
         <div className="relative flex max-w-xl flex-col items-center gap-5">
-          <span
-            className="flex h-16 w-16 items-center justify-center rounded-2xl text-white"
-            style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
-            aria-hidden="true"
-          >
-            <Zap className="h-8 w-8" fill="currentColor" strokeWidth={0} />
-          </span>
-          <h1 className="font-heading text-[32px] font-semibold tracking-tight text-text-h sm:text-[40px]">
-            NexusPlay
-          </h1>
+          <LogoMark className="h-20 w-20" />
+          <h1 className="flex justify-center"><LogoWordmark className="h-10 w-auto sm:h-12" /></h1>
           <p className="text-[16px] leading-relaxed">
             Juegos educativos para aprender sobre ciudades sostenibles, pensados para clases,
             profesores y estudiantes.

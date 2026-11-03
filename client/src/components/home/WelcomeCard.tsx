@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { BookOpenCheck, Compass, Hammer, Play, Trophy, X, Zap } from 'lucide-react'
+import { BookOpenCheck, Compass, Hammer, Play, Trophy, X } from 'lucide-react'
 import truckArt from './games/assets/maze-collector/truck-drive.webp'
 import cloudArt from './games/assets/maze-collector/cloud-chaser.webp'
 import robotArt from './games/true-false-maze/assets/spaceship/robot/robot-down-0.png'
 import jellyArt from './games/true-false-maze/assets/spaceship/jellyfish/jelly-down-0.png'
 import './welcomeCard.css'
+import { LogoMark, LogoWordmark } from '../BrandLogo'
 
 /** Las tres formas de empezar, en una palabra cada una (iconos de Lucide en una ficha de color). */
 const HIGHLIGHTS = [
@@ -138,14 +139,8 @@ export function WelcomeCard({ onClose, onQuickGuide }: WelcomeCardProps) {
           </button>
 
           <div className="flex items-center justify-center gap-3">
-            <span
-              className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-[13px] text-white"
-              style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
-              aria-hidden="true"
-            >
-              <Zap className="h-[22px] w-[22px]" fill="currentColor" strokeWidth={0} />
-            </span>
-            <span className="text-[28px] font-medium tracking-tight text-text-h">NexusPlay</span>
+            <LogoMark className="h-[46px] w-[46px] shrink-0" />
+            <LogoWordmark className="h-7 w-auto" />
           </div>
 
           {/* Escenario: los personajes de los juegos flotando sobre un cielo nocturno con estrellas. */}
