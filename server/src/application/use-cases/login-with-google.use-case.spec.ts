@@ -14,6 +14,7 @@ import {
 } from '../errors/application.errors.js'
 import { TokenPairIssuer } from '../services/token-pair-issuer.service.js'
 import { OrganizationAutoJoinService } from '../services/organization-auto-join.service.js'
+import { InMemoryUserConsentRepository } from './testing/user-consent-fakes.helper-spec.js'
 import { LoginWithGoogleUseCase } from './login-with-google.use-case.js'
 
 const verifyIdTokenMock = vi.fn()
@@ -100,6 +101,7 @@ function setup(options: {
     userRepository,
     identityProviderAccountRepository,
     idGenerator,
+    new InMemoryUserConsentRepository(),
     tokenPairIssuer,
     organizationAutoJoin,
   )

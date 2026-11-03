@@ -1,4 +1,4 @@
-import { InvalidUserStateError, RankingConsentNotAllowedError } from '../errors/user.errors.js';
+import { InvalidUserStateError } from '../errors/user.errors.js';
 import { isEligibleForPublicRanking } from '../services/ranking-eligibility.js';
 import type { AvatarConfig } from '../value-objects/avatar-config.vo.js';
 import { Email } from '../value-objects/email.vo.js';
@@ -20,14 +20,6 @@ export interface UserProps {
    * cada `fromPersistence` existente: ausente equivale a "sin avatar".
    */
   avatarConfig?: AvatarConfig | null;
-  /**
-   * Consentimiento para aparecer en el ranking público de la landing:
-   * null = nunca se le preguntó, true = aceptó, false = rechazó. Opcional por
-   * la misma razón que `avatarConfig`: ausente equivale a "nunca se le preguntó".
-   */
-  rankingConsent?: boolean | null;
-  /** Cuándo tomó esa decisión; null mientras no haya decidido. */
-  rankingConsentAt?: Date | null;
   birthDate: Date | null;
   locale: string;
   isActive: boolean;
@@ -123,31 +115,13 @@ export class User {
     return this.props.birthDate;
   }
 
-  get rankingConsent(): boolean | null {
-    return this.props.rankingConsent ?? null;
-  }
-
-  get rankingConsentAt(): Date | null {
-    return this.props.rankingConsentAt ?? null;
-  }
-
-  /** ¿Puede decidir sobre el ranking público? Requiere fecha de nacimiento y 14 años cumplidos. */
+  /**
+   * ¿Puede decidir sobre el ranking público? Requiere fecha de nacimiento y 14
+   * años cumplidos. La decisión en sí no vive en el usuario sino en su
+   * historial de consentimientos (ver `UserConsent`).
+   */
   canDecideRankingConsent(now: Date = new Date()): boolean {
     return isEligibleForPublicRanking(this.props.birthDate, now);
-  }
-
-  /**
-   * Guarda la decisión de aparecer o no en el ranking público. Aceptar exige
-   * ser elegible por edad; rechazar o retirar el consentimiento se permite
-   * siempre, para que nadie quede atrapado en una decisión previa.
-   */
-  decideRankingConsent(accepted: boolean, now: Date = new Date()): void {
-    if (accepted && !this.canDecideRankingConsent(now)) {
-      throw new RankingConsentNotAllowedError();
-    }
-    this.props.rankingConsent = accepted;
-    this.props.rankingConsentAt = now;
-    this.touch();
   }
 
   get locale(): string {
@@ -221,11 +195,6 @@ export class User {
       throw new InvalidUserStateError('la fecha de nacimiento no es válida.');
     }
     this.props.birthDate = birthDate;
-    // Si la nueva fecha deja a la persona sin la edad mínima, su aceptación deja de valer.
-    if (this.props.rankingConsent === true && !this.canDecideRankingConsent(now)) {
-      this.props.rankingConsent = false;
-      this.props.rankingConsentAt = now;
-    }
     this.touch();
   }
 

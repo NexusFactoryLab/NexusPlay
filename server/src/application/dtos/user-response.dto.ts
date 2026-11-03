@@ -1,4 +1,5 @@
 import { User } from '../../domain/entities/user.entity.js';
+import type { UserConsent } from '../../domain/entities/user-consent.entity.js';
 import type { AvatarConfigProps } from '../../domain/value-objects/avatar-config.vo.js';
 
 export interface UserResponseDto {
@@ -13,10 +14,6 @@ export interface UserResponseDto {
   avatarUrl: string | null;
   /** Avatar armado por piezas (issue #77); null si la cuenta aún no lo configuró. */
   avatarConfig: AvatarConfigProps | null;
-  /** Decisión sobre aparecer en el ranking público: null = aún no se le ha preguntado. */
-  rankingConsent: boolean | null;
-  /** true si tiene 14 años cumplidos verificables: solo entonces se le pregunta y puede aceptar. */
-  rankingConsentEligible: boolean;
   birthDate: Date | null;
   locale: string;
   isActive: boolean;
@@ -24,6 +21,20 @@ export interface UserResponseDto {
   lastLoginAt: Date | null;
   createdAt: Date;
   lastUpdate: Date;
+}
+
+/**
+ * Perfil de la propia persona (login, `/users/me` y lo que edita de sí misma):
+ * el perfil general más su decisión vigente sobre el ranking público. Los
+ * listados y vistas de administración usan `UserResponseDto` y no la incluyen.
+ */
+export interface CurrentUserResponseDto extends UserResponseDto {
+  /** Decisión vigente sobre aparecer en el ranking público: null = aún no se le ha preguntado. */
+  rankingConsent: boolean | null;
+  /** Cuándo tomó esa decisión; null si aún no se le ha preguntado. */
+  rankingConsentAt: Date | null;
+  /** true si tiene 14 años cumplidos verificables: solo entonces se le pregunta y puede aceptar. */
+  rankingConsentEligible: boolean;
 }
 
 export function toUserResponseDto(user: User): UserResponseDto {
@@ -38,8 +49,6 @@ export function toUserResponseDto(user: User): UserResponseDto {
     hasChosenRole: user.hasChosenRole,
     avatarUrl: user.avatarUrl,
     avatarConfig: user.avatarConfig?.toJSON() ?? null,
-    rankingConsent: user.rankingConsent,
-    rankingConsentEligible: user.canDecideRankingConsent(),
     birthDate: user.birthDate,
     locale: user.locale,
     isActive: user.isActive,
@@ -47,5 +56,19 @@ export function toUserResponseDto(user: User): UserResponseDto {
     lastLoginAt: user.lastLoginAt,
     createdAt: user.createdAt,
     lastUpdate: user.lastUpdate,
+  };
+}
+
+/** `rankingConsent` es la última decisión `PUBLIC_RANKING` del historial (null si no hay). */
+export function toCurrentUserResponseDto(
+  user: User,
+  rankingConsent: UserConsent | null,
+  now: Date = new Date(),
+): CurrentUserResponseDto {
+  return {
+    ...toUserResponseDto(user),
+    rankingConsent: rankingConsent?.granted ?? null,
+    rankingConsentAt: rankingConsent?.createdAt ?? null,
+    rankingConsentEligible: user.canDecideRankingConsent(now),
   };
 }

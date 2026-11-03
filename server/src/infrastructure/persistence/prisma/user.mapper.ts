@@ -20,8 +20,6 @@ export class UserMapper {
       displayName: record.displayName,
       avatarUrl: record.avatarUrl,
       avatarConfig: AvatarConfig.restore(record.avatarConfig),
-      rankingConsent: record.rankingConsent,
-      rankingConsentAt: record.rankingConsentAt,
       birthDate: record.birthDate,
       locale: record.locale,
       isActive: record.isActive,
@@ -48,8 +46,6 @@ export class UserMapper {
       avatarUrl: props.avatarUrl,
       // Un Json? de Prisma se vacía con DbNull (un null suelto no compila).
       avatarConfig: props.avatarConfig ? props.avatarConfig.toJSON() : Prisma.DbNull,
-      rankingConsent: props.rankingConsent ?? null,
-      rankingConsentAt: props.rankingConsentAt ?? null,
       birthDate: props.birthDate,
       locale: props.locale,
       isActive: props.isActive,

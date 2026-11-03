@@ -7,6 +7,8 @@ import { PersonName } from '../../domain/value-objects/person-name.vo.js';
 import { Role } from '../../domain/value-objects/role.vo.js';
 import { InvalidAvatarError } from '../../domain/errors/user.errors.js';
 import { UserNotFoundError } from '../errors/application.errors.js';
+import { ConsentType, UserConsent } from '../../domain/entities/user-consent.entity.js';
+import { InMemoryUserConsentRepository } from './testing/user-consent-fakes.helper-spec.js';
 import { UpdateUserAvatarUseCase } from './update-user-avatar.use-case.js';
 
 const AVATAR = {
@@ -34,7 +36,8 @@ function setup(user: User | null) {
     findAll: vi.fn(),
     delete: vi.fn(),
   };
-  return { useCase: new UpdateUserAvatarUseCase(userRepository), userRepository };
+  const consents = new InMemoryUserConsentRepository();
+  return { useCase: new UpdateUserAvatarUseCase(userRepository, consents), userRepository, consents };
 }
 
 describe('UpdateUserAvatarUseCase (issue #77)', () => {
@@ -50,6 +53,17 @@ describe('UpdateUserAvatarUseCase (issue #77)', () => {
     expect(userRepository.save).toHaveBeenCalledWith(user);
     expect(result.avatarConfig).toMatchObject({ top: 'braids', skinColor: '7d4a26', outfit: 'dress', glasses: null });
     expect(user.avatarConfig?.get('outfit')).toBe('dress');
+  });
+
+  it('devuelve el perfil propio con la decisión vigente del ranking (para no perderla en el cliente)', async () => {
+    const { useCase, consents } = setup(student());
+    const decidedAt = new Date('2026-10-01T15:00:00Z');
+    await consents.append(UserConsent.record('user-1', ConsentType.PUBLIC_RANKING, false, decidedAt));
+
+    const result = await useCase.execute({ userId: 'user-1', avatar: AVATAR });
+
+    expect(result.rankingConsent).toBe(false);
+    expect(result.rankingConsentAt).toEqual(decidedAt);
   });
 
   it('no guarda nada si el avatar no es válido', async () => {

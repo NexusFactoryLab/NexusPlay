@@ -39,7 +39,17 @@ export class PrismaPublicRankingRepository implements PublicRankingRepository {
     minAgeBornOnOrBefore: Date,
     limit: number,
   ): Promise<PublicTopStudentRow[]> {
+    // `latest_ranking_decision`: decisión vigente (la más reciente) de cada usuario
+    // sobre el ranking público. Se resuelve una vez por usuario y no por partida,
+    // recorriendo el índice (user_id, type, created_at DESC) de user_consents;
+    // solo entra quien la tiene en granted = true.
     const rows = await this.prisma.$queryRaw<StudentRow[]>(Prisma.sql`
+      WITH latest_ranking_decision AS (
+        SELECT DISTINCT ON (c.user_id) c.user_id, c.granted
+        FROM user_consents c
+        WHERE c.type = 'PUBLIC_RANKING'
+        ORDER BY c.user_id, c.created_at DESC
+      )
       SELECT
         r.student_user_id,
         u.first_name,
@@ -57,10 +67,10 @@ export class PrismaPublicRankingRepository implements PublicRankingRepository {
         COUNT(*)::int AS games_played
       FROM game_play_results r
       JOIN users u ON u.id = r.student_user_id
+      JOIN latest_ranking_decision d ON d.user_id = u.id AND d.granted
       WHERE r.played_at >= ${since}
         AND r.played_at < ${until}
         AND u.is_active
-        AND u.ranking_consent = true
         AND u.birth_date IS NOT NULL
         AND u.birth_date <= ${minAgeBornOnOrBefore}
       GROUP BY r.student_user_id, u.id

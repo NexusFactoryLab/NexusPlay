@@ -29,7 +29,8 @@ export interface PublicTopOrganizationRow {
 export interface PublicRankingRepository {
   /**
    * Top de estudiantes por puntaje en la ventana [`since`, `until`). Solo entra
-   * quien aceptó aparecer (`ranking_consent = true`), tiene fecha de nacimiento
+   * quien tiene vigente el consentimiento `PUBLIC_RANKING` (su última decisión
+   * en el historial es aceptar), tiene fecha de nacimiento
    * conocida y nació en `minAgeBornOnOrBefore` o antes (14 años cumplidos).
    * Excluye cuentas inactivas. `until` es el corte diario: lo jugado hoy no entra.
    */

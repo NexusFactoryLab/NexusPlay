@@ -4,11 +4,17 @@ import {
   type UserRepository,
 } from '../../domain/ports/user.repository.port.js';
 import {
+  USER_CONSENT_REPOSITORY,
+  type UserConsentRepository,
+} from '../../domain/ports/user-consent.repository.port.js';
+import {
   PUBLIC_RANKING_CACHE,
   type PublicRankingCache,
 } from '../../domain/ports/public-ranking-cache.port.js';
+import { ConsentType, UserConsent } from '../../domain/entities/user-consent.entity.js';
+import { RankingConsentNotAllowedError } from '../../domain/errors/user.errors.js';
 import { UserNotFoundError } from '../errors/application.errors.js';
-import { toUserResponseDto, type UserResponseDto } from '../dtos/user-response.dto.js';
+import { toCurrentUserResponseDto, type CurrentUserResponseDto } from '../dtos/user-response.dto.js';
 import type { UseCase } from '../ports/use-case.port.js';
 
 export interface UpdateRankingConsentInput {
@@ -19,33 +25,53 @@ export interface UpdateRankingConsentInput {
 }
 
 /**
- * Guarda la decisión de la propia persona sobre aparecer en el ranking público
- * de la landing (solo 14 años o más, ver `User.decideRankingConsent`). Si
- * retira el consentimiento se descarta la caché del ranking para que deje de
- * verse de inmediato y no recién a la medianoche; al aceptar no hace falta:
- * aparecerá en el próximo corte diario.
+ * Registra la decisión de la propia persona sobre aparecer en el ranking
+ * público de la landing. Aceptar exige 14 años cumplidos verificables;
+ * rechazar o retirar se permite siempre, para que nadie quede atrapado en una
+ * decisión previa.
+ *
+ * El historial es de solo anexar: si la decisión cambia el estado vigente se
+ * inserta una fila nueva; si repite el estado vigente no se inserta nada (el
+ * historial guarda cambios, no clics). Cuando la persona entra o sale del
+ * ranking se descarta su caché para que el cambio se vea de inmediato y no
+ * recién en el próximo corte diario.
  */
 @Injectable()
 export class UpdateRankingConsentUseCase
-  implements UseCase<UpdateRankingConsentInput, UserResponseDto>
+  implements UseCase<UpdateRankingConsentInput, CurrentUserResponseDto>
 {
   constructor(
     @Inject(USER_REPOSITORY) private readonly userRepository: UserRepository,
+    @Inject(USER_CONSENT_REPOSITORY) private readonly consentRepository: UserConsentRepository,
     @Inject(PUBLIC_RANKING_CACHE) private readonly rankingCache: PublicRankingCache<unknown>,
   ) {}
 
-  async execute(input: UpdateRankingConsentInput): Promise<UserResponseDto> {
+  async execute(input: UpdateRankingConsentInput): Promise<CurrentUserResponseDto> {
+    const now = input.now ?? new Date();
     const user = await this.userRepository.findById(input.userId);
 
     if (!user) {
       throw new UserNotFoundError(input.userId);
     }
 
-    user.decideRankingConsent(input.accepted, input.now);
-    await this.userRepository.save(user);
+    if (input.accepted && !user.canDecideRankingConsent(now)) {
+      throw new RankingConsentNotAllowedError();
+    }
 
-    if (!input.accepted) this.rankingCache.invalidate();
+    const current = await this.consentRepository.findLatest(user.id, ConsentType.PUBLIC_RANKING);
+    if (current?.granted === input.accepted) {
+      return toCurrentUserResponseDto(user, current, now);
+    }
 
-    return toUserResponseDto(user);
+    const decision = UserConsent.record(user.id, ConsentType.PUBLIC_RANKING, input.accepted, now);
+    await this.consentRepository.append(decision);
+
+    // Entra (pasa a true) o sale (deja de ser true): el ranking guardado ya no vale.
+    // De "sin preguntar" a "no" no cambia lo que se muestra.
+    if (input.accepted || current?.granted === true) {
+      this.rankingCache.invalidate();
+    }
+
+    return toCurrentUserResponseDto(user, decision, now);
   }
 }

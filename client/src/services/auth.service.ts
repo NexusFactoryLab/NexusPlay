@@ -39,6 +39,8 @@ export type AuthUser = {
   avatarConfig?: AvatarConfig | null
   /** Aparecer en el ranking público: null = aún no se le ha preguntado, true = aceptó, false = rechazó. */
   rankingConsent?: boolean | null
+  /** Cuándo tomó esa decisión (ISO); null si aún no se le ha preguntado. Solo viene en el perfil propio. */
+  rankingConsentAt?: string | null
   /** El servidor confirma que tiene 14 años o más (con fecha de nacimiento): solo entonces se le pregunta. */
   rankingConsentEligible?: boolean
   birthDate: string | null
