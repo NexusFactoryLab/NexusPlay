@@ -17,8 +17,6 @@
     "seed-dual-quest-pixi-demo.ts",
     "seed-game-type-settings.ts",
     "seed-true-false-maze-demo.ts",
-    "seed-sylabus.ts",
-    "sylabus-games.ts",
     "../src/generated/prisma/**/*.ts"
   ]
 }
