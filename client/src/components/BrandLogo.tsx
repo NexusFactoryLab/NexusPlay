@@ -11,3 +11,22 @@ export function LogoMark({ className }: BrandLogoProps) {
 export function LogoWordmark({ className }: BrandLogoProps) {
   return <img src="/brand/logo-wordmark.svg" alt="NexusPlay" draggable={false} className={className} />
 }
+
+/**
+ * La N del isotipo teñida con `color` y difuminada en diagonal, para estamparla
+ * sobre una superficie (p. ej. el dorso de una carta) y que se funda con ella.
+ */
+export function LogoTint({ color, className }: BrandLogoProps & { color: string }) {
+  const mask = 'url(/brand/logo-n.svg) center / contain no-repeat'
+  return (
+    <span
+      aria-hidden="true"
+      className={className}
+      style={{
+        background: `linear-gradient(135deg, color-mix(in srgb, ${color} 90%, transparent), color-mix(in srgb, ${color} 12%, transparent))`,
+        mask,
+        WebkitMask: mask,
+      }}
+    />
+  )
+}
