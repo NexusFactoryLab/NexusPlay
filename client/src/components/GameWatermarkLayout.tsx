@@ -12,7 +12,7 @@ export function GameWatermarkLayout() {
       <Outlet />
       <div
         aria-hidden="true"
-        className="pointer-events-none fixed right-3 bottom-3 z-40 flex select-none items-center gap-1.5 opacity-40"
+        className="pointer-events-none fixed right-3 bottom-3 z-[90] flex select-none items-center gap-1.5 opacity-40"
       >
         <LogoMark className="h-6 w-6" />
         <LogoWordmark className="h-3.5 w-auto" />
