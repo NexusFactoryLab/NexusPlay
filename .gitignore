@@ -10,3 +10,5 @@ server/src/generated/
 
 # Caché de Python de los scripts de assets (client/scripts)
 __pycache__/
+.vercel
+.env*
