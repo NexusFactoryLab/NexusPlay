@@ -9,6 +9,7 @@ import type {
 } from '../services/auth.service'
 import { setRefreshHandler, setUnauthorizedHandler } from '../utils/http'
 import { saveMyAvatar, type AvatarConfig } from '../services/avatar.service'
+import { saveMyRankingConsent } from '../services/ranking-consent.service'
 
 /** `checking` mientras se intenta renovar la sesión al arrancar la app. */
 type AuthStatus = 'checking' | 'authenticated' | 'anonymous'
@@ -27,6 +28,8 @@ type AuthContextValue = {
   updateProfile: (input: UpdateProfileInput) => Promise<void>
   /** Guarda el avatar propio (issue #77) y refresca el usuario en toda la app. */
   saveAvatar: (avatar: AvatarConfig) => Promise<void>
+  /** Guarda si quiere aparecer en el ranking público y refresca el usuario en toda la app. */
+  saveRankingConsent: (accepted: boolean) => Promise<void>
   chooseRole: (role: 'STUDENT' | 'TEACHER') => Promise<void>
   deleteAccount: (currentPlainPassword: string) => Promise<void>
 }
@@ -159,6 +162,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(profile)
   }, [])
 
+  const saveRankingConsent = useCallback(async (accepted: boolean) => {
+    if (!tokenRef.current) throw new Error('No hay una sesión activa.')
+    const profile = await saveMyRankingConsent(tokenRef.current, accepted)
+    setUser(profile)
+  }, [])
+
   const chooseRole = useCallback(async (role: 'STUDENT' | 'TEACHER') => {
     if (!tokenRef.current) throw new Error('No hay una sesión activa.')
     const profile = await authService.chooseOwnRole(tokenRef.current, role)
@@ -194,6 +203,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signOut,
         updateProfile,
         saveAvatar,
+        saveRankingConsent,
         chooseRole,
         deleteAccount,
       }}

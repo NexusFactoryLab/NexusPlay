@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Menu } from 'lucide-react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { Sidebar } from './Sidebar'
 import { SearchBar } from './SearchBar'
@@ -11,6 +11,8 @@ import { HomeSearchContext } from './homeSearchContext'
 import { listMyOrganizations } from '../../services/organization.service'
 import { KidsHomeShell } from './kids/KidsHomeShell'
 import { WelcomeTour } from './WelcomeTour'
+import { RankingConsentPrompt } from './RankingConsentPrompt'
+import { shouldAskRankingConsent, wasDismissedThisSession } from '../../utils/rankingConsent'
 import { isKidsMode } from '../../utils/kidsMode'
 import { ScrollMoreHint } from '../ScrollMoreHint'
 import { MeadowScenery } from './FantasyDecor'
@@ -18,6 +20,11 @@ import { MeadowScenery } from './FantasyDecor'
 export function HomeLayout() {
   const { user, token, signOut } = useAuth()
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const location = useLocation()
+  // Mientras la bienvenida o el recorrido estén abiertos no se pregunta por el ranking (una ventana a la vez).
+  // Arranca en true y WelcomeTour lo corrige al montar, así el aviso nunca parpadea debajo de la bienvenida.
+  const [welcomeBusy, setWelcomeBusy] = useState(true)
+  const [consentPostponed, setConsentPostponed] = useState(false)
   // Menú lateral desplegable en móvil (ver Sidebar).
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const closeMobileMenu = useCallback(() => setMobileMenuOpen(false), [])
@@ -88,7 +95,7 @@ export function HomeLayout() {
           </button>
           <SearchBar value={searchInput} onChange={setSearchInput} onSearch={handleSearch} />
           <div className="ml-auto flex shrink-0 items-center gap-2">
-            <WelcomeTour key={`${user.id}:${user.role}`} user={user} canAccessOrganization={canAccessOrganization || canManageUsers} />
+            <WelcomeTour key={`${user.id}:${user.role}`} user={user} canAccessOrganization={canAccessOrganization || canManageUsers} onBusyChange={setWelcomeBusy} />
             {/* El tema ya no tiene botones aquí (issue #47): se elige en la tuerca → Temas. */}
             <SettingsButton onClick={() => setSettingsOpen(true)} />
           </div>
@@ -105,6 +112,13 @@ export function HomeLayout() {
       </div>
 
       {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
+
+      {!settingsOpen && shouldAskRankingConsent({
+        user,
+        atHome: location.pathname === '/' && !location.search,
+        welcomeBusy,
+        dismissedThisSession: consentPostponed || wasDismissedThisSession(user.id),
+      }) && <RankingConsentPrompt onPostpone={() => setConsentPostponed(true)} />}
     </div>
   )
 

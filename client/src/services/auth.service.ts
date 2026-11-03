@@ -37,6 +37,10 @@ export type AuthUser = {
   avatarUrl: string | null
   /** Avatar armado por piezas (issue #77); null mientras no lo configure. */
   avatarConfig?: AvatarConfig | null
+  /** Aparecer en el ranking público: null = aún no se le ha preguntado, true = aceptó, false = rechazó. */
+  rankingConsent?: boolean | null
+  /** El servidor confirma que tiene 14 años o más (con fecha de nacimiento): solo entonces se le pregunta. */
+  rankingConsentEligible?: boolean
   birthDate: string | null
   isActive: boolean
   isEmailVerified: boolean

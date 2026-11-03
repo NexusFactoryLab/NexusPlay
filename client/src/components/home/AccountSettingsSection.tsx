@@ -14,6 +14,7 @@ import {
   type OrganizationWithMyRole,
 } from '../../services/organization.service'
 import { Modal } from './games/Modal'
+import { RankingConsentSetting } from './RankingConsentSetting'
 
 type AccountSettingsSectionProps = {
   /** Cierra todo el panel de configuración (tras eliminar la cuenta, o para ir al panel de organización). */
@@ -311,6 +312,8 @@ export function AccountSettingsSection({ onClose }: AccountSettingsSectionProps)
           </button>
         </div>
       )}
+
+      <RankingConsentSetting />
 
       <form className="flex flex-col gap-3.5" onSubmit={handleSubmit} noValidate>
         <div className="grid grid-cols-2 gap-[14px]">

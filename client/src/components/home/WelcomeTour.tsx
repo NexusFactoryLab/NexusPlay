@@ -29,7 +29,7 @@ const icons = { play: Gamepad2, create: Plus, explore: Compass, profile: UserRou
  * menos una vez. Una vez iniciado el recorrido en sí (paso a paso) sigue
  * siendo cerrable con la X o Escape, como antes.
  */
-export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds }: { user: AuthUser } & WelcomeOptions) {
+export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds, onBusyChange }: { user: AuthUser, /** Avisa si la bienvenida o el recorrido están abiertos, para no apilar otras ventanas encima. */ onBusyChange?: (busy: boolean) => void } & WelcomeOptions) {
   const location = useLocation()
   const navigate = useNavigate()
   const isKids = isKidsMode(user)
@@ -56,6 +56,7 @@ export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds }: 
   const visible = atHome && phase !== 'closed'
   // Momento obligatorio: solo antes de que la persona inicie el recorrido.
   const forcedInvite = visible && phase === 'invite'
+  useEffect(() => { onBusyChange?.(visible) }, [visible, onBusyChange])
 
   // Reiniciar solo al cambiar de ruta evita reabrir pasos al volver con el navegador.
   if (previousRoute !== location.key) {
