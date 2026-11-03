@@ -36,7 +36,7 @@ export class PrismaPublicRankingRepository implements PublicRankingRepository {
   async topStudentsBetween(
     since: Date,
     until: Date,
-    adultBornOnOrBefore: Date,
+    minAgeBornOnOrBefore: Date,
     limit: number,
   ): Promise<PublicTopStudentRow[]> {
     const rows = await this.prisma.$queryRaw<StudentRow[]>(Prisma.sql`
@@ -60,7 +60,9 @@ export class PrismaPublicRankingRepository implements PublicRankingRepository {
       WHERE r.played_at >= ${since}
         AND r.played_at < ${until}
         AND u.is_active
-        AND (u.birth_date IS NULL OR u.birth_date <= ${adultBornOnOrBefore})
+        AND u.ranking_consent = true
+        AND u.birth_date IS NOT NULL
+        AND u.birth_date <= ${minAgeBornOnOrBefore}
       GROUP BY r.student_user_id, u.id
       HAVING SUM(r.points) > 0
       ORDER BY total_score DESC, games_played DESC, r.student_user_id ASC

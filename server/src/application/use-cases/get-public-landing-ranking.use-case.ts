@@ -3,8 +3,13 @@ import {
   PUBLIC_RANKING_REPOSITORY,
   type PublicRankingRepository,
 } from '../../domain/ports/public-ranking.repository.port.js';
+import {
+  PUBLIC_RANKING_CACHE,
+  type PublicRankingCache,
+} from '../../domain/ports/public-ranking-cache.port.js';
 import { startOfColombiaDay } from '../../domain/services/colombia-day.js';
-import { adultBornOnOrBefore, maskPublicName } from '../../domain/services/public-ranking-name.js';
+import { maskPublicName } from '../../domain/services/public-ranking-name.js';
+import { minAgeBornOnOrBefore } from '../../domain/services/ranking-eligibility.js';
 
 export interface PublicRankingStudentDto {
   rank: number;
@@ -43,26 +48,28 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * `GET /public/ranking`: ranking para la landing, sin sesión. Se calcula una
  * vez al día: cuenta lo jugado hasta la medianoche de Colombia y no lo de hoy,
  * así el podio cambia por la mañana y la gente vuelve a ver quién subió. Solo
- * datos agregados y enmascarados (ver `maskPublicName`); excluye a menores de
- * edad conocidos. Si todavía no hay partidas devuelve listas vacías y es el
- * cliente quien decide qué mostrar.
+ * datos agregados y enmascarados (ver `maskPublicName`). Un estudiante solo
+ * aparece si aceptó (consentimiento explícito) y tiene 14 años cumplidos
+ * verificables por su fecha de nacimiento. Las universidades son agregados de
+ * todos sus miembros activos: no revelan personas. Si todavía no hay partidas
+ * devuelve listas vacías y es el cliente quien decide qué mostrar.
  */
 @Injectable()
 export class GetPublicLandingRankingUseCase {
-  /** El corte del día es el mismo para todas las visitas: se calcula una vez por corte. */
-  private cache: { cutoffMs: number; value: PublicLandingRankingDto } | null = null;
-
   constructor(
     @Inject(PUBLIC_RANKING_REPOSITORY) private readonly repository: PublicRankingRepository,
+    /** El corte del día es el mismo para todas las visitas: se calcula una vez por corte. */
+    @Inject(PUBLIC_RANKING_CACHE) private readonly cache: PublicRankingCache<PublicLandingRankingDto>,
   ) {}
 
   async execute(now: Date = new Date()): Promise<PublicLandingRankingDto> {
     const cutoff = startOfColombiaDay(now);
-    if (this.cache && this.cache.cutoffMs === cutoff.getTime()) return this.cache.value;
+    const cached = this.cache.get(cutoff.getTime());
+    if (cached) return cached;
 
     const since = new Date(cutoff.getTime() - WINDOW_DAYS * DAY_MS);
     const [students, universities] = await Promise.all([
-      this.repository.topStudentsBetween(since, cutoff, adultBornOnOrBefore(now), TOP_STUDENTS),
+      this.repository.topStudentsBetween(since, cutoff, minAgeBornOnOrBefore(now), TOP_STUDENTS),
       this.repository.topOrganizationsUntil(cutoff, TOP_UNIVERSITIES),
     ]);
 
@@ -85,7 +92,7 @@ export class GetPublicLandingRankingUseCase {
       updatedAt: cutoff.toISOString(),
     };
 
-    this.cache = { cutoffMs: cutoff.getTime(), value };
+    this.cache.set(cutoff.getTime(), value);
     return value;
   }
 }

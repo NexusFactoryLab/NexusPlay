@@ -13,6 +13,10 @@ export interface UserResponseDto {
   avatarUrl: string | null;
   /** Avatar armado por piezas (issue #77); null si la cuenta aún no lo configuró. */
   avatarConfig: AvatarConfigProps | null;
+  /** Decisión sobre aparecer en el ranking público: null = aún no se le ha preguntado. */
+  rankingConsent: boolean | null;
+  /** true si tiene 14 años cumplidos verificables: solo entonces se le pregunta y puede aceptar. */
+  rankingConsentEligible: boolean;
   birthDate: Date | null;
   locale: string;
   isActive: boolean;
@@ -34,6 +38,8 @@ export function toUserResponseDto(user: User): UserResponseDto {
     hasChosenRole: user.hasChosenRole,
     avatarUrl: user.avatarUrl,
     avatarConfig: user.avatarConfig?.toJSON() ?? null,
+    rankingConsent: user.rankingConsent,
+    rankingConsentEligible: user.canDecideRankingConsent(),
     birthDate: user.birthDate,
     locale: user.locale,
     isActive: user.isActive,

@@ -37,6 +37,9 @@ import { ChangeOwnRoleUseCase } from '../application/use-cases/change-own-role.u
 import { ResetUserPasswordUseCase } from '../application/use-cases/reset-user-password.use-case.js';
 import { UpdateUserProfileByAdminUseCase } from '../application/use-cases/update-user-profile-by-admin.use-case.js';
 import { UpdateUserAvatarUseCase } from '../application/use-cases/update-user-avatar.use-case.js';
+import { UpdateRankingConsentUseCase } from '../application/use-cases/update-ranking-consent.use-case.js';
+import { PUBLIC_RANKING_CACHE } from '../domain/ports/public-ranking-cache.port.js';
+import { InMemoryPublicRankingCache } from './persistence/in-memory-public-ranking-cache.js';
 import { GetUsersAvatarsUseCase } from '../application/use-cases/get-users-avatars.use-case.js';
 import { RolesGuard } from './http/guards/roles.guard.js';
 import { UserController } from './http/controllers/user.controller.js';
@@ -90,8 +93,12 @@ import { AuthController } from './http/controllers/auth.controller.js';
     ResetUserPasswordUseCase,
     UpdateUserProfileByAdminUseCase,
     UpdateUserAvatarUseCase,
+    UpdateRankingConsentUseCase,
     GetUsersAvatarsUseCase,
+    // Caché del ranking de la landing: la lee MetricsModule y la invalida este
+    // módulo cuando alguien retira su consentimiento. Una sola instancia (vive aquí).
+    { provide: PUBLIC_RANKING_CACHE, useClass: InMemoryPublicRankingCache },
   ],
-  exports: [JwtModule, USER_REPOSITORY, ID_GENERATOR],
+  exports: [JwtModule, USER_REPOSITORY, ID_GENERATOR, PUBLIC_RANKING_CACHE],
 })
 export class UserModule {}

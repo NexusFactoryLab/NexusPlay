@@ -8,8 +8,3 @@ export function maskPublicName(firstName: string, lastName: string): string {
   if (!first) return initial ? `${initial}.` : 'Jugador';
   return initial ? `${first} ${initial}.` : first;
 }
-
-/** Fecha límite de nacimiento para ser mayor de edad hoy: quien nació después es menor. */
-export function adultBornOnOrBefore(now: Date, adultAge = 18): Date {
-  return new Date(Date.UTC(now.getUTCFullYear() - adultAge, now.getUTCMonth(), now.getUTCDate()));
-}

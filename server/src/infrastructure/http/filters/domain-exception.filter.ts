@@ -1,6 +1,6 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpStatus } from '@nestjs/common';
 import type { Response } from 'express';
-import { DomainError } from '../../../domain/errors/user.errors.js';
+import { DomainError, RankingConsentNotAllowedError } from '../../../domain/errors/user.errors.js';
 import { GameVersionConflictError, GameTypeArchivedError } from '../../../domain/errors/game.errors.js';
 import { ForbiddenActionError } from '../../../domain/errors/authorization.errors.js';
 import { PublicEmailProviderDomainError } from '../../../domain/errors/organization.errors.js';
@@ -38,6 +38,7 @@ const STATUS_BY_ERROR = new Map<Function, HttpStatus>([
   [InvalidCredentialsError, HttpStatus.UNAUTHORIZED],
   [UserInactiveError, HttpStatus.FORBIDDEN],
   [UserNotFoundError, HttpStatus.NOT_FOUND],
+  [RankingConsentNotAllowedError, HttpStatus.FORBIDDEN],
   [ForbiddenActionError, HttpStatus.FORBIDDEN],
   [GameNotFoundError, HttpStatus.NOT_FOUND],
   [GameImportJobNotFoundError, HttpStatus.NOT_FOUND],
