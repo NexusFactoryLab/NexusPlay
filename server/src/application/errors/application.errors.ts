@@ -257,3 +257,17 @@ export class AiConfigConflictError extends ApplicationError {
     );
   }
 }
+
+/** El resultado de una partida no es plausible o llegó por un camino no válido (POST /me/game-results). */
+export class GamePlayResultRejectedError extends ApplicationError {
+  constructor(reason: string) {
+    super(`No se puede registrar la partida: ${reason}`);
+  }
+}
+
+/** Demasiados resultados seguidos de la misma persona: se frena antes de que ensucien el ranking. */
+export class GamePlayResultRateLimitedError extends ApplicationError {
+  constructor() {
+    super('Estás registrando partidas demasiado rápido. Intenta de nuevo en unos segundos.');
+  }
+}

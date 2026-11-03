@@ -5,6 +5,7 @@ import type { MazeCollectorConfig, MazeCollectorItem, MazeLayoutDef, CellPositio
 import { iconForConcept } from './mazeCollectorTypes'
 import { POWER_MODE_MS } from './mazeEngine'
 import { useMazeCollectorGame } from './useMazeCollectorGame'
+import { useReportMazeResult } from './useReportMazeResult'
 import type { Direction } from './useMazeCollectorGame'
 import { EcoTruckSprite } from './EcoTruckSprite'
 import { PollutionGhostSprite } from './PollutionGhostSprite'
@@ -21,6 +22,9 @@ type MazeCollectorGameProps = {
   items: MazeCollectorItem[]
   config: MazeCollectorConfig
   onExit: () => void
+  /** Si vienen, el resultado de la partida suma puntos (POST /me/game-results). Sin ellos (vista previa) no se reporta. */
+  gameId?: string
+  token?: string | null
 }
 
 /** Celda mínima: por debajo de esto los sprites dejan de leerse (en ese caso el tablero se desplaza). */
@@ -123,11 +127,19 @@ function MazeCollectorSession({
   items,
   config,
   onExit,
+  gameId,
+  token,
   guideOpen,
   onOpenGuide,
   onCloseGuide,
 }: MazeCollectorGameProps & { guideOpen: boolean; onOpenGuide: () => void; onCloseGuide: () => void }) {
   const game = useMazeCollectorGame({ layout, items, config, inputEnabled: !guideOpen })
+  const reportResult = useReportMazeResult({ token, gameId, title, game })
+  // Salir a mitad de partida también guarda lo jugado (al perder ya se reportó solo).
+  const exitAndReport = () => {
+    reportResult()
+    onExit()
+  }
   const isCity = config.layout === 'CITY'
   // En Ciudad, la primera y la última fila son franjas verdes decorativas: se
   // muestra solo media de cada una y ese alto se le da al resto del mapa.
@@ -526,7 +538,7 @@ function MazeCollectorSession({
           canFullscreen={canFullscreen}
           onResume={resume}
           onToggleFullscreen={toggleFullscreen}
-          onExit={onExit}
+          onExit={exitAndReport}
         />
       )}
       {guideOpen && <MazeCollectorGuide onClose={onCloseGuide} />}

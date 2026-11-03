@@ -118,6 +118,12 @@ type InternalState = {
   comboIndex: number
   lastCollected: MazeCollectorItem | null
   levelUpUntil: number | null
+  /** Reloj de juego en que se movió por primera vez (null mientras está en "listo"). */
+  startedAtMs: number | null
+  /** Todo lo recogido en la partida (puntos, purificadores y bonus): los "aciertos" que se reportan. */
+  collectedCount: number
+  /** Vidas perdidas: los "errores" que se reportan. */
+  livesLost: number
 }
 
 function ghostSpeed(level: number, enemySpeedConfig: number): number {
@@ -201,6 +207,9 @@ function createInitialState(layout: MazeLayoutDef, items: MazeCollectorItem[], c
     comboIndex: 0,
     lastCollected: null,
     levelUpUntil: null,
+    startedAtMs: null,
+    collectedCount: 0,
+    livesLost: 0,
   }
 }
 
@@ -244,6 +253,7 @@ function resolvePlayerArrival(state: InternalState, now: number) {
   const pickupIndex = state.pickups.findIndex((p) => samePos(p.pos, pos))
   if (pickupIndex !== -1) {
     const [picked] = state.pickups.splice(pickupIndex, 1)
+    state.collectedCount += 1
     if (picked.kind === 'PET') {
       state.score += POINTS_PET
       state.petCollectedThisLevel += 1
@@ -269,6 +279,7 @@ function resolvePlayerArrival(state: InternalState, now: number) {
 
   if (state.activeBonus && samePos(state.activeBonus.pos, pos)) {
     state.score += POINTS_BONUS
+    state.collectedCount += 1
     state.lastCollected = state.activeBonus.item
     state.activeBonus = null
     celebrateMatch()
@@ -360,6 +371,7 @@ function resolveGhostCollisions(state: InternalState, layout: MazeLayoutDef) {
 
     signalMismatch()
     state.lives -= 1
+    state.livesLost += 1
     if (state.lives <= 0) {
       state.phase = 'lost'
       return
@@ -434,6 +446,10 @@ export type MazeGameSnapshot = {
   lastCollected: MazeCollectorItem | null
   totalPet: number
   collectedPet: number
+  /** Para reportar la partida: lo recogido, las vidas perdidas y el tiempo jugado (sin contar pausas ni la espera inicial). */
+  collectedCount: number
+  livesLost: number
+  playedMs: number
 }
 
 function toSnapshot(state: InternalState, now: number): MazeGameSnapshot {
@@ -464,6 +480,9 @@ function toSnapshot(state: InternalState, now: number): MazeGameSnapshot {
     lastCollected: state.lastCollected,
     totalPet: state.petTotalThisLevel,
     collectedPet: state.petCollectedThisLevel,
+    collectedCount: state.collectedCount,
+    livesLost: state.livesLost,
+    playedMs: state.startedAtMs === null ? 0 : Math.max(0, Math.round(now - state.startedAtMs)),
   }
 }
 
@@ -531,7 +550,10 @@ export function useMazeCollectorGame({ layout, items, config, inputEnabled = tru
     primeGameFeedback()
     const state = stateRef.current!
     state.player.desiredDirection = direction
-    if (state.phase === 'ready') state.phase = 'playing'
+    if (state.phase === 'ready') {
+      state.phase = 'playing'
+      state.startedAtMs = clockRef.current
+    }
   }, [])
 
   useEffect(() => {

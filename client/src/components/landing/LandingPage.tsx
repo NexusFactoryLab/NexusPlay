@@ -131,7 +131,10 @@ function Hero({ ranking }: { ranking: LandingRanking }) {
               <span className="lp-pts">{formatPoints(person.points)}</span>
             </div>
           ))}
-          <p className="lp-note">¿Y tú en qué puesto estarás? Crea tu cuenta y entra al ranking.</p>
+          <p className="lp-note">
+            ¿Y tú en qué puesto estarás? Crea tu cuenta y entra al ranking.
+            {!studentsAreSample && ' Se actualiza cada día.'}
+          </p>
         </aside>
       </div>
     </header>
@@ -199,7 +202,9 @@ function Ranking({ ranking }: { ranking: LandingRanking }) {
       <div className="lp-wrap">
         <p className="lp-eyebrow">Competitividad</p>
         <h2>Mira quién va de primero</h2>
-        <p className="lp-lead">Ranking de estudiantes y de universidades, actualizado con cada partida.</p>
+        <p className="lp-lead">
+          Ranking de estudiantes y de universidades. Se actualiza cada día: vuelve mañana y mira si subiste.
+        </p>
         <div className="lp-rank-grid">
           <div className="lp-card">
             <h3 className="lp-card-title">

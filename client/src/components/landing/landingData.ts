@@ -112,7 +112,7 @@ export const SAMPLE_RANKING: LandingRanking = {
  * datos reales si hay al menos uno, y los de ejemplo solo si está vacía (o si
  * no hubo respuesta).
  */
-export function buildLandingRanking(api: PublicRanking | null): LandingRanking {
+export function buildLandingRanking(api: Pick<PublicRanking, 'students' | 'universities'> | null): LandingRanking {
   if (!api) return SAMPLE_RANKING
 
   const students: Competitor[] = api.students.map((row) => ({

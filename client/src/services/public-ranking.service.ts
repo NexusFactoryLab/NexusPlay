@@ -19,10 +19,12 @@ export type PublicRankingUniversity = {
 }
 
 export type PublicRanking = {
-  /** Top de estudiantes de los últimos 7 días; vacío si nadie ha jugado. */
+  /** Top de estudiantes de los 7 días cerrados antes de hoy; vacío si nadie ha jugado. */
   students: PublicRankingStudent[]
-  /** Top de universidades acumulado; vacío si no hay datos. */
+  /** Top de universidades acumulado hasta el cierre de ayer; vacío si no hay datos. */
   universities: PublicRankingUniversity[]
+  /** Instante del último corte diario (medianoche de Colombia). */
+  updatedAt: string
 }
 
 /** GET /public/ranking — ranking de la landing, sin sesión. */

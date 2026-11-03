@@ -90,6 +90,8 @@ export function MazeCollectorPlayPage() {
       items={game.content as MazeCollectorItem[]}
       config={config}
       onExit={handleExit}
+      gameId={game.id}
+      token={token}
     />
   )
 }

@@ -171,5 +171,7 @@ import { AiProviderAttemptsController } from './http/controllers/ai-provider-att
     AiAuditLogger,
     ListAiAuditLogsUseCase,
   ],
+  // MetricsModule valida contra el juego real antes de registrar una partida.
+  exports: [GAME_REPOSITORY],
 })
 export class GameModule {}

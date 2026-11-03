@@ -42,6 +42,12 @@ export interface ScoreOverTimeBucket {
 export interface GamePlayResultRepository {
   save(result: GamePlayResultEntity): Promise<void>;
 
+  /** Cuándo registró por última vez este estudiante una partida de este juego (null si nunca). */
+  findLastPlayedAt(studentUserId: string, gameId: string): Promise<Date | null>;
+
+  /** Cuántas partidas registró el estudiante desde `since` (freno contra ráfagas). */
+  countByStudentSince(studentUserId: string, since: Date): Promise<number>;
+
   /** Puntaje total agregado por estudiante dentro de una clase (ranking de clase). */
   aggregateScoreByStudentForClass(classId: string): Promise<StudentScoreAggregate[]>;
 

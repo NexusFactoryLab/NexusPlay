@@ -3,6 +3,7 @@ import {
   PUBLIC_RANKING_REPOSITORY,
   type PublicRankingRepository,
 } from '../../domain/ports/public-ranking.repository.port.js';
+import { startOfColombiaDay } from '../../domain/services/colombia-day.js';
 import { adultBornOnOrBefore, maskPublicName } from '../../domain/services/public-ranking-name.js';
 
 export interface PublicRankingStudentDto {
@@ -25,39 +26,44 @@ export interface PublicRankingUniversityDto {
 }
 
 export interface PublicLandingRankingDto {
-  /** Top de estudiantes de los últimos 7 días. Vacío si nadie ha jugado. */
+  /** Top de estudiantes de los 7 días cerrados antes de hoy. Vacío si nadie ha jugado. */
   students: PublicRankingStudentDto[];
-  /** Top de universidades (organizaciones) acumulado. Vacío si no hay datos. */
+  /** Top de universidades (organizaciones) acumulado hasta el cierre de ayer. Vacío si no hay datos. */
   universities: PublicRankingUniversityDto[];
+  /** Instante del último corte (medianoche de Colombia): el ranking se actualiza una vez al día. */
+  updatedAt: string;
 }
 
 const TOP_STUDENTS = 5;
 const TOP_UNIVERSITIES = 4;
 const WINDOW_DAYS = 7;
-/** La landing es pública: el resultado se reutiliza para no consultar la base en cada visita. */
-const CACHE_TTL_MS = 60_000;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
- * `GET /public/ranking`: ranking para la landing, sin sesión. Solo datos
- * agregados y enmascarados (ver `maskPublicName`); excluye a menores de edad
- * conocidos. Si todavía no hay partidas devuelve listas vacías y es el cliente
- * quien decide qué mostrar.
+ * `GET /public/ranking`: ranking para la landing, sin sesión. Se calcula una
+ * vez al día: cuenta lo jugado hasta la medianoche de Colombia y no lo de hoy,
+ * así el podio cambia por la mañana y la gente vuelve a ver quién subió. Solo
+ * datos agregados y enmascarados (ver `maskPublicName`); excluye a menores de
+ * edad conocidos. Si todavía no hay partidas devuelve listas vacías y es el
+ * cliente quien decide qué mostrar.
  */
 @Injectable()
 export class GetPublicLandingRankingUseCase {
-  private cache: { expiresAt: number; value: PublicLandingRankingDto } | null = null;
+  /** El corte del día es el mismo para todas las visitas: se calcula una vez por corte. */
+  private cache: { cutoffMs: number; value: PublicLandingRankingDto } | null = null;
 
   constructor(
     @Inject(PUBLIC_RANKING_REPOSITORY) private readonly repository: PublicRankingRepository,
   ) {}
 
   async execute(now: Date = new Date()): Promise<PublicLandingRankingDto> {
-    if (this.cache && this.cache.expiresAt > now.getTime()) return this.cache.value;
+    const cutoff = startOfColombiaDay(now);
+    if (this.cache && this.cache.cutoffMs === cutoff.getTime()) return this.cache.value;
 
-    const since = new Date(now.getTime() - WINDOW_DAYS * 24 * 60 * 60 * 1000);
+    const since = new Date(cutoff.getTime() - WINDOW_DAYS * DAY_MS);
     const [students, universities] = await Promise.all([
-      this.repository.topStudentsSince(since, adultBornOnOrBefore(now), TOP_STUDENTS),
-      this.repository.topOrganizations(TOP_UNIVERSITIES),
+      this.repository.topStudentsBetween(since, cutoff, adultBornOnOrBefore(now), TOP_STUDENTS),
+      this.repository.topOrganizationsUntil(cutoff, TOP_UNIVERSITIES),
     ]);
 
     const value: PublicLandingRankingDto = {
@@ -76,9 +82,10 @@ export class GetPublicLandingRankingUseCase {
         gamesPlayed: row.gamesPlayed,
         points: row.totalScore,
       })),
+      updatedAt: cutoff.toISOString(),
     };
 
-    this.cache = { expiresAt: now.getTime() + CACHE_TTL_MS, value };
+    this.cache = { cutoffMs: cutoff.getTime(), value };
     return value;
   }
 }

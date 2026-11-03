@@ -33,8 +33,9 @@ interface OrganizationRow {
 export class PrismaPublicRankingRepository implements PublicRankingRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async topStudentsSince(
+  async topStudentsBetween(
     since: Date,
+    until: Date,
     adultBornOnOrBefore: Date,
     limit: number,
   ): Promise<PublicTopStudentRow[]> {
@@ -57,6 +58,7 @@ export class PrismaPublicRankingRepository implements PublicRankingRepository {
       FROM game_play_results r
       JOIN users u ON u.id = r.student_user_id
       WHERE r.played_at >= ${since}
+        AND r.played_at < ${until}
         AND u.is_active
         AND (u.birth_date IS NULL OR u.birth_date <= ${adultBornOnOrBefore})
       GROUP BY r.student_user_id, u.id
@@ -76,7 +78,7 @@ export class PrismaPublicRankingRepository implements PublicRankingRepository {
     }));
   }
 
-  async topOrganizations(limit: number): Promise<PublicTopOrganizationRow[]> {
+  async topOrganizationsUntil(until: Date, limit: number): Promise<PublicTopOrganizationRow[]> {
     const rows = await this.prisma.$queryRaw<OrganizationRow[]>(Prisma.sql`
       SELECT
         o.id AS organization_id,
@@ -87,7 +89,7 @@ export class PrismaPublicRankingRepository implements PublicRankingRepository {
       FROM organizations o
       JOIN organization_memberships m ON m.organization_id = o.id
       JOIN users u ON u.id = m.user_id AND u.is_active
-      JOIN game_play_results r ON r.student_user_id = m.user_id
+      JOIN game_play_results r ON r.student_user_id = m.user_id AND r.played_at < ${until}
       WHERE o.is_active
       GROUP BY o.id
       HAVING SUM(r.score) > 0

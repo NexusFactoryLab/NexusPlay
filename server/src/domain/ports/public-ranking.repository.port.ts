@@ -28,15 +28,17 @@ export interface PublicTopOrganizationRow {
  */
 export interface PublicRankingRepository {
   /**
-   * Top de estudiantes por puntaje desde `since`. Excluye cuentas inactivas y
-   * a quien se sabe menor de edad (`birthDate` posterior a `adultBornOnOrBefore`).
+   * Top de estudiantes por puntaje en la ventana [`since`, `until`). Excluye
+   * cuentas inactivas y a quien se sabe menor de edad (`birthDate` posterior a
+   * `adultBornOnOrBefore`). `until` es el corte diario: lo jugado hoy no entra.
    */
-  topStudentsSince(
+  topStudentsBetween(
     since: Date,
+    until: Date,
     adultBornOnOrBefore: Date,
     limit: number,
   ): Promise<PublicTopStudentRow[]>;
 
-  /** Top de organizaciones activas por puntaje acumulado de sus miembros. */
-  topOrganizations(limit: number): Promise<PublicTopOrganizationRow[]>;
+  /** Top de organizaciones activas por puntaje acumulado de sus miembros hasta `until`. */
+  topOrganizationsUntil(until: Date, limit: number): Promise<PublicTopOrganizationRow[]>;
 }

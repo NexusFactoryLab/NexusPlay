@@ -2,6 +2,9 @@ import { Module } from '@nestjs/common';
 import { UserModule } from './user.module.js';
 import { OrganizationCoreModule } from './organization-core.module.js';
 import { ClassCoreModule } from './class-core.module.js';
+import { GameModule } from './game.module.js';
+import { SUBJECT_REPOSITORY } from '../domain/ports/subject.repository.port.js';
+import { PrismaSubjectRepository } from './persistence/prisma/prisma-subject.repository.js';
 import { GAME_PLAY_RESULT_REPOSITORY } from '../domain/ports/game-play-result.repository.port.js';
 import { PrismaService } from './persistence/prisma/prisma.service.js';
 import { PUBLIC_RANKING_REPOSITORY } from '../domain/ports/public-ranking.repository.port.js';
@@ -27,11 +30,14 @@ import { MetricsController } from './http/controllers/metrics.controller.js';
  * clases u organizaciones.
  */
 @Module({
-  imports: [UserModule, OrganizationCoreModule, ClassCoreModule],
+  imports: [UserModule, OrganizationCoreModule, ClassCoreModule, GameModule],
   controllers: [MetricsController, PublicRankingController],
   providers: [
     PrismaService,
     { provide: GAME_PLAY_RESULT_REPOSITORY, useClass: PrismaGamePlayResultRepository },
+    { provide: SUBJECT_REPOSITORY, useClass: PrismaSubjectRepository },
+    { provide: PUBLIC_RANKING_REPOSITORY, useClass: PrismaPublicRankingRepository },
+    GetPublicLandingRankingUseCase,
     RequesterAdminResolver,
     ClassAccessResolver,
     ClassRankingService,
