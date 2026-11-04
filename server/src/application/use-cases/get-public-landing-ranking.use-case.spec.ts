@@ -31,11 +31,11 @@ describe('GetPublicLandingRankingUseCase', () => {
   it('enmascara el nombre y numera el puesto', async () => {
     const repository = repo({
       topStudentsBetween: vi.fn().mockResolvedValue([
-        { studentUserId: 'u1', firstName: 'Valentina', lastName: 'Castaño', avatarConfig: { top: 'short' }, organizationName: 'U. Horizonte', totalScore: 900, gamesPlayed: 4 },
-        { studentUserId: 'u2', firstName: 'Andrés', lastName: 'Mora', avatarConfig: null, organizationName: null, totalScore: 700, gamesPlayed: 2 },
+        { studentUserId: 'u1', firstName: 'Valentina', lastName: 'Castaño', avatarConfig: { top: 'short' }, organizationName: 'U. Horizonte', institutionType: 'UNIVERSITY', academicProgram: 'Medicina', totalScore: 900, gamesPlayed: 4 },
+        { studentUserId: 'u2', firstName: 'Andrés', lastName: 'Mora', avatarConfig: null, organizationName: null, institutionType: null, academicProgram: null, totalScore: 700, gamesPlayed: 2 },
       ]),
       topOrganizationsUntil: vi.fn().mockResolvedValue([
-        { organizationId: 'o1', name: 'U. Horizonte', players: 12, gamesPlayed: 30, totalScore: 5000 },
+        { organizationId: 'o1', name: 'U. Horizonte', institutionType: 'UNIVERSITY', players: 12, gamesPlayed: 30, totalScore: 5000 },
       ]),
     });
 
@@ -47,8 +47,32 @@ describe('GetPublicLandingRankingUseCase', () => {
     ]);
     expect(JSON.stringify(result)).not.toContain('Castaño');
     expect(result.universities).toEqual([
-      { rank: 1, name: 'U. Horizonte', players: 12, gamesPlayed: 30, points: 5000 },
+      { rank: 1, name: 'U. Horizonte', institutionType: 'UNIVERSITY', players: 12, gamesPlayed: 30, points: 5000 },
     ]);
+  });
+
+  it('entrega el tipo de institución y el programa de cada estudiante (null si no hay)', async () => {
+    const repository = repo({
+      topStudentsBetween: vi.fn().mockResolvedValue([
+        { studentUserId: 'u1', firstName: 'Valentina', lastName: 'Castaño', avatarConfig: null, organizationName: 'Colegio San José', institutionType: 'SCHOOL', academicProgram: '11°', totalScore: 900, gamesPlayed: 4 },
+        { studentUserId: 'u2', firstName: 'Andrés', lastName: 'Mora', avatarConfig: null, organizationName: 'Instituto Sin Clasificar', institutionType: null, academicProgram: null, totalScore: 700, gamesPlayed: 2 },
+      ]),
+      topOrganizationsUntil: vi.fn().mockResolvedValue([
+        { organizationId: 'o1', name: 'Instituto Sin Clasificar', institutionType: null, players: 3, gamesPlayed: 5, totalScore: 400 },
+      ]),
+    });
+
+    const result = await build(repository).execute(NOW);
+
+    expect(result.students.map((s) => [s.institutionType, s.program])).toEqual([
+      ['SCHOOL', '11°'],
+      [null, null],
+    ]);
+    expect(result.universities[0].institutionType).toBeNull();
+    // Nada de la fila interna (id del usuario, apellido completo) se filtra al DTO público.
+    expect(Object.keys(result.students[0]).sort()).toEqual(
+      ['avatarConfig', 'gamesPlayed', 'institutionType', 'name', 'points', 'program', 'rank', 'university'],
+    );
   });
 
   it('corta en la medianoche de Colombia: 7 días cerrados, sin lo de hoy', async () => {
@@ -59,7 +83,8 @@ describe('GetPublicLandingRankingUseCase', () => {
     expect((since as Date).toISOString()).toBe('2026-10-25T05:00:00.000Z');
     // Fecha límite de nacimiento para tener 14 años hoy (ya no 18).
     expect((minAgeCutoff as Date).toISOString()).toBe('2012-11-01T00:00:00.000Z');
-    expect(limit).toBe(5);
+    expect(limit).toBe(10);
+    expect((repository.topOrganizationsUntil as ReturnType<typeof vi.fn>).mock.calls[0][1]).toBe(8);
     expect((repository.topOrganizationsUntil as ReturnType<typeof vi.fn>).mock.calls[0][0].toISOString()).toBe('2026-11-01T05:00:00.000Z');
     expect(result.updatedAt).toBe('2026-11-01T05:00:00.000Z');
   });

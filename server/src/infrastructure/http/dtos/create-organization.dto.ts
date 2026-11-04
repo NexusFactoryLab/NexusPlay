@@ -1,4 +1,5 @@
-import { IsOptional, IsString, MinLength } from 'class-validator';
+import { IsIn, IsOptional, IsString, MinLength } from 'class-validator';
+import { INSTITUTION_TYPES } from '../../../domain/value-objects/institution-type.vo.js';
 
 export class CreateOrganizationDto {
   @IsString()
@@ -13,4 +14,9 @@ export class CreateOrganizationDto {
   @IsOptional()
   @IsString()
   domain?: string | null;
+
+  /** Universidad, colegio u otra. Opcional: sin él la organización queda sin clasificar. */
+  @IsOptional()
+  @IsIn(INSTITUTION_TYPES)
+  institutionType?: string | null;
 }

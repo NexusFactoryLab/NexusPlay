@@ -1,5 +1,6 @@
 import { InvalidOrganizationNameError } from '../errors/organization.errors.js';
 import { EmailDomain } from '../value-objects/email-domain.vo.js';
+import { parseInstitutionType, type InstitutionType } from '../value-objects/institution-type.vo.js';
 
 export interface OrganizationProps {
   id: string;
@@ -21,6 +22,13 @@ export interface OrganizationProps {
    * código en vez de agregarlos uno por uno por correo.
    */
   inviteCode: string;
+  /**
+   * Universidad, colegio u otra; null = sin clasificar (así quedan las
+   * organizaciones creadas antes de existir el campo). Lo elige quien la
+   * administra y se muestra en el ranking público de la landing. Opcional en
+   * las props para no obligar a tocar cada `fromPersistence` existente.
+   */
+  institutionType?: InstitutionType | null;
 }
 
 export interface CreateOrganizationProps {
@@ -29,6 +37,7 @@ export interface CreateOrganizationProps {
   domain?: string | null;
   createdByUserId: string;
   inviteCode: string;
+  institutionType?: string | null;
 }
 
 const MIN_NAME_LENGTH = 3;
@@ -57,6 +66,7 @@ export class Organization {
       createdAt: new Date(),
       isActive: true,
       inviteCode: props.inviteCode,
+      institutionType: parseInstitutionType(props.institutionType),
     });
   }
 
@@ -90,6 +100,15 @@ export class Organization {
 
   get inviteCode(): string {
     return this.props.inviteCode;
+  }
+
+  get institutionType(): InstitutionType | null {
+    return this.props.institutionType ?? null;
+  }
+
+  /** null la deja sin clasificar; un valor fuera del enum es un error de dominio. */
+  classify(institutionType: string | null): void {
+    this.props.institutionType = parseInstitutionType(institutionType);
   }
 
   deactivate(): void {

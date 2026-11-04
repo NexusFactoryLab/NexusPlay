@@ -72,9 +72,10 @@ export function RankingConsentPrompt({ onPostpone }: { onPostpone: () => void })
         </h2>
         <div id="ranking-consent-body" className="mt-3 flex flex-col gap-2 text-[13.5px] leading-relaxed text-text">
           <p>
-            Si aceptas, tu primer nombre, la inicial de tu apellido, tu avatar, tu universidad y tus
-            puntos podrán verse en la página de inicio de NexusPlay, en el ranking de quienes más
-            juegan. Nunca mostramos tu nombre completo ni tu correo.
+            Si aceptas, tu nombre abreviado (primer nombre e inicial del apellido), tu avatar, tu
+            institución, tu facultad o carrera si la indicaste y tus puntos podrán verse en la página
+            de inicio de NexusPlay, en el ranking de quienes más juegan. Nunca mostramos tu nombre
+            completo ni tu correo.
           </p>
           <p>Puedes cambiar de opinión cuando quieras en Configuración.</p>
           {isMinor && (

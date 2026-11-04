@@ -50,7 +50,7 @@ export function RankingConsentSetting() {
       </div>
       <p id="ranking-consent-setting-help" className="mt-1.5 text-[12px] leading-snug text-text">
         {enabled
-          ? 'Sí: tu primer nombre, la inicial de tu apellido, tu avatar, tu universidad y tus puntos pueden verse en el ranking de quienes más juegan. Nunca mostramos tu nombre completo ni tu correo.'
+          ? 'Sí: tu nombre abreviado (primer nombre e inicial del apellido), tu avatar, tu institución, tu facultad o carrera si la indicaste y tus puntos pueden verse en el ranking de quienes más juegan. Nunca mostramos tu nombre completo ni tu correo.'
           : user.rankingConsent === false
             ? 'No: no apareces en el ranking de la página de inicio.'
             : 'Aún no has decidido: por ahora no apareces en el ranking de la página de inicio.'}

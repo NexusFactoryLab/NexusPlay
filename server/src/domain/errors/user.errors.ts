@@ -35,6 +35,12 @@ export class InvalidAvatarError extends DomainError {
   }
 }
 
+export class InvalidAcademicProgramError extends DomainError {
+  constructor(reason: string) {
+    super(`Facultad o carrera inválida: ${reason}`);
+  }
+}
+
 /** Aceptar aparecer en el ranking público exige tener 14 años cumplidos verificables. */
 export class RankingConsentNotAllowedError extends DomainError {
   constructor() {

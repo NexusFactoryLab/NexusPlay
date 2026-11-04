@@ -29,6 +29,13 @@ export interface UserResponseDto {
  * listados y vistas de administración usan `UserResponseDto` y no la incluyen.
  */
 export interface CurrentUserResponseDto extends UserResponseDto {
+  /**
+   * Facultad, carrera o grado que la persona indicó (null si no lo hizo). Va
+   * solo aquí y no en `UserResponseDto`: los listados y las vistas de otras
+   * personas (administración, docentes) no lo exponen; fuera del propio perfil
+   * únicamente se publica en el ranking de la landing, con consentimiento.
+   */
+  academicProgram: string | null;
   /** Decisión vigente sobre aparecer en el ranking público: null = aún no se le ha preguntado. */
   rankingConsent: boolean | null;
   /** Cuándo tomó esa decisión; null si aún no se le ha preguntado. */
@@ -67,6 +74,7 @@ export function toCurrentUserResponseDto(
 ): CurrentUserResponseDto {
   return {
     ...toUserResponseDto(user),
+    academicProgram: user.academicProgram,
     rankingConsent: rankingConsent?.granted ?? null,
     rankingConsentAt: rankingConsent?.createdAt ?? null,
     rankingConsentEligible: user.canDecideRankingConsent(now),

@@ -13,6 +13,7 @@ import {
   type PublicRankingCache,
 } from '../../domain/ports/public-ranking-cache.port.js';
 import { ConsentType, UserConsent } from '../../domain/entities/user-consent.entity.js';
+import type { User } from '../../domain/entities/user.entity.js';
 import { UserNotFoundError } from '../errors/application.errors.js';
 import { toCurrentUserResponseDto, type CurrentUserResponseDto } from '../dtos/user-response.dto.js';
 import type { UseCase } from '../ports/use-case.port.js';
@@ -25,6 +26,8 @@ export interface UpdateUserProfileInput {
   displayName?: string;
   avatarUrl?: string | null;
   birthDate?: Date;
+  /** Facultad, carrera o grado; null o vacío lo quita. Solo lo edita la propia persona. */
+  academicProgram?: string | null;
   /** Para pruebas; en producción es el instante actual. */
   now?: Date;
 }
@@ -68,6 +71,9 @@ export class UpdateUserProfileUseCase
       user.changeBirthDate(input.birthDate);
     }
 
+    const programChanged =
+      input.academicProgram !== undefined && this.applyAcademicProgram(user, input.academicProgram);
+
     await this.userRepository.save(user);
 
     let rankingConsent = await this.consentRepository.findLatest(user.id, ConsentType.PUBLIC_RANKING);
@@ -79,8 +85,19 @@ export class UpdateUserProfileUseCase
       rankingConsent = UserConsent.record(user.id, ConsentType.PUBLIC_RANKING, false, now);
       await this.consentRepository.append(rankingConsent);
       this.rankingCache.invalidate();
+    } else if (programChanged && rankingConsent?.granted) {
+      // Quien aparece en el ranking y cambia (o quita) su programa no debe
+      // seguir viéndose con el anterior hasta el próximo corte.
+      this.rankingCache.invalidate();
     }
 
     return toCurrentUserResponseDto(user, rankingConsent, now);
+  }
+
+  /** Aplica el programa y dice si cambió de verdad (tras normalizarlo). */
+  private applyAcademicProgram(user: User, rawProgram: string | null): boolean {
+    const before = user.academicProgram;
+    user.changeAcademicProgram(rawProgram);
+    return user.academicProgram !== before;
   }
 }

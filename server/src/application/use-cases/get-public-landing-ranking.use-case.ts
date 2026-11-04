@@ -10,12 +10,21 @@ import {
 import { startOfColombiaDay } from '../../domain/services/colombia-day.js';
 import { maskPublicName } from '../../domain/services/public-ranking-name.js';
 import { minAgeBornOnOrBefore } from '../../domain/services/ranking-eligibility.js';
+import type { InstitutionType } from '../../domain/value-objects/institution-type.vo.js';
 
 export interface PublicRankingStudentDto {
   rank: number;
   /** Primer nombre + inicial del apellido: nunca el nombre completo. */
   name: string;
+  /**
+   * Nombre de su institución (universidad, colegio u otra). Conserva el nombre
+   * `university` del contrato original para no romper clientes ya desplegados.
+   */
   university: string | null;
+  /** Tipo de esa institución; null si no tiene o está sin clasificar. */
+  institutionType: InstitutionType | null;
+  /** Facultad, carrera o grado que indicó (solo de quien aceptó aparecer); null si no lo indicó. */
+  program: string | null;
   points: number;
   gamesPlayed: number;
   /** Avatar guardado tal cual (el cliente lo normaliza); null si la cuenta aún no tiene. */
@@ -25,6 +34,8 @@ export interface PublicRankingStudentDto {
 export interface PublicRankingUniversityDto {
   rank: number;
   name: string;
+  /** Universidad, colegio u otra; null = sin clasificar. */
+  institutionType: InstitutionType | null;
   players: number;
   gamesPlayed: number;
   points: number;
@@ -33,14 +44,20 @@ export interface PublicRankingUniversityDto {
 export interface PublicLandingRankingDto {
   /** Top de estudiantes de los 7 días cerrados antes de hoy. Vacío si nadie ha jugado. */
   students: PublicRankingStudentDto[];
-  /** Top de universidades (organizaciones) acumulado hasta el cierre de ayer. Vacío si no hay datos. */
+  /**
+   * Top de instituciones (organizaciones: universidades, colegios u otras)
+   * acumulado hasta el cierre de ayer. Vacío si no hay datos. La clave conserva
+   * el nombre `universities` del contrato original.
+   */
   universities: PublicRankingUniversityDto[];
   /** Instante del último corte (medianoche de Colombia): el ranking se actualiza una vez al día. */
   updatedAt: string;
 }
 
-const TOP_STUDENTS = 5;
-const TOP_UNIVERSITIES = 4;
+// La landing filtra por tipo de institución sobre lo que recibe: un top algo
+// más largo evita que «Solo colegios» quede vacío con pocos puestos.
+const TOP_STUDENTS = 10;
+const TOP_UNIVERSITIES = 8;
 const WINDOW_DAYS = 7;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -50,7 +67,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * así el podio cambia por la mañana y la gente vuelve a ver quién subió. Solo
  * datos agregados y enmascarados (ver `maskPublicName`). Un estudiante solo
  * aparece si aceptó (consentimiento explícito) y tiene 14 años cumplidos
- * verificables por su fecha de nacimiento. Las universidades son agregados de
+ * verificables por su fecha de nacimiento; solo de ellos se publica la
+ * facultad o carrera que hayan indicado. Las instituciones son agregados de
  * todos sus miembros activos: no revelan personas. Si todavía no hay partidas
  * devuelve listas vacías y es el cliente quien decide qué mostrar.
  */
@@ -78,6 +96,8 @@ export class GetPublicLandingRankingUseCase {
         rank: index + 1,
         name: maskPublicName(row.firstName, row.lastName),
         university: row.organizationName,
+        institutionType: row.institutionType,
+        program: row.academicProgram,
         points: row.totalScore,
         gamesPlayed: row.gamesPlayed,
         avatarConfig: row.avatarConfig ?? null,
@@ -85,6 +105,7 @@ export class GetPublicLandingRankingUseCase {
       universities: universities.map((row, index) => ({
         rank: index + 1,
         name: row.name,
+        institutionType: row.institutionType,
         players: row.players,
         gamesPlayed: row.gamesPlayed,
         points: row.totalScore,

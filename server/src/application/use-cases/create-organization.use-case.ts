@@ -22,6 +22,8 @@ import type { UseCase } from '../ports/use-case.port.js';
 export interface CreateOrganizationInput {
   name: string;
   domain?: string | null;
+  /** Universidad, colegio u otra; ausente o null = sin clasificar. */
+  institutionType?: string | null;
   createdByUserId: string;
 }
 
@@ -60,6 +62,7 @@ export class CreateOrganizationUseCase
       id: this.idGenerator.generate(),
       name: input.name,
       domain: input.domain ?? null,
+      institutionType: input.institutionType ?? null,
       createdByUserId: input.createdByUserId,
       inviteCode: await this.generateUniqueInviteCode(),
     });

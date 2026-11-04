@@ -1,3 +1,5 @@
+import type { InstitutionType } from '../value-objects/institution-type.vo.js';
+
 export const PUBLIC_RANKING_REPOSITORY = Symbol('PUBLIC_RANKING_REPOSITORY');
 
 /** Estudiante del top público: solo lo necesario para dibujar su fila en la landing. */
@@ -6,8 +8,18 @@ export interface PublicTopStudentRow {
   firstName: string;
   lastName: string;
   avatarConfig: unknown;
-  /** Nombre de la organización (universidad) a la que pertenece, si tiene alguna. */
+  /**
+   * Nombre de su primera organización activa (por fecha de ingreso), si tiene
+   * alguna. Puede ser universidad, colegio u otra: ver `institutionType`.
+   */
   organizationName: string | null;
+  /** Tipo de esa misma organización; null si no tiene o está sin clasificar. */
+  institutionType: InstitutionType | null;
+  /**
+   * Facultad, carrera o grado que indicó en su perfil. Solo llega por esta
+   * consulta, que ya exige el consentimiento `PUBLIC_RANKING` vigente.
+   */
+  academicProgram: string | null;
   totalScore: number;
   gamesPlayed: number;
 }
@@ -16,6 +28,8 @@ export interface PublicTopStudentRow {
 export interface PublicTopOrganizationRow {
   organizationId: string;
   name: string;
+  /** Universidad, colegio u otra; null = sin clasificar. */
+  institutionType: InstitutionType | null;
   players: number;
   gamesPlayed: number;
   totalScore: number;

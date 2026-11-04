@@ -42,6 +42,12 @@ model UserModel {
   /// formato lo valida `AvatarConfig`; null = la cuenta aún no tiene avatar.
   avatarConfig             Json?                          @map("avatar_config")
   birthDate               DateTime?                      @map("birth_date")
+  /// Facultad, carrera o grado que la persona escribe en su perfil (opcional,
+  /// texto libre corto; lo limpia `AcademicProgram`). Solo se publica en el
+  /// ranking de la landing si aceptó aparecer (`PUBLIC_RANKING`): junto al
+  /// nombre abreviado y la institución puede identificarla, así que nunca sale
+  /// en listados ni vistas de otras personas.
+  academicProgram         String?                        @map("academic_program") @db.VarChar(80)
   locale                  String                         @default("es-CO")
   isActive                 Boolean                        @default(true) @map("is_active")
   isEmailVerified          Boolean                        @default(false) @map("is_email_verified")
@@ -141,9 +147,23 @@ enum OrganizationRoleEnum {
   @@map("organization_role")
 }
 
+/// Tipo de institución de una organización. La plataforma sirve a colegios,
+/// universidades y a cualquier aula (institutos, cursos libres): OTHER cubre
+/// lo que no es ni lo uno ni lo otro. Lo elige quien administra la organización.
+enum InstitutionTypeEnum {
+  UNIVERSITY
+  SCHOOL
+  OTHER
+
+  @@map("institution_type")
+}
+
 model OrganizationModel {
   id              String    @id @default(uuid())
   name            String
+  /// Nullable a propósito: las organizaciones creadas antes de este campo
+  /// quedan "sin clasificar" en vez de recibir un tipo inventado.
+  institutionType InstitutionTypeEnum? @map("institution_type")
   /// Dominio de correo reclamado (ej. "colegio.edu.co"). Único a nivel global:
   /// el constraint es la garantía real ante dos creaciones simultáneas.
   domain          String?   @unique
