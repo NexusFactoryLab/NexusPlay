@@ -14,7 +14,13 @@
   --lp-gold: #ffc83d;
   --lp-grad: linear-gradient(135deg, var(--lp-accent), var(--lp-accent-2));
 
-  min-height: 100svh;
+  /* El documento tiene html/body en overflow:hidden (la app es de pantalla completa):
+     la landing hace su propio scroll en vez de depender del de la ventana. */
+  position: relative;
+  height: 100svh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scroll-behavior: smooth;
   color: var(--lp-text);
   font-family: var(--font-sans);
   background-color: #17123a;
@@ -124,8 +130,23 @@
   font-weight: 600;
 }
 
-.lp-nav-links a:hover {
+.lp-nav-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.lp-nav-link:hover {
   color: var(--lp-text-h);
+}
+
+.lp-nav-link:focus-visible {
+  outline: 2px solid var(--lp-gold);
+  outline-offset: 4px;
+  border-radius: 4px;
 }
 
 .lp-nav-actions {
@@ -152,6 +173,72 @@
 
 .lp-btn:hover {
   transform: translateY(-2px);
+}
+
+.lp-btn:active {
+  transform: translateY(0) scale(0.97);
+}
+
+/* Brillo que cruza los botones principales al pasar el cursor. */
+.lp-btn-main {
+  position: relative;
+  overflow: hidden;
+}
+
+.lp-btn-main::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.35) 50%, transparent 65%);
+  transform: translateX(-120%);
+}
+
+.lp-btn-main:hover::after {
+  transform: translateX(120%);
+  transition: transform 0.6s ease;
+}
+
+/* Transición hacia login/registro: un destello con el degradado de la marca
+   crece desde el punto del clic y cubre la pantalla; el contenido se aleja. */
+.lp-warp {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: var(--lp-grad);
+  pointer-events: all;
+  animation: lp-warp-open 0.52s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+
+.lp-warp svg {
+  opacity: 0;
+  animation: lp-warp-mark 0.52s ease-out forwards;
+}
+
+.lp-leaving > :not(.lp-warp) {
+  animation: lp-leave 0.52s ease-in forwards;
+}
+
+@keyframes lp-warp-open {
+  from { clip-path: circle(0 at var(--wx) var(--wy)); }
+  to { clip-path: circle(150vmax at var(--wx) var(--wy)); }
+}
+
+@keyframes lp-warp-mark {
+  0%, 40% { opacity: 0; transform: scale(0.6); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes lp-leave {
+  to { opacity: 0.4; transform: scale(0.97); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing { scroll-behavior: auto; }
+  .lp-btn-main:hover::after { transition: none; }
 }
 
 .lp-btn:focus-visible {

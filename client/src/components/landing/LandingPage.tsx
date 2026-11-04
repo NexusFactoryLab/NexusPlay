@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom'
+import { createContext, useContext, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowRight,
   Brain,
@@ -39,29 +40,68 @@ function affiliation(person: Competitor): string | null {
   return [person.university, person.career].filter(Boolean).join(' · ') || null
 }
 
+/** Origen (en px de la ventana) del destello que cubre la pantalla al ir a iniciar sesión o registrarse. */
+type WarpOrigin = { x: number; y: number }
+
+const WARP_MS = 520
+
+const WarpContext = createContext<(path: string, origin: WarpOrigin) => void>(() => undefined)
+
+/**
+ * Enlace a login/registro con transición: un destello con el degradado de la marca
+ * crece desde el punto del clic y cubre la pantalla antes de cambiar de página.
+ * Con clic modificado (nueva pestaña) o sin animaciones se comporta como un enlace normal.
+ */
+function GoLink({ to, className, children }: { to: string; className: string; children: ReactNode }) {
+  const go = useContext(WarpContext)
+  const onClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
+    event.preventDefault()
+    go(to, { x: event.clientX, y: event.clientY })
+  }
+  return (
+    <Link to={to} className={className} onClick={onClick}>
+      {children}
+    </Link>
+  )
+}
+
+/** Lleva a una sección con scroll suave dentro de la landing, sin tocar el historial del navegador. */
+function SectionLink({ id, children }: { id: string; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      className="lp-nav-link"
+      onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+    >
+      {children}
+    </button>
+  )
+}
+
 function Header() {
   return (
     <nav className="lp-nav" aria-label="Principal">
       <div className="lp-wrap">
-        <Link to="/inicio" className="lp-brand">
+        <Link to="/" className="lp-brand">
           <span className="lp-brand-mark" aria-hidden="true">
             <Zap size={20} fill="currentColor" strokeWidth={0} />
           </span>
           NexusPlay
         </Link>
         <div className="lp-nav-links">
-          <a href="#como">Cómo funciona</a>
-          <a href="#ranking">Ranking</a>
-          <a href="#retos">Retos</a>
-          <a href="#universidades">Universidades</a>
+          <SectionLink id="como">Cómo funciona</SectionLink>
+          <SectionLink id="ranking">Ranking</SectionLink>
+          <SectionLink id="retos">Retos</SectionLink>
+          <SectionLink id="universidades">Instituciones</SectionLink>
         </div>
         <div className="lp-nav-actions">
-          <Link to="/login" className="lp-btn lp-btn-ghost lp-btn-sm">
+          <GoLink to="/login" className="lp-btn lp-btn-ghost lp-btn-sm">
             Iniciar sesión
-          </Link>
-          <Link to="/register" className="lp-btn lp-btn-main lp-btn-sm">
+          </GoLink>
+          <GoLink to="/register" className="lp-btn lp-btn-main lp-btn-sm">
             Crear cuenta
-          </Link>
+          </GoLink>
         </div>
       </div>
     </nav>
@@ -74,22 +114,19 @@ function Hero({ ranking }: { ranking: LandingRanking }) {
     <header className="lp-hero">
       <div className="lp-wrap">
         <div>
-          <span className="lp-pill">
-            <GraduationCap size={15} className="lp-icon" aria-hidden="true" /> Hecho para universidades
-          </span>
           <h1>
             Aprende jugando.
             <br />
             <em>Compite en serio.</em>
           </h1>
           <p className="lp-sub">
-            Convierte cualquier tema en un juego, rétate con tu clase y sube en el ranking de tu universidad. Todo en
+            Convierte cualquier tema en un juego, rétate con tu clase y sube en el ranking de tu institución. Todo en
             tiempo real.
           </p>
           <div className="lp-cta">
-            <Link to="/register" className="lp-btn lp-btn-main">
+            <GoLink to="/register" className="lp-btn lp-btn-main">
               Crear mi cuenta gratis <ArrowRight size={16} aria-hidden="true" />
-            </Link>
+            </GoLink>
           </div>
           <div className="lp-faces">
             <div className="lp-faces-stack">
@@ -348,9 +385,9 @@ function Universities() {
           <p style={{ marginBottom: 20 }}>
             Súmala al ranking y deja que sus estudiantes compitan por el primer lugar.
           </p>
-          <Link to="/register" className="lp-btn lp-btn-main">
+          <GoLink to="/register" className="lp-btn lp-btn-main">
             Registrar mi universidad
-          </Link>
+          </GoLink>
         </div>
       </div>
     </section>
@@ -365,9 +402,9 @@ function FinalCall() {
           <h2>¿Listo para subir de nivel?</h2>
           <p className="lp-lead">Crea tu cuenta en un minuto y empieza a competir con tu clase.</p>
           <div className="lp-cta">
-            <Link to="/register" className="lp-btn lp-btn-main">
+            <GoLink to="/register" className="lp-btn lp-btn-main">
               ¡Empezar a jugar!
-            </Link>
+            </GoLink>
           </div>
         </div>
       </div>
@@ -377,8 +414,33 @@ function FinalCall() {
 
 export function LandingPage() {
   const ranking = useLandingRanking()
+  const navigate = useNavigate()
+  const [warp, setWarp] = useState<WarpOrigin | null>(null)
+  const leaving = useRef(false)
+
+  const go = (path: string, origin: WarpOrigin) => {
+    if (leaving.current) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      navigate(path)
+      return
+    }
+    leaving.current = true
+    setWarp(origin)
+    window.setTimeout(() => navigate(path), WARP_MS)
+  }
+
   return (
-    <div className="landing">
+    <WarpContext.Provider value={go}>
+    <div className={warp ? 'landing lp-leaving' : 'landing'}>
+      {warp && (
+        <div
+          className="lp-warp"
+          aria-hidden="true"
+          style={{ '--wx': `${warp.x}px`, '--wy': `${warp.y}px` } as React.CSSProperties}
+        >
+          <Zap size={56} fill="currentColor" strokeWidth={0} />
+        </div>
+      )}
       <Header />
       <main>
         <Hero ranking={ranking} />
@@ -395,5 +457,6 @@ export function LandingPage() {
         </div>
       </footer>
     </div>
+    </WarpContext.Provider>
   )
 }
