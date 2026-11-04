@@ -72,10 +72,10 @@ export const SAMPLE_UNIVERSITIES: UniversityEntry[] = [
   { id: 'horizonte', name: 'U. Horizonte', players: 1240, matches: 18420, points: 96300 },
   { id: 'sol', name: 'U. del Sol', players: 980, matches: 14100, points: 88750 },
   { id: 'nexus', name: 'U. Nexus', players: 760, matches: 11390, points: 71020 },
-  { id: 'andina', name: 'U. Andina', players: 540, matches: 8020, points: 52600 },
+  { id: 'andino', name: 'Colegio Andino', players: 540, matches: 8020, points: 52600 },
 ]
 
-/** Los retos entre carreras y universidades aún no existen en el servidor: siempre son de ejemplo. */
+/** Los retos entre carreras e instituciones aún no existen en el servidor: siempre son de ejemplo. */
 export type Challenge = {
   id: string
   status: string

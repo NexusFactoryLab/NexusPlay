@@ -230,8 +230,8 @@ function Ranking({ ranking }: { ranking: LandingRanking }) {
         <p className="lp-eyebrow">Ranking público</p>
         <h2>Quién lidera esta semana</h2>
         <p className="lp-lead">
-          Estudiantes e instituciones, ordenados por los puntos que ganan respondiendo bien y rápido. Se actualiza
-          cada día.
+          Estudiantes e instituciones, ordenados por los puntos de sus partidas: se suma por jugar y por acertar, y hay
+          un tope diario por juego para que gane quien domina el tema, no quien más repite. Se actualiza cada día.
         </p>
         <div ref={gridRef} className="lp-rank-grid">
           <div className="lp-card">
@@ -263,7 +263,7 @@ function Ranking({ ranking }: { ranking: LandingRanking }) {
 
           <div className="lp-card">
             <h3 className="lp-card-title">
-              Universidades <span className="lp-badge">{liveBadge(universitiesAreSample, 'Acumulado')}</span>
+              Mejores instituciones <span className="lp-badge">{liveBadge(universitiesAreSample, 'Acumulado')}</span>
             </h3>
             {universities.map((uni, index) => (
               <div key={uni.id} className={`lp-row ${index === 0 ? 'lp-row-top' : ''}`}>
@@ -280,7 +280,7 @@ function Ranking({ ranking }: { ranking: LandingRanking }) {
               </div>
             ))}
             <p className="lp-note">
-              Puntaje por universidad = suma de los puntos de sus estudiantes.
+              Puntaje de la institución = suma de los puntos de sus estudiantes.
               {universitiesAreSample && ' Datos de ejemplo.'}
             </p>
           </div>
@@ -333,7 +333,7 @@ function Challenges() {
             </div>
           ))}
         </div>
-        <p className="lp-note">Vista previa: los retos entre carreras y universidades llegan pronto.</p>
+        <p className="lp-note">Vista previa: los retos entre carreras e instituciones llegan pronto.</p>
       </div>
     </section>
   )
