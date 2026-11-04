@@ -18,7 +18,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { FitScale } from './true-false-maze/FitScale'
-import { SpriteStrip, mazeSpriteUrl } from './mazeSpriteStrip'
+import { SpriteStrip, mazeSpriteUrl, useMazeSpriteTheme } from './mazeSpriteStrip'
 import { COMBO_POINTS, POINTS_BONUS, POINTS_PET, POWER_MODE_MS } from './mazeEngine'
 import { POINTS_ANSWER, QUESTION_TIME_MS } from './useMazeCollectorGame'
 import { ArtTruckQuestion } from './tutorial/tutorialArt'
@@ -60,7 +60,8 @@ function Scene({ aspect = 1.6, children }: { aspect?: number; children: ReactNod
 }
 
 function City() {
-  return <div className="mcg-city" style={{ backgroundImage: `url(${mazeSpriteUrl('city-map')})` }} />
+  const { background } = useMazeSpriteTheme()
+  return <div className="mcg-city" style={{ backgroundImage: `url(${mazeSpriteUrl(background)})` }} />
 }
 
 /** Elemento posicionado dentro de la escena (en %/cqw, para que la escena escale entera). */

@@ -352,7 +352,7 @@ function normalizeDominoQuestions(rawQuestions: unknown, legacyQuestion: unknown
 
 // --- Laberinto recolector ---------------------------------------------------
 
-const MAZE_LAYOUTS = ['CLASSIC', 'CROSS', 'SPIRAL', 'CITY'];
+const MAZE_LAYOUTS = ['CITY', 'AMAZON', 'OCEAN', 'PARAMO'];
 
 function normalizeMazeCollector(config: Record<string, unknown>, content: unknown, options: NormalizeDraftOptions): NormalizedDraft {
   const next: Record<string, unknown> = { ...config };
@@ -360,7 +360,7 @@ function normalizeMazeCollector(config: Record<string, unknown>, content: unknow
   setClampedInt(next, 'enemySpeed', 1, 3);
   if (typeof next.layout === 'string') {
     const layout = next.layout.trim().toUpperCase();
-    next.layout = MAZE_LAYOUTS.includes(layout) ? layout : 'CLASSIC';
+    next.layout = MAZE_LAYOUTS.includes(layout) ? layout : 'CITY';
   }
   for (const key of ['collectorLabel', 'enemyLabel'] as const) {
     if (typeof next[key] === 'string') next[key] = truncate((next[key] as string).trim(), 60);

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import './mazeEffects.css'
 import type { Direction } from './mazeEngine'
 import type { GhostMode, MazeGameSnapshot } from './useMazeCollectorGame'
-import { SpriteStrip } from './mazeSpriteStrip'
+import { SpriteStrip, useMazeSpriteTheme } from './mazeSpriteStrip'
 
 /**
  * Efectos de un momento sobre el mapa del Camión Reciclador, sacados de los
@@ -69,6 +69,8 @@ export function useMazeEffects(game: MazeGameSnapshot) {
 
 /** Dibuja los efectos activos (dentro del tablero, con las mismas coordenadas de celda que los sprites). */
 export function MazeEffectsLayer({ effects, cellSize, truckScale }: { effects: MazeEffect[]; cellSize: number; truckScale: number }) {
+  // El muñeco de lado no gira al chocar como el camión visto desde arriba.
+  const { sideView } = useMazeSpriteTheme()
   return (
     <>
       {effects.map((effect) => {
@@ -82,7 +84,7 @@ export function MazeEffectsLayer({ effects, cellSize, truckScale }: { effects: M
         if (effect.kind === 'wreck') {
           return (
             <div key={effect.id} className="pointer-events-none absolute left-0 top-0 z-[21]" style={style} aria-hidden="true">
-              <div className="maze-fx-wreck h-full w-full" style={{ ['--fx-rot' as string]: `${ROTATION[effect.facing]}deg` }}>
+              <div className="maze-fx-wreck h-full w-full" style={{ ['--fx-rot' as string]: `${sideView ? 0 : ROTATION[effect.facing]}deg` }}>
                 <SpriteStrip name="truck-hit" frames={1} size={size} />
               </div>
               {[0, 1, 2].map((puff) => (

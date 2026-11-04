@@ -8,7 +8,7 @@ export const GAME_TYPE_PUBLIC_NAMES: Readonly<Record<string, string>> = {
   MEMORY_MATCH: 'MatchMente',
   GUESS_WHO: 'Identidad Oculta',
   DOMINO: 'Dominexo',
-  MAZE_COLLECTOR: 'Laberinto recolector',
+  MAZE_COLLECTOR: 'Salvando el mundo con sostenibilidad',
   SNAKES_LADDERS: 'Escaleras y serpientes',
   DUAL_QUEST_PIXI: 'Dúo Lógico',
   TRUE_FALSE_MAZE: 'Laberinto Verdadero o Falso',

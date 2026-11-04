@@ -19,7 +19,10 @@ import { EcoTruckSprite } from './EcoTruckSprite'
 import { PollutionGhostSprite } from './PollutionGhostSprite'
 import { BonusSprite, PetSprite, PowerPelletSprite, TrashBagSprite } from './mazeCollectibleSprites'
 import { SostenibleCityBackground } from './SostenibleCityBackground'
-import { SpriteStrip, mazeSpriteUrl } from './mazeSpriteStrip'
+import { MAZE_MAPS } from './mazeMaps'
+import { BookHint } from './BookHint'
+import { normalizeMazeLayout } from './mazeCollectorTypes'
+import { MazeSpriteThemeContext, SpriteStrip, mazeSpriteUrl } from './mazeSpriteStrip'
 import { MazeCollectorGuide } from './MazeCollectorGuide'
 import { useInTournamentPlay } from './tournamentPlay'
 import { MazeCollectorTutorial } from './tutorial/MazeCollectorTutorial'
@@ -60,6 +63,14 @@ type MazeCollectorGameProps = {
   tutorial?: MazeTutorialPart
   /** Preguntas de opción múltiple (issue #103): sus respuestas se reparten por el mapa. */
   questions?: MazeQuestion[]
+  /**
+   * Modo expedición (issue #152): al ganar, en vez de "Jugar otra vez" sale un
+   * botón (`wonActionLabel`) que pasa a la siguiente estación.
+   */
+  onWon?: (result: { score: number; answeredCorrect: number }) => void
+  wonActionLabel?: string
+  /** No abrir la guía al empezar (las estaciones 2, 3 y 4 de una expedición). */
+  skipGuide?: boolean
 }
 
 /** Celda mínima: por debajo de esto los sprites dejan de leerse (en ese caso el tablero se desplaza). */
@@ -101,6 +112,8 @@ const PET_FILTER = 'saturate(0.5) brightness(1.15) contrast(0.85)'
 const ANSWER_COLORS: Record<string, string> = { A: '#f59e0b', B: '#38bdf8', C: '#f472b6', D: '#a78bfa' }
 const BAG_SCALE = 0.8
 const BONUS_SCALE = 1
+/** Tope de crecimiento de botellas y bolsas: van casi en cada celda y, más grandes, se amontonan. */
+const PICKUP_MAX_SCALE = 1.4
 const FULLSCREEN_PREF_KEY = 'nexusplay-maze-collector-fullscreen'
 
 /**
@@ -143,29 +156,6 @@ function clampCamera(position: number, maxOffset: number): number {
   return Math.max(0, Math.min(maxOffset, position))
 }
 
-/** Aclara (percent > 0) u oscurece (percent < 0) un color hex. */
-function shade(hex: string, percent: number): string {
-  const num = parseInt(hex.replace('#', ''), 16)
-  const amount = Math.round(2.55 * percent)
-  const clamp = (value: number) => Math.max(0, Math.min(255, value))
-  const r = clamp((num >> 16) + amount)
-  const g = clamp(((num >> 8) & 0x00ff) + amount)
-  const b = clamp((num & 0x0000ff) + amount)
-  return `#${(0x1000000 + r * 0x10000 + g * 0x100 + b).toString(16).slice(1)}`
-}
-
-type BuildingPalette = { base: string; light: string; dark: string }
-
-/** Layouts abstractos (Clásico/Cruz/Espiral): pared con el color temático del juego — la ambientación de ciudad la da el mapa en sprites. */
-function wallPalette(primaryColor: string): BuildingPalette {
-  return { base: primaryColor, light: shade(primaryColor, 25), dark: shade(primaryColor, -35) }
-}
-
-/** Hash determinista (misma celda = misma animación siempre, sin parpadeo entre frames). */
-function hashCell(row: number, col: number): number {
-  return Math.abs(row * 31 + col * 17)
-}
-
 /**
  * Camión Reciclador. Antes de jugar se muestra una guía visual de 5 pasos
  * (igual que en el Laberinto Verdadero o Falso); se puede volver a abrir
@@ -174,7 +164,7 @@ function hashCell(row: number, col: number): number {
 export function MazeCollectorGame(props: MazeCollectorGameProps) {
   // En el torneo no se abre sola (issue #131); sigue disponible desde "Cómo se juega".
   const inTournamentPlay = useInTournamentPlay()
-  const [guideOpen, setGuideOpen] = useState(!props.tutorial && !inTournamentPlay)
+  const [guideOpen, setGuideOpen] = useState(!props.tutorial && !inTournamentPlay && !props.skipGuide)
   // Al final de la guía se ofrece el tutorial jugable (issue #93); al terminarlo
   // empieza una partida nueva (la sesión se vuelve a montar con otra clave).
   const [inTutorial, setInTutorial] = useState(false)
@@ -196,9 +186,11 @@ export function MazeCollectorGame(props: MazeCollectorGameProps) {
       />
     )
   }
+  const theme = MAZE_MAPS[normalizeMazeLayout(props.config.layout)]
   // La guía se dibuja DENTRO de la sesión: en pantalla completa el navegador
   // solo muestra lo que está dentro del elemento que la pidió.
   return (
+    <MazeSpriteThemeContext.Provider value={{ prefix: theme.spritePrefix, sideView: theme.sideView, background: theme.background }}>
     <MazeCollectorSession
       key={round}
       {...props}
@@ -211,6 +203,7 @@ export function MazeCollectorGame(props: MazeCollectorGameProps) {
       onRoundsChange={setRounds}
       onPlayAgain={() => setRound((value) => value + 1)}
     />
+    </MazeSpriteThemeContext.Provider>
   )
 }
 
@@ -225,6 +218,8 @@ function MazeCollectorSession({
   token,
   tutorial,
   questions,
+  onWon,
+  wonActionLabel,
   guideOpen,
   onOpenGuide,
   onCloseGuide,
@@ -264,7 +259,9 @@ function MazeCollectorSession({
     reportResult()
     exitGame()
   }
-  const isCity = config.layout === 'CITY'
+  const mapTheme = MAZE_MAPS[normalizeMazeLayout(config.layout)]
+  const isCity = mapTheme.id === 'CITY'
+  const spriteScale = layout.spriteScale ?? 1
   // En Ciudad, la primera y la última fila son franjas verdes decorativas: se
   // muestra solo media de cada una y ese alto se le da al resto del mapa.
   const trimmedRows = isCity ? 1 : 0
@@ -654,11 +651,11 @@ function MazeCollectorSession({
           {/* Capa 1: laberinto estático (sin costo por frame). Ciudad usa el mapa
               en sprites, armado sobre la misma cuadrícula; los demás layouts
               (abstractos, sin arte propio) siguen con paredes/calles por color. */}
-          {isCity ? <CityBackground /> : <StaticMaze layout={layout} cellSize={cellSize} primaryColor={primaryColor} />}
+          <MapBackground name={mapTheme.background} />
 
           {/* Capa 2: coleccionables — solo los que quedan, cada uno en su celda lógica (no interpolan, no se mueven). */}
-          <PickupsLayer pickups={game.pickups} bags={game.bags} count={game.pickups.length + game.bags.length} cellSize={cellSize} />
-          {game.bonus && <BonusMarker bonus={game.bonus} cellSize={cellSize} pixelPos={pixelPos} />}
+          <PickupsLayer pickups={game.pickups} bags={game.bags} count={game.pickups.length + game.bags.length} cellSize={cellSize} spriteScale={Math.min(spriteScale, PICKUP_MAX_SCALE)} />
+          {game.bonus && <BonusMarker bonus={game.bonus} cellSize={cellSize} scale={spriteScale} pixelPos={pixelPos} />}
           {tutorial?.scenario.goal && (
             <div
               className="absolute flex items-center justify-center"
@@ -676,7 +673,7 @@ function MazeCollectorSession({
 
           {/* Capa 3: entidades vivas — posición interpolada por el motor cada frame. */}
           {game.ghosts.map((ghost) => (
-            <CenteredSprite key={ghost.id} cloudId={ghost.id} row={ghost.row} col={ghost.col} cellSize={cellSize} scale={GHOST_SCALE}>
+            <CenteredSprite key={ghost.id} cloudId={ghost.id} row={ghost.row} col={ghost.col} cellSize={cellSize} scale={GHOST_SCALE * spriteScale}>
               {/* Las nubes extra (por demorarse en responder) llegan con un "puf" y un brillo rojo. */}
               <div
                 className={ghost.id.startsWith('extra-') ? 'animate-[maze-cloud-arrive_0.9s_ease-out] [filter:drop-shadow(0_0_8px_rgba(244,63,94,0.85))]' : undefined}
@@ -686,15 +683,16 @@ function MazeCollectorSession({
                   personality={ghost.personality}
                   mode={ghost.mode}
                   facing={ghost.facing}
-                  size={cellSize * GHOST_SCALE}
+                  size={cellSize * GHOST_SCALE * spriteScale}
                   warning={energyWarning}
+                  prefix={mapTheme.spritePrefix}
                 />
                 </div>
               </div>
             </CenteredSprite>
           ))}
 
-          <CenteredSprite row={game.player.row} col={game.player.col} cellSize={cellSize} scale={TRUCK_SCALE} zIndex={20}>
+          <CenteredSprite row={game.player.row} col={game.player.col} cellSize={cellSize} scale={TRUCK_SCALE * spriteScale} zIndex={20}>
             {/* Mientras se ubica, un aro late alrededor del camión. */}
             {locating && (
               <span
@@ -710,20 +708,22 @@ function MazeCollectorSession({
             >
               <EcoTruckSprite
                 facing={game.player.facing}
-                size={cellSize * TRUCK_SCALE}
+                size={cellSize * TRUCK_SCALE * spriteScale}
+                prefix={mapTheme.spritePrefix}
+                sideView={mapTheme.sideView}
                 energized={energized}
                 slowed={game.player.slowed}
               />
             </div>
           </CenteredSprite>
 
-          <MazeEffectsLayer effects={effects} cellSize={cellSize} truckScale={TRUCK_SCALE} />
+          <MazeEffectsLayer effects={effects} cellSize={cellSize} truckScale={TRUCK_SCALE * spriteScale} />
 
           {/* Respuestas de la pregunta: encima de botellas y nubes, debajo del camión. */}
           {game.question?.answers
             .filter((answer) => !answer.wrong)
             .map((answer) => (
-              <AnswerMarker key={`${game.question!.id}-${answer.letter}`} answer={answer} cellSize={cellSize} style={pixelPos(answer.pos)} />
+              <AnswerMarker key={`${game.question!.id}-${answer.letter}`} answer={answer} cellSize={cellSize} scale={spriteScale} style={pixelPos(answer.pos)} />
             ))}
 
           {/* Tutorial: la zona que se enseña queda iluminada y el resto del mapa, oscurecido. */}
@@ -757,13 +757,13 @@ function MazeCollectorSession({
             ))}
         </div>
         {game.answerFeedback && game.phase !== 'lost' && <AnswerToast key={`answer-${game.answerFeedback.id}`} feedback={game.answerFeedback} />}
-        {cloudAlert > 0 && <CloudAlert key={`cloud-${cloudAlert}`} />}
+        {cloudAlert > 0 && <CloudAlert key={`cloud-${cloudAlert}`} emoji={mapTheme.text.emoji} enemyAnother={mapTheme.text.enemyAnother} />}
         {locating && (
           <p
             role="status"
             className="pointer-events-none absolute left-1/2 top-4 z-40 -translate-x-1/2 rounded-full border-2 border-amber-300 bg-slate-950/90 px-5 py-2 text-[16px] font-black text-amber-200 shadow-xl"
           >
-            ¡Ubícate! Busca tu camión y las letras
+            ¡Ubícate! Busca {mapTheme.text.player} y las letras
           </p>
         )}
       </div>
@@ -803,13 +803,13 @@ function MazeCollectorSession({
       {game.phase === 'ready' && !tutorial && (
         <Overlay>
           <div className="flex items-end justify-center gap-3 [@media(max-height:520px)]:hidden">
-            <SpriteStrip name="truck-drive" frames={4} size={84} durationMs={640} />
+            <SpriteStrip name={`${mapTheme.spritePrefix}truck-drive`} frames={4} size={84} durationMs={640} />
             <SpriteStrip name="item-pet" frames={4} size={48} durationMs={1200} />
-            <SpriteStrip name="cloud-chaser" frames={4} size={64} durationMs={900} />
+            <SpriteStrip name={`${mapTheme.spritePrefix}cloud-chaser`} frames={4} size={64} durationMs={900} />
           </div>
-          <h2 className="mt-2 text-[22px] font-bold tracking-tight text-white [@media(max-height:520px)]:mt-0">¡A limpiar la ciudad!</h2>
+          <h2 className="mt-2 text-[22px] font-bold tracking-tight text-white [@media(max-height:520px)]:mt-0">{mapTheme.text.startTitle}</h2>
           <p className="mx-auto mt-1.5 max-w-[400px] text-[13.5px] leading-relaxed text-slate-300">
-            Para salvar la ciudad, <b className="text-white">recoge todas las botellas PET</b> con el {config.collectorLabel.toLowerCase()} y esquiva las nubes de contaminación.{' '}
+            Para salvar {mapTheme.text.place}, <b className="text-white">recoge todas las botellas PET</b> con el {config.collectorLabel.toLowerCase()} y esquiva {mapTheme.text.enemies}.{' '}
             {game.question && (
               <>
                 Lee la pregunta y <b className="text-white">maneja hasta la respuesta correcta</b> antes de que se acabe el tiempo: una equivocada te quita una vida.{' '}
@@ -870,7 +870,7 @@ function MazeCollectorSession({
           <img src={mazeSpriteUrl('ui-trophy')} alt="" className="mx-auto h-20 w-20 animate-[maze-levelup-pop_0.4s_cubic-bezier(0.16,1,0.3,1)]" />
           <h2 className="mt-1 text-[22px] font-bold text-white">¡Ronda {game.level} superada!</h2>
           <p className="text-[14px] text-slate-300">
-            {game.targetRounds - game.level === 1 ? 'Falta 1 ronda' : `Faltan ${game.targetRounds - game.level} rondas`} para salvar la ciudad — las nubes vienen más
+            {game.targetRounds - game.level === 1 ? 'Falta 1 ronda' : `Faltan ${game.targetRounds - game.level} rondas`} para salvar {mapTheme.text.place}: los obstáculos vienen más
             rápido…
           </p>
         </Overlay>
@@ -878,11 +878,11 @@ function MazeCollectorSession({
 
       {game.phase === 'lost' && (
         <Overlay>
-          <SpriteStrip name="truck-hit" frames={1} size={96} className="mx-auto" />
-          <h2 className="mt-1 text-[22px] font-bold text-white">Sin batería</h2>
+          <SpriteStrip name={`${mapTheme.spritePrefix}truck-hit`} frames={1} size={96} className="mx-auto" />
+          <h2 className="mt-1 text-[22px] font-bold text-white">{mapTheme.text.lostTitle}</h2>
           {game.lostReason && (
             <p className="mb-2 text-[15px] font-bold text-rose-300" data-lost-reason={game.lostReason}>
-              {game.lostReason === 'timeout' ? '¡Se acabó el tiempo!' : game.lostReason === 'wrong' ? 'Esa no era la respuesta' : 'Te alcanzó una nube'}
+              {game.lostReason === 'timeout' ? '¡Se acabó el tiempo!' : game.lostReason === 'wrong' ? 'Esa no era la respuesta' : `Te alcanzó ${mapTheme.text.enemyOne}`}
             </p>
           )}
           <p className="mb-4 flex items-center justify-center gap-1.5 text-[14px] text-slate-300">
@@ -901,9 +901,9 @@ function MazeCollectorSession({
       {game.phase === 'won' && (
         <Overlay celebrate>
           <img src={mazeSpriteUrl('ui-trophy')} alt="" className="mx-auto h-20 w-20 animate-[maze-levelup-pop_0.4s_cubic-bezier(0.16,1,0.3,1)]" />
-          <h2 className="mt-1 text-[24px] font-bold text-white">¡Salvaste la ciudad!</h2>
+          <h2 className="mt-1 text-[24px] font-bold text-white">¡Salvaste {mapTheme.text.place}!</h2>
           <p className="mt-1 text-[14px] text-slate-300">
-            Limpiaste la ciudad {game.targetRounds === 1 ? 'en 1 ronda' : `en las ${game.targetRounds} rondas`}. ¡Gracias, reciclador!
+            Lo lograste {game.targetRounds === 1 ? 'en 1 ronda' : `en las ${game.targetRounds} rondas`}. ¡Gracias por cuidar {mapTheme.text.place}!
           </p>
           <p className="mt-3 mb-1 flex items-center justify-center gap-1.5 text-[14px] text-slate-300">
             <img src={mazeSpriteUrl('ui-star')} alt="" className="h-5 w-5" />
@@ -914,12 +914,28 @@ function MazeCollectorSession({
               Preguntas acertadas: <b className="text-white">{game.answeredCorrect}</b>
             </p>
           )}
-          <EndButtons onPlayAgain={onPlayAgain} onExit={onExit} />
+          {onWon ? (
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <button
+                type="button"
+                autoFocus
+                className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2.5 text-[14px] font-bold text-white"
+                onClick={() => onWon({ score: game.score, answeredCorrect: game.answeredCorrect })}
+              >
+                <Play className="h-4 w-4" fill="currentColor" /> {wonActionLabel ?? 'Continuar'}
+              </button>
+              <button type="button" className="rounded-2xl border border-white/15 px-5 py-2.5 text-[14px] font-medium text-slate-200 hover:bg-white/5" onClick={onExit}>
+                Salir
+              </button>
+            </div>
+          ) : (
+            <EndButtons onPlayAgain={onPlayAgain} onExit={onExit} />
+          )}
         </Overlay>
       )}
 
       {questionIntro && !guideOpen && (
-        <QuestionIntro question={questionIntro} number={game.answeredCorrect + 1} timed={!tutorial} onGo={startSearching} />
+        <QuestionIntro question={questionIntro} number={game.answeredCorrect + 1} timed={!tutorial} onGo={startSearching} enemyOne={mapTheme.text.enemyOne} />
       )}
 
       {game.paused && !guideOpen && !questionIntro && (
@@ -938,9 +954,20 @@ function MazeCollectorSession({
 }
 
 /** Una respuesta en el mapa: la letra en una ficha de su color, con un pulso para que se vea entre las calles. */
-function AnswerMarker({ answer, cellSize, style }: { answer: MazeAnswer; cellSize: number; style: { left: number; top: number } }) {
+function AnswerMarker({
+  answer,
+  cellSize,
+  scale,
+  style,
+}: {
+  answer: MazeAnswer
+  cellSize: number
+  /** `spriteScale` del mapa: en los mapas de celda fina la ficha crece para seguir leyéndose. */
+  scale: number
+  style: { left: number; top: number }
+}) {
   const color = ANSWER_COLORS[answer.letter]
-  const size = cellSize * ANSWER_SCALE
+  const size = cellSize * ANSWER_SCALE * scale
   return (
     <div
       className="absolute z-10 flex items-center justify-center"
@@ -950,11 +977,11 @@ function AnswerMarker({ answer, cellSize, style }: { answer: MazeAnswer; cellSiz
     >
       <span
         aria-hidden="true"
-        className="absolute animate-ping rounded-full opacity-40 motion-reduce:animate-none"
+        className="absolute shrink-0 animate-ping rounded-full opacity-40 motion-reduce:animate-none"
         style={{ width: size * 0.9, height: size * 0.9, background: color }}
       />
       <span
-        className="relative flex items-center justify-center rounded-full border-2 border-white font-black text-slate-950 shadow-[0_4px_12px_rgba(0,0,0,0.6)]"
+        className="relative flex shrink-0 items-center justify-center rounded-full border-2 border-white font-black text-slate-950 shadow-[0_4px_12px_rgba(0,0,0,0.6)]"
         style={{ width: size, height: size, background: color, fontSize: Math.max(11, size * 0.55) }}
       >
         {answer.letter}
@@ -1016,6 +1043,7 @@ function QuestionPanel({
           )
         })}
       </ul>
+      <BookHint book={question.book} variant="compact" />
       {aside && <p className="text-[11px] leading-snug text-slate-400">Maneja hasta la letra de la respuesta correcta. Si te equivocas o se acaba el tiempo, pierdes una vida.</p>}
     </section>
   )
@@ -1069,7 +1097,20 @@ function EndButtons({ onPlayAgain, onExit }: { onPlayAgain: () => void; onExit: 
 }
 
 /** La pregunta en grande antes de salir a buscar la respuesta (el juego queda en pausa). */
-function QuestionIntro({ question, number, timed, onGo }: { question: ActiveQuestion; number: number; timed: boolean; onGo: () => void }) {
+function QuestionIntro({
+  question,
+  number,
+  timed,
+  onGo,
+  enemyOne,
+}: {
+  question: ActiveQuestion
+  number: number
+  timed: boolean
+  onGo: () => void
+  /** "una nube", "un contaminante"…: lo que llega si se demora (ver mazeMaps.ts). */
+  enemyOne: string
+}) {
   return (
     <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#0b1220]/75 p-2 backdrop-blur-[2px] sm:p-6">
       <section
@@ -1097,13 +1138,14 @@ function QuestionIntro({ question, number, timed, onGo }: { question: ActiveQues
               </li>
             ))}
         </ul>
+        <BookHint book={question.book} variant="full" />
         <p className="mt-4 text-center text-[13px] leading-snug text-slate-300 [@media(max-height:520px)]:mt-2">
           Las letras están repartidas por el mapa: <b className="text-white">maneja hasta la correcta</b>. Si llegas a una equivocada, pierdes una vida.
           {timed && (
             <>
               {' '}
               Tienes <b className="text-amber-300">{QUESTION_TIME_MS / 1000} segundos</b>: si se acaban, también pierdes una vida. Y cada{' '}
-              {EXTRA_CLOUD_EVERY_MS / 1000} segundos sin responder <b className="text-rose-300">llega una nube más</b>.
+              {EXTRA_CLOUD_EVERY_MS / 1000} segundos sin responder <b className="text-rose-300">llega {enemyOne} más</b>.
             </>
           )}
         </p>
@@ -1206,8 +1248,8 @@ function QuestionClock({ remainingMs, compact }: { remainingMs: number; compact?
   )
 }
 
-/** Aviso de que llegó una nube más por demorarse en responder. */
-function CloudAlert() {
+/** Aviso de que llegó un obstáculo más por demorarse en responder. */
+function CloudAlert({ emoji, enemyAnother }: { emoji: string; enemyAnother: string }) {
   const [visible, setVisible] = useState(true)
   useEffect(() => {
     const timer = window.setTimeout(() => setVisible(false), 2200)
@@ -1219,7 +1261,7 @@ function CloudAlert() {
       role="status"
       className="pointer-events-none absolute left-1/2 top-4 z-40 -translate-x-1/2 animate-[fade-in-up_0.3s_ease-out] rounded-full border-2 border-rose-300 bg-rose-950/90 px-5 py-2 text-center text-[15px] font-black text-rose-100 shadow-xl"
     >
-      ☁️ ¡Llegó otra nube! Responde la pregunta
+      {emoji} ¡Llegó {enemyAnother}! Responde la pregunta
     </p>
   )
 }
@@ -1282,10 +1324,12 @@ function CenteredSprite({
 function BonusMarker({
   bonus,
   cellSize,
+  scale,
   pixelPos,
 }: {
   bonus: { pos: CellPosition; item: MazeCollectorItem }
   cellSize: number
+  scale: number
   pixelPos: (cell: CellPosition) => { left: number; top: number }
 }) {
   const { left, top } = pixelPos(bonus.pos)
@@ -1295,7 +1339,7 @@ function BonusMarker({
       style={{ left, top, width: cellSize, height: cellSize }}
       title={bonus.item.label}
     >
-      <BonusSprite size={cellSize * BONUS_SCALE} />
+      <BonusSprite size={cellSize * BONUS_SCALE * scale} />
     </div>
   )
 }
@@ -1500,49 +1544,7 @@ function PadButton({
  * Capas que no cambian cuadro a cuadro: el juego se vuelve a dibujar 60 veces por segundo para mover
  * el camión y las nubes, y rehacer cada vez el mapa y las ~115 botellas era lo que daba tirones.
  */
-const CityBackground = memo(SostenibleCityBackground)
-
-/** Laberinto de los layouts sin arte propio: paredes y calles por color. */
-const StaticMaze = memo(function StaticMaze({ layout, cellSize, primaryColor }: { layout: MazeLayoutDef; cellSize: number; primaryColor: string }) {
-  const wallColors = wallPalette(primaryColor)
-  return (
-    <div
-      className="absolute inset-0 grid"
-      style={{
-        gridTemplateColumns: `repeat(${layout.cols}, ${cellSize}px)`,
-        gridTemplateRows: `repeat(${layout.rows}, ${cellSize}px)`,
-      }}
-    >
-      {layout.grid.map((rowCells, row) =>
-        rowCells.map((cell, col) => {
-          const key = `${row}:${col}`
-          if (cell === 1) {
-            return (
-              <div
-                key={key}
-                style={{
-                  background: `linear-gradient(160deg, ${wallColors.light}, ${wallColors.base} 55%, ${wallColors.dark})`,
-                  border: `1px solid ${wallColors.dark}`,
-                }}
-              >
-                <div
-                  className="h-full w-full animate-[maze-window-glow_3s_ease-in-out_infinite]"
-                  style={{
-                    animationDelay: `${(hashCell(row, col) % 20) * 0.15}s`,
-                    background:
-                      'repeating-linear-gradient(0deg, transparent 0 6px, rgba(254,240,138,0.5) 6px 8px)',
-                    mixBlendMode: 'overlay',
-                  }}
-                />
-              </div>
-            )
-          }
-          return <div key={key} className="bg-[#18212c]" />
-        }),
-      )}
-    </div>
-  )
-})
+const MapBackground = memo(SostenibleCityBackground)
 
 type Collectible = MazeGameSnapshot['pickups'][number]
 
@@ -1551,7 +1553,7 @@ type Collectible = MazeGameSnapshot['pickups'][number]
  * misma; `count` es lo que avisa que cambió.
  */
 const PickupsLayer = memo(
-  function PickupsLayer({ pickups, bags, cellSize }: { pickups: Collectible[]; bags: Collectible[]; count: number; cellSize: number }) {
+  function PickupsLayer({ pickups, bags, cellSize, spriteScale }: { pickups: Collectible[]; bags: Collectible[]; count: number; cellSize: number; spriteScale: number }) {
     const pixelPos = (cell: { row: number; col: number }) => ({ left: cell.col * cellSize, top: cell.row * cellSize })
     return (
       <>
@@ -1561,10 +1563,10 @@ const PickupsLayer = memo(
             <div key={pickup.id} className="absolute flex items-center justify-center" style={{ left, top, width: cellSize, height: cellSize }}>
               {pickup.kind === 'PET' ? (
                 <span className="flex" style={{ filter: PET_FILTER }}>
-                  <PetSprite size={cellSize * PET_SCALE} />
+                  <PetSprite size={cellSize * PET_SCALE * spriteScale} />
                 </span>
               ) : (
-                <PowerPelletSprite size={cellSize * POWER_SCALE} />
+                <PowerPelletSprite size={cellSize * POWER_SCALE * spriteScale} />
               )}
             </div>
           )
@@ -1573,7 +1575,7 @@ const PickupsLayer = memo(
           const { left, top } = pixelPos(bag.pos)
           return (
             <div key={bag.id} className="absolute flex items-center justify-center" style={{ left, top, width: cellSize, height: cellSize }}>
-              <TrashBagSprite size={cellSize * BAG_SCALE} />
+              <TrashBagSprite size={cellSize * BAG_SCALE * spriteScale} />
             </div>
           )
         })}
