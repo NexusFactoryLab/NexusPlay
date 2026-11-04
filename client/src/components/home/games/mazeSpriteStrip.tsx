@@ -16,13 +16,14 @@ const SPRITE_URLS = import.meta.glob<string>('./assets/maze-collector/*.webp', {
 /**
  * El mapa que se está jugando (issue #152): con él, cualquier `truck-*` o
  * `cloud-*` se dibuja con el muñeco y los obstáculos de ese mapa —también en la
- * guía y en los efectos, que nombran los sprites de la Ciudad—. Los muñecos de
- * lado (`sideView`) no se giran como el camión visto desde arriba: hacia la
- * izquierda se voltean y en los demás sentidos quedan derechos.
+ * guía y en los efectos, que nombran los sprites de la Ciudad—. Los muñecos con
+ * tiras por dirección (`directional`, issue #162) no se giran como el camión
+ * visto desde arriba: se elige la tira del sentido y, si quien llama no dice
+ * cuál, la de frente (`-down`).
  */
-export type MazeSpriteTheme = { prefix: string; sideView: boolean; background: string }
+export type MazeSpriteTheme = { prefix: string; directional: boolean; background: string }
 
-const CITY_SPRITES: MazeSpriteTheme = { prefix: '', sideView: false, background: 'city-map' }
+const CITY_SPRITES: MazeSpriteTheme = { prefix: '', directional: false, background: 'city-map' }
 
 export const MazeSpriteThemeContext = createContext<MazeSpriteTheme>(CITY_SPRITES)
 
@@ -30,19 +31,25 @@ export function useMazeSpriteTheme(): MazeSpriteTheme {
   return useContext(MazeSpriteThemeContext)
 }
 
-/** `truck-drive` → `amazon-truck-drive` en Amazonia; los coleccionables y la interfaz son de todos los mapas. */
-export function themedSpriteName(name: string, theme: MazeSpriteTheme): string {
-  if (!theme.prefix || name.startsWith(theme.prefix) || !/^(truck|cloud)-/.test(name)) return name
-  return theme.prefix + name
+export type SpriteDirection = 'down' | 'left' | 'right' | 'up'
+
+const DIRECTION_SUFFIX = /-(down|left|right|up)$/
+
+/**
+ * `truck-drive` → `amazon-truck-drive-down` en Amazonia (o `-left`, etc. si se
+ * pasa `direction`); los coleccionables y la interfaz son de todos los mapas.
+ */
+export function themedSpriteName(name: string, theme: MazeSpriteTheme, direction: SpriteDirection = 'down'): string {
+  if (!theme.prefix || !/^(truck|cloud)-/.test(name.startsWith(theme.prefix) ? name.slice(theme.prefix.length) : name)) return name
+  const themed = name.startsWith(theme.prefix) ? name : theme.prefix + name
+  const isTruck = themed.startsWith(`${theme.prefix}truck-`)
+  return theme.directional && isTruck && !DIRECTION_SUFFIX.test(themed) ? `${themed}-${direction}` : themed
 }
 
-/** Un `rotate(...)` pensado para el camión, traducido para un muñeco de lado. */
-function sideViewTransform(transform: CSSProperties['transform']): CSSProperties['transform'] {
+/** Quita el `rotate(...)`/`scaleX(-1)` pensado para el camión: la tira ya mira hacia donde debe. */
+function withoutTurn(transform: CSSProperties['transform']): CSSProperties['transform'] {
   if (typeof transform !== 'string') return transform
-  const match = transform.match(/rotate\((-?\d+)deg\)/)
-  if (!match) return transform
-  const degrees = ((Number(match[1]) % 360) + 360) % 360
-  return transform.replace(match[0], degrees === 270 ? 'scaleX(-1)' : '').trim() || undefined
+  return transform.replace(/rotate\([^)]*\)|scaleX\(-1\)/g, '').trim() || undefined
 }
 
 export function mazeSpriteUrl(name: string): string {
@@ -71,7 +78,7 @@ type SpriteStripProps = {
 export function SpriteStrip({ name: baseName, frames, size, durationMs = 600, frame, className, style: baseStyle }: SpriteStripProps) {
   const theme = useMazeSpriteTheme()
   const name = themedSpriteName(baseName, theme)
-  const style = theme.sideView && name !== baseName && baseName.startsWith('truck-') && baseStyle ? { ...baseStyle, transform: sideViewTransform(baseStyle.transform) } : baseStyle
+  const style = theme.directional && name !== baseName && baseStyle ? { ...baseStyle, transform: withoutTurn(baseStyle.transform) } : baseStyle
   const fixed = frame !== undefined || frames === 1
   const position = frames > 1 && frame !== undefined ? (frame / (frames - 1)) * 100 : 0
   return (

@@ -135,7 +135,8 @@ function StationBriefing({
         <img src={mazeSpriteUrl(theme.background)} alt="" className="absolute inset-0 h-full w-full object-cover opacity-70" />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent" />
         <div className="absolute bottom-1 left-1/2 flex -translate-x-1/2 items-end gap-4 [@media(max-height:760px)]:scale-75 [@media(max-height:760px)]:origin-bottom">
-          <SpriteStrip name={`${theme.spritePrefix}truck-drive`} frames={4} size={84} durationMs={640} />
+          {/* Fuera del juego no hay MazeSpriteThemeContext: se nombra la tira de frente a mano. */}
+          <SpriteStrip name={`${theme.spritePrefix}truck-drive${theme.directional ? '-down' : ''}`} frames={4} size={84} durationMs={640} />
           <SpriteStrip name={`${theme.spritePrefix}cloud-chaser`} frames={4} size={60} durationMs={900} />
         </div>
       </div>

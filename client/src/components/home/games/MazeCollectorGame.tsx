@@ -190,7 +190,7 @@ export function MazeCollectorGame(props: MazeCollectorGameProps) {
   // La guía se dibuja DENTRO de la sesión: en pantalla completa el navegador
   // solo muestra lo que está dentro del elemento que la pidió.
   return (
-    <MazeSpriteThemeContext.Provider value={{ prefix: theme.spritePrefix, sideView: theme.sideView, background: theme.background }}>
+    <MazeSpriteThemeContext.Provider value={{ prefix: theme.spritePrefix, directional: theme.directional, background: theme.background }}>
     <MazeCollectorSession
       key={round}
       {...props}
@@ -710,7 +710,7 @@ function MazeCollectorSession({
                 facing={game.player.facing}
                 size={cellSize * TRUCK_SCALE * spriteScale}
                 prefix={mapTheme.spritePrefix}
-                sideView={mapTheme.sideView}
+                directional={mapTheme.directional}
                 energized={energized}
                 slowed={game.player.slowed}
               />

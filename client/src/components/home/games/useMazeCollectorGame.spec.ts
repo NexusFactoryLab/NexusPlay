@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { ANSWER_FEEDBACK_MS, EXTRA_CLOUD_EVERY_MS, QUESTION_TIME_MS, __engineForTests as engine } from './useMazeCollectorGame'
 import type { MazeScenario } from './useMazeCollectorGame'
 import { DEFAULT_MAZE_CONFIG, MAZE_LAYOUTS } from './mazeCollectorTypes'
-import type { CellPosition } from './mazeCollectorTypes'
+import type { CellPosition, MazeLayout, MazeLayoutDef } from './mazeCollectorTypes'
 import { SUSTAINABLE_CITY_QUESTIONS } from './mazeCollectorQuestions'
 
 const city = MAZE_LAYOUTS.CITY
@@ -12,7 +12,7 @@ const FRAME = 0.016
 type State = ReturnType<typeof engine.createInitialState>
 
 /** Siguiente paso por la calle hacia `target` (búsqueda en anchura, con túneles). */
-function stepToward(from: CellPosition, target: CellPosition) {
+function stepToward(from: CellPosition, target: CellPosition, layout: MazeLayoutDef = city) {
   const key = (pos: CellPosition) => `${pos.row}:${pos.col}`
   const moves = { UP: [-1, 0], DOWN: [1, 0], LEFT: [0, -1], RIGHT: [0, 1] } as const
   const previous = new Map<string, { from: CellPosition; direction: keyof typeof moves } | null>([[key(from), null]])
@@ -21,8 +21,8 @@ function stepToward(from: CellPosition, target: CellPosition) {
     const current = queue.shift()!
     if (key(current) === key(target)) break
     for (const direction of Object.keys(moves) as (keyof typeof moves)[]) {
-      const next = { row: current.row + moves[direction][0], col: (current.col + moves[direction][1] + city.cols) % city.cols }
-      if (city.grid[next.row]?.[next.col] !== 0 || previous.has(key(next))) continue
+      const next = { row: current.row + moves[direction][0], col: (current.col + moves[direction][1] + layout.cols) % layout.cols }
+      if (layout.grid[next.row]?.[next.col] !== 0 || previous.has(key(next))) continue
       previous.set(key(next), { from: current, direction })
       queue.push(next)
     }
@@ -299,9 +299,9 @@ describe('Camión Reciclador: preguntas de opción múltiple', () => {
   })
 })
 
-describe('comer contaminantes en los mapas temáticos (issue #154)', () => {
+describe('comer contaminantes en los mapas temáticos (issues #154 y #162)', () => {
   /** Un contaminante asustado a `gap` celdas del jugador, en la misma calle. */
-  function frightenedAt(layoutName: 'CITY' | 'AMAZON', gap: number) {
+  function frightenedAt(layoutName: MazeLayout, gap: number) {
     const layout = MAZE_LAYOUTS[layoutName]
     const state = engine.createInitialState(layout, [], { ...config, layout: layoutName })
     const ghost = state.ghosts[0]
@@ -313,12 +313,36 @@ describe('comer contaminantes en los mapas temáticos (issue #154)', () => {
     return ghost.mode
   }
 
-  it('en Amazonia se come al tocarlo con el sprite grande, igual que en la Ciudad', () => {
-    expect(frightenedAt('AMAZON', 1)).toBe('EATEN')
-    expect(frightenedAt('CITY', 1)).toBe('FRIGHTENED')
+  const ALL = ['CITY', 'AMAZON', 'OCEAN', 'PARAMO'] as const
+
+  it('el contacto es el mismo en los 4 mapas: encima se come, a una celda todavía no', () => {
+    for (const name of ALL) {
+      expect(frightenedAt(name, 0), name).toBe('EATEN')
+      expect(frightenedAt(name, 1), name).toBe('FRIGHTENED')
+      expect(frightenedAt(name, 3), name).toBe('FRIGHTENED')
+    }
   })
 
-  it('a varias celdas no hay contacto en ningún mapa', () => {
-    expect(frightenedAt('AMAZON', 3)).toBe('FRIGHTENED')
+  it('persiguiendo a un contaminante asustado por las calles, se lo come en los 4 mapas', () => {
+    for (const name of ALL) {
+      const layout = MAZE_LAYOUTS[name]
+      const state = engine.createInitialState(layout, [], { ...config, layout: name })
+      state.phase = 'playing'
+      state.ghosts = [state.ghosts[0]]
+      const ghost = state.ghosts[0]
+      ghost.mode = 'FRIGHTENED'
+      state.energizedUntil = Number.MAX_SAFE_INTEGER
+      let now = 0
+      // Función y no comparación directa: TypeScript cree que el modo sigue siendo 'FRIGHTENED'.
+      const eaten = () => ghost.mode === 'EATEN'
+      while (now < 30000 && !eaten()) {
+        now += FRAME * 1000
+        const direction = stepToward(state.player.nextPos, ghost.nextPos, layout)
+        if (direction) state.player.desiredDirection = direction
+        engine.tickEngine(state, layout, [], now, FRAME)
+      }
+      expect(ghost.mode, name).toBe('EATEN')
+      expect(state.lives, name).toBe(config.lives)
+    }
   })
 })
