@@ -1,0 +1,544 @@
+/*
+ * Landing pública de NexusPlay (/inicio). Look "Fantasía refinada": cielo
+ * nocturno y brillo sutil, con la misma tipografía y componentes sobrios del
+ * resto de la plataforma. Es independiente del tema elegido (la visita aún no
+ * inició sesión), por eso fija sus propias variables --lp-*.
+ */
+.landing {
+  --lp-text: #c9c2e8;
+  --lp-text-h: #fbf8ff;
+  --lp-surface: #221c4a;
+  --lp-border: #463c70;
+  --lp-accent: #7b5cff;
+  --lp-accent-2: #ff3d7f;
+  --lp-gold: #ffc83d;
+  --lp-grad: linear-gradient(135deg, var(--lp-accent), var(--lp-accent-2));
+
+  /* El documento tiene html/body en overflow:hidden (la app es de pantalla completa):
+     la landing hace su propio scroll en vez de depender del de la ventana. */
+  position: relative;
+  height: 100svh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  color: var(--lp-text);
+  font-family: var(--font-sans);
+  background-color: #17123a;
+  background-image:
+    radial-gradient(1.4px 1.4px at 24px 36px, rgba(255, 255, 255, 0.6) 50%, transparent 52%),
+    radial-gradient(1px 1px at 140px 90px, rgba(255, 255, 255, 0.45) 50%, transparent 52%),
+    radial-gradient(1px 1px at 210px 190px, rgba(255, 236, 170, 0.5) 50%, transparent 52%),
+    radial-gradient(1px 1px at 80px 230px, rgba(196, 180, 255, 0.5) 50%, transparent 52%),
+    radial-gradient(circle at 72% 12%, rgba(140, 100, 255, 0.3), transparent 42%),
+    linear-gradient(180deg, #120d33 0%, #1a1450 60%, #241b63 100%);
+  background-size: 300px 300px, 300px 300px, 300px 300px, 300px 300px, 100% 100%, 100% 100%;
+  background-repeat: repeat, repeat, repeat, repeat, no-repeat, no-repeat;
+}
+
+.landing h1,
+.landing h2,
+.landing h3 {
+  font-family: var(--font-heading);
+  color: var(--lp-text-h);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+
+:where(.landing) a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.lp-wrap {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.lp-section {
+  padding: 72px 0;
+}
+
+.lp-eyebrow {
+  margin-bottom: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #ff8fb8;
+}
+
+.landing h2 {
+  margin-bottom: 12px;
+  font-size: clamp(28px, 4vw, 40px);
+}
+
+.lp-lead {
+  max-width: 620px;
+  font-size: 17px;
+  line-height: 1.55;
+}
+
+.lp-icon {
+  flex: none;
+  vertical-align: -0.125em;
+}
+
+/* ---- Barra superior ---- */
+.lp-nav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(166, 133, 245, 0.2);
+  background: rgba(18, 13, 51, 0.7);
+  backdrop-filter: blur(8px);
+}
+
+.lp-nav .lp-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.lp-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-heading);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--lp-text-h);
+}
+
+/* Logo oficial (SVG de /public/brand): el isotipo y el wordmark con degradado violeta→rosa. */
+.lp-logo-mark {
+  width: 38px;
+  height: 38px;
+  flex: none;
+}
+
+.lp-logo-word {
+  height: 20px;
+  width: auto;
+}
+
+.lp-footer-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.lp-final-logo {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 18px;
+  filter: drop-shadow(0 0 26px rgba(199, 48, 181, 0.55));
+}
+
+.lp-nav-links {
+  display: flex;
+  gap: 26px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.lp-nav-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.lp-nav-link:hover {
+  color: var(--lp-text-h);
+}
+
+.lp-nav-link:focus-visible {
+  outline: 2px solid var(--lp-gold);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+.lp-nav-actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* ---- Botones ---- */
+.lp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 13px 26px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  font-family: var(--font-heading);
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.lp-btn:hover {
+  transform: translateY(-2px);
+}
+
+.lp-btn:active {
+  transform: translateY(0) scale(0.97);
+}
+
+/* Brillo que cruza los botones principales al pasar el cursor. */
+.lp-btn-main {
+  position: relative;
+  overflow: hidden;
+}
+
+.lp-btn-main::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.35) 50%, transparent 65%);
+  transform: translateX(-120%);
+}
+
+.lp-btn-main:hover::after {
+  transform: translateX(120%);
+  transition: transform 0.6s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing { scroll-behavior: auto; }
+  .lp-btn-main:hover::after { transition: none; }
+}
+
+.lp-btn:focus-visible {
+  outline: 2px solid var(--lp-gold);
+  outline-offset: 2px;
+}
+
+.lp-btn-main {
+  background: var(--lp-grad);
+  box-shadow: 0 10px 28px -8px rgba(255, 61, 127, 0.55);
+}
+
+.lp-btn-ghost {
+  color: var(--lp-text-h);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(166, 133, 245, 0.45);
+}
+
+.lp-btn-sm {
+  padding: 9px 18px;
+  font-size: 14px;
+}
+
+/* ---- Hero (el cielo, la demo y las animaciones están en landing-hero.css) ---- */
+.lp-hero {
+  position: relative;
+  overflow: hidden;
+  padding: 64px 0 88px;
+}
+
+.lp-hero .lp-wrap {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: 56px;
+  align-items: center;
+}
+
+.lp-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 22px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(166, 133, 245, 0.45);
+  background: rgba(123, 92, 255, 0.14);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #c4b5ff;
+}
+
+.lp-hero h1 {
+  margin-bottom: 18px;
+  font-size: clamp(40px, 6vw, 68px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.lp-hero h1 em {
+  font-style: normal;
+  background: var(--lp-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.lp-sub {
+  max-width: 520px;
+  margin-bottom: 30px;
+  font-size: 19px;
+  line-height: 1.5;
+}
+
+.lp-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+/* ---- Tarjetas y filas de ranking ---- */
+.lp-card {
+  padding: 22px;
+  border-radius: 20px;
+  border: 1px solid rgba(166, 133, 245, 0.35);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
+    var(--lp-surface);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.03) inset,
+    0 22px 50px -22px rgba(4, 2, 20, 0.8),
+    0 0 40px -18px rgba(123, 92, 255, 0.55);
+}
+
+.lp-card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  font-size: 18px;
+}
+
+.lp-badge {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #c4b5ff;
+}
+
+/* Las filas, el podio y los controles del ranking viven en landing-ranking.css. */
+
+.lp-note {
+  margin-top: 12px;
+  font-size: 12.5px;
+  opacity: 0.75;
+}
+
+/* ---- Cómo funciona ---- */
+.lp-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+  margin-top: 36px;
+}
+
+.lp-step-tile {
+  display: flex;
+  width: 56px;
+  height: 56px;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(166, 133, 245, 0.4);
+  background: rgba(123, 92, 255, 0.14);
+  color: #b9a6ff;
+}
+
+.lp-step h3 {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 6px;
+  font-size: 21px;
+}
+
+.lp-step h3 span {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--lp-accent-2);
+}
+
+/* ---- Retos ---- */
+.lp-challenges {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+  margin-top: 36px;
+}
+
+.lp-vs {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 14px 0;
+  font-family: var(--font-heading);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--lp-text-h);
+}
+
+.lp-vs span:nth-child(2) {
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  color: var(--lp-accent-2);
+}
+
+.lp-meter {
+  display: flex;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.lp-meter i {
+  display: block;
+  height: 100%;
+}
+
+.lp-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+/* ---- Universidades ---- */
+.lp-uni {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+  align-items: center;
+}
+
+.lp-checks {
+  display: grid;
+  gap: 14px;
+  margin-top: 20px;
+  list-style: none;
+}
+
+.lp-checks li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-weight: 600;
+  color: var(--lp-text-h);
+}
+
+.lp-checks li span {
+  display: block;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--lp-text);
+}
+
+.lp-check {
+  display: flex;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+  border-radius: 8px;
+  color: #fff;
+  background: var(--lp-grad);
+}
+
+.lp-uni-card {
+  padding: 36px 24px;
+  text-align: center;
+}
+
+.lp-uni-mark {
+  display: flex;
+  width: 72px;
+  height: 72px;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 14px;
+  border-radius: 20px;
+  color: #fff;
+  background: var(--lp-grad);
+}
+
+/* ---- Cierre y pie ---- */
+.lp-final {
+  position: relative;
+  padding: 56px 24px;
+  border-radius: 26px;
+  border: 1px solid rgba(166, 133, 245, 0.5);
+  background: linear-gradient(135deg, rgba(123, 92, 255, 0.35), rgba(255, 61, 127, 0.3));
+  box-shadow: 0 0 60px -20px rgba(255, 61, 127, 0.6);
+  text-align: center;
+}
+
+.lp-final .lp-lead {
+  margin: 0 auto 26px;
+}
+
+.lp-final .lp-cta {
+  justify-content: center;
+}
+
+.lp-footer {
+  padding: 28px 0;
+  border-top: 1px solid rgba(166, 133, 245, 0.2);
+  font-size: 14px;
+  text-align: center;
+}
+
+.lp-footer a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 860px) {
+  .lp-hero .lp-wrap,
+  .lp-uni {
+    grid-template-columns: 1fr;
+  }
+
+  .lp-nav-links {
+    display: none;
+  }
+
+  .lp-section {
+    padding: 52px 0;
+  }
+}
+
+/* Celulares: la barra superior conserva solo lo esencial y nada desborda. */
+.lp-hero .lp-wrap > *,
+.lp-uni > * {
+  min-width: 0;
+}
+
+@media (max-width: 560px) {
+  .lp-nav .lp-btn-ghost {
+    display: none;
+  }
+
+  .lp-wrap {
+    padding: 0 18px;
+  }
+
+  .lp-cta .lp-btn {
+    width: 100%;
+  }
+}

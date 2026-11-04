@@ -19,7 +19,12 @@ import {
   InvalidGoogleTokenError,
   UserInactiveError,
 } from '../errors/application.errors.js';
-import { toUserResponseDto, type UserResponseDto } from '../dtos/user-response.dto.js';
+import {
+  USER_CONSENT_REPOSITORY,
+  type UserConsentRepository,
+} from '../../domain/ports/user-consent.repository.port.js';
+import { ConsentType } from '../../domain/entities/user-consent.entity.js';
+import { toCurrentUserResponseDto, type CurrentUserResponseDto } from '../dtos/user-response.dto.js';
 import type { UseCase } from '../ports/use-case.port.js';
 import { TokenPairIssuer } from '../services/token-pair-issuer.service.js';
 import { OrganizationAutoJoinService } from '../services/organization-auto-join.service.js';
@@ -29,7 +34,7 @@ export interface LoginWithGoogleInput {
 }
 
 export interface LoginWithGoogleOutput {
-  user: UserResponseDto;
+  user: CurrentUserResponseDto;
   accessToken: string;
   refreshToken: string;
 }
@@ -60,6 +65,7 @@ export class LoginWithGoogleUseCase
     @Inject(IDENTITY_PROVIDER_ACCOUNT_REPOSITORY)
     private readonly identityProviderAccountRepository: IdentityProviderAccountRepository,
     @Inject(ID_GENERATOR) private readonly idGenerator: IdGenerator,
+    @Inject(USER_CONSENT_REPOSITORY) private readonly consentRepository: UserConsentRepository,
     private readonly tokenPairIssuer: TokenPairIssuer,
     private readonly organizationAutoJoin: OrganizationAutoJoinService,
   ) {
@@ -90,7 +96,9 @@ export class LoginWithGoogleUseCase
 
     const { accessToken, refreshToken } = await this.tokenPairIssuer.issueFor(user);
 
-    return { user: toUserResponseDto(user), accessToken, refreshToken };
+    const rankingConsent = await this.consentRepository.findLatest(user.id, ConsentType.PUBLIC_RANKING);
+
+    return { user: toCurrentUserResponseDto(user, rankingConsent), accessToken, refreshToken };
   }
 
   private async resolveExistingUser(userId: string): Promise<User> {

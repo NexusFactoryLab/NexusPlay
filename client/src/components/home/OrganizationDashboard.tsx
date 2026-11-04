@@ -9,11 +9,13 @@ import {
   listAllOrganizations,
   listMyOrganizations,
   reactivateOrganization,
+  type InstitutionType,
   type Organization,
   type OrganizationWithMyRole,
 } from '../../services/organization.service'
 import { ApiError } from '../../utils/http'
 import { Modal } from './games/Modal'
+import { InstitutionTypeSelect } from './InstitutionTypeSelect'
 import { OrganizationCard } from './OrganizationCard'
 import { OrganizationFilterBar } from './OrganizationFilterBar'
 import { useOrganizationAdmins } from './useOrganizationAdmins'
@@ -70,6 +72,7 @@ export function OrganizationDashboard() {
   const [showCreateOrgModal, setShowCreateOrgModal] = useState(false)
   const [newOrgName, setNewOrgName] = useState('')
   const [newOrgDomain, setNewOrgDomain] = useState('')
+  const [newOrgType, setNewOrgType] = useState<InstitutionType | null>(null)
   const [creatingOrg, setCreatingOrg] = useState(false)
   const [createOrgError, setCreateOrgError] = useState<string | null>(null)
 
@@ -143,6 +146,8 @@ export function OrganizationDashboard() {
       const created = await createOrganization(token, {
         name: newOrgName.trim(),
         domain: newOrgDomain.trim() || null,
+        // Solo se envía si se eligió: un servidor sin el campo rechazaría la clave.
+        ...(newOrgType ? { institutionType: newOrgType } : {}),
       })
       // Refresca ambos ejes: para el ADMIN global, `allOrganizations` (ahora
       // paginado/filtrado). Para quien la acaba de fundar, además queda como
@@ -158,6 +163,7 @@ export function OrganizationDashboard() {
         })
       setNewOrgName('')
       setNewOrgDomain('')
+      setNewOrgType(null)
       setShowCreateOrgModal(false)
       navigate(`/organizaciones/${created.id}`)
     } catch (err) {
@@ -224,10 +230,12 @@ export function OrganizationDashboard() {
           <CreateOrganizationModal
             name={newOrgName}
             domain={newOrgDomain}
+            institutionType={newOrgType}
             saving={creatingOrg}
             error={createOrgError}
             onNameChange={setNewOrgName}
             onDomainChange={setNewOrgDomain}
+            onInstitutionTypeChange={setNewOrgType}
             onSubmit={handleCreateOrganization}
             onClose={() => setShowCreateOrgModal(false)}
           />
@@ -360,10 +368,12 @@ export function OrganizationDashboard() {
         <CreateOrganizationModal
           name={newOrgName}
           domain={newOrgDomain}
+          institutionType={newOrgType}
           saving={creatingOrg}
           error={createOrgError}
           onNameChange={setNewOrgName}
           onDomainChange={setNewOrgDomain}
+          onInstitutionTypeChange={setNewOrgType}
           onSubmit={handleCreateOrganization}
           onClose={() => setShowCreateOrgModal(false)}
         />
@@ -410,10 +420,12 @@ export function OrganizationDashboard() {
 type CreateOrganizationModalProps = {
   name: string
   domain: string
+  institutionType: InstitutionType | null
   saving: boolean
   error: string | null
   onNameChange: (value: string) => void
   onDomainChange: (value: string) => void
+  onInstitutionTypeChange: (value: InstitutionType | null) => void
   onSubmit: (event: FormEvent) => void
   onClose: () => void
 }
@@ -421,10 +433,12 @@ type CreateOrganizationModalProps = {
 function CreateOrganizationModal({
   name,
   domain,
+  institutionType,
   saving,
   error,
   onNameChange,
   onDomainChange,
+  onInstitutionTypeChange,
   onSubmit,
   onClose,
 }: CreateOrganizationModalProps) {
@@ -445,6 +459,12 @@ function CreateOrganizationModal({
             disabled={saving}
           />
         </label>
+        <InstitutionTypeSelect
+          value={institutionType}
+          onChange={onInstitutionTypeChange}
+          disabled={saving}
+          hint="Se muestra junto al nombre en el ranking público de la página de inicio."
+        />
         <label className="flex flex-col gap-1.5">
           <span className="text-[13px] font-medium text-text-h">Dominio institucional (opcional)</span>
           <input

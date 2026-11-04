@@ -41,8 +41,14 @@ model UserModel {
   /// Issue #77: avatar armado por piezas (tono de piel, peinado, ropa…). El
   /// formato lo valida `AvatarConfig`; null = la cuenta aún no tiene avatar.
   avatarConfig             Json?                          @map("avatar_config")
-  birthDate                DateTime?                      @map("birth_date")
-  locale                   String                         @default("es-CO")
+  birthDate               DateTime?                      @map("birth_date")
+  /// Facultad, carrera o grado que la persona escribe en su perfil (opcional,
+  /// texto libre corto; lo limpia `AcademicProgram`). Solo se publica en el
+  /// ranking de la landing si aceptó aparecer (`PUBLIC_RANKING`): junto al
+  /// nombre abreviado y la institución puede identificarla, así que nunca sale
+  /// en listados ni vistas de otras personas.
+  academicProgram         String?                        @map("academic_program") @db.VarChar(80)
+  locale                  String                         @default("es-CO")
   isActive                 Boolean                        @default(true) @map("is_active")
   isEmailVerified          Boolean                        @default(false) @map("is_email_verified")
   lastLoginAt              DateTime?                      @map("last_login_at")
@@ -57,10 +63,47 @@ model UserModel {
   identityProviderAccounts IdentityProviderAccountModel[]
   gamePlayResults          GamePlayResultModel[]
   gameCreationDrafts       GameCreationDraftModel[]
+  /// Historial de consentimientos (ver `UserConsentModel`); el estado vigente
+  /// no se guarda aquí, se deriva de la última decisión de cada tipo.
+  consents                 UserConsentModel[]
   tournamentsCreated       TournamentModel[]
   tournamentParticipations TournamentParticipantModel[]
 
   @@map("users")
+}
+
+/// Consentimientos que una persona puede dar o retirar. Es un enum (no un
+/// booleano por consentimiento en `users`) para que agregar uno nuevo sea
+/// sumar un valor aquí, sin columnas nuevas ni otra tabla.
+enum ConsentType {
+  /// Aparecer (nombre enmascarado y puntaje) en el ranking público de la landing.
+  /// Solo puede aceptarlo quien tiene 14 años cumplidos según `birthDate`.
+  PUBLIC_RANKING
+
+  @@map("consent_type")
+}
+
+/// Historial de decisiones de consentimiento, solo de anexar: cada cambio
+/// (aceptar, retirar, volver a aceptar) inserta una fila y ninguna se
+/// actualiza. Así queda constancia de qué decidió la persona y cuándo, que es
+/// lo que hay que poder demostrar sobre un consentimiento. El estado vigente de
+/// (usuario, tipo) es la fila más reciente; sin filas = nunca se le preguntó.
+/// No guarda IP ni otros datos personales: solo la decisión y su fecha.
+/// Borrar el usuario borra su historial (ON DELETE CASCADE): sin cuenta no hay
+/// nada que mostrar ni consentimiento que conservar.
+model UserConsentModel {
+  id        String      @id @default(uuid())
+  userId    String      @map("user_id")
+  user      UserModel   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      ConsentType
+  /// true = dio el consentimiento; false = lo rechazó o lo retiró.
+  granted   Boolean
+  createdAt DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  /// Sirve a "última decisión de este usuario para este tipo" (perfil y
+  /// ranking público) con un solo recorrido del índice, sin ordenar.
+  @@index([userId, type, createdAt(sort: Desc)], map: "user_consents_user_type_created_idx")
+  @@map("user_consents")
 }
 
 /// Proveedores de identidad externa soportados para login federado (issue
@@ -104,9 +147,23 @@ enum OrganizationRoleEnum {
   @@map("organization_role")
 }
 
+/// Tipo de institución de una organización. La plataforma sirve a colegios,
+/// universidades y a cualquier aula (institutos, cursos libres): OTHER cubre
+/// lo que no es ni lo uno ni lo otro. Lo elige quien administra la organización.
+enum InstitutionTypeEnum {
+  UNIVERSITY
+  SCHOOL
+  OTHER
+
+  @@map("institution_type")
+}
+
 model OrganizationModel {
   id              String    @id @default(uuid())
   name            String
+  /// Nullable a propósito: las organizaciones creadas antes de este campo
+  /// quedan "sin clasificar" en vez de recibir un tipo inventado.
+  institutionType InstitutionTypeEnum? @map("institution_type")
   /// Dominio de correo reclamado (ej. "colegio.edu.co"). Único a nivel global:
   /// el constraint es la garantía real ante dos creaciones simultáneas.
   domain          String?   @unique
@@ -389,16 +446,23 @@ model GamePlayResultModel {
   /// Denormalizado por el mismo motivo que `gameTitle`, y porque un área
   /// puede eliminarse (soft-delete) sin que eso rompa el historial agregado.
   subjectName    String?    @map("subject_name")
+  /// Puntaje dentro del juego (lo que ve el jugador y alimenta las métricas de clase).
   score          Int
   correctCount   Int        @map("correct_count")
   incorrectCount Int        @map("incorrect_count")
   timePlayedMs   Int        @map("time_played_ms")
+  /// Puntos de plataforma que suma esta partida al ranking general: los calcula el
+  /// servidor (participación + aciertos − errores, con tope diario por juego), no el
+  /// cliente. El ranking público suma esta columna, no `score`.
+  points         Int        @default(0)
   playedAt       DateTime   @default(now()) @map("played_at")
 
   @@index([studentUserId, playedAt])
   @@index([classId, playedAt])
   @@index([studentUserId, subjectId])
   @@index([gameId])
+  @@index([playedAt])
+  @@index([studentUserId, gameId, playedAt], map: "game_play_results_student_game_played_idx")
   @@map("game_play_results")
 }
 

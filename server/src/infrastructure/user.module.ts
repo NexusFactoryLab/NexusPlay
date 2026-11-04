@@ -12,6 +12,8 @@ import { PrismaService } from './persistence/prisma/prisma.service.js';
 import { PrismaUserRepository } from './persistence/prisma/prisma-user.repository.js';
 import { PrismaRefreshTokenRepository } from './persistence/prisma/prisma-refresh-token.repository.js';
 import { PrismaIdentityProviderAccountRepository } from './persistence/prisma/prisma-identity-provider-account.repository.js';
+import { USER_CONSENT_REPOSITORY } from '../domain/ports/user-consent.repository.port.js';
+import { PrismaUserConsentRepository } from './persistence/prisma/prisma-user-consent.repository.js';
 import { BcryptPasswordHasher } from './security/bcrypt-password-hasher.adapter.js';
 import { CryptoIdGenerator } from './security/crypto-id-generator.adapter.js';
 import { JwtTokenGenerator } from './security/jwt-token-generator.adapter.js';
@@ -37,6 +39,9 @@ import { ChangeOwnRoleUseCase } from '../application/use-cases/change-own-role.u
 import { ResetUserPasswordUseCase } from '../application/use-cases/reset-user-password.use-case.js';
 import { UpdateUserProfileByAdminUseCase } from '../application/use-cases/update-user-profile-by-admin.use-case.js';
 import { UpdateUserAvatarUseCase } from '../application/use-cases/update-user-avatar.use-case.js';
+import { UpdateRankingConsentUseCase } from '../application/use-cases/update-ranking-consent.use-case.js';
+import { PUBLIC_RANKING_CACHE } from '../domain/ports/public-ranking-cache.port.js';
+import { InMemoryPublicRankingCache } from './persistence/in-memory-public-ranking-cache.js';
 import { GetUsersAvatarsUseCase } from '../application/use-cases/get-users-avatars.use-case.js';
 import { RolesGuard } from './http/guards/roles.guard.js';
 import { UserController } from './http/controllers/user.controller.js';
@@ -64,6 +69,7 @@ import { AuthController } from './http/controllers/auth.controller.js';
       provide: IDENTITY_PROVIDER_ACCOUNT_REPOSITORY,
       useClass: PrismaIdentityProviderAccountRepository,
     },
+    { provide: USER_CONSENT_REPOSITORY, useClass: PrismaUserConsentRepository },
     { provide: PASSWORD_HASHER, useClass: BcryptPasswordHasher },
     { provide: ID_GENERATOR, useClass: CryptoIdGenerator },
     { provide: TOKEN_GENERATOR, useClass: JwtTokenGenerator },
@@ -90,8 +96,12 @@ import { AuthController } from './http/controllers/auth.controller.js';
     ResetUserPasswordUseCase,
     UpdateUserProfileByAdminUseCase,
     UpdateUserAvatarUseCase,
+    UpdateRankingConsentUseCase,
     GetUsersAvatarsUseCase,
+    // Caché del ranking de la landing: la lee MetricsModule y la invalida este
+    // módulo cuando alguien da o retira su consentimiento. Una sola instancia (vive aquí).
+    { provide: PUBLIC_RANKING_CACHE, useClass: InMemoryPublicRankingCache },
   ],
-  exports: [JwtModule, USER_REPOSITORY, ID_GENERATOR],
+  exports: [JwtModule, USER_REPOSITORY, ID_GENERATOR, PUBLIC_RANKING_CACHE],
 })
 export class UserModule {}

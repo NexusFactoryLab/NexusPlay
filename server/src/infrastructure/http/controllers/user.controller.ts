@@ -28,6 +28,7 @@ import { ResetUserPasswordUseCase } from '../../../application/use-cases/reset-u
 import { UpdateUserProfileByAdminUseCase } from '../../../application/use-cases/update-user-profile-by-admin.use-case.js';
 import { UpdateUserAvatarUseCase } from '../../../application/use-cases/update-user-avatar.use-case.js';
 import { GetUsersAvatarsUseCase } from '../../../application/use-cases/get-users-avatars.use-case.js';
+import { UpdateRankingConsentUseCase } from '../../../application/use-cases/update-ranking-consent.use-case.js';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard.js';
 import { RolesGuard } from '../guards/roles.guard.js';
 import { Roles } from '../decorators/roles.decorator.js';
@@ -41,6 +42,7 @@ import { ListUsersQueryDto } from '../dtos/list-users-query.dto.js';
 import { CreateUserDto } from '../dtos/create-user.dto.js';
 import { UpdateUserAvatarDto } from '../dtos/update-user-avatar.dto.js';
 import { GetUsersAvatarsQueryDto } from '../dtos/get-users-avatars-query.dto.js';
+import { UpdateRankingConsentDto } from '../dtos/update-ranking-consent.dto.js';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard)
@@ -62,6 +64,7 @@ export class UserController {
     private readonly updateUserProfileByAdminUseCase: UpdateUserProfileByAdminUseCase,
     private readonly updateUserAvatarUseCase: UpdateUserAvatarUseCase,
     private readonly getUsersAvatarsUseCase: GetUsersAvatarsUseCase,
+    private readonly updateRankingConsentUseCase: UpdateRankingConsentUseCase,
   ) {}
 
   @Get('me')
@@ -119,6 +122,12 @@ export class UserController {
   @Put('me/avatar')
   updateAvatar(@CurrentUserId() userId: string, @Body() dto: UpdateUserAvatarDto) {
     return this.updateUserAvatarUseCase.execute({ userId, avatar: { ...dto } });
+  }
+
+  /** Aceptar o rechazar aparecer en el ranking público de la landing (solo 14 años o más). */
+  @Put('me/ranking-consent')
+  updateRankingConsent(@CurrentUserId() userId: string, @Body() dto: UpdateRankingConsentDto) {
+    return this.updateRankingConsentUseCase.execute({ userId, accepted: dto.accepted });
   }
 
   @Patch('me/password')

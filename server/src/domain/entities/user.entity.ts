@@ -1,4 +1,6 @@
 import { InvalidUserStateError } from '../errors/user.errors.js';
+import { isEligibleForPublicRanking } from '../services/ranking-eligibility.js';
+import { normalizeAcademicProgram } from '../value-objects/academic-program.vo.js';
 import type { AvatarConfig } from '../value-objects/avatar-config.vo.js';
 import { Email } from '../value-objects/email.vo.js';
 import { Password } from '../value-objects/password.vo.js';
@@ -20,6 +22,14 @@ export interface UserProps {
    */
   avatarConfig?: AvatarConfig | null;
   birthDate: Date | null;
+  /**
+   * Facultad, carrera o grado (opcional, ya normalizado por
+   * `normalizeAcademicProgram`). Opcional en las props por el mismo motivo que
+   * `avatarConfig`: ausente equivale a "no lo indicó". Es un dato que solo ve
+   * la propia persona y que se publica únicamente en el ranking público si
+   * aceptó aparecer allí.
+   */
+  academicProgram?: string | null;
   locale: string;
   isActive: boolean;
   isEmailVerified: boolean;
@@ -114,6 +124,19 @@ export class User {
     return this.props.birthDate;
   }
 
+  get academicProgram(): string | null {
+    return this.props.academicProgram ?? null;
+  }
+
+  /**
+   * ¿Puede decidir sobre el ranking público? Requiere fecha de nacimiento y 14
+   * años cumplidos. La decisión en sí no vive en el usuario sino en su
+   * historial de consentimientos (ver `UserConsent`).
+   */
+  canDecideRankingConsent(now: Date = new Date()): boolean {
+    return isEligibleForPublicRanking(this.props.birthDate, now);
+  }
+
   get locale(): string {
     return this.props.locale;
   }
@@ -185,6 +208,12 @@ export class User {
       throw new InvalidUserStateError('la fecha de nacimiento no es válida.');
     }
     this.props.birthDate = birthDate;
+    this.touch();
+  }
+
+  /** Solo lo cambia la propia persona desde su perfil; vacío lo quita. */
+  changeAcademicProgram(rawProgram: string | null): void {
+    this.props.academicProgram = normalizeAcademicProgram(rawProgram);
     this.touch();
   }
 

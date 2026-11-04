@@ -19,6 +19,29 @@ export class PrismaGamePlayResultRepository implements GamePlayResultRepository 
     await this.prisma.gamePlayResultModel.create({ data });
   }
 
+  async findLastPlayedAt(studentUserId: string, gameId: string): Promise<Date | null> {
+    const last = await this.prisma.gamePlayResultModel.findFirst({
+      where: { studentUserId, gameId },
+      orderBy: { playedAt: 'desc' },
+      select: { playedAt: true },
+    });
+    return last?.playedAt ?? null;
+  }
+
+  async sumPointsForGameSince(studentUserId: string, gameId: string, since: Date): Promise<number> {
+    const total = await this.prisma.gamePlayResultModel.aggregate({
+      where: { studentUserId, gameId, playedAt: { gte: since } },
+      _sum: { points: true },
+    });
+    return total._sum.points ?? 0;
+  }
+
+  countByStudentSince(studentUserId: string, since: Date): Promise<number> {
+    return this.prisma.gamePlayResultModel.count({
+      where: { studentUserId, playedAt: { gte: since } },
+    });
+  }
+
   async aggregateScoreByStudentForClass(classId: string): Promise<StudentScoreAggregate[]> {
     const grouped = await this.prisma.gamePlayResultModel.groupBy({
       by: ['studentUserId'],

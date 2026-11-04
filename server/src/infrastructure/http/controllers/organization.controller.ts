@@ -23,6 +23,7 @@ import { JoinOrganizationUseCase } from '../../../application/use-cases/join-org
 import { ListOrganizationStudentsUseCase } from '../../../application/use-cases/list-organization-students.use-case.js';
 import { ListOrganizationClassesUseCase } from '../../../application/use-cases/list-organization-classes.use-case.js';
 import { ChangeOrganizationMemberRoleUseCase } from '../../../application/use-cases/change-organization-member-role.use-case.js';
+import { UpdateOrganizationUseCase } from '../../../application/use-cases/update-organization.use-case.js';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard.js';
 import { RolesGuard } from '../guards/roles.guard.js';
 import { Roles } from '../decorators/roles.decorator.js';
@@ -32,6 +33,7 @@ import { AddOrganizationMemberDto } from '../dtos/add-organization-member.dto.js
 import { ListOrganizationsQueryDto } from '../dtos/list-organizations-query.dto.js';
 import { JoinOrganizationDto } from '../dtos/join-organization.dto.js';
 import { ChangeOrganizationMemberRoleDto } from '../dtos/change-organization-member-role.dto.js';
+import { UpdateOrganizationDto } from '../dtos/update-organization.dto.js';
 
 @Controller('organizations')
 @UseGuards(JwtAuthGuard)
@@ -49,6 +51,7 @@ export class OrganizationController {
     private readonly listOrganizationStudentsUseCase: ListOrganizationStudentsUseCase,
     private readonly changeOrganizationMemberRoleUseCase: ChangeOrganizationMemberRoleUseCase,
     private readonly listOrganizationClassesUseCase: ListOrganizationClassesUseCase,
+    private readonly updateOrganizationUseCase: UpdateOrganizationUseCase,
   ) {}
 
   @Post()
@@ -185,6 +188,24 @@ export class OrganizationController {
       userId,
       requestingUserId,
       orgRole: dto.orgRole,
+    });
+  }
+
+  /**
+   * Edita los datos que decide quien administra la organización (hoy, el tipo
+   * de institución). ADMIN de esa organización o ADMIN global, resuelto en el
+   * use-case (mismo OR de ejes que `removeMember`).
+   */
+  @Patch(':id')
+  update(
+    @CurrentUserId() requestingUserId: string,
+    @Param('id') organizationId: string,
+    @Body() dto: UpdateOrganizationDto,
+  ) {
+    return this.updateOrganizationUseCase.execute({
+      organizationId,
+      requestingUserId,
+      institutionType: dto.institutionType,
     });
   }
 

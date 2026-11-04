@@ -1,0 +1,63 @@
+/*
+ * Transición hacia login/registro. Tres tiempos:
+ *  1. cover: el destello crece desde el punto del clic hasta cubrir la pantalla.
+ *  2. (se cambia de ruta, ya cubierto)
+ *  3. reveal: el destello se encoge hacia el centro y deja ver la página nueva.
+ * Los colores son fijos (los de la marca) porque debe verse igual en cualquier tema.
+ */
+.page-warp {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: linear-gradient(135deg, #7b5cff, #ff3d7f);
+  pointer-events: all;
+}
+
+.page-warp--cover {
+  animation: page-warp-cover 0.5s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+
+.page-warp--reveal {
+  animation: page-warp-reveal 0.6s cubic-bezier(0.65, 0, 0.35, 1) 0.12s forwards;
+}
+
+/* La N del logo en blanco (LogoTint) en el centro del destello. */
+.page-warp-mark {
+  display: block;
+  width: 84px;
+  height: 84px;
+  filter: drop-shadow(0 0 18px rgba(255, 255, 255, 0.55));
+}
+
+.page-warp--cover .page-warp-mark {
+  opacity: 0;
+  animation: page-warp-bolt-in 0.5s ease-out forwards;
+}
+
+.page-warp--reveal .page-warp-mark {
+  animation: page-warp-bolt-out 0.6s cubic-bezier(0.65, 0, 0.35, 1) 0.12s forwards;
+}
+
+@keyframes page-warp-cover {
+  from { clip-path: circle(0 at var(--wx) var(--wy)); }
+  to { clip-path: circle(150vmax at var(--wx) var(--wy)); }
+}
+
+@keyframes page-warp-reveal {
+  from { clip-path: circle(150vmax at 50% 50%); }
+  to { clip-path: circle(0 at 50% 50%); }
+}
+
+@keyframes page-warp-bolt-in {
+  0%, 35% { opacity: 0; transform: scale(0.4); }
+  100% { opacity: 1; transform: scale(1.4); }
+}
+
+@keyframes page-warp-bolt-out {
+  from { opacity: 1; transform: scale(1.4); }
+  to { opacity: 1; transform: scale(0); }
+}

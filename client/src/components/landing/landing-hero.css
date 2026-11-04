@@ -1,0 +1,810 @@
+/*
+ * Hero de la landing: cielo con profundidad, titular y la partida simulada.
+ * Regla de rendimiento: solo se animan `transform` y `opacity` (las capas tienen
+ * su propio compositor y no hay reflujos por fotograma). El cursor llega por las
+ * variables --px/--py (hero) y --tx/--ty (tarjeta), escritas con rAF desde
+ * useLandingMotion. Con "reducir movimiento" todo queda quieto en su estado final.
+ */
+
+.lp-hero {
+  --px: 0;
+  --py: 0;
+  isolation: isolate;
+}
+
+/* ---- Cielo ---- */
+.lp-sky {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Cada capa se mueve en contra del cursor según su profundidad (--d, en px). */
+.lp-layer {
+  position: absolute;
+  inset: -6%;
+  transform: translate3d(calc(var(--px) * var(--d) * -1px), calc(var(--py) * var(--d) * -1px), 0);
+  transition: transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1);
+  will-change: transform;
+}
+
+/* Auroras: degradados suaves (sin filter: blur, que es caro) que derivan despacio. */
+.lp-aurora {
+  position: absolute;
+  border-radius: 50%;
+  animation: lp-drift 18s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+.lp-aurora-1 {
+  top: -12%;
+  left: -6%;
+  width: 760px;
+  height: 540px;
+  background: radial-gradient(closest-side, rgba(123, 92, 255, 0.42), rgba(123, 92, 255, 0));
+}
+
+.lp-aurora-2 {
+  top: 4%;
+  right: -4%;
+  width: 640px;
+  height: 500px;
+  background: radial-gradient(closest-side, rgba(255, 61, 127, 0.24), rgba(255, 61, 127, 0));
+  animation-duration: 23s;
+  animation-delay: -7s;
+}
+
+.lp-aurora-3 {
+  bottom: 14%;
+  left: 28%;
+  width: 560px;
+  height: 320px;
+  background: radial-gradient(closest-side, rgba(56, 189, 248, 0.14), rgba(56, 189, 248, 0));
+  animation-duration: 27s;
+  animation-delay: -12s;
+}
+
+@keyframes lp-drift {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(48px, 26px, 0) scale(1.08); }
+}
+
+.lp-stars {
+  background-repeat: repeat;
+}
+
+.lp-stars-far {
+  opacity: 0.7;
+  background-image:
+    radial-gradient(1px 1px at 20px 30px, rgba(255, 255, 255, 0.55) 50%, transparent 52%),
+    radial-gradient(1px 1px at 120px 160px, rgba(196, 180, 255, 0.5) 50%, transparent 52%),
+    radial-gradient(1px 1px at 190px 70px, rgba(255, 255, 255, 0.4) 50%, transparent 52%);
+  background-size: 220px 220px;
+}
+
+/* Estrellas cercanas: además del parallax, titilan muy despacio (un ciclo cada 10 s). */
+.lp-stars-near {
+  background-image:
+    radial-gradient(1.6px 1.6px at 60px 80px, rgba(255, 255, 255, 0.85) 50%, transparent 55%),
+    radial-gradient(1.4px 1.4px at 300px 220px, rgba(255, 236, 170, 0.75) 50%, transparent 55%),
+    radial-gradient(1.2px 1.2px at 210px 330px, rgba(196, 180, 255, 0.8) 50%, transparent 55%);
+  background-size: 380px 380px;
+  animation: lp-twinkle 5s ease-in-out infinite alternate;
+}
+
+@keyframes lp-twinkle {
+  from { opacity: 0.5; }
+  to { opacity: 1; }
+}
+
+/* Piso de "arena": cuadrícula en perspectiva que se desvanece hacia los lados. */
+.lp-horizon {
+  position: absolute;
+  right: -10%;
+  bottom: 0;
+  left: -10%;
+  height: 46%;
+  opacity: 0.75;
+  background-image:
+    linear-gradient(rgba(166, 133, 245, 0.11) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(166, 133, 245, 0.11) 1px, transparent 1px);
+  background-size: 56px 56px;
+  /* Se desvanece también hacia abajo para no cortarse en seco donde termina el hero. */
+  -webkit-mask-image: radial-gradient(ellipse 55% 60% at 50% 55%, #000 10%, transparent 75%);
+  mask-image: radial-gradient(ellipse 55% 60% at 50% 55%, #000 10%, transparent 75%);
+  transform: perspective(600px) rotateX(58deg);
+  transform-origin: 50% 100%;
+}
+
+/* ---- Texto ---- */
+.lp-hero-copy {
+  max-width: 600px;
+}
+
+.lp-hero .lp-pill {
+  margin-bottom: 24px;
+  color: #d6ccff;
+}
+
+.lp-live-dot {
+  position: relative;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--lp-accent-2);
+}
+
+/* Onda de "en vivo": una cada 1,8 s, muy por debajo del límite de 3 destellos por segundo. */
+.lp-live-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: inherit;
+  animation: lp-ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes lp-ping {
+  0% { transform: scale(1); opacity: 0.7; }
+  80%,
+  100% { transform: scale(2.8); opacity: 0; }
+}
+
+.lp-hero .lp-title {
+  margin-bottom: 22px;
+  font-size: clamp(36px, 3.7vw, 50px);
+  font-weight: 700;
+  line-height: 1.06;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+
+.lp-title > span {
+  display: block;
+}
+
+/* inline-block: el degradado abarca solo el texto y el elemento admite transform. */
+.lp-title > em {
+  display: inline-block;
+  padding-bottom: 0.08em;
+}
+
+.lp-underline {
+  position: relative;
+  white-space: nowrap;
+}
+
+/* Subrayado que se traza una sola vez, después de la entrada del titular. */
+.lp-underline::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: -0.06em;
+  left: 0;
+  height: 0.08em;
+  border-radius: 99px;
+  background: var(--lp-grad);
+  transform: scaleX(0);
+  transform-origin: left;
+  animation: lp-draw 0.9s cubic-bezier(0.65, 0, 0.35, 1) 1.1s forwards;
+}
+
+@keyframes lp-draw {
+  to { transform: scaleX(1); }
+}
+
+.lp-hero .lp-sub {
+  max-width: 520px;
+  font-size: 18.5px;
+  color: #d8d2f2;
+}
+
+.lp-trust {
+  margin-top: 28px;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #ada3d9;
+}
+
+.lp-trust span {
+  margin: 0 0.6em;
+  color: var(--lp-accent-2);
+}
+
+/* Entrada escalonada al cargar: --i es el orden de cada bloque. */
+.lp-rise {
+  animation: lp-rise 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 90ms + 80ms);
+}
+
+@keyframes lp-rise {
+  from { opacity: 0; transform: translate3d(0, 18px, 0); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---- Partida simulada ---- */
+.lp-hero-demo {
+  position: relative;
+}
+
+.lp-demo-caption {
+  margin-top: 14px;
+  font-size: 12.5px;
+  text-align: center;
+  opacity: 0.7;
+}
+
+/* Inclinación 3D sutil hacia el cursor (máx. ~5°). */
+.lp-tilt {
+  --tx: 0;
+  --ty: 0;
+  transform: perspective(1100px) rotateX(calc(var(--ty) * -4deg)) rotateY(calc(var(--tx) * 5deg));
+  transition: transform 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
+  will-change: transform;
+}
+
+.lp-demo {
+  position: relative;
+  overflow: hidden;
+  padding: 18px;
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02)),
+    rgba(34, 28, 74, 0.94);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 40px 80px -30px rgba(4, 2, 20, 0.9),
+    0 0 70px -20px rgba(123, 92, 255, 0.6);
+}
+
+/* Brillo que sigue al cursor: un círculo grande que se traslada, sin repintar degradados. */
+.lp-glare {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 140%;
+  aspect-ratio: 1;
+  margin: -70% 0 0 -70%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0) 70%);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(calc(var(--tx) * 35%), calc(var(--ty) * 35%), 0);
+  transition:
+    opacity 0.4s,
+    transform 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.lp-tilt:hover .lp-glare {
+  opacity: 1;
+}
+
+/* Con el cursor encima la partida se congela (el reloj de JS también se detiene). */
+.lp-tilt.is-paused *,
+.lp-tilt.is-paused *::before,
+.lp-tilt.is-paused *::after {
+  animation-play-state: paused !important;
+}
+
+.lp-demo-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.lp-demo-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 10px;
+  border-radius: 99px;
+  background: rgba(255, 61, 127, 0.14);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #ffa3c4;
+}
+
+.lp-demo-room {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #bdb4e4;
+}
+
+.lp-demo-tag {
+  flex: none;
+  padding: 3px 8px;
+  border: 1px solid rgba(166, 133, 245, 0.3);
+  border-radius: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #a59cd3;
+}
+
+.lp-demo-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 0 12px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: #cfc8f0;
+}
+
+.lp-demo-bar {
+  flex: 1;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.lp-demo-bar i {
+  display: block;
+  height: 100%;
+  background: var(--lp-grad);
+  transform-origin: left;
+  transition: transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+/* Cada pregunta nueva entra con un leve ascenso (el `key` del bloque reinicia la animación). */
+.lp-demo-q {
+  animation: lp-q-in 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@keyframes lp-q-in {
+  from { opacity: 0; transform: translate3d(0, 10px, 0); }
+  to { opacity: 1; transform: none; }
+}
+
+.lp-demo-ask {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 14px 14px 16px;
+  border: 1px solid rgba(166, 133, 245, 0.18);
+  border-radius: 14px;
+  background: rgba(10, 7, 32, 0.45);
+}
+
+.lp-demo-ask p {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-height: 2.6em;
+  font-family: var(--font-heading);
+  font-size: 16.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--lp-text-h);
+}
+
+/* Anillo de cuenta regresiva. Excepción consciente a "solo transform/opacity":
+   stroke-dashoffset en un SVG de 46 px cuesta un repintado diminuto. */
+.lp-ring {
+  position: relative;
+  display: grid;
+  flex: none;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+}
+
+.lp-ring > svg {
+  position: absolute;
+  inset: 0;
+  transform: rotate(-90deg);
+}
+
+.lp-ring circle {
+  fill: none;
+  stroke-width: 3.5;
+}
+
+.lp-ring-bg {
+  stroke: rgba(255, 255, 255, 0.1);
+}
+
+.lp-ring-fg {
+  stroke: var(--lp-gold);
+  stroke-linecap: round;
+  stroke-dasharray: 119.4;
+  stroke-dashoffset: 0;
+  animation: lp-ring var(--ask-ms, 5000ms) linear forwards;
+}
+
+@keyframes lp-ring {
+  70% { stroke: var(--lp-gold); }
+  100% { stroke: var(--lp-accent-2); stroke-dashoffset: 119.4; }
+}
+
+.lp-ring.is-done .lp-ring-fg {
+  animation: none;
+  stroke-dashoffset: 119.4;
+}
+
+.lp-ring b {
+  position: relative;
+  display: flex;
+  font-family: var(--font-heading);
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+
+.lp-ring.is-done b {
+  color: #4ade80;
+}
+
+.lp-demo-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.lp-opt {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 42px;
+  padding: 8px 10px;
+  border: 1px solid rgba(166, 133, 245, 0.22);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--lp-text-h);
+  transition: opacity 0.45s;
+  animation: lp-q-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 60ms + 120ms);
+}
+
+/* El color de acierto/error es una capa encima que solo cambia de opacidad. */
+.lp-opt::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity 0.45s;
+}
+
+.lp-opt > * {
+  position: relative;
+}
+
+.lp-opt.is-right::before {
+  background: rgba(74, 222, 128, 0.14);
+  box-shadow: inset 0 0 0 1.5px rgba(74, 222, 128, 0.8);
+  opacity: 1;
+}
+
+.lp-opt.is-wrong::before {
+  background: rgba(255, 61, 127, 0.12);
+  box-shadow: inset 0 0 0 1.5px rgba(255, 61, 127, 0.55);
+  opacity: 1;
+}
+
+.lp-opt.is-off {
+  opacity: 0.45;
+}
+
+.lp-opt-letter {
+  display: grid;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 7px;
+  background: rgba(166, 133, 245, 0.18);
+  font-size: 11px;
+  font-weight: 800;
+  color: #ddd5ff;
+}
+
+.lp-opt.is-right .lp-opt-letter {
+  background: #22c55e;
+  color: #052e14;
+}
+
+.lp-opt-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.lp-opt-who {
+  display: flex;
+}
+
+.lp-opt-who > * {
+  box-shadow: 0 0 0 2px #221c4a;
+  animation: lp-pop 0.4s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+.lp-opt-who > * + * {
+  margin-left: -6px;
+}
+
+@keyframes lp-pop {
+  from { opacity: 0; transform: scale(0.4); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Marcador: filas absolutas desplazadas por su puesto (--rank). Al cambiar de puesto,
+   la transición de transform hace el reordenamiento suave sin medir nada. */
+.lp-board {
+  --row-h: 44px;
+  --row-gap: 6px;
+  position: relative;
+  height: calc(var(--rows) * var(--row-h) + (var(--rows) - 1) * var(--row-gap));
+  margin-top: 14px;
+}
+
+.lp-board-row {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: var(--row-h);
+  padding: 0 12px 0 10px;
+  border: 1px solid rgba(166, 133, 245, 0.14);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.035);
+  transform: translate3d(0, calc(var(--rank) * (var(--row-h) + var(--row-gap))), 0);
+  transition: transform 0.7s cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+.lp-board-row::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: rgba(245, 182, 42, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(245, 182, 42, 0.4);
+  opacity: 0;
+  transition: opacity 0.5s;
+}
+
+.lp-board-row > * {
+  position: relative;
+}
+
+.lp-board-row.is-lead::before {
+  opacity: 1;
+}
+
+.lp-board-pos {
+  width: 16px;
+  font-family: var(--font-heading);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  color: #ada3d9;
+}
+
+.is-lead .lp-board-pos {
+  color: var(--lp-gold);
+}
+
+.lp-board-name {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--lp-text-h);
+}
+
+.lp-streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border-radius: 99px;
+  background: rgba(255, 140, 50, 0.15);
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #ffb470;
+  animation: lp-pop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+.lp-board-state {
+  display: flex;
+  justify-content: center;
+  width: 40px;
+}
+
+.lp-ok,
+.lp-ko,
+.lp-ready {
+  animation: lp-pop 0.4s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+.lp-ok { color: #4ade80; }
+.lp-ko { color: #ff7aa6; }
+
+.lp-ready {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #c9bcff;
+}
+
+.lp-thinking {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.lp-thinking i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #9a90c8;
+  animation: lp-think 1.2s ease-in-out infinite;
+}
+
+.lp-thinking i:nth-child(2) { animation-delay: 0.2s; }
+.lp-thinking i:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes lp-think {
+  0%,
+  100% { opacity: 0.3; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(-2px); }
+}
+
+/* El `key` por puntaje remonta la cifra: cada cambio da un pequeño salto. */
+.lp-board-score {
+  display: inline-block;
+  min-width: 46px;
+  font-family: var(--font-heading);
+  font-size: 14.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: #fff;
+  animation: lp-bump 0.5s ease-out;
+}
+
+@keyframes lp-bump {
+  from { transform: scale(1.2); }
+  to { transform: none; }
+}
+
+.lp-board-row > .lp-gain {
+  position: absolute;
+  top: -6px;
+  right: 12px;
+  font-family: var(--font-heading);
+  font-size: 14px;
+  font-weight: 800;
+  color: #4ade80;
+  text-shadow: 0 0 12px rgba(74, 222, 128, 0.6);
+  pointer-events: none;
+  animation: lp-float 1.6s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+}
+
+@keyframes lp-float {
+  0% { opacity: 0; transform: translate3d(0, 8px, 0) scale(0.8); }
+  15% { opacity: 1; transform: translate3d(0, -6px, 0) scale(1.05); }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(0, -26px, 0); }
+}
+
+.lp-demo-foot {
+  margin-top: 12px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  color: #ada3d9;
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 860px) {
+  .lp-hero {
+    padding: 40px 0 64px;
+  }
+
+  .lp-hero-copy {
+    max-width: none;
+  }
+
+  .lp-hero-demo {
+    width: 100%;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+}
+
+/* Celulares: la demo se simplifica (sin quién eligió qué, racha compacta). */
+@media (max-width: 560px) {
+  .lp-hero .lp-title {
+    font-size: 38px;
+  }
+
+  .lp-hero .lp-sub {
+    font-size: 17px;
+  }
+
+  .lp-trust {
+    font-size: 11px;
+    letter-spacing: 0.12em;
+  }
+
+  .lp-demo {
+    padding: 14px;
+  }
+
+  .lp-demo-ask {
+    padding: 12px;
+  }
+
+  .lp-demo-ask p {
+    font-size: 15px;
+  }
+
+  .lp-opt {
+    padding: 7px 8px;
+    font-size: 12.5px;
+  }
+
+  .lp-opt-who,
+  .lp-streak-word {
+    display: none;
+  }
+
+  .lp-board {
+    --row-h: 40px;
+  }
+}
+
+/* ---- Reducir movimiento: estado final, sin bucles ni seguimiento del cursor ---- */
+@media (prefers-reduced-motion: reduce) {
+  .lp-hero *,
+  .lp-hero *::before,
+  .lp-hero *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .lp-layer,
+  .lp-tilt,
+  .lp-underline::after {
+    transform: none;
+  }
+
+  .lp-tilt .lp-glare {
+    opacity: 0;
+  }
+
+  /* Sin la animación de flotar, el "+puntos" quedaría encima de la cifra: el marcador ya lo refleja. */
+  .lp-board-row > .lp-gain {
+    display: none;
+  }
+}

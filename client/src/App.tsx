@@ -81,6 +81,7 @@ function App() {
   if (status !== 'authenticated' || !user) {
     return (
       <Routes>
+        <Route path="/" element={<PublicHomePage />} />
         <Route path="/inicio" element={<PublicHomePage />} />
         <Route path="/privacidad" element={<PrivacyPolicyPage />} />
         <Route path="/terminos" element={<TermsOfServicePage />} />

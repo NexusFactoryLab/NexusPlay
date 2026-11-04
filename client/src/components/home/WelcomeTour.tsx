@@ -86,7 +86,7 @@ function isActionClick(target: HTMLElement, event: Event) {
  * `TourReturnBar` (en toda la app) le explica la página y la obliga a
  * "Volver a la guía", que la trae de nuevo aquí, al paso siguiente.
  */
-export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds }: { user: AuthUser } & WelcomeOptions) {
+export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds, onBusyChange }: { user: AuthUser, /** Avisa si la bienvenida o el recorrido están abiertos, para no apilar otras ventanas encima. */ onBusyChange?: (busy: boolean) => void } & WelcomeOptions) {
   const location = useLocation()
   const navigate = useNavigate()
   const isKids = isKidsMode(user)
@@ -135,6 +135,7 @@ export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds }: 
   const visible = atHome && phase !== 'closed'
   // Momento obligatorio: solo antes de que la persona inicie el recorrido.
   const forcedInvite = visible && phase === 'invite'
+  useEffect(() => { onBusyChange?.(visible) }, [visible, onBusyChange])
 
   // Al volver al inicio desde la barra "Volver a la guía" (o con el botón
   // atrás del navegador) se retoma el paso que seguía.

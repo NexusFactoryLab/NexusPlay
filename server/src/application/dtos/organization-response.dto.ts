@@ -1,5 +1,6 @@
 import type { Organization } from '../../domain/entities/organization.entity.js';
 import type { OrganizationMembership } from '../../domain/entities/organization-membership.entity.js';
+import type { InstitutionType } from '../../domain/value-objects/institution-type.vo.js';
 
 export interface OrganizationResponseDto {
   id: string;
@@ -8,6 +9,8 @@ export interface OrganizationResponseDto {
   createdByUserId: string;
   createdAt: Date;
   isActive: boolean;
+  /** Universidad, colegio u otra; null = sin clasificar. */
+  institutionType: InstitutionType | null;
 }
 
 export interface OrganizationWithMyRoleDto extends OrganizationResponseDto {
@@ -43,6 +46,7 @@ export function toOrganizationResponseDto(
     createdByUserId: organization.createdByUserId,
     createdAt: organization.createdAt,
     isActive: organization.isActive,
+    institutionType: organization.institutionType,
   };
 }
 

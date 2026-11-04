@@ -12,7 +12,12 @@ import {
   InvalidCredentialsError,
   UserInactiveError,
 } from '../errors/application.errors.js';
-import { toUserResponseDto, type UserResponseDto } from '../dtos/user-response.dto.js';
+import {
+  USER_CONSENT_REPOSITORY,
+  type UserConsentRepository,
+} from '../../domain/ports/user-consent.repository.port.js';
+import { ConsentType } from '../../domain/entities/user-consent.entity.js';
+import { toCurrentUserResponseDto, type CurrentUserResponseDto } from '../dtos/user-response.dto.js';
 import type { UseCase } from '../ports/use-case.port.js';
 import { TokenPairIssuer } from '../services/token-pair-issuer.service.js';
 import { OrganizationAutoJoinService } from '../services/organization-auto-join.service.js';
@@ -23,7 +28,7 @@ export interface LoginUserInput {
 }
 
 export interface LoginUserOutput {
-  user: UserResponseDto;
+  user: CurrentUserResponseDto;
   accessToken: string;
   refreshToken: string;
 }
@@ -33,6 +38,7 @@ export class LoginUserUseCase implements UseCase<LoginUserInput, LoginUserOutput
   constructor(
     @Inject(USER_REPOSITORY) private readonly userRepository: UserRepository,
     @Inject(PASSWORD_HASHER) private readonly passwordHasher: PasswordHasher,
+    @Inject(USER_CONSENT_REPOSITORY) private readonly consentRepository: UserConsentRepository,
     private readonly tokenPairIssuer: TokenPairIssuer,
     private readonly organizationAutoJoin: OrganizationAutoJoinService,
   ) {}
@@ -74,6 +80,8 @@ export class LoginUserUseCase implements UseCase<LoginUserInput, LoginUserOutput
 
     const { accessToken, refreshToken } = await this.tokenPairIssuer.issueFor(user);
 
-    return { user: toUserResponseDto(user), accessToken, refreshToken };
+    const rankingConsent = await this.consentRepository.findLatest(user.id, ConsentType.PUBLIC_RANKING);
+
+    return { user: toCurrentUserResponseDto(user, rankingConsent), accessToken, refreshToken };
   }
 }

@@ -14,6 +14,7 @@ import {
 } from './useMazeCollectorGame'
 import type { ActiveQuestion, AnswerFeedback, Direction, MazeAnswer, MazeGameSnapshot, MazeScenario } from './useMazeCollectorGame'
 import type { MazeQuestion } from './mazeCollectorQuestions'
+import { useReportMazeResult } from './useReportMazeResult'
 import { EcoTruckSprite } from './EcoTruckSprite'
 import { PollutionGhostSprite } from './PollutionGhostSprite'
 import { BonusSprite, PetSprite, PowerPelletSprite, TrashBagSprite } from './mazeCollectibleSprites'
@@ -52,6 +53,9 @@ type MazeCollectorGameProps = {
   items: MazeCollectorItem[]
   config: MazeCollectorConfig
   onExit: () => void
+  /** Si vienen, el resultado de la partida suma puntos (POST /me/game-results). Sin ellos (vista previa) no se reporta. */
+  gameId?: string
+  token?: string | null
   /** Si viene, se juega una parte del tutorial (sin guía, sin pantalla de inicio ni de fin). */
   tutorial?: MazeTutorialPart
   /** Preguntas de opción múltiple (issue #103): sus respuestas se reparten por el mapa. */
@@ -216,7 +220,9 @@ function MazeCollectorSession({
   layout,
   items,
   config,
-  onExit,
+  onExit: exitGame,
+  gameId,
+  token,
   tutorial,
   questions,
   guideOpen,
@@ -245,6 +251,19 @@ function MazeCollectorSession({
     questions,
   })
   const focus = tutorial?.focus
+  // Las partidas de torneo las registra el torneo; el tutorial y las vistas previas no suman puntos.
+  const inTournament = useInTournamentPlay()
+  const reportResult = useReportMazeResult({
+    token: tutorial || inTournament ? null : token,
+    gameId,
+    title,
+    game,
+  })
+  // Salir a mitad de partida también guarda lo jugado (al ganar o perder ya se reportó solo).
+  const onExit = () => {
+    reportResult()
+    exitGame()
+  }
   const isCity = config.layout === 'CITY'
   // En Ciudad, la primera y la última fila son franjas verdes decorativas: se
   // muestra solo media de cada una y ese alto se le da al resto del mapa.

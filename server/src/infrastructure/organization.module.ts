@@ -15,6 +15,7 @@ import { JoinOrganizationUseCase } from '../application/use-cases/join-organizat
 import { ListOrganizationStudentsUseCase } from '../application/use-cases/list-organization-students.use-case.js';
 import { ListOrganizationClassesUseCase } from '../application/use-cases/list-organization-classes.use-case.js';
 import { ChangeOrganizationMemberRoleUseCase } from '../application/use-cases/change-organization-member-role.use-case.js';
+import { UpdateOrganizationUseCase } from '../application/use-cases/update-organization.use-case.js';
 import { RolesGuard } from './http/guards/roles.guard.js';
 import { OrganizationController } from './http/controllers/organization.controller.js';
 
@@ -37,6 +38,7 @@ import { OrganizationController } from './http/controllers/organization.controll
     ListOrganizationStudentsUseCase,
     ChangeOrganizationMemberRoleUseCase,
     ListOrganizationClassesUseCase,
+    UpdateOrganizationUseCase,
   ],
 })
 export class OrganizationModule {}

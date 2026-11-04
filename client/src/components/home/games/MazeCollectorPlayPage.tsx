@@ -92,6 +92,8 @@ export function MazeCollectorPlayPage() {
       config={config}
       questions={questionsForGame((game.config as { questions?: unknown } | null)?.questions)}
       onExit={handleExit}
+      gameId={game.id}
+      token={token}
     />
   )
 }

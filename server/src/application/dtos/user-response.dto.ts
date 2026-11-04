@@ -1,4 +1,5 @@
 import { User } from '../../domain/entities/user.entity.js';
+import type { UserConsent } from '../../domain/entities/user-consent.entity.js';
 import type { AvatarConfigProps } from '../../domain/value-objects/avatar-config.vo.js';
 
 export interface UserResponseDto {
@@ -22,6 +23,27 @@ export interface UserResponseDto {
   lastUpdate: Date;
 }
 
+/**
+ * Perfil de la propia persona (login, `/users/me` y lo que edita de sí misma):
+ * el perfil general más su decisión vigente sobre el ranking público. Los
+ * listados y vistas de administración usan `UserResponseDto` y no la incluyen.
+ */
+export interface CurrentUserResponseDto extends UserResponseDto {
+  /**
+   * Facultad, carrera o grado que la persona indicó (null si no lo hizo). Va
+   * solo aquí y no en `UserResponseDto`: los listados y las vistas de otras
+   * personas (administración, docentes) no lo exponen; fuera del propio perfil
+   * únicamente se publica en el ranking de la landing, con consentimiento.
+   */
+  academicProgram: string | null;
+  /** Decisión vigente sobre aparecer en el ranking público: null = aún no se le ha preguntado. */
+  rankingConsent: boolean | null;
+  /** Cuándo tomó esa decisión; null si aún no se le ha preguntado. */
+  rankingConsentAt: Date | null;
+  /** true si tiene 14 años cumplidos verificables: solo entonces se le pregunta y puede aceptar. */
+  rankingConsentEligible: boolean;
+}
+
 export function toUserResponseDto(user: User): UserResponseDto {
   return {
     id: user.id,
@@ -41,5 +63,20 @@ export function toUserResponseDto(user: User): UserResponseDto {
     lastLoginAt: user.lastLoginAt,
     createdAt: user.createdAt,
     lastUpdate: user.lastUpdate,
+  };
+}
+
+/** `rankingConsent` es la última decisión `PUBLIC_RANKING` del historial (null si no hay). */
+export function toCurrentUserResponseDto(
+  user: User,
+  rankingConsent: UserConsent | null,
+  now: Date = new Date(),
+): CurrentUserResponseDto {
+  return {
+    ...toUserResponseDto(user),
+    academicProgram: user.academicProgram,
+    rankingConsent: rankingConsent?.granted ?? null,
+    rankingConsentAt: rankingConsent?.createdAt ?? null,
+    rankingConsentEligible: user.canDecideRankingConsent(now),
   };
 }

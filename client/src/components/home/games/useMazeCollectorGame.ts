@@ -198,6 +198,12 @@ type InternalState = {
   feedbackUntil: number | null
   /** Cuándo llega la próxima nube extra (reloj del juego); null = todavía no empezó a contar. */
   nextExtraCloudAt: number | null
+  /** Reloj de juego en que se movió por primera vez (null mientras está en "listo"). */
+  startedAtMs: number | null
+  /** Conceptos educativos recogidos (los bonus): los "aciertos" que se reportan cuando el juego no tiene preguntas. */
+  conceptsCollected: number
+  /** Vidas perdidas: los "errores" que se reportan. */
+  livesLost: number
 }
 
 function ghostSpeed(level: number, enemySpeedConfig: number): number {
@@ -421,6 +427,7 @@ function resolveAnswer(state: InternalState, layout: MazeLayoutDef, answer: Maze
   // La respuesta incorrecta desaparece del mapa y cuesta una vida; el camión vuelve a su punto de partida.
   answer.wrong = true
   state.lives -= 1
+  state.livesLost += 1
   if (state.lives <= 0) {
     state.phase = 'lost'
     state.lostReason = 'wrong'
@@ -440,6 +447,7 @@ function questionTimedOut(state: InternalState, layout: MazeLayoutDef, now: numb
   state.answerFeedback = { id: (state.answerFeedback?.id ?? 0) + 1, kind: 'timeout', letter: '' }
   state.feedbackUntil = now + ANSWER_FEEDBACK_MS
   state.lives -= 1
+  state.livesLost += 1
   if (state.lives <= 0) {
     // La última vida: nada de aviso «¡Se acabó el tiempo!» encima; el motivo va en la pantalla final.
     state.phase = 'lost'
@@ -503,6 +511,9 @@ function createInitialState(
     questionDeadline: null,
     feedbackUntil: null,
     nextExtraCloudAt: null,
+    startedAtMs: null,
+    conceptsCollected: 0,
+    livesLost: 0,
   }
   if (!scenario) nextQuestion(state, layout)
   return state
@@ -582,6 +593,7 @@ function resolvePlayerArrival(state: InternalState, layout: MazeLayoutDef, now: 
 
   if (state.activeBonus && samePos(state.activeBonus.pos, pos)) {
     state.score += POINTS_BONUS
+    state.conceptsCollected += 1
     state.lastCollected = state.activeBonus.item
     state.activeBonus = null
     celebrateMatch()
@@ -728,6 +740,7 @@ function resolveGhostCollisions(state: InternalState, layout: MazeLayoutDef) {
       return
     }
     state.lives -= 1
+    state.livesLost += 1
     if (state.lives <= 0) {
       state.phase = 'lost'
       state.lostReason = 'caught'
@@ -850,6 +863,10 @@ export type MazeGameSnapshot = {
   feedbackActive: boolean
   /** Nubes que llegaron por demorarse en responder la pregunta actual. */
   extraClouds: number
+  /** Para reportar la partida: lo recogido, las vidas perdidas y el tiempo jugado (sin contar pausas ni la espera inicial). */
+  conceptsCollected: number
+  livesLost: number
+  playedMs: number
 }
 
 function toSnapshot(state: InternalState, now: number, cols: number): MazeGameSnapshot {
@@ -889,6 +906,9 @@ function toSnapshot(state: InternalState, now: number, cols: number): MazeGameSn
     answerFeedback: state.answerFeedback,
     lostReason: state.lostReason,
     extraClouds: state.ghosts.filter((ghost) => ghost.id.startsWith(EXTRA_CLOUD_PREFIX)).length,
+    conceptsCollected: state.conceptsCollected,
+    livesLost: state.livesLost,
+    playedMs: state.startedAtMs === null ? 0 : Math.max(0, Math.round(now - state.startedAtMs)),
     feedbackActive: state.feedbackUntil !== null,
     questionRemainingMs:
       state.question && !state.scenario ? (state.questionDeadline === null ? QUESTION_TIME_MS : Math.min(QUESTION_TIME_MS, Math.max(0, state.questionDeadline - now))) : 0,
@@ -976,7 +996,10 @@ export function useMazeCollectorGame({ layout, items, config, inputEnabled = tru
     primeGameFeedback()
     const state = stateRef.current!
     state.player.desiredDirection = direction
-    if (state.phase === 'ready') state.phase = 'playing'
+    if (state.phase === 'ready') {
+      state.phase = 'playing'
+      state.startedAtMs = clockRef.current
+    }
   }, [])
 
   useEffect(() => {

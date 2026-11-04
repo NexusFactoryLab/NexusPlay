@@ -17,6 +17,7 @@ export class OrganizationMapper {
       createdAt: record.createdAt,
       isActive: record.isActive,
       inviteCode: record.inviteCode,
+      institutionType: record.institutionType,
     });
   }
 
@@ -31,6 +32,7 @@ export class OrganizationMapper {
       createdAt: props.createdAt,
       isActive: props.isActive,
       inviteCode: props.inviteCode,
+      institutionType: props.institutionType ?? null,
     };
   }
 }

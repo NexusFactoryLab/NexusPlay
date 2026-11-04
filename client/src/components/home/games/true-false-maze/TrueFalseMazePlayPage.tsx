@@ -81,5 +81,15 @@ export function TrueFalseMazePlayPage() {
     )
   }
 
-  return <TrueFalseMazeGame key={game.id} title={game.title} questions={questions} config={config} onExit={handleExit} />
+  return (
+    <TrueFalseMazeGame
+      key={game.id}
+      title={game.title}
+      questions={questions}
+      config={config}
+      onExit={handleExit}
+      gameId={game.id}
+      token={token}
+    />
+  )
 }

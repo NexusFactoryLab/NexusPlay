@@ -11,13 +11,18 @@ import {
   listMyOrganizations,
   listOrganizationMembers,
   removeOrganizationMember,
+  updateOrganization,
+  isInstitutionType,
   ORGANIZATION_ROLES,
+  type InstitutionType,
+  type Organization,
   type OrganizationMember,
   type OrganizationRoleValue,
   type OrganizationWithMyRole,
 } from '../../../services/organization.service'
 import { ApiError } from '../../../utils/http'
 import { Modal } from '../games/Modal'
+import { InstitutionTypeSelect } from '../InstitutionTypeSelect'
 import { InstitutionTopNav, type InstitutionSection } from './InstitutionTopNav'
 import { InstitutionStudentsSection } from './InstitutionStudentsSection'
 import { InstitutionTeachersSection } from './InstitutionTeachersSection'
@@ -53,11 +58,10 @@ export function InstitutionView() {
   const navigate = useNavigate()
   const isGlobalAdmin = user?.role === 'ADMIN'
 
-  const [organization, setOrganization] = useState<OrganizationWithMyRole | { id: string; name: string } | null>(
-    null,
-  )
+  const [organization, setOrganization] = useState<OrganizationWithMyRole | Organization | null>(null)
   const [loadingOrganization, setLoadingOrganization] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  const [savingInstitutionType, setSavingInstitutionType] = useState(false)
 
   const [institutionSection, setInstitutionSection] = useState<InstitutionSection>('members')
   const [selectedClass, setSelectedClass] = useState<{ id: string; name: string } | null>(null)
@@ -220,6 +224,25 @@ export function InstitutionView() {
   }
 
   const inviteCode = 'inviteCode' in organization ? organization.inviteCode : undefined
+  const institutionType = isInstitutionType(organization.institutionType) ? organization.institutionType : null
+  // El servidor decide de verdad (ADMIN de esta organización o ADMIN global);
+  // aquí solo se evita ofrecer un control que respondería 403.
+  const canEditInstitutionType =
+    isGlobalAdmin || ('myOrgRole' in organization && organization.myOrgRole === 'ADMIN')
+
+  async function handleInstitutionTypeChange(next: InstitutionType | null) {
+    if (!token || !organizationId || !organization) return
+    setSavingInstitutionType(true)
+    try {
+      const updated = await updateOrganization(token, organizationId, { institutionType: next })
+      setOrganization({ ...organization, institutionType: updated.institutionType ?? next })
+      showToast('Tipo de institución actualizado.')
+    } catch (err) {
+      showToast(err instanceof ApiError ? err.message : 'No se pudo cambiar el tipo de institución.', 'error')
+    } finally {
+      setSavingInstitutionType(false)
+    }
+  }
   const studentsCount = members.filter((m) => m.orgRole === 'STUDENT').length
   const teachersCount = members.filter((m) => m.orgRole === 'TEACHER').length
 
@@ -267,6 +290,16 @@ export function InstitutionView() {
                   <Copy className="h-3.5 w-3.5" strokeWidth={2} />
                   Código: {inviteCode}
                 </button>
+              )}
+              {canEditInstitutionType && (
+                <div className="mt-2.5">
+                  <InstitutionTypeSelect
+                    size="compact"
+                    value={institutionType}
+                    onChange={handleInstitutionTypeChange}
+                    disabled={savingInstitutionType}
+                  />
+                </div>
               )}
             </div>
           </div>

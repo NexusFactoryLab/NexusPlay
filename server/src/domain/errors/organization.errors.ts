@@ -12,6 +12,12 @@ export class InvalidOrganizationNameError extends DomainError {
   }
 }
 
+export class InvalidInstitutionTypeError extends DomainError {
+  constructor(value: string) {
+    super(`El tipo de institución "${value}" no es válido.`);
+  }
+}
+
 export class InvalidOrganizationDomainError extends DomainError {
   constructor(value: string) {
     super(`El dominio "${value}" no tiene un formato válido.`);

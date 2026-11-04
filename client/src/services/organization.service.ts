@@ -1,5 +1,21 @@
 import { request } from '../utils/http'
 
+/** Mismo enum que `institution_type` en el servidor. */
+export const INSTITUTION_TYPES = ['UNIVERSITY', 'SCHOOL', 'OTHER'] as const
+
+export type InstitutionType = (typeof INSTITUTION_TYPES)[number]
+
+/** Nombres que ve la persona; null = «Sin clasificar». */
+export const INSTITUTION_TYPE_LABELS: Record<InstitutionType, string> = {
+  UNIVERSITY: 'Universidad',
+  SCHOOL: 'Colegio',
+  OTHER: 'Otro',
+}
+
+export function isInstitutionType(value: unknown): value is InstitutionType {
+  return typeof value === 'string' && (INSTITUTION_TYPES as readonly string[]).includes(value)
+}
+
 export type Organization = {
   id: string
   name: string
@@ -7,6 +23,8 @@ export type Organization = {
   createdByUserId: string
   createdAt: string
   isActive: boolean
+  /** Universidad, colegio u otra; null o ausente (servidor sin la migración) = sin clasificar. */
+  institutionType?: InstitutionType | null
 }
 
 export type OrganizationWithMyRole = Organization & {
@@ -33,6 +51,30 @@ export type OrganizationMember = {
 export type CreateOrganizationInput = {
   name: string
   domain?: string | null
+  /** Omitirlo o null = sin clasificar. */
+  institutionType?: InstitutionType | null
+}
+
+export type UpdateOrganizationInput = {
+  /** null la deja sin clasificar. */
+  institutionType: InstitutionType | null
+}
+
+/**
+ * PATCH /organizations/:id — edita lo que decide quien administra la
+ * organización (hoy, su tipo de institución). Solo ADMIN de esa organización
+ * o ADMIN global.
+ */
+export function updateOrganization(
+  token: string,
+  organizationId: string,
+  input: UpdateOrganizationInput,
+): Promise<Organization> {
+  return request<Organization>(`/organizations/${organizationId}`, {
+    method: 'PATCH',
+    token,
+    body: input,
+  })
 }
 
 /** POST /organizations — crea la organización; el usuario queda ADMIN automático. */

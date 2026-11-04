@@ -37,6 +37,7 @@ import { TrueFalseMazeGuide } from './TrueFalseMazeGuide'
 import { useInTournamentPlay } from '../tournamentPlay'
 import { TrueFalseMazeTutorial } from '../tutorial/TrueFalseMazeTutorial'
 import { useTrueFalseMazeSession, type TrueFalseMazeHud } from './useTrueFalseMazeSession'
+import { useReportTrueFalseResult } from './useReportTrueFalseResult'
 import type { TrueFalseMazeConfig, TrueFalseMazeQuestion } from './trueFalseMazeTypes'
 import { ArrowKeysInline } from '../tutorial/ArrowKeysInline'
 
@@ -72,6 +73,9 @@ export type TrueFalseMazeGameProps = {
   questions: TrueFalseMazeQuestion[]
   config: TrueFalseMazeConfig
   onExit: () => void
+  /** Si vienen, el resultado de la partida suma puntos (POST /me/game-results). La demo, el tutorial, el torneo y las vistas previas no los pasan. */
+  gameId?: string
+  token?: string | null
   /** Si viene, la partida es una ronda de torneo. */
   tournament?: TrueFalseMazeTournamentRun
   /** Si viene, se juega una parte del tutorial: sin guía ni pantallas de inicio y de fin. */
@@ -185,6 +189,8 @@ function TrueFalseMazeSession({
   questions,
   config,
   onExit,
+  gameId,
+  token,
   tournament,
   tutorial,
   guideOpen,
@@ -257,6 +263,8 @@ function TrueFalseMazeSession({
       if (wantFullscreen) enterFullscreen()
     },
   })
+  // Las rondas de torneo las califica el servidor por respuesta; el tutorial no suma puntos.
+  useReportTrueFalseResult({ token: tournament || tutorial ? null : token, gameId, title, hud })
   // Celular en horizontal: el HUD pasa a una columna lateral para que la nave use toda la altura.
   const compactLandscape = useMediaQuery('(orientation: landscape) and (max-height: 520px) and (pointer: coarse)')
   // La cruceta aparece en cualquier pantalla táctil, no según el ancho.
