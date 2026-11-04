@@ -45,3 +45,33 @@ export function validateBirthDate(value: string): string | null {
   if (date.getTime() < minDate.getTime()) return 'Ingresa una fecha de nacimiento válida.'
   return null
 }
+
+/** Mismo límite que `users.academic_program` (VARCHAR(80)). */
+const ACADEMIC_PROGRAM_MAX = 80
+// Copia de las reglas de `normalizeAcademicProgram` del servidor, que es quien
+// decide: aquí solo se avisa antes de enviar.
+const ACADEMIC_PROGRAM_ALLOWED = /^[\p{L}\p{M}\p{N} .,'’()&/°º+#:-]+$/u
+
+/** Limpia la facultad o carrera como lo hará el servidor; vacío = null (no la indicó). */
+export function normalizeAcademicProgramInput(value: string): string | null {
+  const cleaned = value
+    .normalize('NFC')
+    .replace(/\p{Cf}/gu, '')
+    .replace(/\p{Cc}/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return cleaned.length > 0 ? cleaned : null
+}
+
+/** Opcional: solo falla si es demasiado largo o trae símbolos que no van en un nombre de programa. */
+export function validateAcademicProgram(value: string): string | null {
+  const cleaned = normalizeAcademicProgramInput(value)
+  if (cleaned === null) return null
+  if (cleaned.length > ACADEMIC_PROGRAM_MAX) {
+    return `Máximo ${ACADEMIC_PROGRAM_MAX} caracteres.`
+  }
+  if (!ACADEMIC_PROGRAM_ALLOWED.test(cleaned)) {
+    return 'Usa solo letras, números y signos como . , - ( ) / °.'
+  }
+  return null
+}

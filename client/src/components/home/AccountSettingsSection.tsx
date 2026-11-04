@@ -6,7 +6,13 @@ import { TextField } from '../TextField'
 import { RoleCharacterIllustration } from '../RoleCharacterIllustration'
 import { useAuth } from '../../hooks/useAuth'
 import { ApiError } from '../../utils/http'
-import { validateBirthDate, validateRequiredName } from '../../utils/validation'
+import {
+  normalizeAcademicProgramInput,
+  validateAcademicProgram,
+  validateBirthDate,
+  validateRequiredName,
+} from '../../utils/validation'
+import { ACADEMIC_PROGRAM_MAX_LENGTH } from '../../services/auth.service'
 import { getEmailDomain, isPublicEmailProviderDomain } from '../../utils/publicEmailProviders'
 import {
   createOrganization,
@@ -65,7 +71,13 @@ export function AccountSettingsSection({ onClose }: AccountSettingsSectionProps)
   const [displayName, setDisplayName] = useState(user?.displayName ?? '')
   // El backend devuelve un datetime ISO completo; <input type="date"> solo acepta "YYYY-MM-DD".
   const [birthDate, setBirthDate] = useState(user?.birthDate?.slice(0, 10) ?? '')
-  const [errors, setErrors] = useState<{ firstName?: string; lastName?: string; birthDate?: string }>({})
+  const [academicProgram, setAcademicProgram] = useState(user?.academicProgram ?? '')
+  const [errors, setErrors] = useState<{
+    firstName?: string
+    lastName?: string
+    birthDate?: string
+    academicProgram?: string
+  }>({})
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -164,10 +176,12 @@ export function AccountSettingsSection({ onClose }: AccountSettingsSectionProps)
       firstName: validateRequiredName(firstName, 'El nombre') ?? undefined,
       lastName: validateRequiredName(lastName, 'El apellido') ?? undefined,
       birthDate: validateBirthDate(birthDate) ?? undefined,
+      academicProgram: validateAcademicProgram(academicProgram) ?? undefined,
     }
     setErrors(nextErrors)
-    if (nextErrors.firstName || nextErrors.lastName || nextErrors.birthDate) return
+    if (nextErrors.firstName || nextErrors.lastName || nextErrors.birthDate || nextErrors.academicProgram) return
 
+    const nextProgram = normalizeAcademicProgramInput(academicProgram)
     setSubmitting(true)
     try {
       await updateProfile({
@@ -176,6 +190,8 @@ export function AccountSettingsSection({ onClose }: AccountSettingsSectionProps)
         middleName: middleName.trim() || null,
         displayName: displayName.trim() || undefined,
         birthDate,
+        // Solo si cambió: así guardar el resto del perfil nunca depende de este campo.
+        ...(nextProgram !== (user!.academicProgram ?? null) ? { academicProgram: nextProgram } : {}),
       })
       setSuccessMessage('Perfil actualizado correctamente.')
     } catch (error) {
@@ -371,6 +387,19 @@ export function AccountSettingsSection({ onClose }: AccountSettingsSectionProps)
             de ver el Modo Kids automáticamente.
           </p>
         )}
+
+        <TextField
+          label="Facultad o carrera (opcional)"
+          type="text"
+          value={academicProgram}
+          error={errors.academicProgram}
+          placeholder="Ej. Ingeniería de Sistemas, Medicina u 11°"
+          hint="Se muestra en el ranking público solo si aceptaste aparecer."
+          maxLength={ACADEMIC_PROGRAM_MAX_LENGTH}
+          disabled={submitting}
+          onChange={setAcademicProgram}
+          onBlur={() => {}}
+        />
 
         {submitError && (
           <p

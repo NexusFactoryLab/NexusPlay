@@ -23,7 +23,12 @@ export type UpdateProfileInput = {
   displayName?: string
   /** ISO "YYYY-MM-DD". */
   birthDate?: string
+  /** Facultad, carrera o grado (máx. 80 caracteres); null o vacío lo quita. */
+  academicProgram?: string | null
 }
+
+/** Mismo límite que `users.academic_program` (VARCHAR(80)) y el DTO del servidor. */
+export const ACADEMIC_PROGRAM_MAX_LENGTH = 80
 
 export type AuthUser = {
   id: string
@@ -43,6 +48,12 @@ export type AuthUser = {
   rankingConsentAt?: string | null
   /** El servidor confirma que tiene 14 años o más (con fecha de nacimiento): solo entonces se le pregunta. */
   rankingConsentEligible?: boolean
+  /**
+   * Facultad, carrera o grado que indicó. Solo viene en el perfil propio
+   * (ausente en servidores sin la migración); se publica en el ranking de la
+   * landing únicamente si aceptó aparecer.
+   */
+  academicProgram?: string | null
   birthDate: string | null
   isActive: boolean
   isEmailVerified: boolean

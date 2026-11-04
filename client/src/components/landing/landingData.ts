@@ -1,4 +1,5 @@
 import type { AvatarConfig } from '../../services/avatar.service'
+import { isInstitutionType, type InstitutionType } from '../../services/organization.service'
 import type { PublicRanking } from '../../services/public-ranking.service'
 import { DEFAULT_AVATAR, normalizeAvatar } from '../avatar/avatarConfig'
 
@@ -14,65 +15,112 @@ const avatar = (overrides: Partial<AvatarConfig>): AvatarConfig => ({ ...DEFAULT
 export type Competitor = {
   id: string
   name: string
-  /** Universidad (organización) a la que pertenece, si se conoce. */
+  /** Institución (universidad, colegio u otra) a la que pertenece, si se conoce. */
   university: string | null
-  /** Carrera: solo los datos de ejemplo la traen; la base de datos aún no la guarda. */
-  career: string | null
+  /** Tipo de esa institución; null si no se conoce o está sin clasificar. */
+  institutionType: InstitutionType | null
+  /** Facultad, carrera o grado que indicó (solo llega de quien aceptó aparecer). */
+  program: string | null
   points: number
   /** Null cuando la cuenta aún no armó su avatar: se muestran sus iniciales. */
   avatar: AvatarConfig | null
 }
 
-export type UniversityEntry = { id: string; name: string; players: number; matches: number; points: number }
+export type UniversityEntry = {
+  id: string
+  name: string
+  /** Universidad, colegio u otra; null = sin clasificar. */
+  institutionType: InstitutionType | null
+  players: number
+  matches: number
+  points: number
+}
 
+// Nombres, instituciones y puntajes ficticios. Mezcla a propósito
+// universidades, colegios y un instituto para que los filtros por tipo de la
+// vista previa muestren algo en cada caso.
 export const SAMPLE_STUDENTS: Competitor[] = [
   {
     id: 'valentina',
     name: 'Valentina C.',
-    career: 'Medicina',
+    program: 'Medicina',
     university: 'U. Horizonte',
+    institutionType: 'UNIVERSITY',
     points: 2480,
     avatar: avatar({ top: 'longWavy', hairColor: '2c222b', skinColor: 'dda878', outfit: 'hoodie', shirtColor: '7950f2', eyes: 'happy', mouth: 'bigSmile' }),
   },
   {
     id: 'andres',
     name: 'Andrés M.',
-    career: 'Ingeniería',
+    program: 'Ingeniería de Sistemas',
     university: 'U. del Sol',
+    institutionType: 'UNIVERSITY',
     points: 2355,
     avatar: avatar({ top: 'spiky', hairColor: '3b2f2f', skinColor: 'c99062', outfit: 'stripes', shirtColor: 'e64980', mouth: 'grin', glasses: 'round', cheeks: null }),
   },
   {
     id: 'laura',
     name: 'Laura R.',
-    career: 'Derecho',
-    university: 'U. Horizonte',
+    program: '11°',
+    university: 'Colegio Andino',
+    institutionType: 'SCHOOL',
     points: 2190,
     avatar: avatar({ top: 'ponytail', hairColor: 'b55239', skinColor: 'f5d0b0', outfit: 'jacket', jacketColor: '5ba8a0', eyes: 'soft', cheeks: 'freckles' }),
   },
   {
     id: 'juan',
     name: 'Juan P.',
-    career: 'Biología',
-    university: 'U. Nexus',
+    program: 'Derecho',
+    university: 'U. Horizonte',
+    institutionType: 'UNIVERSITY',
     points: 2040,
     avatar: avatar({ top: 'short', hairColor: '7b4a2d', skinColor: 'b07347', outfit: 'checker', shirtColor: '228be6', eyes: 'wide', mouth: 'laugh', cheeks: null, beard: 'stubble' }),
   },
   {
     id: 'sofia',
     name: 'Sofía G.',
-    career: 'Economía',
-    university: 'U. del Sol',
+    program: 'Diseño Gráfico',
+    university: 'Instituto Nexus de Artes',
+    institutionType: 'OTHER',
     points: 1985,
     avatar: avatar({ top: 'braids', hairColor: 'c98850', skinColor: 'eab890', outfit: 'overalls', shirtColor: '12b886', eyes: 'star', mouth: 'smirk' }),
+  },
+  {
+    id: 'mateo',
+    name: 'Mateo L.',
+    program: '10°',
+    university: 'Liceo Bolívar',
+    institutionType: 'SCHOOL',
+    points: 1870,
+    avatar: avatar({ top: 'short', hairColor: '2c222b', skinColor: 'c99062', outfit: 'hoodie', shirtColor: 'fab005', eyes: 'happy', mouth: 'grin', cheeks: null }),
+  },
+  {
+    id: 'camila',
+    name: 'Camila T.',
+    program: 'Biología',
+    university: 'U. del Sol',
+    institutionType: 'UNIVERSITY',
+    points: 1760,
+    avatar: avatar({ top: 'longWavy', hairColor: 'b55239', skinColor: 'f5d0b0', outfit: 'jacket', jacketColor: '7950f2', eyes: 'soft', mouth: 'bigSmile' }),
+  },
+  {
+    id: 'samuel',
+    name: 'Samuel O.',
+    program: null,
+    university: 'Colegio Andino',
+    institutionType: 'SCHOOL',
+    points: 1640,
+    avatar: null,
   },
 ]
 
 export const SAMPLE_UNIVERSITIES: UniversityEntry[] = [
-  { id: 'horizonte', name: 'U. Horizonte', players: 1240, matches: 18420, points: 96300 },
-  { id: 'sol', name: 'U. del Sol', players: 980, matches: 14100, points: 88750 },
-  { id: 'nexus', name: 'U. Nexus', players: 760, matches: 11390, points: 71020 },
-  { id: 'andino', name: 'Colegio Andino', players: 540, matches: 8020, points: 52600 },
+  { id: 'horizonte', name: 'U. Horizonte', institutionType: 'UNIVERSITY', players: 1240, matches: 18420, points: 96300 },
+  { id: 'sol', name: 'U. del Sol', institutionType: 'UNIVERSITY', players: 980, matches: 14100, points: 88750 },
+  { id: 'andino', name: 'Colegio Andino', institutionType: 'SCHOOL', players: 760, matches: 11390, points: 71020 },
+  { id: 'nexus-artes', name: 'Instituto Nexus de Artes', institutionType: 'OTHER', players: 410, matches: 6240, points: 48900 },
+  { id: 'bolivar', name: 'Liceo Bolívar', institutionType: 'SCHOOL', players: 380, matches: 5310, points: 41250 },
+  { id: 'llanos', name: 'U. de los Llanos', institutionType: 'UNIVERSITY', players: 300, matches: 4180, points: 33600 },
 ]
 
 /** Los retos entre carreras e instituciones aún no existen en el servidor: siempre son de ejemplo. */
@@ -97,6 +145,8 @@ export type LandingRanking = {
   /** true = los estudiantes mostrados son de ejemplo (no hay datos reales). */
   studentsAreSample: boolean
   universitiesAreSample: boolean
+  /** Último corte diario que informó el servidor (ISO); null sin respuesta. */
+  updatedAt: string | null
 }
 
 /** Estado inicial y de respaldo: todo de ejemplo. */
@@ -105,27 +155,44 @@ export const SAMPLE_RANKING: LandingRanking = {
   universities: SAMPLE_UNIVERSITIES,
   studentsAreSample: true,
   universitiesAreSample: true,
+  updatedAt: null,
+}
+
+/** Recorta y descarta lo vacío: un programa de solo espacios equivale a no tenerlo. */
+function cleanText(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
+/** Un servidor sin la migración no manda el campo, y uno futuro podría mandar otro valor: ambos = sin clasificar. */
+function toInstitutionType(value: unknown): InstitutionType | null {
+  return isInstitutionType(value) ? value : null
 }
 
 /**
  * Une la respuesta del servidor con los datos de ejemplo: cada lista usa los
  * datos reales si hay al menos uno, y los de ejemplo solo si está vacía (o si
- * no hubo respuesta).
+ * no hubo respuesta). Tolera respuestas sin `institutionType`/`program`.
  */
-export function buildLandingRanking(api: Pick<PublicRanking, 'students' | 'universities'> | null): LandingRanking {
+export function buildLandingRanking(
+  api: Pick<PublicRanking, 'students' | 'universities'> & Partial<Pick<PublicRanking, 'updatedAt'>> | null,
+): LandingRanking {
   if (!api) return SAMPLE_RANKING
 
-  const students: Competitor[] = api.students.map((row) => ({
+  const students: Competitor[] = (api.students ?? []).map((row) => ({
     id: `student-${row.rank}`,
     name: row.name,
-    university: row.university,
-    career: null,
+    university: cleanText(row.university),
+    institutionType: toInstitutionType(row.institutionType),
+    program: cleanText(row.program),
     points: row.points,
     avatar: normalizeAvatar(row.avatarConfig),
   }))
-  const universities: UniversityEntry[] = api.universities.map((row) => ({
+  const universities: UniversityEntry[] = (api.universities ?? []).map((row) => ({
     id: `university-${row.rank}`,
     name: row.name,
+    institutionType: toInstitutionType(row.institutionType),
     players: row.players,
     matches: row.gamesPlayed,
     points: row.points,
@@ -136,6 +203,7 @@ export function buildLandingRanking(api: Pick<PublicRanking, 'students' | 'unive
     universities: universities.length > 0 ? universities : SAMPLE_UNIVERSITIES,
     studentsAreSample: students.length === 0,
     universitiesAreSample: universities.length === 0,
+    updatedAt: typeof api.updatedAt === 'string' ? api.updatedAt : null,
   }
 }
 

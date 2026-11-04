@@ -16,6 +16,8 @@ type TextFieldProps = {
   /** Solo relevante para type="date": acota el selector de calendario. */
   min?: string
   max?: string
+  /** Límite de caracteres del navegador (el servidor lo vuelve a validar). */
+  maxLength?: number
   onChange: (value: string) => void
   onBlur: (value: string) => void
   /** Contenido opcional al final del campo, p. ej. mostrar/ocultar clave. */
@@ -34,12 +36,14 @@ export function TextField({
   autoFocus,
   min,
   max,
+  maxLength,
   onChange,
   onBlur,
   action,
 }: TextFieldProps) {
   const id = useId()
   const errorId = `${id}-error`
+  const hintId = `${id}-hint`
   // Ayuda del flujo de creación (solo dentro de GameFormShell): ejemplo editable
   // para título/descripción y mensaje amable al salir del campo.
   const assist = useContext(FieldAssistContext)
@@ -71,8 +75,9 @@ export function TextField({
           autoFocus={autoFocus}
           min={min}
           max={max}
+          maxLength={maxLength}
           aria-invalid={error ? true : undefined}
-          aria-describedby={error ? errorId : undefined}
+          aria-describedby={error ? errorId : hint && !feedback ? hintId : undefined}
           onChange={(event) => onChange(event.target.value)}
           onBlur={(event) => {
             setTouched(true)
@@ -99,7 +104,11 @@ export function TextField({
           {feedback.text}
         </p>
       )}
-      {hint && !error && !feedback && <p className="nx-hint text-[12px] leading-snug text-text">{hint}</p>}
+      {hint && !error && !feedback && (
+        <p id={hintId} className="nx-hint text-[12px] leading-snug text-text">
+          {hint}
+        </p>
+      )}
       {error && (
         <p className="nx-error text-[13px] leading-tight text-danger" id={errorId}>
           {error}
