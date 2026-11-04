@@ -3,9 +3,9 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../src/generated/prisma/client.js';
 
 /**
- * Siembra idempotente (upsert por `gameType`) de los 8 tipos de juego del
+ * Siembra idempotente (upsert por `gameType`) de los 7 tipos de juego del
  * catálogo (`VALID_GAME_TYPES`, ver domain/value-objects/game-type.vo.ts) en
- * `game_type_settings`. `MAZE_COLLECTOR` y `DUAL_QUEST` nacen ARCHIVED por
+ * `game_type_settings`. `MAZE_COLLECTOR` nace ARCHIVED por
  * decisión de producto (issue #156); el resto nace ACTIVE.
  *
  * Uso: npm run db:seed:game-type-settings
@@ -50,15 +50,9 @@ const GAME_TYPE_SEEDS: GameTypeSeed[] = [
     archived: false,
   },
   {
-    gameType: 'DUAL_QUEST',
-    displayName: 'Fuego y Agua',
-    description: 'Juego cooperativo donde dos jugadores avanzan juntos resolviendo retos complementarios.',
-    archived: true,
-  },
-  {
     gameType: 'DUAL_QUEST_PIXI',
-    displayName: 'Fuego y Agua (Pixi)',
-    description: 'Versión con motor gráfico Pixi del cooperativo Fuego y Agua.',
+    displayName: 'Dúo Lógico',
+    description: 'Cooperativo en línea para 2: Lumen y Gota superan escenarios juntos y solo avanzan si los dos responden bien.',
     archived: false,
   },
   {

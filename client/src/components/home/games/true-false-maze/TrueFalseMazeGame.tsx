@@ -29,21 +29,57 @@ import {
 import { FitScale } from './FitScale'
 import { loadSpaceshipAssets, spaceshipSpriteUrl, type SpaceshipAssets } from './spaceshipAssets'
 import { SPACESHIP_MAP } from './spaceshipMap'
+import type { ShipMap } from './spaceshipMap'
+import type { TfEvent, TfState } from './trueFalseMazeEngine'
 import { INTRO_MS, type Direction, type TfAnswerRecord } from './trueFalseMazeEngine'
 import type { Insets } from './TrueFalseMazeRenderer'
 import { TrueFalseMazeGuide } from './TrueFalseMazeGuide'
+import { useInTournamentPlay } from '../tournamentPlay'
+import { TrueFalseMazeTutorial } from '../tutorial/TrueFalseMazeTutorial'
 import { useTrueFalseMazeSession, type TrueFalseMazeHud } from './useTrueFalseMazeSession'
 import { useReportTrueFalseResult } from './useReportTrueFalseResult'
 import type { TrueFalseMazeConfig, TrueFalseMazeQuestion } from './trueFalseMazeTypes'
+import { ArrowKeysInline } from '../tutorial/ArrowKeysInline'
+
+/** Una parte del tutorial jugable (issue #93): la nave real con una pregunta de práctica. */
+export type TrueFalseMazeTutorialPart = {
+  /** false mientras se lee la instrucción de la parte: la nave está quieta. */
+  active: boolean
+  /** Nave chica armada para la tarea (por defecto, la nave completa). */
+  map?: ShipMap
+  /**
+   * Tarea sin afirmación (mover, esquivar, rejilla, apagón…): sin salas ni
+   * pregunta; el tutorial mira cada cuadro y decide cuándo se logró.
+   */
+  onFrame?: (state: TfState, events: TfEvent[]) => 'freeze' | void
+  /** Terminó la pregunta: `correct` dice si la respondió bien. */
+  onFinished: (correct: boolean) => void
+  /** Una medusa lo atrapó (en el juego costaría una batería). */
+  onCaught: () => void
+}
+
+/**
+ * Una ronda de torneo (issue #102): cada respuesta se reporta al servidor, que
+ * es quien califica; no hay "empezar de nuevo" y salir cierra la partida sin punto.
+ */
+export type TrueFalseMazeTournamentRun = {
+  onAnswer: (answer: { questionId: string; chosen: boolean }) => void
+  /** Terminó la partida: respondió todo o se quedó sin baterías. */
+  onFinish: () => void
+}
 
 export type TrueFalseMazeGameProps = {
   title: string
   questions: TrueFalseMazeQuestion[]
   config: TrueFalseMazeConfig
   onExit: () => void
-  /** Si vienen, el resultado de la partida suma puntos (POST /me/game-results). La demo y las vistas previas no los pasan. */
+  /** Si vienen, el resultado de la partida suma puntos (POST /me/game-results). La demo, el tutorial, el torneo y las vistas previas no los pasan. */
   gameId?: string
   token?: string | null
+  /** Si viene, la partida es una ronda de torneo. */
+  tournament?: TrueFalseMazeTournamentRun
+  /** Si viene, se juega una parte del tutorial: sin guía ni pantallas de inicio y de fin. */
+  tutorial?: TrueFalseMazeTutorialPart
 }
 
 /** Movimiento mínimo (px) para que un toque sobre el mapa cuente como deslizar. */
@@ -86,17 +122,38 @@ function saveFullscreenPreference(value: boolean) {
  * pasos; se puede volver a abrir desde el botón de ayuda.
  */
 export function TrueFalseMazeGame(props: TrueFalseMazeGameProps) {
-  const [guideOpen, setGuideOpen] = useState(true)
+  // En el torneo no se abre sola (issue #131); sigue disponible desde "Cómo se juega".
+  const inTournamentPlay = useInTournamentPlay()
+  const [guideOpen, setGuideOpen] = useState(!props.tutorial && !inTournamentPlay)
+  // Al final de la guía se ofrece el tutorial jugable (issue #93); al terminarlo
+  // empieza una partida nueva (la sesión se vuelve a montar con otra clave).
+  const [inTutorial, setInTutorial] = useState(false)
+  const [round, setRound] = useState(0)
+  if (inTutorial) {
+    return (
+      <TrueFalseMazeTutorial
+        title={props.title}
+        onFinish={() => {
+          setInTutorial(false)
+          setGuideOpen(false)
+          setRound((value) => value + 1)
+        }}
+      />
+    )
+  }
   // La guía se dibuja DENTRO de la sesión (no al lado): en pantalla completa el
   // navegador solo muestra lo que está dentro del elemento que la pidió, y una
   // guía de afuera quedaba invisible pero capturando el teclado (el juego
   // parecía trabado hasta salir de pantalla completa).
   return (
     <TrueFalseMazeSession
+      key={round}
       {...props}
       guideOpen={guideOpen}
-      onOpenGuide={() => setGuideOpen(true)}
+      // En el tutorial la guía ya se vio: el botón de ayuda no la vuelve a abrir encima.
+      onOpenGuide={() => !props.tutorial && setGuideOpen(true)}
       onCloseGuide={() => setGuideOpen(false)}
+      onStartTutorial={props.tutorial ? undefined : () => setInTutorial(true)}
     />
   )
 }
@@ -134,10 +191,13 @@ function TrueFalseMazeSession({
   onExit,
   gameId,
   token,
+  tournament,
+  tutorial,
   guideOpen,
   onOpenGuide,
   onCloseGuide,
-}: TrueFalseMazeGameProps & { guideOpen: boolean; onOpenGuide: () => void; onCloseGuide: () => void }) {
+  onStartTutorial,
+}: TrueFalseMazeGameProps & { guideOpen: boolean; onOpenGuide: () => void; onCloseGuide: () => void; onStartTutorial?: () => void }) {
   const [assets, setAssets] = useState<SpaceshipAssets | null>(null)
   const [loadError, setLoadError] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -147,10 +207,12 @@ function TrueFalseMazeSession({
   const bottomPadRef = useRef<HTMLDivElement>(null)
   const pointerStart = useRef<{ x: number; y: number } | null>(null)
   const [layout, setLayout] = useState<Layout>({ width: 0, height: 0, insets: { top: 0, right: 0, bottom: 0, left: 0 } })
-  const [fullscreen, setFullscreen] = useState(false)
+  // Puede llegar ya en pantalla completa (la que dejó puesta el tutorial).
+  const [fullscreen, setFullscreen] = useState(() => typeof document !== 'undefined' && Boolean(document.fullscreenElement))
   const [wantFullscreen, setWantFullscreen] = useState(readFullscreenPreference)
   const [fullscreenHintClosed, setFullscreenHintClosed] = useState(false)
-  const canFullscreen = typeof document !== 'undefined' && document.fullscreenEnabled
+  // En el tutorial la pantalla completa la maneja el tutorial (entra al jugar y sale para explicar).
+  const canFullscreen = !tutorial && typeof document !== 'undefined' && document.fullscreenEnabled
 
   function enterFullscreen() {
     const root = rootRef.current
@@ -179,18 +241,35 @@ function TrueFalseMazeSession({
     config,
     assets,
     canvasRef,
-    inputEnabled: !guideOpen,
+    // En el tutorial, mientras se lee la instrucción el robot no responde.
+    inputEnabled: !guideOpen && (tutorial?.active ?? true),
+    map: tutorial?.map,
+    taskMode: Boolean(tutorial?.onFrame),
+    onFrame: tutorial?.onFrame,
+    onRunEvents: tournament
+      ? (state, events) => {
+          for (const event of events) {
+            if (event.type === 'answer') {
+              const last = state.answers[state.answers.length - 1]
+              if (last) tournament.onAnswer({ questionId: last.questionId, chosen: last.chosen })
+            } else if (event.type === 'finished') {
+              tournament.onFinish()
+            }
+          }
+        }
+      : undefined,
     // Despegar es un gesto del jugador: ahí se puede pasar a pantalla completa sin que tenga que buscar el botón.
     onBeforeStart: () => {
       if (wantFullscreen) enterFullscreen()
     },
   })
-  useReportTrueFalseResult({ token, gameId, title, hud })
+  // Las rondas de torneo las califica el servidor por respuesta; el tutorial no suma puntos.
+  useReportTrueFalseResult({ token: tournament || tutorial ? null : token, gameId, title, hud })
   // Celular en horizontal: el HUD pasa a una columna lateral para que la nave use toda la altura.
-  const compactLandscape = useMediaQuery('(orientation: landscape) and (max-height: 520px)')
+  const compactLandscape = useMediaQuery('(orientation: landscape) and (max-height: 520px) and (pointer: coarse)')
   // La cruceta aparece en cualquier pantalla táctil, no según el ancho.
   const coarsePointer = useMediaQuery('(pointer: coarse)')
-  const portraitPhone = useMediaQuery('(orientation: portrait) and (max-width: 600px)')
+  const portraitPhone = useMediaQuery('(orientation: portrait) and (max-width: 600px) and (pointer: coarse)')
 
   useEffect(() => {
     let cancelled = false
@@ -208,6 +287,22 @@ function TrueFalseMazeSession({
       cancelled = true
     }
   }, [])
+
+  // Tutorial: la parte arranca sola en cuanto la nave cargó, y avisa cómo terminó.
+  const tutorialRef = useRef(tutorial)
+  useEffect(() => {
+    tutorialRef.current = tutorial
+  })
+  // Tarea de tutorial sin afirmación: no hay panel de pregunta ni presentación.
+  const taskOnly = Boolean(tutorial?.onFrame)
+  const { start } = actions
+  useEffect(() => {
+    if (tutorial?.active && assets && hud.phase === 'ready') start()
+  }, [tutorial?.active, assets, hud.phase, start])
+  useEffect(() => {
+    if (hud.phase === 'caught') tutorialRef.current?.onCaught()
+    if (hud.phase === 'finished') tutorialRef.current?.onFinished(hud.answers.length > 0 && hud.answers.every((answer) => answer.correct))
+  }, [hud.phase, hud.answers])
 
   // Abrir la guía a mitad de partida pausa el juego.
   const { pause } = actions
@@ -256,18 +351,20 @@ function TrueFalseMazeSession({
       const active = !!document.fullscreenElement
       setFullscreen(active)
       // Al salir (con Esc, por ejemplo) la pantalla cambia de tamaño de golpe: la partida se pausa para no perder el hilo.
-      if (!active) pause()
+      // En el tutorial salir de pantalla completa es parte del recorrido (para explicar), no una pausa.
+      if (!active && !tutorialRef.current) pause()
     }
     document.addEventListener('fullscreenchange', onChange)
     return () => document.removeEventListener('fullscreenchange', onChange)
   }, [pause])
 
-  // Al salir del juego no se deja la pantalla completa puesta.
+  // Al salir del juego no se deja la pantalla completa puesta (en el tutorial sigue: la maneja el tutorial).
+  const partOfTutorial = Boolean(tutorial)
   useEffect(
     () => () => {
-      if (document.fullscreenElement) void document.exitFullscreen().catch(() => {})
+      if (!partOfTutorial && document.fullscreenElement) void document.exitFullscreen().catch(() => {})
     },
-    [],
+    [partOfTutorial],
   )
 
   // El manejador de teclas vive entre renders: lee siempre la versión más reciente de la función.
@@ -309,7 +406,8 @@ function TrueFalseMazeSession({
   // segundos (se va antes si el jugador pausa o termina la ronda). Se ajusta
   // durante el render, al cambiar la fase, sin un efecto de por medio.
   const [pauseHint, setPauseHint] = useState<'pending' | 'showing' | 'done'>('pending')
-  if (pauseHint === 'pending' && hud.phase === 'playing' && !paused) setPauseHint('showing')
+  // En el tutorial la barra de la tarea ya guía: no se suma este aviso.
+  if (pauseHint === 'pending' && hud.phase === 'playing' && !paused && !tutorial) setPauseHint('showing')
   if (pauseHint === 'showing' && (paused || hud.phase !== 'playing')) setPauseHint('done')
   useEffect(() => {
     if (pauseHint !== 'showing') return
@@ -376,7 +474,7 @@ function TrueFalseMazeSession({
           <div className="ml-auto">{controls}</div>
         </div>
         <HudBar hud={hud} compact className="pointer-events-auto w-full" />
-        <QuestionPanel hud={hud} title={title} relocateTotal={relocateEnabled ? config.relocateSeconds : 0} compact className="pointer-events-auto" />
+        {!taskOnly && <QuestionPanel hud={hud} title={title} relocateTotal={relocateEnabled ? config.relocateSeconds : 0} compact className="pointer-events-auto" />}
         <div className="pointer-events-none relative">{statusStack}</div>
         {coarsePointer && (
           <div className="pointer-events-auto flex justify-center pt-1">
@@ -392,15 +490,17 @@ function TrueFalseMazeSession({
           <div className="order-1 flex">{pauseButton}</div>
           <div className="order-2 ml-auto flex sm:order-3 sm:ml-0 xl:order-4">{controls}</div>
           <HudBar hud={hud} className="order-3 basis-full sm:order-2 sm:basis-0 sm:flex-1 xl:flex-none xl:basis-auto" />
-          <QuestionPanel
-            hud={hud}
-            title={title}
-            relocateTotal={relocateEnabled ? config.relocateSeconds : 0}
-            className="order-4 basis-full xl:order-3 xl:basis-0"
-          />
+          {!taskOnly && (
+            <QuestionPanel
+              hud={hud}
+              title={title}
+              relocateTotal={relocateEnabled ? config.relocateSeconds : 0}
+              className="order-4 basis-full xl:order-3 xl:basis-0"
+            />
+          )}
         </div>
         <div className="pointer-events-none relative">{statusStack}</div>
-        {portraitPhone && playing && (
+        {portraitPhone && playing && !tutorial && (
           <p className="pointer-events-none mx-auto mt-2 w-fit max-w-full rounded-full border border-white/10 bg-slate-950/70 px-3 py-1 text-center text-[11.5px] text-slate-300 backdrop-blur">
             Gira el teléfono para ver la nave más grande
           </p>
@@ -438,18 +538,20 @@ function TrueFalseMazeSession({
       {hudPanels}
 
       {!assets && <LoadingOverlay error={loadError} onExit={onExit} />}
-      {assets && hud.phase === 'ready' && (
+      {assets && hud.phase === 'ready' && !tutorial && (
         <ReadyOverlay
           total={hud.totalQuestions}
           lives={hud.maxLives}
           compact={compactLandscape}
+          touch={coarsePointer}
           fullscreen={canFullscreen ? { wanted: wantFullscreen, active: fullscreen, onChange: chooseFullscreen } : null}
+          tournament={Boolean(tournament)}
           onStart={actions.start}
           onGuide={onOpenGuide}
           onExit={onExit}
         />
       )}
-      {hud.phase === 'intro' && hud.statement && (
+      {hud.phase === 'intro' && hud.statement && !taskOnly && (
         <IntroCard key={hud.questionIndex} index={hud.questionIndex} total={hud.totalQuestions} statement={hud.statement} />
       )}
       {hud.phase === 'feedback' && hud.result && (
@@ -467,10 +569,13 @@ function TrueFalseMazeSession({
           onToggleFullscreen={toggleFullscreen}
           onRestart={actions.restart}
           onExit={onExit}
+          tournament={Boolean(tournament)}
         />
       )}
-      {hud.phase === 'finished' && <ResultsOverlay hud={hud} compact={compactLandscape} onRestart={actions.restart} onExit={onExit} />}
-      {guideOpen && <TrueFalseMazeGuide onClose={onCloseGuide} />}
+      {hud.phase === 'finished' && !tutorial && (
+        <ResultsOverlay hud={hud} compact={compactLandscape} onRestart={actions.restart} onExit={onExit} tournament={Boolean(tournament)} />
+      )}
+      {guideOpen && !tutorial && <TrueFalseMazeGuide onClose={onCloseGuide} onTutorial={onStartTutorial} />}
     </div>
   )
 }
@@ -701,7 +806,7 @@ function QuestionPanel({
   compact?: boolean
   className?: string
 }) {
-  let label = `${title} · Pregunta ${hud.questionIndex + 1} de ${hud.totalQuestions}`
+  let label = `Pregunta ${hud.questionIndex + 1} de ${hud.totalQuestions}`
   let statement = hud.statement ?? ''
   if (hud.phase === 'ready') {
     label = title
@@ -917,17 +1022,21 @@ function FullscreenChoice({ wanted, active, onChange }: FullscreenChoiceProps) {
 function ReadyOverlay({
   total,
   lives,
+  touch,
   compact,
   fullscreen,
+  tournament,
   onStart,
   onGuide,
   onExit,
 }: {
   total: number
   lives: number
+  touch: boolean
   compact: boolean
   /** null si el navegador no permite pantalla completa (por ejemplo, iPhone). */
   fullscreen: FullscreenChoiceProps | null
+  tournament: boolean
   onStart: () => void
   onGuide: () => void
   onExit: () => void
@@ -954,8 +1063,13 @@ function ReadyOverlay({
         </h2>
         <p className="mx-auto mt-1.5 max-w-[420px] text-[13.5px] leading-relaxed text-slate-300">
           Son <b className="text-white">{total} afirmaciones</b> y tienes <b className="text-white">{lives}</b>{' '}
-          {lives === 1 ? 'batería' : 'baterías'}. Muévete con las <b className="text-white">flechas del teclado</b> (o W A S D).
+          {lives === 1 ? 'batería' : 'baterías'}. {touch ? (<>Muévete con la <b className="text-white">cruceta</b> o <b className="text-white">deslizando el dedo</b>.</>) : (<>Muévete con las <b className="text-white">flechas del teclado</b> <ArrowKeysInline />.</>)}
         </p>
+        {tournament && (
+          <p className="mx-auto mt-2 max-w-[420px] rounded-xl border border-amber-300/30 bg-amber-400/10 px-3 py-2 text-[12.5px] leading-snug text-amber-100">
+            <b>Ronda de torneo:</b> sumas <b>1 punto</b> solo si respondes <b>todas</b> bien. Tienes una sola partida.
+          </p>
+        )}
         {fullscreen && <FullscreenChoice {...fullscreen} />}
         <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
           <button
@@ -977,13 +1091,13 @@ function ReadyOverlay({
             className="inline-flex items-center gap-1.5 rounded-2xl px-3 py-3 text-[13.5px] font-medium text-slate-400 hover:bg-white/5 hover:text-slate-200"
             onClick={onExit}
           >
-            <ArrowLeft className="h-4 w-4" /> Salir
+            <ArrowLeft className="h-4 w-4" /> {tournament ? 'Abandonar ronda' : 'Salir'}
           </button>
         </div>
         {/* En celular horizontal no sobra alto: estos consejos están en la guía y el botón Pausa ya se ve. */}
         {!compact && (
           <>
-            <p className="mt-2 text-[11.5px] text-slate-400">o presiona cualquier flecha para despegar</p>
+            {!touch && <p className="mt-2 text-[11.5px] text-slate-400">o presiona cualquier flecha para despegar</p>}
             <p className="mt-1 text-[11.5px] text-slate-400">
               ¿Necesitas parar? Usa el botón <b className="text-slate-200">Pausa</b> (arriba a la izquierda) o la tecla{' '}
               <b className="text-slate-200">P</b>.
@@ -1098,6 +1212,7 @@ function PauseOverlay({
   onToggleFullscreen,
   onRestart,
   onExit,
+  tournament,
 }: {
   hud: TrueFalseMazeHud
   muted: boolean
@@ -1109,6 +1224,7 @@ function PauseOverlay({
   onToggleFullscreen: () => void
   onRestart: () => void
   onExit: () => void
+  tournament: boolean
 }) {
   const [confirm, setConfirm] = useState<'restart' | 'exit' | null>(null)
 
@@ -1161,9 +1277,13 @@ function PauseOverlay({
           {confirm ? (
             <div role="alertdialog" aria-labelledby="tf-pause-confirm" className="mt-4 rounded-2xl border border-amber-300/40 bg-amber-400/10 p-4">
               <p id="tf-pause-confirm" className="text-[16px] font-bold text-white">
-                {confirm === 'restart' ? '¿Empezar de nuevo?' : '¿Salir del juego?'}
+                {confirm === 'restart' ? '¿Empezar de nuevo?' : tournament ? '¿Abandonar la ronda?' : '¿Salir del juego?'}
               </p>
-              <p className="mt-1 text-[13px] text-slate-300">Se pierde lo que llevas de esta partida.</p>
+              <p className="mt-1 text-[13px] text-slate-300">
+                {tournament
+                  ? 'Tu partida de esta ronda termina y no sumas punto.'
+                  : 'Se pierde lo que llevas de esta partida.'}
+              </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -1202,14 +1322,14 @@ function PauseOverlay({
                     onClick={onToggleFullscreen}
                   />
                 )}
-                <MenuButton icon={RotateCcw} label="Empezar de nuevo" onClick={() => setConfirm('restart')} />
+                {!tournament && <MenuButton icon={RotateCcw} label="Empezar de nuevo" onClick={() => setConfirm('restart')} />}
               </div>
               <button
                 type="button"
                 className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border border-rose-400/30 px-4 py-3 text-[14px] font-semibold text-rose-200 transition-colors hover:bg-rose-500/15"
                 onClick={() => setConfirm('exit')}
               >
-                <LogOut className="h-4 w-4" /> Salir del juego
+                <LogOut className="h-4 w-4" /> {tournament ? 'Abandonar la ronda' : 'Salir del juego'}
               </button>
             </>
           )}
@@ -1270,13 +1390,17 @@ function ResultsOverlay({
   compact,
   onRestart,
   onExit,
+  tournament,
 }: {
   hud: TrueFalseMazeHud
   compact: boolean
   onRestart: () => void
   onExit: () => void
+  tournament: boolean
 }) {
   const correct = hud.answers.filter((answer) => answer.correct).length
+  // En el torneo solo cuenta responder TODO bien (el servidor lo confirma con sus propias cuentas).
+  const perfect = hud.totalQuestions > 0 && hud.answers.length === hud.totalQuestions && correct === hud.totalQuestions
   const stars = starsFor(correct, hud.totalQuestions)
   const unanswered = hud.totalQuestions - hud.answers.length
   const firstWrong = hud.answers.findIndex((answer) => !answer.correct)
@@ -1298,10 +1422,16 @@ function ResultsOverlay({
             className={`h-auto w-auto drop-shadow-[0_0_16px_rgba(34,211,238,0.55)] ${compact ? 'hidden' : 'max-h-[11dvh] sm:max-h-[14dvh]'}`}
           />
           <h2 className="mt-1.5 font-heading text-[clamp(1.3rem,3.2dvh+0.8vw,1.9rem)] font-bold tracking-tight text-white">
-            {hud.won ? '¡Misión completada!' : 'Misión fallida'}
+            {tournament ? (perfect ? '¡Todo bien! +1 punto' : 'Sin punto esta ronda') : hud.won ? '¡Misión completada!' : 'Misión fallida'}
           </h2>
           <p className="mt-0.5 text-[13px] text-slate-300">
-            {hud.won ? 'El robot llegó a salvo al final del recorrido.' : 'Las medusas y los errores agotaron las baterías.'}
+            {tournament
+              ? perfect
+                ? 'Respondiste todas las afirmaciones correctamente.'
+                : 'Para sumar hay que responder todas bien. El torneo sigue: vuelve para la próxima ronda.'
+              : hud.won
+                ? 'El robot llegó a salvo al final del recorrido.'
+                : 'Las medusas y los errores agotaron las baterías.'}
           </p>
 
           <div className="mt-2 flex justify-center gap-1.5" aria-label={`${stars} de 3 estrellas`}>
@@ -1321,20 +1451,32 @@ function ResultsOverlay({
           </div>
 
           <div className="mt-3 flex flex-wrap justify-center gap-2">
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-violet-500 to-cyan-500 px-5 py-2.5 text-[14px] font-bold text-white shadow-[0_12px_30px_-10px_rgba(34,211,238,0.7)]"
-              onClick={onRestart}
-            >
-              <RotateCcw className="h-4 w-4" /> Jugar de nuevo
-            </button>
-            <button
-              type="button"
-              className="rounded-2xl border border-white/15 px-5 py-2.5 text-[14px] font-medium text-slate-200 hover:bg-white/5"
-              onClick={onExit}
-            >
-              Salir
-            </button>
+            {tournament ? (
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-violet-500 to-cyan-500 px-5 py-2.5 text-[14px] font-bold text-white shadow-[0_12px_30px_-10px_rgba(34,211,238,0.7)]"
+                onClick={onExit}
+              >
+                <ArrowLeft className="h-4 w-4" /> Volver al torneo
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-violet-500 to-cyan-500 px-5 py-2.5 text-[14px] font-bold text-white shadow-[0_12px_30px_-10px_rgba(34,211,238,0.7)]"
+                  onClick={onRestart}
+                >
+                  <RotateCcw className="h-4 w-4" /> Jugar de nuevo
+                </button>
+                <button
+                  type="button"
+                  className="rounded-2xl border border-white/15 px-5 py-2.5 text-[14px] font-medium text-slate-200 hover:bg-white/5"
+                  onClick={onExit}
+                >
+                  Salir
+                </button>
+              </>
+            )}
           </div>
         </div>
 

@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { CircleHelp, Clock3, Hourglass, SkipForward, Sparkles, Volume2 } from 'lucide-react'
 import { MIN_DISCARDS_TO_ACCUSE, type GuessWhoCard, type RoomPlayerView } from './guessWhoTypes'
 import { CardInfoBubble } from './CardInfoBubble'
@@ -150,18 +151,24 @@ export function TurnPopBanner({
     // "Barajando cartas…" tapaba este aviso durante toda su ventana de 1.7s
     // — el jugador que NO empezaba el turno podía terminar sin ver nunca
     // "Turno de X", aunque el aviso sí se hubiera disparado.
-    <div className="pointer-events-none fixed inset-0 z-[75] flex items-center justify-center p-5">
-      <div
-        className={`rounded-2xl border px-8 py-5 text-center shadow-[var(--shadow)] backdrop-blur-sm animate-[turn-pop-in_0.35s_cubic-bezier(0.16,1,0.3,1),turn-pop-out_0.3s_ease-in_1.35s_forwards] ${
-          isMyTurn ? 'border-accent/50 bg-accent/15' : 'border-border bg-surface/95'
-        }`}
-      >
-        <p className={`text-[22px] font-bold tracking-tight ${isMyTurn ? 'text-accent' : 'text-text-h'}`}>
-          {isMyTurn ? '¡Es tu turno!' : `Turno de ${opponentName}`}
-        </p>
-        {accusationMessage && <p className="mt-1 text-[14px] font-semibold text-danger">{accusationMessage}</p>}
-      </div>
-    </div>
+    // En un portal: el tablero es un contenedor de consultas (`container`), y eso encierra a los
+    // `position: fixed` de adentro; el aviso quedaba recortado dentro del tablero y casi no se veía.
+    createPortal(
+      <div className="pointer-events-none fixed inset-0 z-[75] flex items-center justify-center bg-black/25 p-5" data-turn-pop={isMyTurn ? 'mine' : 'rival'}>
+        <div
+          className={`rounded-3xl border-4 px-10 py-6 text-center text-white animate-[turn-pop-in_0.35s_cubic-bezier(0.16,1,0.3,1),turn-pop-out_0.3s_ease-in_1.35s_forwards] ${
+            isMyTurn ? 'border-white bg-gradient-to-br from-green-600 via-green-500 to-lime-500 shadow-[0_0_60px_rgba(74,222,128,0.7)]' : 'border-white/70 bg-slate-700 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.8)]'
+          }`}
+        >
+          <p className="text-[clamp(1.7rem,4vw,2.6rem)] leading-tight font-black tracking-tight uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.35)]">
+            {isMyTurn ? '¡Es tu turno!' : `Turno de ${opponentName}`}
+          </p>
+          <p className="mt-1 text-[15px] font-semibold text-white/90">{isMyTurn ? 'Pregunta, descarta o adivina.' : 'Espera mientras tu rival juega.'}</p>
+          {accusationMessage && <p className="mt-2 rounded-xl bg-white/90 px-3 py-1 text-[14px] font-bold text-danger">{accusationMessage}</p>}
+        </div>
+      </div>,
+      document.body,
+    )
   )
 }
 
@@ -261,7 +268,7 @@ export function AccusationOverlay({
         {/* Solo las tarjetas hacen scroll (con el aviso "Desliza para ver más");
             el título y los botones de confirmar quedan siempre a la vista. */}
         <div className="relative -mx-1 min-h-0 flex-1 overflow-y-auto px-1 pt-1 pb-1">
-        <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4 md:grid-cols-5">
+        <div data-tut-focus="pick" className="grid grid-cols-3 gap-2.5 sm:grid-cols-4 md:grid-cols-5">
           {remaining.map((card, index) => (
             <div key={card.cardId} className="relative">
               <button
@@ -287,7 +294,7 @@ export function AccusationOverlay({
         </div>
         {/* Botones en una fila: dejan más alto para las imágenes. */}
         <div className="mt-3 flex shrink-0 gap-2">
-        <button type="button" disabled={!selected} className="flex-1 rounded-xl bg-accent px-4 py-3 text-[14px] font-bold text-white disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-accent" onClick={() => {
+        <button type="button" data-tut-focus="confirm" disabled={!selected} className="flex-1 rounded-xl bg-accent px-4 py-3 text-[14px] font-bold text-white disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-accent" onClick={() => {
           if (!selected || submitted.current) return
           submitted.current = true
           onAccuse(selected.cardId)
@@ -322,6 +329,14 @@ type MatchBoardProps = {
    * disponible sin scroll: las tarjetas se encogen para caber (issue #80).
    */
   fitHeight?: boolean
+  /** Tutorial (issue #93): tocar tu tarjeta secreta («Tú eres…»). */
+  onSecretCardClick?: () => void
+  /** Tutorial: se abrió la selección para adivinar. */
+  onAccuseOpen?: () => void
+  /** Tutorial: la selección para adivinar arranca abierta. */
+  startAccusing?: boolean
+  /** false: quien usa el tablero decide cuándo avisar el turno (el tutorial). */
+  showTurnPop?: boolean
 }
 
 /**
@@ -345,21 +360,22 @@ export function TurnStatusStrip({
 }) {
   const remainingMs = useCountdown(turnDeadline)
   const secondsLeft = Math.ceil(remainingMs / 1000)
-  const urgent = secondsLeft <= 5
-  const progress = Math.max(0, Math.min(1, remainingMs / (turnDurationSeconds * 1000)))
+  // Sin plazo (el tutorial) no hay reloj: ni segundos, ni barra, ni tic-tac.
+  const timed = turnDeadline !== null
+  const urgent = timed && secondsLeft <= 5
+  const progress = timed ? Math.max(0, Math.min(1, remainingMs / (turnDurationSeconds * 1000))) : 0
 
   useEffect(() => {
-    if (secondsLeft > 0 && secondsLeft <= 5) playGuessWhoCountdownTick(secondsLeft)
-  }, [secondsLeft])
+    if (timed && secondsLeft > 0 && secondsLeft <= 5) playGuessWhoCountdownTick(secondsLeft)
+  }, [timed, secondsLeft])
 
   return (
     <div
       role="status"
       data-turn={isMyTurn ? 'mine' : 'rival'}
       className={`relative min-w-0 overflow-hidden rounded-2xl border-2 transition-colors duration-300 ${compact ? 'px-3 py-1.5' : 'px-4 py-3'} ${
-        isMyTurn ? 'border-transparent text-white shadow-[0_12px_28px_-14px_var(--accent)]' : 'border-dashed border-border bg-surface text-text-h'
+        isMyTurn ? 'turn-mine-glow border-white text-white' : 'border-dashed border-border bg-surface text-text-h'
       }`}
-      style={isMyTurn ? { background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' } : undefined}
     >
       <div className={`flex items-center ${compact ? 'gap-2.5' : 'gap-3'}`}>
         <span
@@ -376,14 +392,16 @@ export function TurnStatusStrip({
             {isMyTurn ? 'Pregunta, descarta o adivina.' : 'Espera: tu rival está jugando.'}
           </p>
         </div>
-        <span
-          className={`shrink-0 rounded-xl font-extrabold tabular-nums ${compact ? 'px-2.5 py-1 text-[17px]' : 'px-3 py-1.5 text-[20px]'} ${
-            urgent ? 'bg-danger text-white' : isMyTurn ? 'bg-white/20' : 'bg-border/60'
-          }`}
-          aria-label={`${secondsLeft} segundos restantes`}
-        >
-          {secondsLeft}s
-        </span>
+        {timed && (
+          <span
+            className={`shrink-0 rounded-xl font-extrabold tabular-nums ${compact ? 'px-2.5 py-1 text-[17px]' : 'px-3 py-1.5 text-[20px]'} ${
+              urgent ? 'bg-danger text-white' : isMyTurn ? 'bg-white/20' : 'bg-border/60'
+            }`}
+            aria-label={`${secondsLeft} segundos restantes`}
+          >
+            {secondsLeft}s
+          </span>
+        )}
       </div>
       <div className={`absolute inset-x-0 bottom-0 h-1 ${isMyTurn ? 'bg-white/20' : 'bg-border/50'}`} aria-hidden="true">
         <div
@@ -415,8 +433,12 @@ export function MatchBoard({
   onAccuse,
   onPassTurn,
   fitHeight = false,
+  onSecretCardClick,
+  onAccuseOpen,
+  startAccusing = false,
+  showTurnPop = true,
 }: MatchBoardProps) {
-  const [accusing, setAccusing] = useState(false)
+  const [accusing, setAccusing] = useState(startAccusing)
   const [showHelp, setShowHelp] = useState(false)
   const secretCard = cards.find((card) => card.cardId === self.secretCardId)
   const discardsMissing = Math.max(0, MIN_DISCARDS_TO_ACCUSE - self.discardedCardIds.length)
@@ -432,11 +454,13 @@ export function MatchBoard({
 
   return (
     <div className={fitHeight ? 'guess-who-board-fit flex h-full min-h-0 flex-col' : 'flex flex-col gap-5'}>
-      <TurnPopBanner
-        isMyTurn={isMyTurn}
-        opponentName={opponent.displayName}
-        accusationMessage={accusationMessage}
-      />
+      {showTurnPop && (
+        <TurnPopBanner
+          isMyTurn={isMyTurn}
+          opponentName={opponent.displayName}
+          accusationMessage={accusationMessage}
+        />
+      )}
 
       {!fitHeight && <TurnStatusStrip
         isMyTurn={isMyTurn}
@@ -453,7 +477,13 @@ export function MatchBoard({
         <div className="guess-who-board-actions flex shrink-0 flex-col gap-3 sm:w-[210px]">
           <div
             key={self.secretCardId}
-            className="rounded-xl border border-accent/60 bg-gradient-to-br from-accent/20 via-surface to-accent-2/10 p-3.5 shadow-[0_10px_28px_-18px_var(--accent)] animate-[secret-card-reveal_0.72s_cubic-bezier(0.16,1,0.3,1)_both] motion-reduce:animate-none"
+            role={onSecretCardClick ? 'button' : undefined}
+            tabIndex={onSecretCardClick ? 0 : undefined}
+            aria-label={onSecretCardClick ? 'Tu tarjeta secreta' : undefined}
+            data-tut-focus="secret"
+            onClick={onSecretCardClick}
+            onKeyDown={onSecretCardClick ? (event) => (event.key === 'Enter' || event.key === ' ') && onSecretCardClick() : undefined}
+            className={`rounded-xl border border-accent/60 bg-gradient-to-br from-accent/20 via-surface to-accent-2/10 p-3.5 shadow-[0_10px_28px_-18px_var(--accent)] animate-[secret-card-reveal_0.72s_cubic-bezier(0.16,1,0.3,1)_both] motion-reduce:animate-none ${onSecretCardClick ? 'cursor-pointer ring-2 ring-amber-300 ring-offset-2 ring-offset-transparent' : ''}`}
           >
             <div className="flex items-center gap-1.5 text-accent">
               <Sparkles className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden="true" />
@@ -462,7 +492,7 @@ export function MatchBoard({
             {/* Se muestra la imagen real (no solo el nombre) para que sea
                 más intuitivo y pedagógico: quien juega ve la bandera/tarjeta
                 que su rival debe adivinar, no solo su etiqueta de texto. */}
-            <p className="mt-1 text-[11px] font-bold tracking-wide text-accent-2 uppercase">Tu bandera es</p>
+            <p className="mt-1 text-[11px] font-bold tracking-wide text-accent-2 uppercase">Tu tarjeta oculta es:</p>
             {secretCard?.imageUrl && (
               <div className="relative mt-2">
                 <img
@@ -480,11 +510,15 @@ export function MatchBoard({
             <div className="relative flex items-center gap-2">
             <button
               type="button"
+              data-tut-focus="guess-btn"
               disabled={!guessAvailable}
               className={`flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl border border-accent bg-accent px-3 py-3 text-[13px] font-bold text-white transition-transform hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 ${
                 guessAvailable && !accusing ? 'animate-[result-glow-pulse_1s_ease-in-out_2] motion-reduce:animate-none' : ''
               }`}
-              onClick={() => setAccusing((current) => !current)}
+              onClick={() => {
+                if (!accusing) onAccuseOpen?.()
+                setAccusing((current) => !current)
+              }}
             >
               <Sparkles className="h-4 w-4 shrink-0" aria-hidden="true" />
               {accusing ? 'Cancelar selección' : '¡Creo que es esta!'}
@@ -525,7 +559,7 @@ export function MatchBoard({
             // Tu tablero se puede ordenar en cualquier momento, también en el turno del rival (issue #64).
             const locked = false
             return (
-              <div key={card.cardId} className="relative">
+              <div key={card.cardId} className="relative" data-card-id={card.cardId}>
                 <button
                   type="button"
                   disabled={locked}

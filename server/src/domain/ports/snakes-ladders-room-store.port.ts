@@ -3,6 +3,7 @@ import type {
   SnakesLaddersQuestion,
   SnakesLaddersTriggerType,
 } from '../../application/content-validators/snakes-ladders.content-validator.js';
+import type { PausableGame } from '../services/player-wait.js';
 
 export const SNAKES_LADDERS_ROOM_STORE = Symbol('SNAKES_LADDERS_ROOM_STORE');
 
@@ -32,7 +33,7 @@ export interface SnakesLaddersPendingChallenge {
   deadlineTs: number;
 }
 
-export interface SnakesLaddersRoomState {
+export interface SnakesLaddersRoomState extends PausableGame {
   code: string;
   gameId: string;
   gameTitle: string;

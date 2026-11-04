@@ -175,11 +175,11 @@ describe('AdaptGameUseCase', () => {
     ).rejects.toBeInstanceOf(InvalidGameContentError);
   });
 
-  it('rechaza un tipo sin asistente de IA (Dúo Lógico Pixi)', async () => {
+  it('rechaza un tipo sin asistente de IA (Cartas sin modo)', async () => {
     const { useCase } = build();
 
     await expect(
-      useCase.execute({ gameId: 'game-1', requestingUserId: 'u', engine: 'AI', targetType: 'DUAL_QUEST_PIXI' }),
+      useCase.execute({ gameId: 'game-1', requestingUserId: 'u', engine: 'AI', targetType: 'MEMORY_MATCH' }),
     ).rejects.toBeInstanceOf(InvalidGameContentError);
   });
 });

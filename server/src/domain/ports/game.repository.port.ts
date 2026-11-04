@@ -20,6 +20,11 @@ export interface FindAllGamesFilter {
   pageSize: number;
 }
 
+/**
+ * Los juegos de `findAll` son resúmenes: llegan con `content` y `config`
+ * vacíos (no se leen de la base para no mover datos que el listado no usa).
+ * Para el contenido completo, `findById`/`findBySlug`.
+ */
 export interface PaginatedGames {
   items: Game[];
   total: number;

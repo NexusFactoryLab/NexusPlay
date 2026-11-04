@@ -1,15 +1,17 @@
+import { InMemoryDuoRoomStore } from './in-memory-duo-room.store.js';
+import { createDuoRoom } from '../../domain/duo-logico/duo-room.js';
 import 'reflect-metadata';
 import { describe, expect, it, vi } from 'vitest';
 import { JwtService } from '@nestjs/jwt';
 import type { GameRepository } from '../../domain/ports/game.repository.port.js';
 import type { UserRepository } from '../../domain/ports/user.repository.port.js';
+import type { TournamentSettingsRepository } from '../../domain/ports/tournament-settings.repository.port.js';
 import type { AnalyticsTrackerService } from '../../application/services/analytics-tracker.service.js';
 import { RoomsGateway } from './rooms.gateway.js';
 import { InMemoryRoomStore } from './in-memory-room.store.js';
 import { InMemoryTournamentStore } from './in-memory-tournament.store.js';
 import { InMemoryDominoRoomStore } from './in-memory-domino-room.store.js';
 import { InMemorySnakesLaddersRoomStore } from './in-memory-snakes-ladders-room.store.js';
-import { InMemoryDualQuestRoomStore } from './in-memory-dual-quest-room.store.js';
 
 type Client = Parameters<RoomsGateway['handleCreate']>[0];
 function client(id: string): Client {
@@ -28,7 +30,7 @@ function client(id: string): Client {
  * home, y por el campo de código de cada juego) tenía 5 chequeos
  * hand-escritos, uno por store — ahora es un solo loop sobre
  * `roomRegistry`. Este spec confirma que sigue reconociendo los 5 tipos de
- * sala existentes (room, tournament, domino, snakes-ladders, dual-quest) y
+ * sala existentes (room, tournament, domino, snakes-ladders y, por registro, duo-logico) y
  * que un código inexistente sigue rechazándose igual que antes.
  */
 describe('RoomsGateway room code registry', () => {
@@ -38,13 +40,13 @@ describe('RoomsGateway room code registry', () => {
       tournament: new InMemoryTournamentStore(),
       domino: new InMemoryDominoRoomStore(),
       snakes: new InMemorySnakesLaddersRoomStore(),
-      dual: new InMemoryDualQuestRoomStore(),
     };
     const gameByType: Record<string, unknown> = {
       GUESS_WHO: {
         id: 'game-guess-who',
         title: 'Quién Es Demo',
         gameType: { getName: () => 'GUESS_WHO' },
+        status: { getName: () => 'PUBLISHED' },
         config: {},
         content: Array.from({ length: 6 }, (_, i) => ({
           cardId: `c${i}`,
@@ -67,27 +69,6 @@ describe('RoomsGateway room code registry', () => {
         config: { boardSize: 30, ladders: [], snakes: [] },
         content: [],
       },
-      DUAL_QUEST: {
-        id: 'game-dual-quest',
-        title: 'Dúo Lógico Demo',
-        gameType: { getName: () => 'DUAL_QUEST' },
-        config: {
-          gridCols: 3,
-          gridRows: 3,
-          grid: [
-            [0, 0, 0],
-            [0, 0, 0],
-            [0, 0, 0],
-          ],
-          fireStart: { row: 0, col: 0 },
-          waterStart: { row: 0, col: 1 },
-          corePosition: { row: 2, col: 2 },
-          gates: [],
-          triggers: [],
-          coreQuestion: 'Pregunta',
-        },
-        content: [],
-      },
     };
 
     const gameRepository = {
@@ -100,13 +81,23 @@ describe('RoomsGateway room code registry', () => {
     const gateway = new RoomsGateway(
       new JwtService(),
       gameRepository,
-      {} as UserRepository,
+      { findById: async () => ({ isAdmin: () => true }) } as unknown as UserRepository,
       stores.room,
       stores.tournament,
       stores.domino,
       stores.snakes,
-      stores.dual,
       { track: vi.fn().mockResolvedValue(undefined) } as unknown as AnalyticsTrackerService,
+      undefined,
+      undefined,
+      {
+        get: async () => ({
+          games: [{ gameId: 'game-guess-who', level: 'MEDIUM' }],
+          maxParticipants: 4,
+          totalRounds: 3,
+          updatedByUserId: 'u1',
+          updatedAt: new Date(),
+        }),
+      } as unknown as TournamentSettingsRepository,
     );
     gateway.server = { to: () => ({ emit: vi.fn() }) } as never;
 
@@ -148,24 +139,19 @@ describe('RoomsGateway room code registry', () => {
     expect(resolved).toEqual({ kind: 'snakes-ladders', gameId: 'game-snakes', gameTitle: 'Escaleras Demo' });
   });
 
-  it('resuelve una sala de Dúo Lógico con kind "dual-quest"', async () => {
-    const { gateway, gameByType } = buildGateway();
-    const socket = client('u1');
-    await gateway.handleDualQuestCreate(socket, { gameId: (gameByType.DUAL_QUEST as { id: string }).id });
-    const code = (socket.emit as ReturnType<typeof vi.fn>).mock.calls[0][1].code as string;
+  it('resuelve una sala de Dúo Lógico (registrada por su gateway) con kind "duo-logico"', () => {
+    const { gateway } = buildGateway();
+    const duoStore = new InMemoryDuoRoomStore();
+    gateway.registerRoomStore({ kind: 'duo-logico', store: duoStore });
+    duoStore.create(createDuoRoom({ code: 'DUO123', gameId: 'game-duo', gameTitle: 'Dúo Lógico Demo', user: { userId: 'u1', displayName: 'U', socketId: 's1' }, role: 'FIRE', now: 0 }));
 
-    const resolved = gateway.handleResolveCode({ code });
-
-    expect(resolved).toEqual({ kind: 'dual-quest', gameId: 'game-dual-quest', gameTitle: 'Dúo Lógico Demo' });
+    expect(gateway.handleResolveCode({ code: 'duo123' })).toEqual({ kind: 'duo-logico', gameId: 'game-duo', gameTitle: 'Dúo Lógico Demo' });
   });
 
   it('resuelve un torneo con kind "tournament"', async () => {
-    const { gateway, gameByType } = buildGateway();
+    const { gateway } = buildGateway();
     const socket = client('u1');
-    await gateway.handleTournamentCreate(socket, {
-      gameId: (gameByType.GUESS_WHO as { id: string }).id,
-      maxParticipants: 4,
-    });
+    await gateway.handleTournamentCreate(socket);
     const code = (socket.emit as ReturnType<typeof vi.fn>).mock.calls[0][1].code as string;
 
     const resolved = gateway.handleResolveCode({ code });

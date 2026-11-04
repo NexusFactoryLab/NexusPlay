@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Rocket, Smile, Ghost, Gem, SlidersHorizontal } from 'lucide-react'
+import { Rocket, Smile, Ghost, Gem, SlidersHorizontal, CircleHelp } from 'lucide-react'
 import type { FormEvent } from 'react'
 import { TextField } from '../../TextField'
 import { SaveVisibilityModal } from './SaveVisibilityModal'
@@ -47,6 +47,36 @@ import {
   type MazeLayout,
 } from './mazeCollectorTypes'
 import { DOMINO_ICON_KEYS } from './dominoTypes'
+import {
+  ANSWER_LETTERS,
+  MAX_MAZE_QUESTIONS,
+  MAX_OPTION_LENGTH,
+  MAX_QUESTION_LENGTH,
+  MIN_MAZE_QUESTIONS,
+  MIN_QUESTION_OPTIONS,
+  type MazeQuestion,
+} from './mazeCollectorQuestions'
+
+/** Pregunta en edición: siempre 4 casillas de respuesta; las vacías no se guardan. */
+type QuestionDraft = {
+  question: string
+  options: string[]
+  correctIndex: number
+}
+
+function emptyQuestion(): QuestionDraft {
+  return { question: '', options: ['', '', '', ''], correctIndex: 0 }
+}
+
+/** Lo que se guarda: solo las respuestas escritas, con el índice de la correcta recalculado. */
+function cleanQuestion(draft: QuestionDraft): MazeQuestion {
+  const filled = draft.options.map((text, index) => ({ text: text.trim(), index })).filter((option) => option.text)
+  return {
+    question: draft.question.trim(),
+    options: filled.map((option) => option.text),
+    correctIndex: Math.max(0, filled.findIndex((option) => option.index === draft.correctIndex)),
+  }
+}
 
 type ItemDraft = {
   label: string
@@ -84,11 +114,12 @@ function emptyItem(index: number): ItemDraft {
   }
 }
 
-/** Fases del formulario (issue #218): Identidad, Configuración del laberinto y Contenido (objetos). */
+/** Fases del formulario (issue #218): Identidad, Configuración del laberinto, Contenido (objetos) y Preguntas (#103). */
 const PHASES = [
   { label: 'Identidad del juego' },
   { label: 'Configuración del laberinto' },
   { label: 'Contenido: objetos' },
+  { label: 'Preguntas' },
 ] as const
 const TOTAL_PHASES = PHASES.length
 
@@ -132,6 +163,8 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
   const [createdGameId, setCreatedGameId] = useState<string | null>(null)
   const [phase, setPhase] = useState(0)
   const [selectedItem, setSelectedItem] = useState(0)
+  const [questions, setQuestions] = useState<QuestionDraft[]>(() => Array.from({ length: MIN_MAZE_QUESTIONS }, emptyQuestion))
+  const [selectedQuestion, setSelectedQuestion] = useState(0)
   const { setSubPhase } = useCreateGameProgress()
 
   // Informa al header del wizard en qué fase va este formulario; se limpia al desmontar.
@@ -175,6 +208,8 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
     organizationId,
     phase,
     selectedItem,
+    questions,
+    selectedQuestion,
   }
 
   function restoreDraft(saved: Record<string, unknown>) {
@@ -195,6 +230,9 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
     setOrganizationId(savedString(state, 'organizationId', ''))
     setPhase(clampIndex(savedNumber(state, 'phase', 0), TOTAL_PHASES))
     setSelectedItem(clampIndex(savedNumber(state, 'selectedItem', 0), (savedItems ?? items).length))
+    const savedQuestions = savedList<QuestionDraft>(state, 'questions')
+    if (savedQuestions) setQuestions(savedQuestions)
+    setSelectedQuestion(clampIndex(savedNumber(state, 'selectedQuestion', 0), (savedQuestions ?? questions).length))
   }
 
   useApplyAdaptation(adaptation, (adapted) => {
@@ -264,6 +302,37 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
     setSelectedItem((current) => Math.max(0, Math.min(current, items.length - 2)))
   }
 
+  function updateQuestion(index: number, change: Partial<QuestionDraft>) {
+    setQuestions((current) => current.map((question, i) => (i === index ? { ...question, ...change } : question)))
+  }
+
+  function updateOption(index: number, optionIndex: number, text: string) {
+    setQuestions((current) =>
+      current.map((question, i) =>
+        i === index ? { ...question, options: question.options.map((option, o) => (o === optionIndex ? text : option)) } : question,
+      ),
+    )
+  }
+
+  function addQuestion() {
+    setQuestions((current) => (current.length < MAX_MAZE_QUESTIONS ? [...current, emptyQuestion()] : current))
+  }
+
+  function removeQuestion(index: number) {
+    setQuestions((current) => (current.length > MIN_MAZE_QUESTIONS ? current.filter((_, i) => i !== index) : current))
+    setSelectedQuestion((current) => Math.max(0, Math.min(current, questions.length - 2)))
+  }
+
+  /** Por qué una pregunta todavía no está lista (o null si lo está). */
+  function questionProblem(question: QuestionDraft): string | null {
+    if (!question.question.trim()) return 'Escribe la pregunta.'
+    if (question.options.filter((option) => option.trim()).length < MIN_QUESTION_OPTIONS) {
+      return `Escribe al menos ${MIN_QUESTION_OPTIONS} respuestas.`
+    }
+    if (!question.options[question.correctIndex]?.trim()) return 'Marca cuál respuesta es la correcta.'
+    return null
+  }
+
   /** Fase 1 (Identidad): título, descripción, área. */
   function validateIdentityPhase(): string | null {
     if (!title.trim() || title.trim().length < 3) return 'El título debe tener al menos 3 caracteres.'
@@ -293,7 +362,18 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
     return null
   }
 
-  const VALIDATORS = [validateIdentityPhase, validateConfigPhase, validateContentPhase]
+  /** Fase 4 (Preguntas): cada una con enunciado, al menos 2 respuestas y la correcta marcada. */
+  function validateQuestionsPhase(): string | null {
+    if (questions.length < MIN_MAZE_QUESTIONS) return `Necesitas al menos ${MIN_MAZE_QUESTIONS} preguntas.`
+    const brokenAt = questions.findIndex((question) => questionProblem(question) !== null)
+    if (brokenAt !== -1) {
+      setSelectedQuestion(brokenAt)
+      return `Pregunta ${brokenAt + 1}: ${questionProblem(questions[brokenAt])}`
+    }
+    return null
+  }
+
+  const VALIDATORS = [validateIdentityPhase, validateConfigPhase, validateContentPhase, validateQuestionsPhase]
 
   function goToNextPhase() {
     const validationError = VALIDATORS[phase]()
@@ -349,6 +429,7 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
           collectorIcon,
           enemyLabel: enemyLabel.trim(),
           enemyIcon,
+          questions: questions.map(cleanQuestion),
         },
       })
       setCreatedGameId(game.id)
@@ -632,6 +713,83 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
               />
             </div>
           )}
+        />
+        </FormSection>
+        )}
+
+        {phase === 3 && (
+        <FormSection
+          icon={CircleHelp}
+          title="Preguntas de opción múltiple"
+          subtitle="Las respuestas aparecen repartidas por el mapa: el jugador maneja hasta la correcta."
+          tone={4}
+          bare
+          info="Cada pregunta necesita entre 2 y 4 respuestas y una marcada como correcta. En el juego las respuestas se mezclan y se reparten por el mapa con las letras A, B, C y D. Llegar a una equivocada quita una vida."
+        >
+        <ItemGridEditor
+          itemLabel="Pregunta"
+          addLabel="+ Agregar pregunta"
+          count={questions.length}
+          minItems={MIN_MAZE_QUESTIONS}
+          maxItems={MAX_MAZE_QUESTIONS}
+          selected={selectedQuestion}
+          onSelect={setSelectedQuestion}
+          onAdd={addQuestion}
+          onRemove={removeQuestion}
+          disabled={submitting}
+          isComplete={(index) => !!questions[index] && questionProblem(questions[index]) === null}
+          tileText={(index) => questions[index]?.question ?? ''}
+          tileVisual={(index) => (
+            <span className="nx-gi-swatch" style={{ background: '#0ea5e9' }}>
+              <span className="text-[15px] font-black">{index + 1}</span>
+            </span>
+          )}
+          renderEditor={(index) => {
+            const question = questions[index]
+            if (!question) return null
+            return (
+              <div className="flex flex-col gap-3">
+                <TextField
+                  label="Pregunta"
+                  type="text"
+                  value={question.question}
+                  disabled={submitting}
+                  onChange={(value) => updateQuestion(index, { question: value.slice(0, MAX_QUESTION_LENGTH) })}
+                  onBlur={() => {}}
+                />
+                <fieldset className="flex flex-col gap-2">
+                  <legend className="nx-label mb-1.5 text-[13px] font-medium text-text-h">
+                    Respuestas <span className="font-normal text-text">(marca la correcta)</span>
+                  </legend>
+                  {question.options.map((option, optionIndex) => (
+                    <div key={optionIndex} className="flex items-center gap-2">
+                      <label className="flex shrink-0 cursor-pointer items-center gap-1.5 text-[13px] font-semibold text-text-h">
+                        <input
+                          type="radio"
+                          name={`maze-question-${index}-correct`}
+                          checked={question.correctIndex === optionIndex}
+                          disabled={submitting}
+                          onChange={() => updateQuestion(index, { correctIndex: optionIndex })}
+                          aria-label={`La respuesta ${ANSWER_LETTERS[optionIndex]} es la correcta`}
+                        />
+                        {ANSWER_LETTERS[optionIndex]}
+                      </label>
+                      <input
+                        type="text"
+                        className="w-full rounded-lg border border-border bg-bg px-[13px] py-[9px] text-[15px] text-text-h outline-none focus:border-accent"
+                        placeholder={optionIndex < MIN_QUESTION_OPTIONS ? 'Respuesta' : 'Respuesta (opcional)'}
+                        value={option}
+                        maxLength={MAX_OPTION_LENGTH}
+                        disabled={submitting}
+                        onChange={(event) => updateOption(index, optionIndex, event.target.value)}
+                        aria-label={`Respuesta ${ANSWER_LETTERS[optionIndex]}`}
+                      />
+                    </div>
+                  ))}
+                </fieldset>
+              </div>
+            )
+          }}
         />
         </FormSection>
         )}

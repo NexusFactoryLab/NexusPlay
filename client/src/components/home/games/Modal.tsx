@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { ScrollMoreHint } from '../../ScrollMoreHint'
 
@@ -25,10 +25,17 @@ type ModalProps = {
   fitContent?: boolean
   /** Escala mínima de `fitContent`; más abajo de esto se vuelve al scroll. Por defecto `MIN_FIT_SCALE`. */
   minFitScale?: number
+  /**
+   * `false` = ni Esc ni un clic afuera lo cierran (solo se cierra desde adentro,
+   * quitándolo el padre). Por defecto `true`.
+   */
+  dismissible?: boolean
 }
 
 /** Por debajo de esto el texto deja de leerse bien; ahí se prefiere un poco de scroll. */
 const MIN_FIT_SCALE = 0.6
+/** Lo que dura la animación de salida (ver `modal-panel-out` en index.css). */
+const EXIT_MS = 160
 /** Margen para redondeos del navegador al reducir (evita que sobre un par de píxeles). */
 const FIT_SAFETY_PX = 8
 
@@ -44,14 +51,35 @@ export function Modal({
   ariaModal = true,
   fitContent = false,
   minFitScale = MIN_FIT_SCALE,
+  dismissible = true,
 }: ModalProps) {
+  // Cerrar no es un corte seco: el popup se desvanece y recién ahí se avisa al padre.
+  const [closing, setClosing] = useState(false)
+  const closeTimer = useRef<number | undefined>(undefined)
+  useEffect(() => () => window.clearTimeout(closeTimer.current), [])
+
+  const requestClose = useCallback(() => {
+    if (!dismissible || closeTimer.current !== undefined) return
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      onClose()
+      return
+    }
+    setClosing(true)
+    closeTimer.current = window.setTimeout(() => {
+      closeTimer.current = undefined
+      onClose()
+      // Si el padre no lo quitó, vuelve a mostrarse en vez de quedar invisible.
+      setClosing(false)
+    }, EXIT_MS)
+  }, [dismissible, onClose])
+
   useEffect(() => {
     function handleEscape(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose()
+      if (event.key === 'Escape') requestClose()
     }
     document.addEventListener('keydown', handleEscape)
     return () => document.removeEventListener('keydown', handleEscape)
-  }, [onClose])
+  }, [requestClose])
 
   const panelRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
@@ -59,15 +87,19 @@ export function Modal({
 
   return (
     <div
-      className="app-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-5 backdrop-blur-sm animate-[modal-backdrop-in_0.2s_ease-out]"
-      onClick={onClose}
+      className={`app-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-5 backdrop-blur-sm ${
+        closing ? 'pointer-events-none animate-[modal-backdrop-out_0.16s_ease-in_forwards]' : 'animate-[modal-backdrop-in_0.2s_ease-out]'
+      }`}
+      onClick={requestClose}
       role="presentation"
     >
       <div
         ref={panelRef}
         className={`app-modal-panel w-full ${maxWidthClassName} ${maxHeightClassName} ${
           fitContent && scale > minFitScale ? 'overflow-hidden' : 'overflow-y-auto'
-        } rounded-2xl bg-surface p-6 shadow-[var(--shadow)] animate-[modal-panel-in_0.25s_cubic-bezier(0.16,1,0.3,1)] sm:p-8 ${
+        } rounded-2xl bg-surface p-6 shadow-[var(--shadow)] ${
+          closing ? 'animate-[modal-panel-out_0.16s_ease-in_forwards]' : 'animate-[modal-panel-in_0.25s_cubic-bezier(0.16,1,0.3,1)]'
+        } sm:p-8 ${
           accentBorder ? 'border-[3px] border-transparent' : 'border border-border'
         }`}
         style={

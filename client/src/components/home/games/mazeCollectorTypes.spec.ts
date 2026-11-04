@@ -56,8 +56,8 @@ describe('MAZE_LAYOUTS — puertas de teletransporte', () => {
     }
   })
 
-  it('el mapa de Ciudad Sostenible tiene puerta en sus 5 avenidas (una fila cada una, como el fondo en sprites)', () => {
-    expect(MAZE_LAYOUTS.CITY.tunnelRows).toEqual([1, 6, 10, 13, 17])
+  it('el mapa de Ciudad Sostenible tiene túnel solo en sus 2 avenidas centrales (como el fondo en sprites)', () => {
+    expect(MAZE_LAYOUTS.CITY.tunnelRows).toEqual([6, 13])
   })
 
   it('en Ciudad Sostenible cada calle mide una sola celda (nunca dos filas o columnas de calle seguidas dentro de la ciudad)', () => {

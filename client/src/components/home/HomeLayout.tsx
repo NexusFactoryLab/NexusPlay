@@ -1,3 +1,4 @@
+import { PageTransition } from '../PageTransition'
 import { useCallback, useEffect, useState } from 'react'
 import { Menu } from 'lucide-react'
 import { Outlet, useLocation } from 'react-router-dom'
@@ -105,7 +106,9 @@ export function HomeLayout() {
           <HomeSearchContext.Provider
             value={{ searchQuery: submittedQuery, searchNonce, onSectionViewed: trackSection }}
           >
-            <Outlet />
+            <PageTransition>
+              <Outlet />
+            </PageTransition>
           </HomeSearchContext.Provider>
           <ScrollMoreHint />
         </main>

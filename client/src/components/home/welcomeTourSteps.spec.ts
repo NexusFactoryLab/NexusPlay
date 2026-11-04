@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { initialWelcomePhase, phaseAfterGreeting } from './welcomeTourSteps'
+import { getWelcomeSteps, initialWelcomePhase, phaseAfterGreeting } from './welcomeTourSteps'
 
 describe('initialWelcomePhase', () => {
   it('saluda al entrar al inicio, sea la cuenta nueva o antigua, si aún no ha saludado en esta sesión', () => {
@@ -26,5 +26,34 @@ describe('phaseAfterGreeting', () => {
 
   it('quien nunca la hizo sigue viendo la invitación obligatoria de siempre', () => {
     expect(phaseAfterGreeting(false)).toBe('invite')
+  })
+})
+
+describe('getWelcomeSteps (recorrido interactivo)', () => {
+  const all = [
+    getWelcomeSteps('TEACHER', false),
+    getWelcomeSteps('ADMIN', false, { canAccessOrganization: true }),
+    getWelcomeSteps('STUDENT', false),
+    getWelcomeSteps('STUDENT', true),
+  ]
+
+  it('cada paso que se hace dice qué hacer; los de solo mirar no piden nada', () => {
+    for (const steps of all) {
+      for (const step of steps) {
+        if (step.kind === 'look') expect(step.task).toBeUndefined()
+        else expect(step.task, step.title).toBeTruthy()
+      }
+    }
+  })
+
+  it('los pasos que llevan a otra página explican esa página en la barra de volver', () => {
+    const teacher = getWelcomeSteps('TEACHER', false)
+    for (const target of ['create', 'nav-subjects', 'nav-classes', 'nav-community', 'nav-own-games']) {
+      expect(teacher.find((step) => step.target === target)?.away, target).toBeTruthy()
+    }
+  })
+
+  it('en Kids siempre está el paso de Volver a los mundos (el primer paso hace entrar a uno)', () => {
+    expect(getWelcomeSteps('STUDENT', true).map((step) => step.target)).toEqual(['worlds', 'worlds', 'worlds-back', 'profile'])
   })
 })

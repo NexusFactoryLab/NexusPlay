@@ -18,7 +18,6 @@ import { GuessWhoContentValidator } from '../application/content-validators/gues
 import { DominoContentValidator } from '../application/content-validators/domino.content-validator.js';
 import { MazeCollectorContentValidator } from '../application/content-validators/maze-collector.content-validator.js';
 import { SnakesLaddersContentValidator } from '../application/content-validators/snakes-ladders.content-validator.js';
-import { DualQuestContentValidator } from '../application/content-validators/dual-quest.content-validator.js';
 import { DualQuestPixiContentValidator } from '../application/content-validators/dual-quest-pixi.content-validator.js';
 import { TrueFalseMazeContentValidator } from '../application/content-validators/true-false-maze.content-validator.js';
 import { ContentValidatorRegistry } from '../application/content-validators/content-validator.registry.js';
@@ -35,6 +34,18 @@ import { UpdateGameUseCase } from '../application/use-cases/update-game.use-case
 import { PublishGameUseCase } from '../application/use-cases/publish-game.use-case.js';
 import { UnpublishGameUseCase } from '../application/use-cases/unpublish-game.use-case.js';
 import { SetGameFeaturedUseCase } from '../application/use-cases/set-game-featured.use-case.js';
+import { GetTournamentSettingsUseCase } from '../application/use-cases/get-tournament-settings.use-case.js';
+import { SaveTournamentSettingsUseCase } from '../application/use-cases/save-tournament-settings.use-case.js';
+import { ClearTournamentSettingsUseCase } from '../application/use-cases/clear-tournament-settings.use-case.js';
+import { TournamentSettingsController } from './http/controllers/tournament-settings.controller.js';
+import { TournamentHistoryController } from './http/controllers/tournament-history.controller.js';
+import { GetTournamentHistoryUseCase, ListTournamentHistoryUseCase } from '../application/use-cases/tournament-history.use-cases.js';
+import { TOURNAMENT_HISTORY_REPOSITORY } from '../domain/ports/tournament-history.repository.port.js';
+import { PrismaTournamentHistoryRepository } from './persistence/prisma/prisma-tournament-history.repository.js';
+import { TOURNAMENT_SETTINGS_REPOSITORY } from '../domain/ports/tournament-settings.repository.port.js';
+import { MongoTournamentSettingsRepository } from './persistence/mongo/mongo-tournament-settings.repository.js';
+import { CachedTournamentSettingsRepository } from './persistence/cache/cached-tournament-settings.repository.js';
+import { CachedTournamentHistoryRepository } from './persistence/cache/cached-tournament-history.repository.js';
 import { DeleteGameUseCase } from '../application/use-cases/delete-game.use-case.js';
 import { DonateGameToOrganizationUseCase } from '../application/use-cases/donate-game-to-organization.use-case.js';
 import { ImportGamesBatchUseCase } from '../application/use-cases/import-games-batch.use-case.js';
@@ -93,6 +104,8 @@ import { AiProviderAttemptsController } from './http/controllers/ai-provider-att
   controllers: [
     GameCreationDraftController,
     GameController,
+    TournamentSettingsController,
+    TournamentHistoryController,
     GameImportController,
     GameAiDraftController,
     GameTypeSettingController,
@@ -110,6 +123,17 @@ import { AiProviderAttemptsController } from './http/controllers/ai-provider-att
     GameCreationDraftService,
     GameCreationDraftExpirationJob,
     { provide: GAME_REPOSITORY, useClass: MongoGameRepository },
+    // Con caché (issue #147): el Inicio de cada persona lee el torneo habilitado y el historial repite consultas.
+    {
+      provide: TOURNAMENT_SETTINGS_REPOSITORY,
+      useFactory: (mongo: MongoService) => new CachedTournamentSettingsRepository(new MongoTournamentSettingsRepository(mongo)),
+      inject: [MongoService],
+    },
+    {
+      provide: TOURNAMENT_HISTORY_REPOSITORY,
+      useFactory: (prisma: PrismaService) => new CachedTournamentHistoryRepository(new PrismaTournamentHistoryRepository(prisma)),
+      inject: [PrismaService],
+    },
     { provide: GAME_TYPE_SETTING_REPOSITORY, useClass: PrismaGameTypeSettingRepository },
     { provide: GAME_IMPORT_JOB_REPOSITORY, useClass: MongoGameImportJobRepository },
     { provide: TRANSACTION_RUNNER, useClass: MongoSessionFactory },
@@ -118,7 +142,6 @@ import { AiProviderAttemptsController } from './http/controllers/ai-provider-att
     DominoContentValidator,
     MazeCollectorContentValidator,
     SnakesLaddersContentValidator,
-    DualQuestContentValidator,
     DualQuestPixiContentValidator,
     TrueFalseMazeContentValidator,
     ContentValidatorRegistry,
@@ -135,6 +158,11 @@ import { AiProviderAttemptsController } from './http/controllers/ai-provider-att
     PublishGameUseCase,
     UnpublishGameUseCase,
     SetGameFeaturedUseCase,
+    GetTournamentSettingsUseCase,
+    SaveTournamentSettingsUseCase,
+    ClearTournamentSettingsUseCase,
+    ListTournamentHistoryUseCase,
+    GetTournamentHistoryUseCase,
     DeleteGameUseCase,
     DonateGameToOrganizationUseCase,
     ImportGamesBatchUseCase,

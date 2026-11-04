@@ -9,8 +9,8 @@ import type { CellPosition, MazeLayoutDef } from './mazeCollectorTypes'
  * coincide con el dibujo — la calle es la calle, el edificio es el edificio.
  *
  * `#` = manzana o franja verde (pared), `.` = calle. Las columnas de los
- * bordes son calles que rodean la ciudad; las 5 avenidas horizontales tienen
- * su puerta de teletransporte en ambos extremos.
+ * bordes son calles que rodean la ciudad; de las 5 avenidas horizontales,
+ * solo las 2 centrales tienen túnel en ambos extremos (`CITY_TUNNEL_ROWS`).
  */
 const CITY_MAP_ROWS_ASCII = [
   '########################',
@@ -68,9 +68,17 @@ function closestOpenCell(grid: number[][], targetRow: number, targetCol: number,
 }
 
 /**
- * Las avenidas del mapa: las filas abiertas de punta a punta. Cada una es una
- * puerta de teletransporte (salir por un borde entra por el otro); el borde
- * se abre por si acaso, igual que `carveTunnels` en mazeCollectorTypes.ts.
+ * Avenidas con túnel (issue #103): solo 2 por lado, las dos centrales, lejos
+ * de las esquinas donde nacen las nubes. Con las 5 avenidas había demasiados
+ * atajos. El dibujo del mapa solo marca estas dos.
+ */
+export const CITY_TUNNEL_ROWS = [6, 13]
+
+/**
+ * Las avenidas del mapa: las filas abiertas de punta a punta. Las que están
+ * en `CITY_TUNNEL_ROWS` son puertas de teletransporte (salir por un borde
+ * entra por el otro); el borde se abre por si acaso, igual que
+ * `carveTunnels` en mazeCollectorTypes.ts.
  */
 function findAndCarveTunnelRows(grid: number[][]): number[] {
   const cols = grid[0].length
@@ -83,7 +91,7 @@ function findAndCarveTunnelRows(grid: number[][]): number[] {
         break
       }
     }
-    if (fullyOpen) {
+    if (fullyOpen && CITY_TUNNEL_ROWS.includes(row)) {
       grid[row][0] = 0
       grid[row][cols - 1] = 0
       tunnelRows.push(row)

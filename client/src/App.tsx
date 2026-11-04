@@ -1,11 +1,13 @@
 import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { LoginPage } from './components/LoginPage'
+import { GameWatermarkLayout } from './components/GameWatermarkLayout'
 import { RegisterPage } from './components/RegisterPage'
 import { HomeLayout } from './components/home/HomeLayout'
 import { HomePage } from './components/home/sections/HomePage'
 import { CategoriesPage } from './components/home/sections/CategoriesPage'
 import { EditionPage } from './components/home/sections/EditionPage'
+import { TournamentsAdminPage } from './components/home/sections/TournamentsAdminPage'
 import { LegacyGameTypeRedirect } from './components/home/games/LegacyGameTypeRedirect'
 import { CommunityPage } from './components/home/sections/CommunityPage'
 import { MyGamesPage } from './components/home/sections/MyGamesPage'
@@ -24,35 +26,39 @@ import { GuessWhoGameFormPage } from './components/home/games/create/GuessWhoGam
 import { DominoGameFormPage } from './components/home/games/create/DominoGameFormPage'
 import { MazeCollectorGameFormPage } from './components/home/games/create/MazeCollectorGameFormPage'
 import { SnakesLaddersGameFormPage } from './components/home/games/create/SnakesLaddersGameFormPage'
-import { DualQuestGameFormPage } from './components/home/games/create/DualQuestGameFormPage'
+import { DuoLogicoGameFormPage } from './components/home/games/create/DuoLogicoGameFormPage'
 import { TrueFalseMazeGameFormPage } from './components/home/games/create/TrueFalseMazeGameFormPage'
 import { DominoRoomPage } from './components/home/games/DominoRoomPage'
 import { SnakesLaddersRoomPage } from './components/home/games/SnakesLaddersRoomPage'
-import { DualQuestRoomPage } from './components/home/games/DualQuestRoomPage'
 import { MemoryMatchPlayPage } from './components/home/games/MemoryMatchPlayPage'
 import { MazeCollectorPlayPage } from './components/home/games/MazeCollectorPlayPage'
 import { GuessWhoRoomPage } from './components/home/games/GuessWhoRoomPage'
 import { TournamentRoomPage } from './components/home/games/TournamentRoomPage'
 import { RoleSelectionPage } from './components/RoleSelectionPage'
 import { AvatarEditorPage } from './components/avatar/AvatarEditorPage'
+import { AvatarOnboardingGate } from './components/avatar/AvatarOnboardingGate'
 import { PublicHomePage } from './components/legal/PublicHomePage'
 import { PrivacyPolicyPage } from './components/legal/PrivacyPolicyPage'
 import { TermsOfServicePage } from './components/legal/TermsOfServicePage'
 import { useAuth } from './hooks/useAuth'
+import { TourReturnBar } from './components/home/TourReturnBar'
+import { welcomeStorageKey } from './components/home/welcomeTourSteps'
 import { invitationAuthPath, invitationDestination } from './utils/invitationDestination'
 
-// PixiJS + Matter.js solo se descargan si alguien entra a esta ruta —
-// van cargados de fábrica (~700 KB) y nadie más en el sitio los necesita.
-const DualQuestPixiDemoPage = lazy(() =>
-  import('./components/home/games/DualQuestPixiDemoPage').then((m) => ({ default: m.DualQuestPixiDemoPage })),
-)
-const DualQuestPixiPlayPage = lazy(() =>
-  import('./components/home/games/DualQuestPixiPlayPage').then((m) => ({ default: m.DualQuestPixiPlayPage })),
+// Dúo Lógico con sprites (issue #105): PixiJS y los sprites solo se
+// descargan si alguien entra a jugarlo.
+const DuoLogicoPage = lazy(() =>
+  import('./components/home/games/duo-logico/DuoLogicoPage').then((m) => ({ default: m.DuoLogicoPage })),
 )
 // Laberinto Verdadero o Falso: motor + renderer en canvas y ~60 sprites; se
 // descarga solo al entrar a jugarlo.
 const TrueFalseMazePlayPage = lazy(() =>
   import('./components/home/games/true-false-maze/TrueFalseMazePlayPage').then((m) => ({ default: m.TrueFalseMazePlayPage })),
+)
+const TrueFalseMazeTournamentPage = lazy(() =>
+  import('./components/home/games/true-false-maze/TrueFalseMazeTournamentPage').then((m) => ({
+    default: m.TrueFalseMazeTournamentPage,
+  })),
 )
 const TrueFalseMazeDemoPage = lazy(() =>
   import('./components/home/games/true-false-maze/TrueFalseMazeDemoPage').then((m) => ({ default: m.TrueFalseMazeDemoPage })),
@@ -112,6 +118,9 @@ function App() {
   }
 
   return (
+    <AvatarOnboardingGate user={user}>
+    {/* Recorrido interactivo: si un paso lo llevó a otra página, la barra lo obliga a volver a la guía. */}
+    <TourReturnBar owner={welcomeStorageKey(user.id, user.role)} />
     <Routes>
       <Route path="/inicio" element={<PublicHomePage />} />
       <Route path="/privacidad" element={<PrivacyPolicyPage />} />
@@ -127,54 +136,67 @@ function App() {
         <Route path="domino" element={<DominoGameFormPage />} />
         <Route path="laberinto" element={<MazeCollectorGameFormPage />} />
         <Route path="escaleras-serpientes" element={<SnakesLaddersGameFormPage />} />
-        <Route path="dual-quest" element={<DualQuestGameFormPage />} />
+        <Route path="duo-logico" element={<DuoLogicoGameFormPage />} />
         <Route path="laberinto-vf" element={<TrueFalseMazeGameFormPage />} />
       </Route>
-      <Route path="/domino/sala/:code?" element={<DominoRoomPage />} />
-      <Route path="/escaleras-serpientes/sala/:code?" element={<SnakesLaddersRoomPage />} />
-      <Route path="/dual-quest/sala/:code?" element={<DualQuestRoomPage />} />
-      <Route path="/jugar/memoria/:slug" element={<MemoryMatchPlayPage />} />
-      <Route path="/jugar/laberinto/:slug" element={<MazeCollectorPlayPage />} />
-      <Route
-        path="/jugar/laberinto-vf/:slug"
-        element={
-          <Suspense fallback={<main className="flex flex-1 items-center justify-center">Cargando la nave…</main>}>
-            <TrueFalseMazePlayPage />
-          </Suspense>
-        }
-      />
-      <Route
-        path="/jugar/laberinto-vf-demo"
-        element={
-          <Suspense fallback={<main className="flex flex-1 items-center justify-center">Cargando la nave…</main>}>
-            <TrueFalseMazeDemoPage />
-          </Suspense>
-        }
-      />
-      <Route path="/quien-es/sala/:code?" element={<GuessWhoRoomPage />} />
-      <Route path="/quien-es/torneo/:code?" element={<TournamentRoomPage />} />
-      <Route
-        path="/dual-quest/pixi-demo"
-        element={
-          <Suspense fallback={<main className="flex flex-1 items-center justify-center">Cargando motor del juego…</main>}>
-            <DualQuestPixiDemoPage />
-          </Suspense>
-        }
-      />
-      <Route
-        path="/dual-quest-pixi/:slug"
-        element={
-          <Suspense fallback={<main className="flex flex-1 items-center justify-center">Cargando motor del juego…</main>}>
-            <DualQuestPixiPlayPage />
-          </Suspense>
-        }
-      />
+      {/* Todas las pantallas de juego llevan la marca de agua de NexusPlay. */}
+      <Route element={<GameWatermarkLayout />}>
+        <Route path="/domino/sala/:code?" element={<DominoRoomPage />} />
+        <Route path="/escaleras-serpientes/sala/:code?" element={<SnakesLaddersRoomPage />} />
+        <Route path="/jugar/memoria/:slug" element={<MemoryMatchPlayPage />} />
+        <Route path="/jugar/laberinto/:slug" element={<MazeCollectorPlayPage />} />
+        <Route
+          path="/jugar/laberinto-vf/:slug"
+          element={
+            <Suspense fallback={<main className="flex flex-1 items-center justify-center">Cargando la nave…</main>}>
+              <TrueFalseMazePlayPage />
+            </Suspense>
+          }
+        />
+        {/* Una ronda de Misión Galáctica dentro de un torneo (issue #102): cada persona juega sola. */}
+        <Route
+          path="/laberinto-vf/torneo/:code"
+          element={
+            <Suspense fallback={<main className="flex flex-1 items-center justify-center">Cargando la nave…</main>}>
+              <TrueFalseMazeTournamentPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/jugar/laberinto-vf-demo"
+          element={
+            <Suspense fallback={<main className="flex flex-1 items-center justify-center">Cargando la nave…</main>}>
+              <TrueFalseMazeDemoPage />
+            </Suspense>
+          }
+        />
+        <Route path="/quien-es/sala/:code?" element={<GuessWhoRoomPage />} />
+        <Route path="/quien-es/torneo/:code?" element={<TournamentRoomPage />} />
+        <Route
+          path="/dual-quest-pixi/sala/:code"
+          element={
+            <Suspense fallback={<main className="flex flex-1 items-center justify-center">Cargando Dúo Lógico…</main>}>
+              <DuoLogicoPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/dual-quest-pixi/:slug"
+          element={
+            <Suspense fallback={<main className="flex flex-1 items-center justify-center">Cargando Dúo Lógico…</main>}>
+              <DuoLogicoPage />
+            </Suspense>
+          }
+        />
+      </Route>
       <Route path="/" element={<HomeLayout />}>
         <Route index element={<HomePage />} />
         <Route path=":slug" element={<HomePage />} />
         <Route path="areas" element={<CategoriesPage />} />
         <Route path="areas/:slug" element={<CategoriesPage />} />
         <Route path="edicion" element={<EditionPage />} />
+        <Route path="torneos" element={<TournamentsAdminPage />} />
+        <Route path="torneos/historial/:code?" element={<TournamentsAdminPage />} />
         <Route path="tipos-de-juego" element={<Navigate to="/edicion?tab=tipos" replace />} />
         <Route path="tipos-de-juego/:gameType" element={<LegacyGameTypeRedirect />} />
         <Route path="tipos-de-juego/:gameType/:slug" element={<LegacyGameTypeRedirect />} />
@@ -193,6 +215,7 @@ function App() {
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </AvatarOnboardingGate>
   )
 }
 

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import { ArrowLeft, ArrowRight, Check, CircleHelp, MessageCircle, Sparkles, X } from 'lucide-react'
 import { DemoChildIllustration } from './DemoChildIllustration'
+import { TutorialQuestion } from './tutorial/TutorialQuestion'
 import type { GuessWhoDemoExample } from './guessWhoDemoExamples'
 
 const sceneTitles = ['Descubre el objetivo', 'Haz una pregunta', 'Escucha y descarta', 'Cambia el turno', 'Adivina con cuidado']
@@ -10,7 +11,8 @@ const primaryButton = 'flex items-center justify-center gap-2 rounded-2xl px-4 p
 const gradient = { background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }
 
 /** Solo estado de presentación. No importa hooks de sala, servicios, sockets ni relojes. */
-export function GuessWhoVisualDemo({ example, onContinue }: { example: GuessWhoDemoExample; onContinue: () => void }) {
+/** `onTutorial`: si viene, el final pregunta «¿Deseas jugar un tutorial?» (issue #93) en vez de «¡Entendido!». */
+export function GuessWhoVisualDemo({ example, onContinue, onTutorial }: { example: GuessWhoDemoExample; onContinue: () => void; onTutorial?: () => void }) {
   const [scene, setScene] = useState(0)
   const [correct, setCorrect] = useState(false)
   const root = useRef<HTMLDivElement>(null)
@@ -115,6 +117,7 @@ export function GuessWhoVisualDemo({ example, onContinue }: { example: GuessWhoD
         <button type="button" className={secondaryButton} onClick={() => move(scene - 1)} disabled={scene === 0}><ArrowLeft className="h-4 w-4" aria-hidden="true" />Anterior</button>
         {scene < 4 ? <button type="button" className={`${primaryButton} ml-auto`} style={gradient} onClick={() => move(scene + 1)}>Siguiente<ArrowRight className="h-4 w-4" aria-hidden="true" /></button>
           : !correct ? <button type="button" className={`${primaryButton} ml-auto`} style={gradient} onClick={() => setCorrect(true)}>Ver un acierto<ArrowRight className="h-4 w-4" aria-hidden="true" /></button>
+          : onTutorial ? <TutorialQuestion onYes={onTutorial} onNo={onContinue} />
           : <button type="button" className={`${primaryButton} w-full`} style={gradient} onClick={onContinue}><Check className="h-4 w-4 shrink-0" aria-hidden="true" />¡Entendido, vamos a jugar!</button>}
       </nav>
     </div>

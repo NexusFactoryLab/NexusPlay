@@ -8,7 +8,7 @@ const EXPECTED: Record<CreatedGameKind, { typeLabel: string; isMultiplayer: bool
   DOMINO: { typeLabel: 'Dominexo', isMultiplayer: true },
   MAZE_COLLECTOR: { typeLabel: 'Laberinto recolector', isMultiplayer: false },
   SNAKES_LADDERS: { typeLabel: 'Escaleras y serpientes', isMultiplayer: true },
-  DUAL_QUEST: { typeLabel: 'Dúo Lógico', isMultiplayer: true },
+  DUAL_QUEST_PIXI: { typeLabel: 'Dúo Lógico', isMultiplayer: true },
   TRUE_FALSE_MAZE: { typeLabel: 'Laberinto Verdadero o Falso', isMultiplayer: false },
 }
 

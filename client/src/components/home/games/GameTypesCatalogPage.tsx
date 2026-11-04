@@ -33,7 +33,6 @@ const ICON_BY_GAME_TYPE: Record<string, LucideIcon> = {
   DOMINO: Puzzle,
   MAZE_COLLECTOR: Ghost,
   SNAKES_LADDERS: Dices,
-  DUAL_QUEST: Flame,
   DUAL_QUEST_PIXI: Flame,
   TRUE_FALSE_MAZE: Bot,
 }

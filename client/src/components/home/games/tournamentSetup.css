@@ -1,0 +1,419 @@
+/*
+ * Sección «Torneos» del administrador (issue #147): preparar el torneo y abrir la sala.
+ * Todo cuelga de `.tsu` para no tocar nada más. Los colores salen de los tokens del tema; Pradera los
+ * sobreescribe con tarjetas blancas, tinta oscura y un azul más profundo para que no se mezclen con el
+ * fondo crema y amarillento del tema.
+ */
+.tsu {
+  --tsu-surface: var(--surface);
+  --tsu-field: color-mix(in srgb, var(--text-h) 5%, var(--surface));
+  --tsu-line: var(--border);
+  --tsu-ink: var(--text-h);
+  --tsu-soft: var(--text);
+  --tsu-pick: var(--accent);
+  --tsu-pick-bg: color-mix(in srgb, var(--accent) 9%, var(--surface));
+  --tsu-danger: var(--danger, #dc2626);
+  --tsu-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  color: var(--tsu-soft);
+}
+
+[data-theme='meadow'] .tsu {
+  --tsu-surface: #ffffff;
+  --tsu-field: #f1f6fb;
+  --tsu-line: #b8cce0;
+  --tsu-ink: #2b1a0e;
+  --tsu-soft: #5a4129;
+  --tsu-pick: #2563c0;
+  --tsu-pick-bg: #eaf2fd;
+}
+
+.tsu-lv--easy { --lv: #16a34a; }
+.tsu-lv--medium { --lv: #d97706; }
+.tsu-lv--hard { --lv: #dc2626; }
+
+.tsu-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--lv, var(--tsu-soft)) 42%, var(--tsu-surface));
+  background: color-mix(in srgb, var(--lv, var(--tsu-soft)) 13%, var(--tsu-surface));
+  color: color-mix(in srgb, var(--lv, var(--tsu-soft)) 58%, var(--tsu-ink));
+  padding: 2px 9px;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+/* ---------- Pasos ---------- */
+.tsu-steps {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tsu-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 14px;
+  border: 1px solid var(--tsu-line);
+  background: var(--tsu-surface);
+  padding: 8px 14px 8px 8px;
+  text-align: left;
+  color: var(--tsu-ink);
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s var(--tsu-ease);
+}
+.tsu-step:not(:disabled):hover { transform: translateY(-1px); border-color: var(--tsu-pick); }
+.tsu-step:disabled { cursor: not-allowed; opacity: 0.6; }
+.tsu-step[aria-current='step'] {
+  border-color: var(--tsu-pick);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tsu-pick) 18%, transparent);
+}
+.tsu-step:focus-visible { outline: 2px solid var(--tsu-pick); outline-offset: 2px; }
+
+.tsu-step__dot {
+  display: flex;
+  height: 30px;
+  width: 30px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--tsu-field);
+  color: var(--tsu-ink);
+  font-size: 13px;
+  font-weight: 700;
+  transition: background 0.3s, color 0.3s;
+}
+.tsu-step[aria-current='step'] .tsu-step__dot,
+.tsu-step[data-done='true'] .tsu-step__dot {
+  background: var(--tsu-pick);
+  color: #fff;
+}
+.tsu-step__title { display: block; font-size: 14px; font-weight: 700; line-height: 1.2; }
+.tsu-step__hint { display: block; font-size: 12px; line-height: 1.3; color: var(--tsu-soft); }
+
+.tsu-steps__bar {
+  position: relative;
+  height: 4px;
+  min-width: 36px;
+  flex: 1;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--tsu-line);
+}
+.tsu-steps__bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--tsu-pick);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.55s var(--tsu-ease);
+}
+.tsu-steps__bar[data-filled='true']::after { transform: scaleX(1); }
+
+/* ---------- Estructura ---------- */
+.tsu-layout { display: grid; gap: 16px; align-items: start; }
+@media (min-width: 1024px) {
+  .tsu-layout { grid-template-columns: minmax(0, 1fr) 330px; }
+  .tsu-aside { position: sticky; top: 12px; }
+}
+
+.tsu-box {
+  border-radius: 18px;
+  border: 1px solid var(--tsu-line);
+  background: var(--tsu-surface);
+  padding: 16px;
+  color: var(--tsu-soft);
+}
+.tsu-h { color: var(--tsu-ink); font-weight: 700; letter-spacing: -0.01em; }
+.tsu-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tsu-pick);
+}
+
+/* ---------- Búsqueda y filtros ---------- */
+.tsu-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; }
+.tsu-search { position: relative; flex: 1 1 220px; max-width: 340px; }
+.tsu-search svg { position: absolute; left: 12px; top: 50%; height: 16px; width: 16px; transform: translateY(-50%); color: var(--tsu-soft); pointer-events: none; }
+.tsu-input {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--tsu-line);
+  background: var(--tsu-field);
+  padding: 9px 12px;
+  font-size: 14px;
+  color: var(--tsu-ink);
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
+.tsu-search .tsu-input { padding-left: 36px; }
+.tsu-input::placeholder { color: var(--tsu-soft); opacity: 0.75; }
+.tsu-input:focus { outline: none; border-color: var(--tsu-pick); background: var(--tsu-surface); box-shadow: 0 0 0 3px color-mix(in srgb, var(--tsu-pick) 18%, transparent); }
+
+.tsu-filter {
+  border-radius: 999px;
+  border: 1px solid var(--tsu-line);
+  background: var(--tsu-surface);
+  padding: 6px 13px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tsu-soft);
+  transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.2s var(--tsu-ease);
+}
+.tsu-filter:hover { border-color: var(--tsu-pick); color: var(--tsu-ink); }
+.tsu-filter[aria-pressed='true'] { background: var(--tsu-pick); border-color: var(--tsu-pick); color: #fff; }
+.tsu-filter:focus-visible { outline: 2px solid var(--tsu-pick); outline-offset: 2px; }
+
+/* ---------- Cuadrícula de juegos ---------- */
+.tsu-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(188px, 1fr)); }
+
+.tsu-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 2px solid var(--tsu-line);
+  background: var(--tsu-surface);
+  transition: border-color 0.2s, box-shadow 0.25s, transform 0.25s var(--tsu-ease);
+}
+.tsu-card:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--tsu-pick) 55%, var(--tsu-line)); }
+.tsu-card[data-picked='true'] {
+  border-color: var(--tsu-pick);
+  background: var(--tsu-pick-bg);
+  box-shadow: 0 10px 24px -14px var(--tsu-pick);
+}
+.tsu-card[data-blocked='true'] { opacity: 0.5; }
+
+.tsu-card__main { display: block; width: 100%; text-align: left; cursor: pointer; color: inherit; }
+.tsu-card__main:disabled { cursor: not-allowed; }
+.tsu-card__main:focus-visible { outline: 3px solid var(--tsu-pick); outline-offset: -3px; border-radius: 14px; }
+
+.tsu-card__cover {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  width: 100%;
+  background-size: cover;
+  background-position: center;
+}
+.tsu-card__type {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  border-radius: 999px;
+  background: rgba(20, 16, 12, 0.78);
+  padding: 2px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+}
+.tsu-card__check {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  display: flex;
+  height: 26px;
+  width: 26px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--tsu-pick);
+  color: #fff;
+  box-shadow: 0 4px 10px -2px rgba(0, 0, 0, 0.4);
+}
+.tsu-card__body { padding: 10px 12px 12px; }
+.tsu-card__title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--tsu-ink);
+}
+.tsu-card__by { margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--tsu-soft); }
+.tsu-card__cta { margin-top: 8px; font-size: 12px; font-weight: 600; color: var(--tsu-pick); }
+
+/* Complejidad: aparece dentro de la tarjeta elegida, desplegándose sin saltos. */
+.tsu-levels {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.3s var(--tsu-ease);
+}
+.tsu-card[data-picked='true'] .tsu-levels { grid-template-rows: 1fr; }
+.tsu-levels > div { overflow: hidden; }
+.tsu-levels__inner { padding: 0 12px 12px; }
+.tsu-seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; border-radius: 12px; background: var(--tsu-field); padding: 3px; }
+.tsu-seg button {
+  border-radius: 9px;
+  border: 1px solid transparent;
+  padding: 5px 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tsu-soft);
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.tsu-seg button:hover { color: var(--tsu-ink); }
+.tsu-seg button[aria-checked='true'] {
+  border-color: color-mix(in srgb, var(--lv) 45%, var(--tsu-surface));
+  background: color-mix(in srgb, var(--lv) 16%, var(--tsu-surface));
+  color: color-mix(in srgb, var(--lv) 58%, var(--tsu-ink));
+}
+.tsu-seg button:focus-visible { outline: 2px solid var(--tsu-pick); outline-offset: 1px; }
+.tsu-levels__detail { margin-top: 6px; font-size: 11.5px; line-height: 1.35; color: var(--tsu-soft); }
+
+/* ---------- Panel «Tu torneo» ---------- */
+.tsu-count {
+  display: inline-block;
+  min-width: 2.2em;
+  border-radius: 999px;
+  background: var(--tsu-pick);
+  padding: 1px 9px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+}
+.tsu-picked { display: flex; flex-direction: column; gap: 6px; margin: 10px 0 0; padding: 0; list-style: none; }
+.tsu-picked li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 10px;
+  background: var(--tsu-field);
+  padding: 6px 6px 6px 10px;
+  font-size: 13px;
+  color: var(--tsu-ink);
+}
+.tsu-picked li > span:first-child { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.tsu-x {
+  display: flex;
+  height: 24px;
+  width: 24px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: var(--tsu-soft);
+  transition: background 0.2s, color 0.2s;
+}
+.tsu-x:hover { background: color-mix(in srgb, var(--tsu-danger) 14%, transparent); color: var(--tsu-danger); }
+.tsu-x:focus-visible { outline: 2px solid var(--tsu-pick); }
+
+.tsu-field { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.tsu-field label { font-size: 13px; font-weight: 600; color: var(--tsu-ink); }
+.tsu-field small { display: block; font-size: 11.5px; font-weight: 400; color: var(--tsu-soft); }
+.tsu-stepper { display: inline-flex; align-items: center; overflow: hidden; border-radius: 10px; border: 1px solid var(--tsu-line); background: var(--tsu-field); }
+.tsu-stepper button { height: 34px; width: 34px; font-size: 18px; font-weight: 600; color: var(--tsu-ink); transition: background 0.2s; }
+.tsu-stepper button:hover:not(:disabled) { background: color-mix(in srgb, var(--tsu-pick) 14%, transparent); }
+.tsu-stepper button:disabled { opacity: 0.35; cursor: not-allowed; }
+.tsu-stepper input { width: 44px; border: 0; background: transparent; text-align: center; font-size: 14px; font-weight: 700; color: var(--tsu-ink); -moz-appearance: textfield; appearance: textfield; }
+.tsu-stepper input:focus { outline: none; background: var(--tsu-surface); }
+.tsu-stepper input::-webkit-outer-spin-button, .tsu-stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+.tsu-all { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: var(--tsu-soft); }
+.tsu-all button { border-radius: 999px; border: 1px solid var(--tsu-line); padding: 3px 10px; font-weight: 600; color: var(--tsu-ink); transition: border-color 0.2s, color 0.2s; }
+.tsu-all button:hover { border-color: var(--tsu-pick); color: var(--tsu-pick); }
+
+/* ---------- Botones ---------- */
+.tsu-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 12px;
+  border: 1px solid var(--tsu-line);
+  background: var(--tsu-surface);
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--tsu-ink);
+  transition: transform 0.2s var(--tsu-ease), box-shadow 0.2s, border-color 0.2s, background 0.2s;
+}
+.tsu-btn:not(:disabled):hover { transform: translateY(-1px); border-color: var(--tsu-pick); }
+.tsu-btn:disabled { cursor: not-allowed; opacity: 0.5; }
+.tsu-btn:focus-visible { outline: 2px solid var(--tsu-pick); outline-offset: 2px; }
+.tsu-btn--primary {
+  border-color: transparent;
+  background: var(--tsu-pick);
+  color: #fff;
+  box-shadow: 0 10px 22px -12px var(--tsu-pick);
+}
+.tsu-btn--primary:not(:disabled):hover { border-color: transparent; box-shadow: 0 14px 26px -12px var(--tsu-pick); }
+.tsu-btn--danger { border-color: color-mix(in srgb, var(--tsu-danger) 45%, var(--tsu-surface)); color: var(--tsu-danger); }
+.tsu-btn--danger:not(:disabled):hover { border-color: var(--tsu-danger); background: color-mix(in srgb, var(--tsu-danger) 9%, var(--tsu-surface)); }
+.tsu-btn--block { width: 100%; }
+
+/* ---------- Torneo preparado ---------- */
+.tsu-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.tsu-stat { border-radius: 14px; background: var(--tsu-field); padding: 12px; }
+.tsu-stat svg { height: 18px; width: 18px; color: var(--tsu-pick); }
+.tsu-stat strong { display: block; margin-top: 6px; font-size: 26px; line-height: 1; font-weight: 800; color: var(--tsu-ink); font-variant-numeric: tabular-nums; }
+.tsu-stat span { display: block; margin-top: 2px; font-size: 12px; color: var(--tsu-soft); }
+
+.tsu-minis { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); margin: 0; padding: 0; list-style: none; }
+.tsu-mini { display: flex; align-items: center; gap: 10px; border-radius: 14px; border: 1px solid var(--tsu-line); background: var(--tsu-surface); padding: 8px; }
+.tsu-mini__cover { height: 46px; width: 46px; flex: none; border-radius: 10px; background-size: cover; background-position: center; }
+.tsu-mini__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; font-weight: 700; color: var(--tsu-ink); }
+.tsu-mini__meta { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
+
+.tsu-live {
+  border-radius: 18px;
+  border: 2px solid var(--tsu-pick);
+  background: var(--tsu-pick-bg);
+  padding: 16px;
+}
+.tsu-dot { display: inline-block; height: 8px; width: 8px; border-radius: 999px; background: var(--tsu-pick); }
+
+/* ---------- Animaciones ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  .tsu-rise { animation: tsu-rise 0.48s var(--tsu-ease) both; animation-delay: calc(var(--i, 0) * 45ms); }
+  .tsu-slide-next { animation: tsu-slide-next 0.42s var(--tsu-ease) both; }
+  .tsu-slide-prev { animation: tsu-slide-prev 0.42s var(--tsu-ease) both; }
+  .tsu-pop { animation: tsu-pop 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+  .tsu-bump { animation: tsu-bump 0.32s var(--tsu-ease); }
+  .tsu-enter { animation: tsu-enter 0.3s var(--tsu-ease) both; }
+  .tsu-dot { animation: tsu-pulse 1.8s ease-in-out infinite; }
+  .tsu-live { animation: tsu-glow 2.4s ease-in-out infinite; }
+}
+
+@keyframes tsu-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes tsu-slide-next { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+@keyframes tsu-slide-prev { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: none; } }
+@keyframes tsu-pop { from { opacity: 0; transform: scale(0.3); } to { opacity: 1; transform: scale(1); } }
+@keyframes tsu-bump { 0% { transform: scale(1); } 40% { transform: scale(1.22); } 100% { transform: scale(1); } }
+@keyframes tsu-enter { from { opacity: 0; transform: translateX(-10px) scale(0.97); } to { opacity: 1; transform: none; } }
+@keyframes tsu-pulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--tsu-pick) 55%, transparent); } 50% { box-shadow: 0 0 0 6px transparent; } }
+@keyframes tsu-glow { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--tsu-pick) 16%, transparent); } }
+
+/* Los controles de complejidad de una tarjeta sin elegir no deben recibir el foco del teclado. */
+.tsu-card:not([data-picked='true']) .tsu-levels > div { visibility: hidden; }
+
+/* ---------- Pestañas de la sección ---------- */
+.tsu-tabs { display: flex; width: fit-content; gap: 4px; border-radius: 14px; border: 1px solid var(--tsu-line); background: var(--tsu-surface); padding: 4px; }
+.tsu-tab { border-radius: 10px; padding: 7px 16px; font-size: 14px; font-weight: 600; color: var(--tsu-soft); transition: background 0.25s, color 0.25s; }
+.tsu-tab:hover { color: var(--tsu-ink); background: var(--tsu-field); }
+.tsu-tab[aria-current='page'] { background: var(--tsu-pick); color: #fff; }
+.tsu-tab:focus-visible { outline: 2px solid var(--tsu-pick); outline-offset: 2px; }
+
+/*
+ * El Historial usa las clases de color del tema (superficie, texto, code-bg). En Pradera el code-bg es
+ * crema amarillento sobre superficie crema: dentro de la sección se cambian por blanco y azul grisáceo.
+ */
+[data-theme='meadow'] .tsu [class*='bg-code-bg'] { background-color: #f1f6fb; }
+[data-theme='meadow'] .tsu .bg-surface { background-color: #ffffff; }
+[data-theme='meadow'] .tsu .border-border,
+[data-theme='meadow'] .tsu [class*='border-border'] { border-color: #b8cce0; }
+[data-theme='meadow'] .tsu .text-text { color: #5a4129; }
+[data-theme='meadow'] .tsu .text-text-h { color: #2b1a0e; }

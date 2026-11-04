@@ -37,7 +37,7 @@ export type JellyMode = 'WAITING' | 'NORMAL' | 'FRIGHTENED' | 'RETURNING'
 
 // ==================== Ajustes ====================
 
-export const INTRO_MS = 2600
+export const INTRO_MS = 4100
 const FEEDBACK_CORRECT_MS = 2400
 const FEEDBACK_WRONG_MS = 3400
 const FEEDBACK_READING_MS_PER_CHAR = 30

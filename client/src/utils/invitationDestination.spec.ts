@@ -10,7 +10,7 @@ describe('destino de invitación al autenticar', () => {
     'quien-es/torneo',
     'domino/sala',
     'escaleras-serpientes/sala',
-    'dual-quest/sala',
+    'dual-quest-pixi/sala',
   ])('conserva %s y normaliza el código', (route) => {
     expect(invitationDestination(`/${route}/abc234`)).toBe(`/${route}/ABC234`)
     const login = invitationAuthPath('/login', `/${route}/ABC234`)

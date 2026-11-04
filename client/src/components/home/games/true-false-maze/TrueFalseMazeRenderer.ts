@@ -257,7 +257,11 @@ export class TrueFalseMazeRenderer {
   private nextShootingStarAt = 4000
   private readonly emitters = new Map<string, number>()
 
-  constructor(canvas: HTMLCanvasElement, assets: SpaceshipAssets, map: ShipMap) {
+  /** Naves chicas del tutorial: se ven enteras (sin el zoom que cubre la pantalla con la nave completa). */
+  private readonly fitWhole: boolean
+
+  constructor(canvas: HTMLCanvasElement, assets: SpaceshipAssets, map: ShipMap, options: { fitWhole?: boolean } = {}) {
+    this.fitWhole = options.fitWhole ?? false
     const ctx = canvas.getContext('2d')
     if (!ctx) throw new Error('El navegador no permite dibujar en canvas.')
     this.canvas = canvas
@@ -280,7 +284,9 @@ export class TrueFalseMazeRenderer {
   resize(cssWidth: number, cssHeight: number, devicePixelRatio: number, insets: Insets = NO_INSETS) {
     const availWidth = Math.max(120, cssWidth - insets.left - insets.right)
     const availHeight = Math.max(120, cssHeight - insets.top - insets.bottom)
-    const scale = fitShipScale(availWidth, availHeight, this.shipWidth, this.shipHeight)
+    const scale = this.fitWhole
+      ? Math.min(availWidth / this.shipWidth, availHeight / this.shipHeight)
+      : fitShipScale(availWidth, availHeight, this.shipWidth, this.shipHeight)
     // La capa de la nave puede ser más grande que la pantalla: el tope de píxeles cuenta las dos.
     const largest = Math.max(1, cssWidth * cssHeight, this.shipWidth * this.shipHeight * scale * scale)
     const dpr = Math.max(1, Math.min(devicePixelRatio, 2, Math.sqrt(MAX_LAYER_PIXELS / largest)))
@@ -466,6 +472,67 @@ export class TrueFalseMazeRenderer {
   private drawSpriteFit(ctx: CanvasRenderingContext2D, sprite: Sprite, cx: number, bottom: number, width: number) {
     const height = (sprite.height / sprite.width) * width
     ctx.drawImage(sprite, cx - width / 2, bottom - height, width, height)
+  }
+
+  /** 0 = puerta cerrada, 1 = abierta del todo (se desliza al llegar el robot). */
+  private doorOpen = 0
+
+  /**
+   * Puerta del tutorial, dentro del tablero: cerrada y con un aro que pulsa
+   * mientras el robot no llega; al pisar su casilla se desliza y deja ver
+   * la luz de detrás.
+   */
+  private drawGoalDoor(ctx: CanvasRenderingContext2D, state: TfState, dt: number) {
+    const cell = this.map.goalDoor
+    if (!cell) return
+    const here = state.player.pos.row === cell.row && state.player.pos.col === cell.col
+    this.doorOpen += ((here ? 1 : 0) - this.doorOpen) * Math.min(1, dt / 55)
+    const open = this.doorOpen
+    const pulse = 0.5 + 0.5 * Math.sin(state.now / 260)
+    // Una compuerta con marco, centrada en SU casilla: se levanta sobre el piso
+    // (como un muro) y sus dos hojas se separan hacia los lados al llegar.
+    // Las celdas se miden desde el margen del tablero (PAD), igual que todo lo demás.
+    const left = PAD.left + cell.col * CELL + 5
+    const width = CELL - 10
+    const floor = PAD.top + (cell.row + 1) * CELL - 4
+    const top = floor - CELL * 1.18
+    const half = width / 2
+    const gap = half * open
+    ctx.save()
+    // Placa luminosa en el piso: invita a llegar y se enciende al abrir.
+    this.drawGlow(ctx, left + half, floor - CELL * 0.18, CELL * (0.75 + open * 0.35), open > 0.4 ? '#67e8f9' : '#38bdf8', 0.3 + open * 0.5 + (here ? 0 : pulse * 0.22))
+    // Hueco: lo que se ve entre las hojas (luz del otro lado).
+    const light = ctx.createLinearGradient(0, top, 0, floor)
+    light.addColorStop(0, '#0e7490')
+    light.addColorStop(1, '#67e8f9')
+    ctx.fillStyle = light
+    ctx.fillRect(left, top, width, floor - top)
+    // Hojas.
+    const panel = ctx.createLinearGradient(0, top, 0, floor)
+    panel.addColorStop(0, '#94a3b8')
+    panel.addColorStop(1, '#475569')
+    const leaf = (x: number, w: number) => {
+      if (w < 1) return
+      ctx.fillStyle = panel
+      ctx.fillRect(x, top, w, floor - top)
+      ctx.strokeStyle = 'rgba(15,23,42,0.55)'
+      ctx.lineWidth = 2
+      ctx.strokeRect(x + 1, top + 1, w - 2, floor - top - 2)
+      // Franjas de precaución.
+      ctx.fillStyle = '#facc15'
+      for (let y = top + 8; y < floor - 6; y += 14) ctx.fillRect(x + 3, y, Math.max(0, w - 6), 4)
+    }
+    leaf(left, half - gap)
+    leaf(left + half + gap, half - gap)
+    // Marco y luz de estado (roja cerrada, verde abierta).
+    ctx.strokeStyle = '#1e293b'
+    ctx.lineWidth = 5
+    ctx.strokeRect(left - 1, top - 1, width + 2, floor - top + 2)
+    ctx.fillStyle = open > 0.5 ? '#4ade80' : pulse > 0.5 ? '#f87171' : '#7f1d1d'
+    ctx.beginPath()
+    ctx.arc(left + half, top - 7, 5, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.restore()
   }
 
   private drawFloorDecals(ctx: CanvasRenderingContext2D) {
@@ -1067,6 +1134,7 @@ export class TrueFalseMazeRenderer {
     const zones = this.zoneVisuals(state)
     this.drawZoneFloors(ctx, state, zones)
     this.drawShadows(ctx, state)
+    this.drawGoalDoor(ctx, state, dt)
     this.drawDepthSorted(ctx, state, zones)
     // Las partículas van bajo el apagón (el vapor no debe brillar en la
     // oscuridad); los textos flotantes encima, para que siempre se lean.

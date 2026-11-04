@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Bot } from 'lucide-react'
 import { Modal } from './Modal'
+import { useAuth } from '../../../hooks/useAuth'
 import { BOT_DIFFICULTY_OPTIONS, soloRoomPath } from './guessWhoBot'
 
 type GuessWhoRoomProps = {
@@ -22,6 +23,8 @@ type GuessWhoRoomProps = {
 export function GuessWhoRoom({ gameId, onExit }: GuessWhoRoomProps) {
   const navigate = useNavigate()
   const [choosingBot, setChoosingBot] = useState(false)
+  // Solo el administrador crea y modera torneos (issue #102); los demás entran con código o enlace.
+  const isAdmin = useAuth().user?.role?.toUpperCase() === 'ADMIN'
 
   return (
     <Modal onClose={onExit} maxWidthClassName="max-w-[440px]">
@@ -45,13 +48,15 @@ export function GuessWhoRoom({ gameId, onExit }: GuessWhoRoomProps) {
               >
                 1 contra 1
               </button>
+              {isAdmin && (
               <button
-                type="button"
-                className="rounded-2xl border border-border bg-surface px-4 py-3 text-[14.5px] font-semibold text-text-h transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/50 hover:bg-accent/5"
-                onClick={() => navigate(`/quien-es/torneo?gameId=${gameId}`)}
-              >
-                Grupo (torneo eliminatorio)
-              </button>
+                  type="button"
+                  className="rounded-2xl border border-border bg-surface px-4 py-3 text-[14.5px] font-semibold text-text-h transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/50 hover:bg-accent/5"
+                  onClick={() => navigate(`/quien-es/torneo?gameId=${gameId}`)}
+                >
+                  Torneo grupal (administrador)
+                </button>
+              )}
               <button
                 type="button"
                 className="flex items-center justify-center gap-2 rounded-2xl border border-border bg-surface px-4 py-3 text-[14.5px] font-semibold text-text-h transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/50 hover:bg-accent/5"

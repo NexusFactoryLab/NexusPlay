@@ -1,6 +1,7 @@
 import type { GuessWhoCard } from '../../application/content-validators/guess-who.content-validator.js';
 import type { PendingQuestion, GuidedMessage, GuidedAnswer } from '../services/guided-questions.js';
 import type { BotDifficulty } from './guess-who-bot-policy.port.js';
+import type { PausableGame } from '../services/player-wait.js';
 
 export const ROOM_STORE = Symbol('ROOM_STORE');
 
@@ -24,7 +25,7 @@ export interface RoomPlayer {
   bot?: { difficulty: BotDifficulty };
 }
 
-export interface RoomState {
+export interface RoomState extends PausableGame {
   pendingQuestion?: PendingQuestion | null;
   guidedChat?: GuidedMessage[];
   code: string;

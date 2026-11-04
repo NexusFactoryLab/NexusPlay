@@ -91,5 +91,3 @@ El software se entrega **"tal cual"**, sin garantías de ningún tipo, expresas 
 Si encuentras una vulnerabilidad, **no la publiques en un issue**. Repórtala de forma privada a los mantenedores de [NexusFactoryLab](https://github.com/NexusFactoryLab).
 
 ---
-
-*Este documento es informativo y no constituye asesoría legal. Antes de operar la plataforma con usuarios reales, consulta a un profesional jurídico.*

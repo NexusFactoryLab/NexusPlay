@@ -33,7 +33,28 @@ export interface MazeCollectorConfig {
   /** Nombre temático de los enemigos, ej. "Nube de contaminación". */
   enemyLabel: string;
   enemyIcon: string;
+  /**
+   * Preguntas de opción múltiple que escribe quien crea el juego (issue
+   * #103): las respuestas se reparten por el mapa y el jugador maneja hasta
+   * la correcta. Opcional: sin preguntas el cliente usa su banco sobre
+   * ciudades sostenibles de Colombia.
+   */
+  questions?: MazeQuestion[];
 }
+
+export interface MazeQuestion {
+  question: string;
+  /** Entre 2 y 4 respuestas. */
+  options: string[];
+  /** Posición de la respuesta correcta en `options`. */
+  correctIndex: number;
+}
+
+const MAX_QUESTIONS = 30;
+const MIN_OPTIONS = 2;
+const MAX_OPTIONS = 4;
+const MAX_QUESTION_LENGTH = 160;
+const MAX_OPTION_LENGTH = 60;
 
 const DEFAULT_CONFIG: Omit<MazeCollectorConfig, 'collectorLabel' | 'collectorIcon' | 'enemyLabel' | 'enemyIcon'> = {
   layout: 'CLASSIC',
@@ -94,6 +115,8 @@ export class MazeCollectorContentValidator implements ContentValidator {
       throw new InvalidGameContentError('enemyIcon es obligatorio.');
     }
 
+    const questions = this.validateQuestions(raw.questions);
+
     return {
       layout,
       lives,
@@ -102,7 +125,43 @@ export class MazeCollectorContentValidator implements ContentValidator {
       collectorIcon: raw.collectorIcon!.trim(),
       enemyLabel: raw.enemyLabel!.trim(),
       enemyIcon: raw.enemyIcon!.trim(),
+      ...(questions ? { questions } : {}),
     };
+  }
+
+  private validateQuestions(value: unknown): MazeQuestion[] | undefined {
+    if (value === undefined || value === null) return undefined;
+    if (!Array.isArray(value) || value.length > MAX_QUESTIONS) {
+      throw new InvalidGameContentError(`questions debe ser una lista de máximo ${MAX_QUESTIONS} preguntas.`);
+    }
+    return value.map((item: unknown, index) => {
+      const raw = (typeof item === 'object' && item !== null ? item : {}) as Record<string, unknown>;
+      if (!isNonEmptyString(raw.question, MAX_QUESTION_LENGTH)) {
+        throw new InvalidGameContentError(
+          `la pregunta ${index + 1} necesita un enunciado (máximo ${MAX_QUESTION_LENGTH} caracteres).`,
+        );
+      }
+      const options: unknown = raw.options;
+      if (
+        !Array.isArray(options) ||
+        options.length < MIN_OPTIONS ||
+        options.length > MAX_OPTIONS ||
+        !options.every((option) => isNonEmptyString(option, MAX_OPTION_LENGTH))
+      ) {
+        throw new InvalidGameContentError(
+          `la pregunta ${index + 1} necesita entre ${MIN_OPTIONS} y ${MAX_OPTIONS} respuestas (máximo ${MAX_OPTION_LENGTH} caracteres cada una).`,
+        );
+      }
+      const correctIndex = raw.correctIndex;
+      if (typeof correctIndex !== 'number' || !Number.isInteger(correctIndex) || correctIndex < 0 || correctIndex >= options.length) {
+        throw new InvalidGameContentError(`la pregunta ${index + 1} necesita marcar cuál respuesta es la correcta.`);
+      }
+      return {
+        question: raw.question.trim(),
+        options: (options as string[]).map((option) => option.trim()),
+        correctIndex,
+      };
+    });
   }
 
   validateContent(content: unknown): unknown[] {

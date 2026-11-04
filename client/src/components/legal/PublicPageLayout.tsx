@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { Zap } from 'lucide-react'
 import { ThemeToggle } from '../ThemeToggle'
+import { LogoMark, LogoWordmark } from '../BrandLogo'
 
 type PublicPageLayoutProps = {
   title: string
@@ -13,14 +13,8 @@ export function PublicPageLayout({ title, children }: PublicPageLayoutProps) {
     <div className="flex h-svh min-h-0 flex-col overflow-y-auto bg-bg text-text">
       <header className="flex shrink-0 items-center justify-between border-b border-border px-5 py-4 sm:px-8">
         <Link to="/inicio" className="flex items-center gap-2.5">
-          <span
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-white"
-            style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
-            aria-hidden="true"
-          >
-            <Zap className="h-5 w-5" fill="currentColor" strokeWidth={0} />
-          </span>
-          <span className="font-heading text-lg font-semibold text-text-h">NexusPlay</span>
+          <LogoMark className="h-9 w-9" />
+          <LogoWordmark className="h-5 w-auto" />
         </Link>
         <ThemeToggle />
       </header>

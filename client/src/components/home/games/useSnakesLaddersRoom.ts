@@ -35,12 +35,13 @@ export function useSnakesLaddersRoom(token: string | null) {
 
     socket.on('connect', () => {
       setConnecting(false)
-      // Reingresar al lobby tras reconectar; el servidor exige confirmar de nuevo.
+      // Volver a la sala tras reconectar: en la sala de espera el servidor exige
+      // confirmar de nuevo; en plena partida, la partida sigue donde iba (issue #120).
       if (waitingCodeRef.current) socket.emit('snakes-ladders:join', { code: waitingCodeRef.current })
     })
     socket.on('disconnect', () => setConnecting(true))
     socket.on('snakes-ladders:state', (state: SnakesLaddersRoomStateView) => {
-      waitingCodeRef.current = state.phase === 'WAITING' ? state.code : null
+      waitingCodeRef.current = state.code
       setRoom(state)
       setError(null)
     })

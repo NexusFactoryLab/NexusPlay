@@ -62,8 +62,8 @@ const AI_GAME_HINTS: Record<string, AiGameHint> = {
     summary: 'La IA diseña el tablero y las preguntas.',
     placeholder: 'Ej.: "El sistema solar" o "Tablas de multiplicar del 6 al 9"…',
   },
-  DUAL_QUEST: {
-    summary: 'La IA diseña el mapa, las preguntas y las gemas.',
+  DUAL_QUEST_PIXI: {
+    summary: 'La IA escribe las preguntas de las Puertas del Saber de cada escenario.',
     placeholder: 'Ej.: "El ciclo del agua" o "Estados de la materia"…',
   },
 }

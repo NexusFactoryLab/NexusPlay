@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Archive, Globe2, Image, Lock, Settings, Trash2 } from 'lucide-react'
+import { Archive, Globe2, Image, Lock, Pencil, Settings, Trash2 } from 'lucide-react'
 import { donateGame, publishGame, updateGame, type GameDetail } from '../../../services/game.service'
 import { listMyOrganizations, type OrganizationWithMyRole } from '../../../services/organization.service'
 import { useAuth } from '../../../hooks/useAuth'
@@ -62,6 +62,11 @@ export function GameDetailModal({
   const [editingConfig, setEditingConfig] = useState(false)
   const [adapting, setAdapting] = useState(false)
   const [editingTheme, setEditingTheme] = useState(false)
+  const [editingDetails, setEditingDetails] = useState(false)
+  const [titleDraft, setTitleDraft] = useState(game.title)
+  const [descriptionDraft, setDescriptionDraft] = useState(game.description)
+  const [savingDetails, setSavingDetails] = useState(false)
+  const [detailsError, setDetailsError] = useState<string | null>(null)
   const [coverImageUrl, setCoverImageUrl] = useState<string | null>(game.theme.coverImageUrl ?? null)
   const [savingTheme, setSavingTheme] = useState(false)
   const [themeError, setThemeError] = useState<string | null>(null)
@@ -185,6 +190,31 @@ export function GameDetailModal({
     }
   }
 
+  async function handleSaveDetails() {
+    if (!token) return
+    const title = titleDraft.trim()
+    const description = descriptionDraft.trim()
+    if (title.length < 3) {
+      setDetailsError('El título debe tener al menos 3 caracteres.')
+      return
+    }
+    if (description.length < 10) {
+      setDetailsError('La descripción debe tener al menos 10 caracteres.')
+      return
+    }
+    setSavingDetails(true)
+    setDetailsError(null)
+    try {
+      const updated = await updateGame(token, game.id, { title, description })
+      onUpdated(updated)
+      setEditingDetails(false)
+    } catch (err) {
+      setDetailsError(err instanceof ApiError ? err.message : 'No se pudo guardar el título y la descripción.')
+    } finally {
+      setSavingDetails(false)
+    }
+  }
+
   async function handleSaveTheme() {
     if (!token) return
     setSavingTheme(true)
@@ -232,8 +262,60 @@ export function GameDetailModal({
               Este tipo de juego está archivado: solo tú (como administrador) lo ves, y nadie puede crear juegos nuevos de este tipo hasta que lo reactives.
             </p>
           )}
-          <h2 className="mb-1.5 text-[22px] tracking-tight text-text-h">{game.title}</h2>
-          <p className="text-[14px] leading-relaxed text-text">{game.description}</p>
+          {editingDetails ? (
+            <div className="space-y-2">
+              <input
+                type="text"
+                aria-label="Título del juego"
+                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[16px] text-text-h"
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                disabled={savingDetails}
+              />
+              <textarea
+                aria-label="Descripción del juego"
+                rows={3}
+                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-[14px] text-text"
+                value={descriptionDraft}
+                onChange={(e) => setDescriptionDraft(e.target.value)}
+                disabled={savingDetails}
+              />
+              {detailsError && (
+                <p className="text-[12.5px] text-danger" role="alert">
+                  {detailsError}
+                </p>
+              )}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="rounded-lg px-3.5 py-2 text-[13px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
+                  onClick={handleSaveDetails}
+                  disabled={savingDetails}
+                >
+                  {savingDetails ? 'Guardando…' : 'Guardar'}
+                </button>
+                <button
+                  type="button"
+                  className="rounded-lg border border-border px-3.5 py-2 text-[13px] font-medium text-text-h"
+                  onClick={() => {
+                    setEditingDetails(false)
+                    setDetailsError(null)
+                    setTitleDraft(game.title)
+                    setDescriptionDraft(game.description)
+                  }}
+                  disabled={savingDetails}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <h2 className="mb-1.5 text-[22px] tracking-tight text-text-h">{game.title}</h2>
+              <p className="text-[14px] leading-relaxed text-text">{game.description}</p>
+            </>
+          )}
           {canDelete && (game.status === 'DRAFT' || game.status === 'PUBLISHED') && (
             <p className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[11.5px] font-medium text-text">
               {game.status === 'DRAFT' ? (
@@ -248,8 +330,19 @@ export function GameDetailModal({
             </p>
           )}
         </div>
-        {canDelete && !confirming && !editingConfig && !editingTheme && (
+        {canDelete && !confirming && !editingConfig && !editingTheme && !editingDetails && (
           <div className="flex shrink-0 gap-2">
+            {isAdmin && (
+              <button
+                type="button"
+                aria-label="Editar título y descripción del juego"
+                title="Editar título y descripción"
+                className="rounded-lg border border-border p-2 text-text/70 transition-colors hover:border-accent hover:bg-accent/10 hover:text-accent"
+                onClick={() => setEditingDetails(true)}
+              >
+                <Pencil className="h-4 w-4" strokeWidth={2} />
+              </button>
+            )}
             {isAdmin && (
               <button
                 type="button"

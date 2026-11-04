@@ -1,5 +1,7 @@
 import 'dotenv/config';
+import compression from 'compression';
 import cookieParser from 'cookie-parser';
+import type { NextFunction, Request, Response } from 'express';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe } from '@nestjs/common';
@@ -9,6 +11,16 @@ import { DomainExceptionFilter } from './infrastructure/http/filters/domain-exce
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
+  // Comprime las respuestas JSON (listados de juegos y áreas): menos bytes
+  // por petición y menos tráfico saliente del servidor.
+  app.use(compression());
+  // Los GET llevan datos por usuario: ningún proxy compartido debe
+  // guardarlos, y el navegador siempre revalida con el ETag que Express ya
+  // genera (si no cambió, responde 304 sin cuerpo).
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.method === 'GET') res.setHeader('Cache-Control', 'private, no-cache');
+    next();
+  });
   app.use(cookieParser());
   // Sin límite explícito, Express deja pasar bodies grandes hasta agotar
   // memoria antes de que la validación de aplicación (ej. tope de 200

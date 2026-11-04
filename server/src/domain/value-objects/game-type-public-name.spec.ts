@@ -16,8 +16,7 @@ describe('nombres públicos de GameType', () => {
     ['DOMINO', 'Dominexo'],
     ['MAZE_COLLECTOR', 'Laberinto recolector'],
     ['SNAKES_LADDERS', 'Escaleras y serpientes'],
-    ['DUAL_QUEST', 'Dúo Lógico'],
-    ['DUAL_QUEST_PIXI', 'Dúo Lógico Pixi'],
+    ['DUAL_QUEST_PIXI', 'Dúo Lógico'],
     ['TRUE_FALSE_MAZE', 'Laberinto Verdadero o Falso'],
   ] as const)('%s usa %s como fallback editorial', (gameType, expectedName) => {
     expect(publicGameTypeName(gameType)).toBe(expectedName);

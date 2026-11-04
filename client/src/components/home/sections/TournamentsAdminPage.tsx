@@ -1,0 +1,46 @@
+import { Link, Navigate, useLocation } from 'react-router-dom'
+import { useAuth } from '../../../hooks/useAuth'
+import { TournamentSetupPanel } from '../games/TournamentSetupPanel'
+import '../games/tournamentSetup.css'
+import { TournamentHistoryPage } from './TournamentHistoryPage'
+
+const TABS = [
+  { id: 'preparar', label: 'Preparar y abrir', to: '/torneos' },
+  { id: 'historial', label: 'Historial', to: '/torneos/historial' },
+] as const
+
+/**
+ * Torneos (issue #147): el lugar del administrador para todo lo del torneo. Dos pestañas, una por momento:
+ * «Preparar y abrir» (antes y durante) e «Historial» (después). Solo ADMIN.
+ */
+export function TournamentsAdminPage() {
+  const { user } = useAuth()
+  const { pathname } = useLocation()
+  const tab: (typeof TABS)[number]['id'] = pathname.startsWith('/torneos/historial') ? 'historial' : 'preparar'
+
+  if (user?.role?.toUpperCase() !== 'ADMIN') return <Navigate to="/comunidad" replace />
+
+  return (
+    <div className="tsu mx-auto -mt-6 max-w-[1100px] px-4 sm:-mt-8">
+      <div className="mb-4">
+        <h1 className="tsu-h mb-1 text-[22px]">Torneos</h1>
+        <p className="text-[14px]">Prepara un torneo, ábrelo para tu grupo y consulta cómo les fue.</p>
+      </div>
+
+      <nav className="tsu-tabs mb-5" aria-label="Secciones de torneos">
+        {TABS.map(({ id, label, to }) => (
+          <Link
+            key={id}
+            to={to}
+            aria-current={tab === id ? 'page' : undefined}
+            className="tsu-tab"
+          >
+            {label}
+          </Link>
+        ))}
+      </nav>
+
+      {tab === 'preparar' ? <TournamentSetupPanel /> : <TournamentHistoryPage />}
+    </div>
+  )
+}

@@ -6,7 +6,6 @@ import { GameStatus } from '../../domain/value-objects/game-status.vo.js';
 import { GameType } from '../../domain/value-objects/game-type.vo.js';
 import { ContentValidatorRegistry } from '../content-validators/content-validator.registry.js';
 import { DominoContentValidator } from '../content-validators/domino.content-validator.js';
-import { DualQuestContentValidator } from '../content-validators/dual-quest.content-validator.js';
 import { DualQuestPixiContentValidator } from '../content-validators/dual-quest-pixi.content-validator.js';
 import { GuessWhoContentValidator } from '../content-validators/guess-who.content-validator.js';
 import { MazeCollectorContentValidator } from '../content-validators/maze-collector.content-validator.js';
@@ -22,7 +21,6 @@ const registry = new ContentValidatorRegistry(
   new DominoContentValidator(),
   new MazeCollectorContentValidator(),
   new SnakesLaddersContentValidator(),
-  new DualQuestContentValidator(),
   new DualQuestPixiContentValidator(),
   new TrueFalseMazeContentValidator(),
 );

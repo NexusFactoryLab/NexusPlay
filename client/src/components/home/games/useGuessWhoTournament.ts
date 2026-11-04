@@ -6,7 +6,7 @@ import type { TournamentMatchStateView, TournamentPairingAnnouncement, Tournamen
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:3000'
 
 /**
- * Conexión de socket para el modo grupo (torneo eliminatorio) de "¿Quién
+ * Conexión de socket para el torneo por puntos (modo grupo) de "¿Quién
  * Es?". Espeja el patrón de useGuessWhoRoom (un socket por montaje), pero
  * habla los eventos `tournament:*` en vez de `room:*` — el servidor los
  * mantiene separados para no chocar con las salas 1v1 sueltas.
@@ -19,7 +19,10 @@ export function useGuessWhoTournament(token: string | null) {
   const [error, setError] = useState<string | null>(null)
   const [connecting, setConnecting] = useState(true)
   const [pairingAnnouncement, setPairingAnnouncement] = useState<TournamentPairingAnnouncement | null>(null)
+  const [closed, setClosed] = useState(false)
   const [matchAccusationFailedMessage, setMatchAccusationFailedMessage] = useState<string | null>(null)
+  const [matchAbandonedMessage, setMatchAbandonedMessage] = useState<string | null>(null)
+  const [kickedMessage, setKickedMessage] = useState<string | null>(null)
 
   useEffect(() => {
     if (!token) return
@@ -33,14 +36,21 @@ export function useGuessWhoTournament(token: string | null) {
 
     socket.on('connect', () => {
       setConnecting(false)
-      // Reingresar al lobby tras reconectar; el servidor exige confirmar de nuevo.
+      // Volver a la sala tras reconectar: en la espera el servidor exige confirmar
+      // de nuevo; con el torneo en marcha, la partida propia sigue (issue #120).
       if (waitingCodeRef.current) socket.emit('tournament:join', { code: waitingCodeRef.current })
     })
     socket.on('disconnect', () => setConnecting(true))
     socket.on('tournament:state', (state: TournamentStateView) => {
-      waitingCodeRef.current = state.phase === 'WAITING' ? state.code : null
+      waitingCodeRef.current = state.phase === 'FINISHED' ? null : state.code
       setTournament(state)
       setError(null)
+    })
+    // El administrador cerró el torneo: todos salen de la sala.
+    socket.on('tournament:closed', () => {
+      waitingCodeRef.current = null
+      setTournament(null)
+      setClosed(true)
     })
     socket.on('room:error', (payload: { message: string }) => setError(payload.message))
     // Anuncio de emparejamiento al arrancar una ronda: se muestra brevemente
@@ -63,6 +73,14 @@ export function useGuessWhoTournament(token: string | null) {
         setMatchAccusationFailedMessage('Bandera equivocada.')
       },
     )
+    // El rival abandonó el duelo (issue #131): la partida ya cerró y la ganó quien se queda.
+    socket.on('tournament:match-abandoned', (payload: { matchCode: string; message: string }) => setMatchAbandonedMessage(payload.message))
+    // El administrador te sacó del torneo (issue #147): no hay vuelta atrás, se limpia todo.
+    socket.on('tournament:kicked', (payload: { message: string }) => {
+      waitingCodeRef.current = null
+      setTournament(null)
+      setKickedMessage(payload.message)
+    })
 
     return () => {
       socket.disconnect()
@@ -70,8 +88,56 @@ export function useGuessWhoTournament(token: string | null) {
     }
   }, [token])
 
-  const createTournament = useCallback((gameId: string, maxParticipants: number) => {
-    socketRef.current?.emit('tournament:create', { gameId, maxParticipants })
+  const createTournament = useCallback(
+    (name?: string) => {
+      // Juegos, niveles, cupo y rondas los lee el servidor del torneo habilitado; el nombre es opcional.
+      socketRef.current?.emit('tournament:create', { name })
+    },
+    [],
+  )
+
+  /** Misión Galáctica: una respuesta de la persona; el servidor la califica. */
+  const sendMazeAnswer = useCallback((questionId: string, chosen: boolean) => {
+    socketRef.current?.emit('tournament:maze-answer', { questionId, chosen })
+  }, [])
+
+  /** Misión Galáctica: terminó su partida (o la abandonó). */
+  const sendMazeFinish = useCallback(() => {
+    socketRef.current?.emit('tournament:maze-finish')
+  }, [])
+
+  const clearError = useCallback(() => setError(null), [])
+
+  const startTournament = useCallback(() => {
+    socketRef.current?.emit('tournament:start')
+  }, [])
+
+  /** El administrador elige el juego de la siguiente ronda (`null` = volver al sorteo). */
+  const setNextGame = useCallback((gameIndex: number | null) => {
+    socketRef.current?.emit('tournament:set-next-game', { gameIndex })
+  }, [])
+
+  /** El administrador expulsa a una persona del torneo. */
+  const kickParticipant = useCallback((userId: string) => {
+    socketRef.current?.emit('tournament:kick', { userId })
+  }, [])
+
+  /** El administrador pausa o reanuda la ronda. */
+  const setPaused = useCallback((paused: boolean) => {
+    socketRef.current?.emit('tournament:pause', { paused })
+  }, [])
+
+  /** El administrador suma segundos a los turnos en curso. */
+  const addTime = useCallback((seconds: number) => {
+    socketRef.current?.emit('tournament:add-time', { seconds })
+  }, [])
+
+  const endRound = useCallback(() => {
+    socketRef.current?.emit('tournament:end-round')
+  }, [])
+
+  const closeTournament = useCallback(() => {
+    socketRef.current?.emit('tournament:close')
   }, [])
 
   const joinTournament = useCallback((code: string) => {
@@ -91,10 +157,6 @@ export function useGuessWhoTournament(token: string | null) {
   }, [])
   const answerQuestion = useCallback((requestId: string, answer: boolean) => {
     if (socketRef.current?.connected) socketRef.current.emit('tournament:match-answer', { requestId, answer })
-  }, [])
-
-  const setReady = useCallback((ready: boolean) => {
-    if (socketRef.current?.connected) socketRef.current.emit('tournament:ready', { ready })
   }, [])
 
   const updateTurnDuration = useCallback((turnDurationSeconds: number) => {
@@ -133,9 +195,22 @@ export function useGuessWhoTournament(token: string | null) {
     clearPairingAnnouncement: () => setPairingAnnouncement(null),
     matchAccusationFailedMessage,
     clearMatchAccusationFailedMessage: () => setMatchAccusationFailedMessage(null),
+    matchAbandonedMessage,
+    kickedMessage,
+    kickParticipant,
+    setPaused,
+    addTime,
+    clearMatchAbandonedMessage: () => setMatchAbandonedMessage(null),
     createTournament,
+    sendMazeAnswer,
+    sendMazeFinish,
+    clearError,
     joinTournament,
-    setReady,
+    startTournament,
+    closeTournament,
+    endRound,
+    setNextGame,
+    closed,
     updateTurnDuration,
     leaveTournament,
     discardMatchCard,

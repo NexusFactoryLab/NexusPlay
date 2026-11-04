@@ -1,9 +1,21 @@
 import { Injectable } from '@nestjs/common';
+import type { SubjectModel } from '../../../generated/prisma/client.js';
 import type { SubjectRepository } from '../../../domain/ports/subject.repository.port.js';
 import type { Subject } from '../../../domain/entities/subject.entity.js';
 import { SubjectSlugAlreadyTakenError } from '../../../application/errors/application.errors.js';
 import { PrismaService } from './prisma.service.js';
 import { SubjectMapper } from './subject.mapper.js';
+import { TtlCache } from '../../cache/ttl-cache.js';
+
+/**
+ * Una sola lista con todas las áreas vigentes sirve a todos los usuarios: la
+ * visibilidad (públicas + propias) se filtra en memoria en cada llamada, así
+ * que nunca se comparte nada privado entre usuarios. Se invalida en cada
+ * escritura; el TTL cubre cambios hechos por fuera de la app (seeds).
+ */
+const SUBJECTS_CACHE_TTL_MS = 30_000;
+const ALL_SUBJECTS_KEY = 'all';
+const subjectsCache = new TtlCache<SubjectModel[]>(SUBJECTS_CACHE_TTL_MS, 1);
 
 const UNIQUE_CONSTRAINT_ERROR_CODE = 'P2002';
 
@@ -30,6 +42,7 @@ export class PrismaSubjectRepository implements SubjectRepository {
         create: data,
         update: data,
       });
+      subjectsCache.clear();
     } catch (error) {
       if (isSlugConstraintViolation(error)) {
         throw new SubjectSlugAlreadyTakenError(data.slug);
@@ -58,22 +71,23 @@ export class PrismaSubjectRepository implements SubjectRepository {
   }
 
   async findVisibleTo(requestingUserId: string): Promise<Subject[]> {
-    const records = await this.prisma.subjectModel.findMany({
-      where: {
-        deletedAt: null,
-        OR: [{ status: 'PUBLIC' }, { creatorUserId: requestingUserId }],
-      },
-      orderBy: { name: 'asc' },
-    });
-    return records.map(SubjectMapper.toDomain);
+    const records = await this.loadAll();
+    return records
+      .filter((r) => r.status === 'PUBLIC' || r.creatorUserId === requestingUserId)
+      .map(SubjectMapper.toDomain);
   }
 
   async findAll(): Promise<Subject[]> {
-    const records = await this.prisma.subjectModel.findMany({
-      where: { deletedAt: null },
-      orderBy: { name: 'asc' },
-    });
-    return records.map(SubjectMapper.toDomain);
+    return (await this.loadAll()).map(SubjectMapper.toDomain);
+  }
+
+  private loadAll(): Promise<SubjectModel[]> {
+    return subjectsCache.getOrLoad(ALL_SUBJECTS_KEY, () =>
+      this.prisma.subjectModel.findMany({
+        where: { deletedAt: null },
+        orderBy: { name: 'asc' },
+      }),
+    );
   }
 
   async findByParentId(parentId: string): Promise<Subject[]> {
@@ -88,5 +102,6 @@ export class PrismaSubjectRepository implements SubjectRepository {
       where: { id },
       data: { deletedAt: new Date() },
     });
+    subjectsCache.clear();
   }
 }

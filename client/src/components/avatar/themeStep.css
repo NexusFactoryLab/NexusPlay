@@ -1,0 +1,128 @@
+/* Fondos propios de Fantasía y Kids en el paso de tema del primer inicio. */
+
+.ts-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -10;
+  isolation: isolate;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.ts-fantasy {
+  background:
+    radial-gradient(circle at 80% 12%, rgba(255, 224, 138, 0.35), transparent 28%),
+    radial-gradient(circle at 20% 70%, rgba(255, 61, 160, 0.2), transparent 45%),
+    radial-gradient(circle at 60% 40%, rgba(123, 92, 255, 0.45), transparent 50%),
+    linear-gradient(180deg, #0d0828 0%, #1e1656 55%, #3a2272 100%);
+}
+
+.ts-kids {
+  background:
+    radial-gradient(circle at 15% 85%, rgba(255, 154, 61, 0.35), transparent 40%),
+    radial-gradient(circle at 85% 80%, rgba(6, 182, 212, 0.3), transparent 40%),
+    linear-gradient(180deg, #8fdcff 0%, #c8f0ff 45%, #fff3c9 100%);
+}
+
+.ts-star {
+  position: absolute;
+  border-radius: 50%;
+  background: #fff6c9;
+  box-shadow: 0 0 8px 2px rgba(255, 246, 201, 0.8);
+  animation: ts-twinkle 3.2s ease-in-out infinite;
+}
+
+.ts-moon-glow {
+  position: absolute;
+  top: -80px;
+  right: 6%;
+  width: 260px;
+  height: 260px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 229, 138, 0.5), transparent 68%);
+  animation: ts-twinkle 6s ease-in-out infinite;
+}
+
+.ts-floater {
+  position: absolute;
+  line-height: 1;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35));
+  animation: ts-float 5.5s ease-in-out infinite;
+}
+
+.ts-fantasy .ts-floater {
+  filter: drop-shadow(0 0 12px rgba(255, 200, 61, 0.7));
+}
+
+.ts-confetti {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  animation: ts-float 4.5s ease-in-out infinite;
+}
+.ts-confetti-0 { background: #ff7a1a; }
+.ts-confetti-1 { background: #06b6d4; border-radius: 50%; }
+.ts-confetti-2 { background: #ff4f9a; }
+.ts-confetti-3 { background: #ffc83d; border-radius: 50%; }
+.ts-confetti-4 { background: #7b5cff; }
+
+.ts-sun {
+  position: absolute;
+  top: -60px;
+  left: 6%;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff4a8 0 35%, rgba(255, 214, 80, 0.55) 55%, transparent 72%);
+  animation: ts-twinkle 5s ease-in-out infinite;
+}
+
+.ts-kids-hill {
+  position: absolute;
+  left: -10%;
+  width: 120%;
+  border-radius: 50% 50% 0 0;
+}
+.ts-kids-hill-back { bottom: -12%; height: 34%; background: #7fe08a; }
+.ts-kids-hill-front { bottom: -18%; height: 28%; background: #4cc96a; }
+
+@keyframes ts-twinkle {
+  0%, 100% { opacity: 0.35; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+@keyframes ts-float {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50% { transform: translateY(-14px) rotate(3deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ts-star, .ts-moon-glow, .ts-floater, .ts-confetti, .ts-sun { animation: none; }
+}
+
+.ts-layer { position: fixed; inset: 0; z-index: -10; }
+.ts-layer-in { animation: ts-fade-in 0.5s ease-in-out both; }
+.ts-layer-out { animation: ts-fade-out 0.5s ease-in-out both; }
+
+@keyframes ts-fade-out {
+  0%, 30% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes ts-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* La tarjeta elegida «salta» un poco al tocarla. */
+.ts-card[aria-pressed='true'] { animation: ts-pick 0.26s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+@keyframes ts-pick {
+  0% { transform: scale(0.96); }
+  100% { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ts-layer-in, .ts-layer-out, .ts-card[aria-pressed='true'] { animation: none; }
+}

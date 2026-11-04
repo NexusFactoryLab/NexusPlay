@@ -9,7 +9,7 @@ export type CreatedGameKind =
   | 'DOMINO'
   | 'MAZE_COLLECTOR'
   | 'SNAKES_LADDERS'
-  | 'DUAL_QUEST'
+  | 'DUAL_QUEST_PIXI'
   | 'TRUE_FALSE_MAZE'
 
 /**
@@ -20,8 +20,7 @@ export type CreatedGameKind =
  *   modo (1 jugador / multijugador) vía `isMultiplayerGameType`.
  * - `instructionKind`: la clave de `gameInstructions` con la que se juega lo
  *   recién creado. Ojo: ¿Quién Es? se crea como GUESS_WHO (el torneo
- *   GUESS_WHO_GROUP es solo una forma de jugarlo) y Dúo Lógico se crea como
- *   DUAL_QUEST (no DUAL_QUEST_PIXI, que es el motor de demo aparte).
+ *   GUESS_WHO_GROUP es solo una forma de jugarlo).
  */
 const CREATED_GAME_KINDS: Record<CreatedGameKind, { label: string; gameType: string; instructionKind: CreationInstructionKind }> = {
   PAIRS: { label: 'MatchMente: parejas', gameType: 'MEMORY_MATCH', instructionKind: 'PAIRS' },
@@ -30,7 +29,7 @@ const CREATED_GAME_KINDS: Record<CreatedGameKind, { label: string; gameType: str
   DOMINO: { label: 'Dominexo', gameType: 'DOMINO', instructionKind: 'DOMINO' },
   MAZE_COLLECTOR: { label: 'Laberinto recolector', gameType: 'MAZE_COLLECTOR', instructionKind: 'MAZE_COLLECTOR' },
   SNAKES_LADDERS: { label: 'Escaleras y serpientes', gameType: 'SNAKES_LADDERS', instructionKind: 'SNAKES_LADDERS' },
-  DUAL_QUEST: { label: 'Dúo Lógico', gameType: 'DUAL_QUEST', instructionKind: 'DUAL_QUEST' },
+  DUAL_QUEST_PIXI: { label: 'Dúo Lógico', gameType: 'DUAL_QUEST_PIXI', instructionKind: 'DUAL_QUEST_PIXI' },
   TRUE_FALSE_MAZE: {
     label: 'Laberinto Verdadero o Falso',
     gameType: 'TRUE_FALSE_MAZE',

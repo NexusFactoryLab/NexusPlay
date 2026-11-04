@@ -11,7 +11,6 @@ import { InMemoryRoomStore } from './in-memory-room.store.js';
 import { InMemoryTournamentStore } from './in-memory-tournament.store.js';
 import { InMemoryDominoRoomStore } from './in-memory-domino-room.store.js';
 import { InMemorySnakesLaddersRoomStore } from './in-memory-snakes-ladders-room.store.js';
-import { InMemoryDualQuestRoomStore } from './in-memory-dual-quest-room.store.js';
 
 type Client = Parameters<RoomsGateway['handleDominoPlay']>[0];
 
@@ -62,7 +61,6 @@ function setup(phase: DominoRoomState['phase'] = 'WAITING') {
     new InMemoryTournamentStore(),
     domino,
     new InMemorySnakesLaddersRoomStore(),
-    new InMemoryDualQuestRoomStore(),
     { track: vi.fn().mockResolvedValue(undefined) } as unknown as AnalyticsTrackerService,
   );
   const events: Array<{ target: string; event: string; payload: unknown }> = [];
@@ -219,8 +217,16 @@ describe('Intermedio: pregunta antes de colocar', () => {
   it('la salida de un jugador descarta la pregunta pendiente', () => {
     const h = mediumPlaying();
     h.gateway.handleDominoPlay(h.p1, { tileId: 'to1', side: 'right' });
-    h.gateway.handleDisconnect(h.p2);
+    h.gateway.handleDominoLeave(h.p2);
     expect(h.room.pendingQuestion).toBeNull();
+  });
+
+  it('si al otro se le corta la conexión, la pregunta pendiente se conserva para cuando vuelva (issue #120)', () => {
+    const h = mediumPlaying();
+    h.gateway.handleDominoPlay(h.p1, { tileId: 'to1', side: 'right' });
+    h.gateway.handleDisconnect(h.p2);
+    expect(h.room.pendingQuestion).toMatchObject({ userId: 'p1', tileId: 'to1' });
+    expect(h.room.phase).toBe('PLAYING');
   });
 });
 

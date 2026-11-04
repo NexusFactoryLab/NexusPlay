@@ -34,7 +34,7 @@ export function SaveVisibilityModal({ onChoose, onDone }: SaveVisibilityModalPro
   }
 
   return (
-    <Modal onClose={() => {}} maxWidthClassName="max-w-[440px]">
+    <Modal onClose={() => {}} dismissible={false} maxWidthClassName="max-w-[440px]">
       <span
         aria-hidden="true"
         className="nx-celebrate-badge mb-3 flex h-11 w-11 items-center justify-center rounded-full text-white"

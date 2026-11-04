@@ -1,25 +1,28 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { AlertTriangle, KeyRound, PlusCircle, Sparkles, Trash2, Trophy } from 'lucide-react'
+import { AlertTriangle, KeyRound, PlusCircle, Sparkles, Swords, Trash2, Trophy } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
 import { DEFAULT_CATEGORY_COLOR, colorForCategory, iconForCategory } from './gamesCatalogVisuals'
 import {
   listGames,
+  loadGames,
   getGameBySlug,
   deleteGame,
-  listAllGameTypeSettings,
+  loadAllGameTypeSettings,
   type GameSummary,
   type GameDetail,
 } from '../../services/game.service'
 import {
   listSubjects as listCategories,
+  loadSubjects,
   createSubject,
   deleteSubject as deleteCategory,
   publishSubject,
   type SubjectWithGameCount as CategoryWithGameCount,
 } from '../../services/subject.service'
+import { getTournamentSettings } from '../../services/tournament-settings.service'
 import { ApiError } from '../../utils/http'
 import { trackEvent } from '../../services/analytics.service'
 import { GameCard } from './games/GameCard'
@@ -31,6 +34,7 @@ import { parseCreatedKind } from './games/create/justCreatedRedirect'
 import { GameDetailModal } from './games/GameDetailModal'
 import { Modal } from './games/Modal'
 import { JoinByCodeModal } from './games/JoinByCodeModal'
+import { TournamentCodeModal } from './games/TournamentCodeModal'
 import { resolveRoomCode, LIVE_ROOM_ROUTES, type ResolvedRoom } from './games/resolveRoomCode'
 import { GuessWhoRoom } from './games/GuessWhoRoom'
 import { GameFiltersPanel, type GameTypeFilterOption } from './games/GameFiltersPanel'
@@ -138,6 +142,8 @@ export function GamesSection({
   const [activeAreaId, setActiveAreaId] = useState<string | null>(null)
 
   const [categories, setCategories] = useState<CategoryWithGameCount[]>([])
+  // Hasta que llega la primera respuesta, "sin áreas" no es una verdad sino un desconocido.
+  const [categoriesLoaded, setCategoriesLoaded] = useState(false)
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null)
   const [rootUnclassifiedGames, setRootUnclassifiedGames] = useState<GameSummary[]>([])
   const [loadingRootUnclassified, setLoadingRootUnclassified] = useState(false)
@@ -178,6 +184,23 @@ export function GamesSection({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token])
   const [joinByCodeOpen, setJoinByCodeOpen] = useState(false)
+  // Acceso temporal al torneo (issue #102): solo existe mientras un ADMIN tenga el torneo habilitado en Edición.
+  const [tournamentOpen, setTournamentOpen] = useState(false)
+  const [tournamentCodeOpen, setTournamentCodeOpen] = useState(false)
+  useEffect(() => {
+    if (!token) return
+    let cancelled = false
+    getTournamentSettings(token)
+      .then((settings) => {
+        if (!cancelled) setTournamentOpen(settings.enabled)
+      })
+      .catch(() => {
+        if (!cancelled) setTournamentOpen(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [token])
   const [deleting, setDeleting] = useState(false)
   const [deletingCategory, setDeletingCategory] = useState(false)
   const [pendingDeleteCategory, setPendingDeleteCategory] = useState<CategoryWithGameCount | null>(null)
@@ -211,7 +234,8 @@ export function GamesSection({
     if (!token || !shouldLoadGames || browsingHidden) return
     setLoading(true)
     setError(null)
-    listGames(token, {
+    // Si ya se conoce este listado se pinta al instante y se revalida detrás.
+    return loadGames(token, {
       search: searchQuery || undefined,
       categoryId: mode === 'categories' ? activeCategoryId ?? undefined : undefined,
       onlyMine: mode === 'my-games' || undefined,
@@ -220,12 +244,13 @@ export function GamesSection({
       // El Inicio solo muestra los destacados que fija un ADMIN; Comunidad lo muestra todo.
       featured: mode === 'all' || undefined,
       pageSize: 40,
+    }, (result) => {
+      setGames(result.items)
+      setLoading(false)
+    }, (err: unknown) => {
+      setError(err instanceof ApiError ? err.message : 'No se pudieron cargar los juegos.')
+      setLoading(false)
     })
-      .then((result) => setGames(result.items))
-      .catch((err: unknown) => {
-        setError(err instanceof ApiError ? err.message : 'No se pudieron cargar los juegos.')
-      })
-      .finally(() => setLoading(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     token,
@@ -237,9 +262,7 @@ export function GamesSection({
     browsingHidden,
   ])
 
-  useEffect(() => {
-    reload()
-  }, [reload])
+  useEffect(() => reload(), [reload])
 
   // Al entrar a un área raíz se muestran sus sub-áreas, no un catálogo
   // de juegos — pero la raíz puede tener juegos asignados directo a ella
@@ -262,39 +285,36 @@ export function GamesSection({
   // el área sin importar la sección activa (Home, Comunidad, Mis juegos).
   useEffect(() => {
     if (!token) return
-    listCategories(token)
-      .then((items) => setCategories(sortByGameCount(items)))
-      .catch(() => {})
+    // Al volver a esta pantalla las áreas ya conocidas salen al instante
+    // (sin esqueleto ni "sin áreas") y se refrescan en segundo plano.
+    return loadSubjects(
+      token,
+      (items) => {
+        setCategories(sortByGameCount(items))
+        setCategoriesLoaded(true)
+      },
+      () => setCategoriesLoaded(true),
+    )
   }, [token])
 
-  // Solo ADMIN necesita saber qué tipos están archivados (issue #156): el
-  // backend ya excluye esos juegos para no-admin, así que para el resto de
-  // roles esta llamada no aportaría nada.
-  useEffect(() => {
-    if (!token || !isAdmin) {
-      setArchivedGameTypes(new Set())
-      return
-    }
-    listAllGameTypeSettings(token)
-      .then((settings) => {
-        setArchivedGameTypes(new Set(settings.filter((s) => s.isArchived).map((s) => s.gameType)))
-      })
-      .catch(() => {})
-  }, [token, isAdmin])
-
-  // Nombres visibles por tipo, para las casillas del filtro (issue #216) —
-  // a diferencia del efecto de arriba, este corre para cualquier rol.
+  // Una sola consulta de tipos de juego para dos usos:
+  //  - nombres visibles por tipo, para las casillas del filtro (issue #216),
+  //    para cualquier rol;
+  //  - tipos archivados (issue #156), que solo necesita un ADMIN: el backend
+  //    ya excluye esos juegos para el resto de roles.
   useEffect(() => {
     if (!token) return
-    listAllGameTypeSettings(token)
-      .then((settings) => {
-        setGameTypeDisplayNames(new Map(settings.map((s) => [
-          s.gameType,
-          resolveGameTypeDisplayName(s.gameType, s.displayName),
-        ])))
-      })
-      .catch(() => {})
-  }, [token])
+    if (!isAdmin) setArchivedGameTypes(new Set())
+    return loadAllGameTypeSettings(token, (settings) => {
+      setGameTypeDisplayNames(new Map(settings.map((s) => [
+        s.gameType,
+        resolveGameTypeDisplayName(s.gameType, s.displayName),
+      ])))
+      if (isAdmin) {
+        setArchivedGameTypes(new Set(settings.filter((s) => s.isArchived).map((s) => s.gameType)))
+      }
+    })
+  }, [token, isAdmin])
 
   // Se reinicia el filtro al cambiar de sección/modo, para no dejar
   // aplicado sin que se vea (el panel no se muestra en 'categories').
@@ -621,7 +641,17 @@ export function GamesSection({
           </div>
         </div>
 
-        {categories.length === 0 ? (
+        {!categoriesLoaded ? (
+          <div
+            className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4"
+            role="status"
+            aria-label="Cargando áreas"
+          >
+            {Array.from({ length: 8 }, (_, i) => (
+              <div key={i} className="h-28 animate-pulse rounded-2xl border border-border bg-border/40" />
+            ))}
+          </div>
+        ) : categories.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-16 text-center">
             <span
               className="mb-3 flex h-12 w-12 items-center justify-center rounded-full text-white"
@@ -1051,6 +1081,37 @@ export function GamesSection({
                   Unirme con código
                 </button>
               </div>
+              {/* Torneo: una sola franja compacta bajo las acciones principales, para que no compita con ellas por espacio. */}
+              {tournamentOpen && (
+                <div
+                  className="home-hero-tournament mt-3 inline-flex max-w-full flex-wrap items-center gap-1.5 rounded-full border border-border bg-surface p-1"
+                  role="group"
+                  aria-label="Torneo"
+                >
+                  <span className="tournament-label flex items-center gap-1.5 pr-1 pl-3 text-[11.5px] font-semibold tracking-wide text-text uppercase">
+                    <Trophy className="h-3.5 w-3.5 text-accent-2" strokeWidth={2.25} />
+                    Torneo
+                  </span>
+                  <button
+                    type="button"
+                    className="tournament-cta relative flex items-center gap-1.5 rounded-full border border-accent-2 bg-surface px-3.5 py-1.5 text-[13px] font-bold text-accent-2"
+                    onClick={() => setTournamentCodeOpen(true)}
+                  >
+                    <Swords className="h-4 w-4" strokeWidth={2.5} />
+                    Entrar al torneo
+                  </button>
+                  {user?.role?.toUpperCase() === 'ADMIN' && (
+                    <button
+                      type="button"
+                      className="tournament-open flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-semibold text-text-h transition-colors duration-200 hover:bg-accent/10 hover:text-accent"
+                      onClick={() => navigate('/quien-es/torneo?crear=1')}
+                    >
+                      <Trophy className="h-4 w-4" strokeWidth={2} />
+                      Abrir sala del torneo
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* En Fantasía el ícono se cambia por un trofeo dorado con destellos (solo CSS + emoji, ver .home-hero-trophy en index.css). */}
@@ -1226,10 +1287,8 @@ export function GamesSection({
                 filteredGames.map((game, index) => (
                   <div
                     key={game.id}
-                    className={`animate-[fade-in-up_0.35s_ease-out_backwards] ${
-                      mode === 'all' ? 'games-carousel-item shrink-0 snap-start' : ''
-                    }`}
-                    style={{ animationDelay: `${Math.min(index, 8) * 40}ms` }}
+                    className={`stagger-in ${mode === 'all' ? 'games-carousel-item shrink-0 snap-start' : ''}`}
+                    style={{ '--stagger': index } as React.CSSProperties}
                   >
                     <GameCard
                       game={game}
@@ -1272,6 +1331,8 @@ export function GamesSection({
           }}
         />
       )}
+
+      {tournamentCodeOpen && <TournamentCodeModal onClose={() => setTournamentCodeOpen(false)} />}
 
       {renderGameOverlays()}
     </section>

@@ -15,7 +15,6 @@ import { InMemoryRoomStore } from './in-memory-room.store.js';
 import { InMemoryTournamentStore } from './in-memory-tournament.store.js';
 import { InMemoryDominoRoomStore } from './in-memory-domino-room.store.js';
 import { InMemorySnakesLaddersRoomStore } from './in-memory-snakes-ladders-room.store.js';
-import { InMemoryDualQuestRoomStore } from './in-memory-dual-quest-room.store.js';
 import { MlpGuessWhoBotPolicy } from '../../application/bots/mlp-guess-who-bot.policy.js';
 import { DEFAULT_GUESS_WHO_MODEL_PATH, loadGuessWhoBotPolicy } from '../bots/load-guess-who-bot-policy.js';
 
@@ -40,7 +39,7 @@ afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); });
 
 function setup(botPolicy?: GuessWhoBotPolicy, freeAnswerer?: GuessWhoFreeAnswerer) {
   const rooms = new InMemoryRoomStore();
-  const gateway = new RoomsGateway(new JwtService(), { findById: async (id: string) => (id === game.id ? game : null) } as unknown as GameRepository, {} as UserRepository, rooms, new InMemoryTournamentStore(), new InMemoryDominoRoomStore(), new InMemorySnakesLaddersRoomStore(), new InMemoryDualQuestRoomStore(), { track: async () => {} } as unknown as AnalyticsTrackerService, botPolicy, freeAnswerer);
+  const gateway = new RoomsGateway(new JwtService(), { findById: async (id: string) => (id === game.id ? game : null) } as unknown as GameRepository, {} as UserRepository, rooms, new InMemoryTournamentStore(), new InMemoryDominoRoomStore(), new InMemorySnakesLaddersRoomStore(), { track: async () => {} } as unknown as AnalyticsTrackerService, botPolicy, freeAnswerer);
   const events: { target: string; event: string }[] = [];
   gateway.server = { to: (target: string) => ({ emit: (event: string) => events.push({ target, event }) }) } as unknown as Server;
   return { gateway, rooms, events };

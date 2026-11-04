@@ -179,7 +179,7 @@ export function ChatPanel({
           <p className="text-[12px] font-bold text-accent">{guided.pending.askerId === selfUserId ? (guided.pending.free && guided.opponentIsBot ? 'El bot está pensando la respuesta con IA…' : 'Esperando a tu rival…') : guided.pending.free ? 'Tu rival hace su propia pregunta' : 'Tu rival pregunta'}</p>
           <p className="mt-1 text-[13px] font-semibold text-text-h">{guided.pending.text}</p>
           {guided.pending.askerId !== selfUserId && answerHint && <p role="status" className="mt-2 rounded-lg border border-amber-400/60 bg-amber-50 px-2.5 py-1.5 text-[12px] text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">{answerHint}</p>}
-          {guided.pending.askerId !== selfUserId && <div className="mt-2 flex gap-2">
+          {guided.pending.askerId !== selfUserId && <div data-tut-focus="answer" className="mt-2 flex gap-2 rounded-xl">
             {[true, false].map(answer => <button key={String(answer)} type="button" disabled={disconnected} onClick={() => guided.onAnswer(guided.pending!.requestId, answer)} className="min-h-11 flex-1 rounded-xl border border-accent bg-accent/10 px-3 py-2 font-bold text-accent focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50">{answer ? 'Sí' : 'No'}</button>)}
           </div>}
           <p className="mt-2 text-[11px] text-text">{guided.pending.free ? 'Es una pregunta propia: responde con la verdad sobre tu tarjeta. Quien pregunta descarta según la respuesta.' : guided.autoDiscard === false ? 'Con la respuesta, descarta tú las tarjetas que no coinciden.' : 'La respuesta descarta automáticamente las opciones que no coinciden.'} La pregunta vence al cambiar el turno.</p>
@@ -193,7 +193,7 @@ export function ChatPanel({
           <p className="shrink-0 text-[12px] font-bold text-accent">Preguntas Sí/No · {guided.autoDiscard === false ? 'descartas tú' : 'descarte automático'}</p>
           {!guided.isMyTurn ? <p className="mt-1 shrink-0 text-[12px] text-text">{botTurn ? 'Podrás preguntar cuando sea tu turno.' : 'Podrás preguntar en tu turno. Puedes escribir mensajes mientras esperas.'}</p> : <>
             {/* La lista tiene su propio scroll con margen arriba y abajo: así ninguna pregunta queda cortada contra el borde. */}
-            <div role="list" aria-label="Preguntas sugeridas" className="mt-2 flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto overscroll-contain scroll-py-2 py-1 pr-1">
+            <div role="list" data-tut-focus="questions" aria-label="Preguntas sugeridas" className="mt-2 flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto overscroll-contain scroll-py-2 py-1 pr-1">
               {filteredQuestions.map(q => <button key={q.id} role="listitem" type="button" disabled={disconnected} onClick={() => { guided.onAsk(q.id); setText('') }} className="flex w-full shrink-0 items-center gap-1.5 rounded-xl border border-accent/30 bg-surface px-3 py-2 text-left text-[12px] font-medium leading-snug text-text-h hover:border-accent focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent disabled:opacity-50" aria-label={`Preguntar: ${q.text}`}>{q.category && <span className="shrink-0 rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold text-accent">{q.category}</span>}<span className="min-w-0">{q.text}</span></button>)}
               {filteredQuestions.length === 0 && <p className="text-[12px] text-text">{guided.questions.length ? 'Sin sugerencias para ese texto.' : 'No quedan preguntas sugeridas que separen las tarjetas.'}</p>}
             </div>

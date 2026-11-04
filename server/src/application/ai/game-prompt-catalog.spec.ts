@@ -6,7 +6,6 @@ import { GuessWhoContentValidator } from '../content-validators/guess-who.conten
 import { DominoContentValidator } from '../content-validators/domino.content-validator.js';
 import { MazeCollectorContentValidator } from '../content-validators/maze-collector.content-validator.js';
 import { SnakesLaddersContentValidator } from '../content-validators/snakes-ladders.content-validator.js';
-import { DualQuestContentValidator } from '../content-validators/dual-quest.content-validator.js';
 import { DualQuestPixiContentValidator } from '../content-validators/dual-quest-pixi.content-validator.js';
 import { TrueFalseMazeContentValidator } from '../content-validators/true-false-maze.content-validator.js';
 import { normalizeDraft } from './draft-normalizers.js';
@@ -18,7 +17,6 @@ const registry = new ContentValidatorRegistry(
   new DominoContentValidator(),
   new MazeCollectorContentValidator(),
   new SnakesLaddersContentValidator(),
-  new DualQuestContentValidator(),
   new DualQuestPixiContentValidator(),
   new TrueFalseMazeContentValidator(),
 );
@@ -30,8 +28,8 @@ const CASES: Array<{ name: string; gameType: GameTypeName; mode?: string }> = [
   { name: 'GUESS_WHO', gameType: 'GUESS_WHO' },
   { name: 'MEMORY_MATCH / PAIRS', gameType: 'MEMORY_MATCH', mode: 'PAIRS' },
   { name: 'MEMORY_MATCH / OPPOSITES', gameType: 'MEMORY_MATCH', mode: 'OPPOSITES' },
-  { name: 'DUAL_QUEST', gameType: 'DUAL_QUEST' },
   { name: 'TRUE_FALSE_MAZE', gameType: 'TRUE_FALSE_MAZE' },
+  { name: 'DUAL_QUEST_PIXI', gameType: 'DUAL_QUEST_PIXI' },
 ];
 
 /** Cuántos elementos tiene que tener el ejemplo (abreviado a propósito en el prompt) para pasar los mínimos de cantidad. */
@@ -85,11 +83,9 @@ function runThroughPipeline(gameType: GameTypeName, mode: string | undefined, ex
 }
 
 describe('catálogo de prompts de la IA', () => {
-  it('todos los tipos de juego tienen asistente, salvo Dúo Lógico Pixi (que no usa IA todavía)', () => {
+  it('todos los tipos de juego tienen asistente', () => {
     for (const gameType of VALID_GAME_TYPES) {
-      if (gameType === 'DUAL_QUEST_PIXI') {
-        expect(resolveGamePromptSpec(gameType)).toBeNull();
-      } else if (gameType === 'MEMORY_MATCH') {
+      if (gameType === 'MEMORY_MATCH') {
         expect(resolveGamePromptSpec(gameType, 'PAIRS')).not.toBeNull();
         expect(resolveGamePromptSpec(gameType, 'OPPOSITES')).not.toBeNull();
         expect(resolveGamePromptSpec(gameType)).toBeNull();

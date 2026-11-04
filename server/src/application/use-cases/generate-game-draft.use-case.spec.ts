@@ -13,7 +13,6 @@ import { GuessWhoContentValidator } from '../content-validators/guess-who.conten
 import { DominoContentValidator } from '../content-validators/domino.content-validator.js';
 import { MazeCollectorContentValidator } from '../content-validators/maze-collector.content-validator.js';
 import { SnakesLaddersContentValidator } from '../content-validators/snakes-ladders.content-validator.js';
-import { DualQuestContentValidator } from '../content-validators/dual-quest.content-validator.js';
 import { DualQuestPixiContentValidator } from '../content-validators/dual-quest-pixi.content-validator.js';
 import { TrueFalseMazeContentValidator } from '../content-validators/true-false-maze.content-validator.js';
 import { FileTextExtractor, type SourceFile } from '../../infrastructure/ai/file-text-extractor.js';
@@ -27,7 +26,6 @@ function buildRegistry(): ContentValidatorRegistry {
     new DominoContentValidator(),
     new MazeCollectorContentValidator(),
     new SnakesLaddersContentValidator(),
-    new DualQuestContentValidator(),
     new DualQuestPixiContentValidator(),
     new TrueFalseMazeContentValidator(),
   );
@@ -263,7 +261,7 @@ describe('GenerateGameDraftUseCase — tipos sin imagen obligatoria', () => {
     const assistant = fakeAssistant(VALID_DOMINO_DRAFT);
 
     await expect(
-      buildUseCase(assistant).execute({ gameType: 'DUAL_QUEST_PIXI', files: [csvFile('a,b')] }),
+      buildUseCase(assistant).execute({ gameType: 'MEMORY_MATCH', files: [csvFile('a,b')] }),
     ).rejects.toThrow(InvalidGameContentError);
     expect(assistant.generateGameDraft).not.toHaveBeenCalled();
   });

@@ -383,7 +383,7 @@ describe('normalizeDraft — Dominó y Laberinto recolector', () => {
 });
 
 describe('normalizeDraft — tipos sin arreglo seguro', () => {
-  it.each(['SNAKES_LADDERS', 'DUAL_QUEST', 'DUAL_QUEST_PIXI'] as const)('%s pasa tal cual (solo asegura que config sea objeto)', (gameType) => {
+  it.each(['SNAKES_LADDERS', 'DUAL_QUEST_PIXI'] as const)('%s pasa tal cual (solo asegura que config sea objeto)', (gameType) => {
     const content = [{ cellNumber: 4 }];
     expect(normalizeDraft({ gameType }, null, content)).toEqual({ config: {}, content });
   });
