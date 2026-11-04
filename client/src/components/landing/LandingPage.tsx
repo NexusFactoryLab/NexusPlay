@@ -1,4 +1,4 @@
-import { createContext, useContext, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { type MouseEvent, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowRight,
@@ -13,6 +13,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { AvatarCircle } from '../avatar/AvatarCircle'
+import { startPageWarp } from '../PageWarp'
 import { CHALLENGES, formatPoints, type Competitor, type LandingRanking } from './landingData'
 import { useLandingRanking } from './useLandingRanking'
 import './landing.css'
@@ -40,24 +41,16 @@ function affiliation(person: Competitor): string | null {
   return [person.university, person.career].filter(Boolean).join(' · ') || null
 }
 
-/** Origen (en px de la ventana) del destello que cubre la pantalla al ir a iniciar sesión o registrarse. */
-type WarpOrigin = { x: number; y: number }
-
-const WARP_MS = 520
-
-const WarpContext = createContext<(path: string, origin: WarpOrigin) => void>(() => undefined)
-
 /**
- * Enlace a login/registro con transición: un destello con el degradado de la marca
- * crece desde el punto del clic y cubre la pantalla antes de cambiar de página.
- * Con clic modificado (nueva pestaña) o sin animaciones se comporta como un enlace normal.
+ * Enlace a login/registro con transición (ver `PageWarp`). Con clic modificado
+ * (nueva pestaña) o sin animaciones se comporta como un enlace normal.
  */
 function GoLink({ to, className, children }: { to: string; className: string; children: ReactNode }) {
-  const go = useContext(WarpContext)
+  const navigate = useNavigate()
   const onClick = (event: MouseEvent<HTMLAnchorElement>) => {
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
     event.preventDefault()
-    go(to, { x: event.clientX, y: event.clientY })
+    if (!startPageWarp(to, { x: event.clientX, y: event.clientY })) navigate(to)
   }
   return (
     <Link to={to} className={className} onClick={onClick}>
@@ -115,13 +108,13 @@ function Hero({ ranking }: { ranking: LandingRanking }) {
       <div className="lp-wrap">
         <div>
           <h1>
-            Aprende jugando.
+            Refuerza lo que sabes
             <br />
-            <em>Compite en serio.</em>
+            <em>jugando con tu clase.</em>
           </h1>
           <p className="lp-sub">
-            Convierte cualquier tema en un juego, rétate con tu clase y sube en el ranking de tu institución. Todo en
-            tiempo real.
+            Convierte tus apuntes en juegos multijugador, repasa cualquier tema con tus compañeros y comprueba cuánto
+            dominas. Para colegios, universidades y cualquier aula.
           </p>
           <div className="lp-cta">
             <GoLink to="/register" className="lp-btn lp-btn-main">
@@ -192,7 +185,7 @@ const STEPS = [
   {
     icon: Trophy,
     title: 'Sube en el ranking',
-    text: 'Cada partida suma puntos para ti, tu carrera y tu universidad. El podio es público.',
+    text: 'Cada partida suma puntos para ti y tu institución: repasar también te hace subir. El podio es público.',
   },
 ]
 
@@ -400,7 +393,7 @@ function FinalCall() {
       <div className="lp-wrap">
         <div className="lp-final">
           <h2>¿Listo para subir de nivel?</h2>
-          <p className="lp-lead">Crea tu cuenta en un minuto y empieza a competir con tu clase.</p>
+          <p className="lp-lead">Crea tu cuenta en un minuto y empieza a repasar jugando con tu clase.</p>
           <div className="lp-cta">
             <GoLink to="/register" className="lp-btn lp-btn-main">
               ¡Empezar a jugar!
@@ -414,33 +407,8 @@ function FinalCall() {
 
 export function LandingPage() {
   const ranking = useLandingRanking()
-  const navigate = useNavigate()
-  const [warp, setWarp] = useState<WarpOrigin | null>(null)
-  const leaving = useRef(false)
-
-  const go = (path: string, origin: WarpOrigin) => {
-    if (leaving.current) return
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      navigate(path)
-      return
-    }
-    leaving.current = true
-    setWarp(origin)
-    window.setTimeout(() => navigate(path), WARP_MS)
-  }
-
   return (
-    <WarpContext.Provider value={go}>
-    <div className={warp ? 'landing lp-leaving' : 'landing'}>
-      {warp && (
-        <div
-          className="lp-warp"
-          aria-hidden="true"
-          style={{ '--wx': `${warp.x}px`, '--wy': `${warp.y}px` } as React.CSSProperties}
-        >
-          <Zap size={56} fill="currentColor" strokeWidth={0} />
-        </div>
-      )}
+    <div className="landing">
       <Header />
       <main>
         <Hero ranking={ranking} />
@@ -457,6 +425,5 @@ export function LandingPage() {
         </div>
       </footer>
     </div>
-    </WarpContext.Provider>
   )
 }
