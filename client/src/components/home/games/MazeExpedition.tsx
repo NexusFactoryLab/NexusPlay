@@ -76,7 +76,12 @@ export function MazeExpedition({ title, primaryColor, items, config, stations, o
   }
 
   return (
-    <main className="flex min-h-full flex-1 items-center justify-center bg-[#0b1220] p-4 sm:p-8">
+    // Pantalla propia con scroll (issue #159): en una ventana baja (sin pantalla
+    // completa) la tarjeta es más alta que la ventana y, centrada sin scroll, se
+    // cortaba por arriba y por abajo. `min-h-full` + `items-center` la centra
+    // solo cuando cabe; si no, empieza arriba y se desliza.
+    <main className="fixed inset-0 overflow-y-auto overscroll-contain bg-[#0b1220]">
+      <div className="flex min-h-full items-center justify-center p-3 sm:p-6 [@media(max-height:700px)]:py-3">
       {phase === 'briefing' ? (
         <StationBriefing
           station={station}
@@ -98,6 +103,7 @@ export function MazeExpedition({ title, primaryColor, items, config, stations, o
           onExit={onExit}
         />
       )}
+      </div>
     </main>
   )
 }
@@ -125,16 +131,16 @@ function StationBriefing({
       aria-label={`Estación ${station.number}: ${station.region}`}
       className="w-full max-w-[640px] animate-[maze-levelup-pop_0.45s_cubic-bezier(0.16,1,0.3,1)] overflow-hidden rounded-3xl border-2 border-emerald-300/40 bg-slate-950/95 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.8)]"
     >
-      <div className="relative h-36 overflow-hidden">
+      <div className="relative h-36 overflow-hidden [@media(max-height:760px)]:h-24 [@media(max-height:620px)]:h-16">
         <img src={mazeSpriteUrl(theme.background)} alt="" className="absolute inset-0 h-full w-full object-cover opacity-70" />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent" />
-        <div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 items-end gap-4">
+        <div className="absolute bottom-1 left-1/2 flex -translate-x-1/2 items-end gap-4 [@media(max-height:760px)]:scale-75 [@media(max-height:760px)]:origin-bottom">
           <SpriteStrip name={`${theme.spritePrefix}truck-drive`} frames={4} size={84} durationMs={640} />
           <SpriteStrip name={`${theme.spritePrefix}cloud-chaser`} frames={4} size={60} durationMs={900} />
         </div>
       </div>
-      <div className="p-5 sm:p-6">
-        <nav aria-label="Elige la estación" className="mb-4 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+      <div className="p-5 sm:p-6 [@media(max-height:760px)]:p-4 [@media(max-height:620px)]:p-3">
+        <nav aria-label="Elige la estación" className="mb-4 grid grid-cols-2 gap-1.5 sm:grid-cols-4 [@media(max-height:760px)]:mb-2.5">
           {stations.map((item, position) => {
             const active = item.layout === station.layout
             const won = Boolean(completed[item.layout])
@@ -161,7 +167,7 @@ function StationBriefing({
         <p className="mt-1 flex items-center gap-1.5 text-[14px] text-slate-300">
           <MapPin className="h-4 w-4 text-emerald-300" aria-hidden="true" /> {station.place} · {theme.label}
         </p>
-        <dl className="mt-4 grid gap-3 text-[14px] sm:grid-cols-2">
+        <dl className="mt-4 grid gap-3 text-[14px] sm:grid-cols-2 [@media(max-height:760px)]:mt-2.5 [@media(max-height:760px)]:gap-2 [@media(max-height:620px)]:text-[13px]">
           <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
             <dt className="flex items-center gap-1.5 text-[12px] font-bold text-rose-300 uppercase">
               <Target className="h-3.5 w-3.5" aria-hidden="true" /> Reto ambiental
@@ -185,7 +191,7 @@ function StationBriefing({
             Llevas {done * PBR_PER_STATION} Puntos de Bio-Resiliencia.
           </p>
         )}
-        <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-2 [@media(max-height:760px)]:mt-3">
           <button
             type="button"
             autoFocus
