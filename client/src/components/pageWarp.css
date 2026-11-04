@@ -25,16 +25,20 @@
   animation: page-warp-reveal 0.6s cubic-bezier(0.65, 0, 0.35, 1) 0.12s forwards;
 }
 
-.page-warp svg {
+/* La N del logo en blanco (LogoTint) en el centro del destello. */
+.page-warp-mark {
+  display: block;
+  width: 84px;
+  height: 84px;
   filter: drop-shadow(0 0 18px rgba(255, 255, 255, 0.55));
 }
 
-.page-warp--cover svg {
+.page-warp--cover .page-warp-mark {
   opacity: 0;
   animation: page-warp-bolt-in 0.5s ease-out forwards;
 }
 
-.page-warp--reveal svg {
+.page-warp--reveal .page-warp-mark {
   animation: page-warp-bolt-out 0.6s cubic-bezier(0.65, 0, 0.35, 1) 0.12s forwards;
 }
 

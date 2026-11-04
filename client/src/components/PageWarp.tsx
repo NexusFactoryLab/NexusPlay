@@ -1,6 +1,6 @@
 import { useEffect, useState, type AnimationEvent, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Zap } from 'lucide-react'
+import { LogoTint } from './BrandLogo'
 import './pageWarp.css'
 
 /** Punto de la ventana (en px) desde el que crece el destello. */
@@ -56,7 +56,7 @@ export function PageWarp() {
       style={{ '--wx': `${state.origin.x}px`, '--wy': `${state.origin.y}px` } as CSSProperties}
       onAnimationEnd={onAnimationEnd}
     >
-      <Zap size={64} fill="currentColor" strokeWidth={0} />
+      <LogoTint color="#fff" className="page-warp-mark" />
     </div>
   )
 }

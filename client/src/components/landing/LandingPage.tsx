@@ -1,7 +1,8 @@
 import { useRef, type CSSProperties, type MouseEvent, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowRight, BarChart3, Brain, Check, Crown, GraduationCap, Radio, Users, Zap } from 'lucide-react'
+import { ArrowRight, BarChart3, Brain, Check, Crown, GraduationCap, Radio, Users } from 'lucide-react'
 import { AvatarCircle } from '../avatar/AvatarCircle'
+import { LogoMark, LogoWordmark } from '../BrandLogo'
 import { startPageWarp } from '../PageWarp'
 import { CountUp } from './CountUp'
 import { CHALLENGES, formatPoints, type Competitor, type LandingRanking } from './landingData'
@@ -66,11 +67,9 @@ function Header() {
   return (
     <nav className="lp-nav" aria-label="Principal">
       <div className="lp-wrap">
-        <Link to="/" className="lp-brand">
-          <span className="lp-brand-mark" aria-hidden="true">
-            <Zap size={20} fill="currentColor" strokeWidth={0} />
-          </span>
-          NexusPlay
+        <Link to="/" className="lp-brand" aria-label="NexusPlay, inicio">
+          <LogoMark className="lp-logo-mark" />
+          <LogoWordmark className="lp-logo-word" />
         </Link>
         <div className="lp-nav-links">
           <SectionLink id="como">Cómo funciona</SectionLink>
@@ -393,6 +392,7 @@ function FinalCall() {
     <section className="lp-section">
       <div className="lp-wrap">
         <div className="lp-final">
+          <LogoMark className="lp-final-logo" />
           <h2>Tu próxima clase puede ser una final.</h2>
           <p className="lp-lead">
             Crea tu cuenta en un minuto, sube un apunte y lanza la primera partida hoy mismo.
@@ -423,6 +423,10 @@ export function LandingPage() {
       </main>
       <footer className="lp-footer">
         <div className="lp-wrap">
+          <div className="lp-footer-brand">
+            <LogoMark className="lp-logo-mark" />
+            <LogoWordmark className="lp-logo-word" />
+          </div>
           <Link to="/privacidad">Política de Privacidad</Link> · <Link to="/terminos">Términos de Servicio</Link>
           <p className="lp-note">© 2026 NexusFactoryLab</p>
         </div>
