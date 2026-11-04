@@ -1,5 +1,5 @@
-import { Zap } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { LogoWordmark } from './BrandLogo'
 import { RegisterForm } from './RegisterForm'
 import { ThemeToggle } from './ThemeToggle'
 
@@ -28,13 +28,7 @@ export function RegisterPage({ onSwitchToLogin }: RegisterPageProps) {
         style={{ boxShadow: 'var(--shadow), var(--glow)' }}
       >
         <header className="mb-5 text-center">
-          <span
-            className="inline-flex h-13 w-13 items-center justify-center rounded-2xl text-white"
-            style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
-            aria-hidden="true"
-          >
-            <Zap className="h-6 w-6" fill="currentColor" strokeWidth={0} />
-          </span>
+          <div className="flex justify-center"><LogoWordmark className="h-10 w-auto" /></div>
           <h1 className="mt-3 mb-1.5 text-[26px] tracking-tight text-text-h">Crea tu cuenta</h1>
           <p className="text-[15px]">Únete a NexusPlay y empieza a jugar.</p>
         </header>
