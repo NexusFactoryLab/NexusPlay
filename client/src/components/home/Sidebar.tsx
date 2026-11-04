@@ -1,11 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { ChevronLeft, Plus, Zap } from 'lucide-react'
+import { ChevronLeft, Plus } from 'lucide-react'
 import type { AuthUser } from '../../services/auth.service'
 import { ProfileMenu } from './ProfileMenu'
 import { NAV_ICONS, navIcon, navTileStyle } from './sidebarIcons'
 import { useTheme } from '../../hooks/useTheme'
+import { LogoMark, LogoWordmark } from '../BrandLogo'
 
 type SidebarProps = {
   user: AuthUser
@@ -160,18 +161,8 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
       <span className="sidebar-vine" aria-hidden="true">🌿</span>
 
       <div className="sidebar-header mb-4 flex items-center gap-2.5 px-1.5">
-        <span
-          className="sidebar-logo flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white"
-          style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
-          aria-hidden="true"
-        >
-          <Zap className="h-[18px] w-[18px]" fill="currentColor" strokeWidth={0} />
-        </span>
-        {!collapsed && (
-          <span className="sidebar-brand truncate text-[17px] font-semibold tracking-tight text-text-h">
-            NexusPlay
-          </span>
-        )}
+        <LogoMark className="sidebar-logo h-9 w-9 shrink-0 object-contain" />
+        {!collapsed && <LogoWordmark className="h-7 w-auto min-w-0" />}
       </div>
 
       <ProfileMenu user={user} onSignOut={onSignOut} placement="sidebar" collapsed={collapsed} />

@@ -10,6 +10,7 @@ import { bestBoardGrid } from './memoryMatchLayout'
 import { MemoryMatchTutorial } from './tutorial/MemoryMatchTutorial'
 import { enterPageFullscreen } from './tutorial/TutorialRunner'
 import { Maximize, Minimize } from 'lucide-react'
+import { LogoTint } from '../../BrandLogo'
 
 const FULLSCREEN_PREF_KEY = 'nexusplay-memory-fullscreen'
 
@@ -337,9 +338,7 @@ function MemoryMatchSession({
                     className="absolute inset-0 flex items-center justify-center rounded-xl border-2 bg-bg/90 shadow-[var(--shadow)] [backface-visibility:hidden]"
                     style={{ borderColor: primaryColor, backgroundImage: `linear-gradient(135deg, ${primaryColor}26, ${primaryColor}0d)` }}
                   >
-                    <span style={{ color: primaryColor, fontSize: grid.cardWidth * 0.3 }}>
-                      ✦
-                    </span>
+                    <LogoTint color={primaryColor} className="block h-[58%] w-[58%]" />
                   </div>
                   {/* Cara: la imagen llena la carta y el texto va en una franja corta abajo. Sin zonas vacías. */}
                   <div

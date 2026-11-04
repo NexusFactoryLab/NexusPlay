@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { LoginPage } from './components/LoginPage'
+import { GameWatermarkLayout } from './components/GameWatermarkLayout'
 import { RegisterPage } from './components/RegisterPage'
 import { HomeLayout } from './components/home/HomeLayout'
 import { HomePage } from './components/home/sections/HomePage'
@@ -137,53 +138,56 @@ function App() {
         <Route path="duo-logico" element={<DuoLogicoGameFormPage />} />
         <Route path="laberinto-vf" element={<TrueFalseMazeGameFormPage />} />
       </Route>
-      <Route path="/domino/sala/:code?" element={<DominoRoomPage />} />
-      <Route path="/escaleras-serpientes/sala/:code?" element={<SnakesLaddersRoomPage />} />
-      <Route path="/jugar/memoria/:slug" element={<MemoryMatchPlayPage />} />
-      <Route path="/jugar/laberinto/:slug" element={<MazeCollectorPlayPage />} />
-      <Route
-        path="/jugar/laberinto-vf/:slug"
-        element={
-          <Suspense fallback={<main className="flex flex-1 items-center justify-center">Cargando la nave…</main>}>
-            <TrueFalseMazePlayPage />
-          </Suspense>
-        }
-      />
-      {/* Una ronda de Misión Galáctica dentro de un torneo (issue #102): cada persona juega sola. */}
-      <Route
-        path="/laberinto-vf/torneo/:code"
-        element={
-          <Suspense fallback={<main className="flex flex-1 items-center justify-center">Cargando la nave…</main>}>
-            <TrueFalseMazeTournamentPage />
-          </Suspense>
-        }
-      />
-      <Route
-        path="/jugar/laberinto-vf-demo"
-        element={
-          <Suspense fallback={<main className="flex flex-1 items-center justify-center">Cargando la nave…</main>}>
-            <TrueFalseMazeDemoPage />
-          </Suspense>
-        }
-      />
-      <Route path="/quien-es/sala/:code?" element={<GuessWhoRoomPage />} />
-      <Route path="/quien-es/torneo/:code?" element={<TournamentRoomPage />} />
-      <Route
-        path="/dual-quest-pixi/sala/:code"
-        element={
-          <Suspense fallback={<main className="flex flex-1 items-center justify-center">Cargando Dúo Lógico…</main>}>
-            <DuoLogicoPage />
-          </Suspense>
-        }
-      />
-      <Route
-        path="/dual-quest-pixi/:slug"
-        element={
-          <Suspense fallback={<main className="flex flex-1 items-center justify-center">Cargando Dúo Lógico…</main>}>
-            <DuoLogicoPage />
-          </Suspense>
-        }
-      />
+      {/* Todas las pantallas de juego llevan la marca de agua de NexusPlay. */}
+      <Route element={<GameWatermarkLayout />}>
+        <Route path="/domino/sala/:code?" element={<DominoRoomPage />} />
+        <Route path="/escaleras-serpientes/sala/:code?" element={<SnakesLaddersRoomPage />} />
+        <Route path="/jugar/memoria/:slug" element={<MemoryMatchPlayPage />} />
+        <Route path="/jugar/laberinto/:slug" element={<MazeCollectorPlayPage />} />
+        <Route
+          path="/jugar/laberinto-vf/:slug"
+          element={
+            <Suspense fallback={<main className="flex flex-1 items-center justify-center">Cargando la nave…</main>}>
+              <TrueFalseMazePlayPage />
+            </Suspense>
+          }
+        />
+        {/* Una ronda de Misión Galáctica dentro de un torneo (issue #102): cada persona juega sola. */}
+        <Route
+          path="/laberinto-vf/torneo/:code"
+          element={
+            <Suspense fallback={<main className="flex flex-1 items-center justify-center">Cargando la nave…</main>}>
+              <TrueFalseMazeTournamentPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/jugar/laberinto-vf-demo"
+          element={
+            <Suspense fallback={<main className="flex flex-1 items-center justify-center">Cargando la nave…</main>}>
+              <TrueFalseMazeDemoPage />
+            </Suspense>
+          }
+        />
+        <Route path="/quien-es/sala/:code?" element={<GuessWhoRoomPage />} />
+        <Route path="/quien-es/torneo/:code?" element={<TournamentRoomPage />} />
+        <Route
+          path="/dual-quest-pixi/sala/:code"
+          element={
+            <Suspense fallback={<main className="flex flex-1 items-center justify-center">Cargando Dúo Lógico…</main>}>
+              <DuoLogicoPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/dual-quest-pixi/:slug"
+          element={
+            <Suspense fallback={<main className="flex flex-1 items-center justify-center">Cargando Dúo Lógico…</main>}>
+              <DuoLogicoPage />
+            </Suspense>
+          }
+        />
+      </Route>
       <Route path="/" element={<HomeLayout />}>
         <Route index element={<HomePage />} />
         <Route path=":slug" element={<HomePage />} />
