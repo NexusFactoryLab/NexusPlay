@@ -39,8 +39,8 @@ const GAME_TYPE_SEEDS: GameTypeSeed[] = [
   },
   {
     gameType: 'MAZE_COLLECTOR',
-    displayName: 'Recolector de laberinto',
-    description: 'Recorre el laberinto recolectando elementos antes de llegar a la meta.',
+    displayName: 'Salvando el mundo con sostenibilidad',
+    description: 'Elige un mapa (ciudad, Amazonia, océano o páramo), recolecta los elementos y esquiva la contaminación.',
     archived: true,
   },
   {

@@ -7,9 +7,11 @@ import { trackEvent } from '../../../services/analytics.service'
 import { colorForCategory, DEFAULT_CATEGORY_COLOR } from '../gamesCatalogVisuals'
 import { listSubjects as listCategories, type SubjectWithGameCount } from '../../../services/subject.service'
 import { MazeCollectorGame } from './MazeCollectorGame'
-import { MAZE_LAYOUTS, DEFAULT_MAZE_CONFIG } from './mazeCollectorTypes'
+import { MAZE_LAYOUTS, DEFAULT_MAZE_CONFIG, normalizeMazeLayout } from './mazeCollectorTypes'
 import type { MazeCollectorConfig, MazeCollectorItem } from './mazeCollectorTypes'
 import { questionsForGame } from './mazeCollectorQuestions'
+import { MazeExpedition } from './MazeExpedition'
+import { expeditionStations } from './mazeExpeditionStations'
 
 /**
  * Vista dedicada de Maze Collector en ruta propia (`/jugar/laberinto/:slug`,
@@ -82,15 +84,29 @@ export function MazeCollectorPlayPage() {
   const category = categories.find((c) => c.id === game.categoryId)
   const primaryColor = category ? colorForCategory(category.name) : DEFAULT_CATEGORY_COLOR
   const config = { ...DEFAULT_MAZE_CONFIG, ...(game.config as Partial<MazeCollectorConfig>) }
+  const stations = expeditionStations(config.stations)
+
+  if (stations.length > 0) {
+    return (
+      <MazeExpedition
+        title={game.title}
+        primaryColor={primaryColor}
+        items={game.content as MazeCollectorItem[]}
+        config={config}
+        stations={stations}
+        onExit={handleExit}
+      />
+    )
+  }
 
   return (
     <MazeCollectorGame
       title={game.title}
       primaryColor={primaryColor}
-      layout={MAZE_LAYOUTS[config.layout]}
+      layout={MAZE_LAYOUTS[normalizeMazeLayout(config.layout)]}
       items={game.content as MazeCollectorItem[]}
       config={config}
-      questions={questionsForGame((game.config as { questions?: unknown } | null)?.questions)}
+      questions={questionsForGame((game.config as { questions?: unknown } | null)?.questions, normalizeMazeLayout(config.layout))}
       onExit={handleExit}
       gameId={game.id}
       token={token}

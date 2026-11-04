@@ -44,8 +44,11 @@ import {
   MIN_MAZE_ITEMS,
   MAZE_ICON_LABELS,
   iconForConcept,
+  MAZE_LAYOUT_IDS,
+  normalizeMazeLayout,
   type MazeLayout,
 } from './mazeCollectorTypes'
+import { MAZE_MAPS } from './mazeMaps'
 import { DOMINO_ICON_KEYS } from './dominoTypes'
 import {
   ANSWER_LETTERS,
@@ -98,12 +101,10 @@ const SUGGESTED_COLORS = [
   '#f97316',
 ]
 
-const LAYOUT_OPTIONS: Array<{ value: MazeLayout; label: string }> = [
-  { value: 'CLASSIC', label: 'Clásico' },
-  { value: 'CROSS', label: 'Cruz' },
-  { value: 'SPIRAL', label: 'Espiral' },
-  { value: 'CITY', label: 'Ciudad (grande, con calles y edificios)' },
-]
+const LAYOUT_OPTIONS: Array<{ value: MazeLayout; label: string }> = MAZE_LAYOUT_IDS.map((id) => ({
+  value: id,
+  label: `${MAZE_MAPS[id].label}: ${MAZE_MAPS[id].description}`,
+}))
 
 function emptyItem(index: number): ItemDraft {
   return {
@@ -217,7 +218,7 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
     setTitle(savedString(state, 'title', ''))
     setDescription(savedString(state, 'description', ''))
     setCoverImageUrl(savedNullableString(state, 'coverImageUrl'))
-    setLayout(savedString(state, 'layout', DEFAULT_MAZE_CONFIG.layout) as MazeLayout)
+    setLayout(normalizeMazeLayout(savedString(state, 'layout', DEFAULT_MAZE_CONFIG.layout)))
     setLives(savedNumber(state, 'lives', DEFAULT_MAZE_CONFIG.lives))
     setEnemySpeed(savedNumber(state, 'enemySpeed', DEFAULT_MAZE_CONFIG.enemySpeed))
     setCollectorLabel(savedString(state, 'collectorLabel', ''))
@@ -273,10 +274,7 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
       }),
     )
     const config = (draft.config ?? {}) as Record<string, unknown>
-    const validLayouts = LAYOUT_OPTIONS.map((option) => option.value)
-    if (typeof config.layout === 'string' && validLayouts.includes(config.layout as MazeLayout)) {
-      setLayout(config.layout as MazeLayout)
-    }
+    if (typeof config.layout === 'string') setLayout(normalizeMazeLayout(config.layout))
     if (typeof config.lives === 'number') setLives(config.lives)
     if (typeof config.enemySpeed === 'number') setEnemySpeed(config.enemySpeed)
     if (typeof config.collectorLabel === 'string') setCollectorLabel(config.collectorLabel)
@@ -468,7 +466,7 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
       draftState={draftState}
       onRestoreDraft={restoreDraft}
       adaptation={adaptation}
-       title="Laberinto recolector"
+       title="Salvando el mundo con sostenibilidad"
       description="Recolecta objetos temáticos en un laberinto y esquiva enemigos."
       descriptionDetail="Puedes cambiar la narrativa: por ejemplo, un camión de reciclaje esquivando nubes de contaminación, o cualquier otra idea."
       aiPanel={<AiGameAssistantPanel gameType="MAZE_COLLECTOR" disabled={submitting} onDraftReady={(draft, meta) => { applyAiDraft(draft); aiIdentity.onDraft(draft, meta) }} />}
@@ -518,15 +516,15 @@ export function MazeCollectorGameForm({ onClose, onCreated, onBack, onCategoryCr
 
         {phase === 1 && (
         <>
-        <FormSection icon={SlidersHorizontal} title="Reglas del laberinto" subtitle="Forma, vidas y velocidad de los enemigos." tone={4}>
+        <FormSection icon={SlidersHorizontal} title="Reglas del laberinto" subtitle="Mapa, vidas y velocidad de los enemigos." tone={4}>
         <div>
           <div className="mb-1.5 flex items-center gap-1.5">
             <label className="nx-label text-[13px] font-medium text-text-h" htmlFor="maze-layout">
-              Forma del laberinto
+              Mapa del juego
             </label>
             <InfoBubble
-              label="Ayuda: forma del laberinto"
-              text="Es el dibujo del mapa por el que se mueve el personaje. Clásico es el más sencillo; Ciudad es grande, con calles y edificios, y toma más tiempo recorrerlo."
+              label="Ayuda: mapa del juego"
+              text="Es el escenario por el que se mueve el personaje, con su propio muñeco y sus propios obstáculos: la ciudad con su camión reciclador, la selva amazónica, el océano o el páramo."
             />
           </div>
           <FormSelect

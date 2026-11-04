@@ -20,7 +20,7 @@ import {
 import type { Collectible, Direction, GhostPersonality } from './mazeEngine'
 import { celebrateMatch, primeGameFeedback, signalMismatch } from '../../../utils/gameFeedback'
 import { ANSWER_LETTERS } from './mazeCollectorQuestions'
-import type { MazeQuestion } from './mazeCollectorQuestions'
+import type { MazeQuestion, MazeQuestionBook } from './mazeCollectorQuestions'
 
 export type { Direction }
 export type MazePhase = 'ready' | 'playing' | 'levelup' | 'lost' | 'won'
@@ -66,7 +66,7 @@ const ANSWER_MIN_DISTANCE = 6
 
 /** Una respuesta en el mapa: el camión la toma al pasar por su celda. */
 export type MazeAnswer = { letter: string; text: string; correct: boolean; pos: CellPosition; wrong: boolean }
-export type ActiveQuestion = { id: number; question: string; answers: MazeAnswer[] }
+export type ActiveQuestion = { id: number; question: string; answers: MazeAnswer[]; book?: MazeQuestionBook }
 /** Lo último que pasó con una respuesta, para el aviso en pantalla (`id` cambia con cada intento). */
 export type AnswerFeedback = { id: number; kind: 'correct' | 'wrong' | 'timeout'; letter: string }
 /** Por qué se perdió la última vida (se muestra en la pantalla final, no en un aviso aparte). */
@@ -336,6 +336,7 @@ function buildQuestion(source: MazeQuestion, positions: CellPosition[], id: numb
   return {
     id,
     question: source.question,
+    book: source.book,
     answers: sequence.slice(0, positions.length).map((optionIndex, slot) => ({
       letter: ANSWER_LETTERS[slot],
       text: source.options[optionIndex],
@@ -540,7 +541,7 @@ function advance(entity: Moving, speed: number, dt: number): boolean {
 
 function tickPlayer(state: InternalState, layout: MazeLayoutDef, now: number, dt: number) {
   const player = state.player
-  const speed = PLAYER_BASE_SPEED * (now < player.slowUntil ? SLOW_TRAP_FACTOR : 1)
+  const speed = PLAYER_BASE_SPEED * (layout.speedScale ?? 1) * (now < player.slowUntil ? SLOW_TRAP_FACTOR : 1)
   const arrived = advance(player, speed, dt)
 
   if (arrived || samePos(player.pos, player.nextPos)) {
@@ -644,7 +645,7 @@ function tickGhost(ghost: InternalGhost, state: InternalState, layout: MazeLayou
   const area = state.scenario?.area
   if (state.scenario?.purifier && ghost.mode === 'NORMAL') return
   const speedFactor = ghost.mode === 'FRIGHTENED' ? FRIGHTENED_SPEED_FACTOR : ghost.mode === 'EATEN' ? EATEN_SPEED_FACTOR : 1
-  const speed = ghostSpeed(state.level, state.baseEnemySpeed) * speedFactor
+  const speed = ghostSpeed(state.level, state.baseEnemySpeed) * (layout.speedScale ?? 1) * speedFactor
   const arrived = advance(ghost, speed, dt)
 
   if (arrived || samePos(ghost.pos, ghost.nextPos)) {
@@ -710,12 +711,16 @@ function wrappedDistance(a: { row: number; col: number }, b: { row: number; col:
 
 function resolveGhostCollisions(state: InternalState, layout: MazeLayoutDef) {
   const playerPoint = interpolated(state.player, layout.cols)
+  // El contacto crece con los sprites: en los mapas de celda fina (spriteScale
+  // 2.4) el muñeco ya se ve encima del contaminante mucho antes de estar a 0.6
+  // celdas, y se lo atravesaba sin comerlo. Así se siente igual que en la Ciudad.
+  const collisionRadius = COLLISION_RADIUS * (layout.spriteScale ?? 1)
 
   for (const ghost of state.ghosts) {
     if (ghost.mode === 'EATEN') continue
     const ghostPoint = interpolated(ghost, layout.cols)
     const distance = wrappedDistance(playerPoint, ghostPoint, layout.cols)
-    if (distance > COLLISION_RADIUS) continue
+    if (distance > collisionRadius) continue
 
     if (ghost.mode === 'FRIGHTENED') {
       ghost.mode = 'EATEN'
@@ -1018,4 +1023,4 @@ export function useMazeCollectorGame({ layout, items, config, inputEnabled = tru
 }
 
 /** Solo para pruebas del motor. */
-export const __engineForTests = { createInitialState, tickEngine, interpolated, wrappedDistance }
+export const __engineForTests = { createInitialState, tickEngine, interpolated, wrappedDistance, resolveGhostCollisions }

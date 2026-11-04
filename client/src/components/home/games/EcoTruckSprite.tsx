@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import type { Direction } from './mazeEngine'
 import { SpriteStrip } from './mazeSpriteStrip'
 
@@ -16,6 +17,10 @@ type EcoTruckSpriteProps = {
   energized?: boolean
   /** true mientras está bajo el efecto de una Bolsa Negra (20% más lento 1s) — camión gris echando humo. */
   slowed?: boolean
+  /** Prefijo de los sprites del mapa (ver mazeMaps.ts); vacío = camión de la Ciudad. */
+  prefix?: string
+  /** Muñeco de lado mirando a la derecha: se voltea en vez de girarse. */
+  sideView?: boolean
 }
 
 /**
@@ -24,19 +29,24 @@ type EcoTruckSpriteProps = {
  * mueve `useMazeCollectorGame` con transform:translate3d; este es el único
  * que gira, así ninguna de las dos transformaciones pisa a la otra.
  */
-export function EcoTruckSprite({ facing, size, energized, slowed }: EcoTruckSpriteProps) {
+export function EcoTruckSprite({ facing, size, energized, slowed, prefix = '', sideView }: EcoTruckSpriteProps) {
+  // De lado, hacia arriba o abajo se conserva el último lado al que miraba.
+  const mirrored = useRef(false)
+  if (facing === 'LEFT') mirrored.current = true
+  else if (facing === 'RIGHT') mirrored.current = false
   const strip = energized
-    ? { name: 'truck-energized', frames: 4, durationMs: 480 }
+    ? { name: `${prefix}truck-energized`, frames: 4, durationMs: 480 }
     : slowed
-      ? { name: 'truck-slowed', frames: 1, durationMs: 0 }
-      : { name: 'truck-drive', frames: 4, durationMs: 640 }
+      ? { name: `${prefix}truck-slowed`, frames: 1, durationMs: 0 }
+      : { name: `${prefix}truck-drive`, frames: 4, durationMs: 640 }
+  const transform = sideView ? (mirrored.current ? 'scaleX(-1)' : undefined) : `rotate(${ROTATION_BY_DIRECTION[facing]}deg)`
   return (
     <SpriteStrip
       name={strip.name}
       frames={strip.frames}
       durationMs={strip.durationMs}
       size={size}
-      style={{ transform: `rotate(${ROTATION_BY_DIRECTION[facing]}deg)` }}
+      style={{ transform }}
     />
   )
 }

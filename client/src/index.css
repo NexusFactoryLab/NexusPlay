@@ -2466,7 +2466,7 @@ code {
 }
 
 /* GameTypesCatalogPage.tsx: transición de deslizamiento entre páginas de
- * tarjetas (issue #156, paginado por flecha en vez de scroll largo). */
+ * tarjetas (issue #159, paginado por flecha en vez de scroll largo). */
 @keyframes slide-in-right {
   from {
     opacity: 0;
@@ -4655,7 +4655,10 @@ code {
 }
 
 @media (min-width: 1024px) {
-  .app-main:has(> .home-fit) {
+  /* La sección puede venir envuelta en PageTransition: sin el segundo selector
+   * el <main> conserva su relleno normal y el Inicio se desborda (scroll). */
+  .app-main:has(> .home-fit),
+  .app-main:has(> .page-transition > .home-fit) {
     padding-top: 16px;
     padding-bottom: 14px;
   }
@@ -4693,6 +4696,43 @@ code {
     padding-top: 18px;
     padding-bottom: 18px;
   }
+}
+
+/* Ventanas bajas (issue #159): el banner y el carrusel tienen mínimos que, sumados,
+ * no caben en el alto del <main> y el Inicio terminaba con scroll. Se compactan. */
+@media (max-height: 700px) {
+  .home-fit .home-hero {
+    padding: 14px 24px;
+  }
+
+  .home-fit .home-hero-title {
+    font-size: 24px;
+  }
+
+  .home-fit .home-hero-actions {
+    margin-top: 10px;
+  }
+
+  .home-fit .games-carousel {
+    min-height: 150px;
+  }
+
+  /* Pradera: letrero de madera y trofeo sobre el tronco, más bajos. */
+  [data-theme='meadow'] .home-fit .home-hero {
+    margin-top: 12px;
+  }
+
+  [data-theme='meadow'] .home-fit .home-hero-trophy {
+    width: 120px;
+    height: 100px;
+    margin: -20px 0 -16px;
+  }
+}
+
+/* El Inicio cabe entero en la ventana: no lleva el aviso "Desliza para ver más"
+ * (su difuminado además tapaba el borde inferior de las tarjetas). */
+.app-main:has(.home-fit) [data-scroll-hint] {
+  display: none;
 }
 
 @media (max-height: 820px) {

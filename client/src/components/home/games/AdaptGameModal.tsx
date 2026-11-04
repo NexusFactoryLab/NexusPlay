@@ -61,7 +61,7 @@ const TARGETS: AdaptTarget[] = [
   },
   {
     key: 'MAZE_COLLECTOR',
-    title: 'Laberinto recolector',
+    title: 'Salvando el mundo con sostenibilidad',
     description: 'Recolecta los conceptos del tema esquivando enemigos.',
     targetType: 'MAZE_COLLECTOR',
     route: '/juegos/crear/laberinto',

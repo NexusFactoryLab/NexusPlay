@@ -55,7 +55,7 @@ const EXAMPLES: Record<string, ExampleSet> = {
     title: 'Dominó de la tabla periódica',
     description: 'Encadena cada elemento con su símbolo y gana quien se quede sin fichas.',
   },
-  'Laberinto recolector': {
+  'Salvando el mundo con sostenibilidad': {
     title: 'Recicla en el laberinto',
     description: 'Recoge los residuos correctos y esquiva a los enemigos antes de que acabe el tiempo.',
   },

@@ -24,7 +24,7 @@ const ADMIN_TARGETS = ['nav-users', 'nav-edition', 'nav-ai-providers', 'nav-orga
 
 const GAMES = [
   { emoji: '🧠', name: 'MatchMente', color: '#a78bfa' },
-  { emoji: '🏃', name: 'Laberinto recolector', color: '#06b6d4' },
+  { emoji: '🏃', name: 'Salvando el mundo', color: '#06b6d4' },
   { emoji: '🁢', name: 'Dominexo', color: '#ff7a1a' },
 ]
 
@@ -317,7 +317,7 @@ const AI_REQUESTS = [
 ]
 const SCHOOLS = [['🏫', 'Colegio San José', '#06b6d4'], ['🎓', 'Liceo Nacional', '#a78bfa'], ['📚', 'Instituto Andino', '#ff7a1a'], ['🌱', 'Escuela Nueva Era', '#22c55e']]
 const SUBJECTS = [['🔢', 'Matemáticas', '#ff7a1a'], ['🔬', 'Ciencias', '#22c55e'], ['🌎', 'Sociales', '#06b6d4'], ['📖', 'Lenguaje', '#a78bfa'], ['🎨', 'Arte', '#ff4d6d'], ['🎵', 'Música', '#ffcc4d']]
-const FEATURED: [string, boolean][] = [['MatchMente', true], ['Dominexo', true], ['Laberinto recolector', false], ['Escaleras y serpientes', false]]
+const FEATURED: [string, boolean][] = [['MatchMente', true], ['Dominexo', true], ['Salvando el mundo', false], ['Escaleras y serpientes', false]]
 const CLASSES = [['5°A', 'Matemáticas', '28', '#ff7a1a'], ['6°B', 'Ciencias', '31', '#22c55e'], ['7°A', 'Inglés', '25', '#a78bfa']]
 
 /** Contenido de cada sección en miniatura. Usuarios, IA y Organización solo salen en cuentas administrativas. */
