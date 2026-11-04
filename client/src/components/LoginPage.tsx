@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { LoginForm } from './LoginForm'
 import { ThemeToggle } from './ThemeToggle'
 import { useAuth } from '../hooks/useAuth'
-import { LogoMark, LogoWordmark } from './BrandLogo'
+import { LogoWordmark } from './BrandLogo'
 
 type LoginPageProps = {
   onSwitchToRegister: () => void
@@ -31,8 +31,7 @@ export function LoginPage({ onSwitchToRegister }: LoginPageProps) {
         style={{ boxShadow: 'var(--shadow), var(--glow)' }}
       >
         <header className="mb-5 text-center">
-          <LogoMark className="h-14 w-14" />
-          <h1 className="mt-3 mb-1.5 flex justify-center"><LogoWordmark className="h-8 w-auto" /></h1>
+          <h1 className="mb-2 flex justify-center"><LogoWordmark className="h-10 w-auto" /></h1>
           <p className="text-[15px]">Inicia sesión para continuar tu partida.</p>
         </header>
 
