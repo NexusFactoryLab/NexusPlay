@@ -162,7 +162,7 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
 
       <div className="sidebar-header mb-4 flex items-center gap-2.5 px-1.5">
         <LogoMark className="sidebar-logo h-9 w-9 shrink-0 object-contain" />
-        {!collapsed && <LogoWordmark className="h-[18px] w-auto min-w-0" />}
+        {!collapsed && <LogoWordmark className="h-7 w-auto min-w-0" />}
       </div>
 
       <ProfileMenu user={user} onSignOut={onSignOut} placement="sidebar" collapsed={collapsed} />
