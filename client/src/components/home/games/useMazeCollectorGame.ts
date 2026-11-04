@@ -20,7 +20,7 @@ import {
 import type { Collectible, Direction, GhostPersonality } from './mazeEngine'
 import { celebrateMatch, primeGameFeedback, signalMismatch } from '../../../utils/gameFeedback'
 import { ANSWER_LETTERS } from './mazeCollectorQuestions'
-import type { MazeQuestion } from './mazeCollectorQuestions'
+import type { MazeQuestion, MazeQuestionBook } from './mazeCollectorQuestions'
 
 export type { Direction }
 export type MazePhase = 'ready' | 'playing' | 'levelup' | 'lost' | 'won'
@@ -66,7 +66,7 @@ const ANSWER_MIN_DISTANCE = 6
 
 /** Una respuesta en el mapa: el camión la toma al pasar por su celda. */
 export type MazeAnswer = { letter: string; text: string; correct: boolean; pos: CellPosition; wrong: boolean }
-export type ActiveQuestion = { id: number; question: string; answers: MazeAnswer[] }
+export type ActiveQuestion = { id: number; question: string; answers: MazeAnswer[]; book?: MazeQuestionBook }
 /** Lo último que pasó con una respuesta, para el aviso en pantalla (`id` cambia con cada intento). */
 export type AnswerFeedback = { id: number; kind: 'correct' | 'wrong' | 'timeout'; letter: string }
 /** Por qué se perdió la última vida (se muestra en la pantalla final, no en un aviso aparte). */
@@ -330,6 +330,7 @@ function buildQuestion(source: MazeQuestion, positions: CellPosition[], id: numb
   return {
     id,
     question: source.question,
+    book: source.book,
     answers: sequence.slice(0, positions.length).map((optionIndex, slot) => ({
       letter: ANSWER_LETTERS[slot],
       text: source.options[optionIndex],

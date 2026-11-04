@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { Award, Check, MapPin, Play, Target } from 'lucide-react'
+import { Award, BookOpen, Check, MapPin, Play, Target } from 'lucide-react'
 import { MazeCollectorGame } from './MazeCollectorGame'
 import { MAZE_LAYOUTS } from './mazeCollectorTypes'
 import type { MazeCollectorConfig, MazeCollectorItem, MazeLayout } from './mazeCollectorTypes'
-import { questionsForGame } from './mazeCollectorQuestions'
+import { BOOK_TITLE, questionsForGame } from './mazeCollectorQuestions'
 import { MAZE_MAPS } from './mazeMaps'
 import { PBR_PER_STATION } from './mazeExpeditionStations'
 import type { MazeStation } from './mazeExpeditionStations'
@@ -184,6 +184,12 @@ function StationBriefing({
           <span>
             Supera el mapa respondiendo las preguntas del libro guía y gana <b className="text-white">{PBR_PER_STATION} PBR</b> y el insumo{' '}
             <b className="text-white">“{station.reward}”</b>.
+          </span>
+        </p>
+        <p className="mt-2 flex items-start gap-1.5 text-[13px] text-amber-200 [@media(max-height:620px)]:hidden">
+          <BookOpen className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>
+            Ten a mano el libro <b>«{BOOK_TITLE}»</b> (PDF): cada pregunta te dice en qué página está la respuesta.
           </span>
         </p>
         {done > 0 && (

@@ -19,6 +19,7 @@ import { PollutionGhostSprite } from './PollutionGhostSprite'
 import { BonusSprite, PetSprite, PowerPelletSprite, TrashBagSprite } from './mazeCollectibleSprites'
 import { SostenibleCityBackground } from './SostenibleCityBackground'
 import { MAZE_MAPS } from './mazeMaps'
+import { BookHint } from './BookHint'
 import { normalizeMazeLayout } from './mazeCollectorTypes'
 import { MazeSpriteThemeContext, SpriteStrip, mazeSpriteUrl } from './mazeSpriteStrip'
 import { MazeCollectorGuide } from './MazeCollectorGuide'
@@ -1023,6 +1024,7 @@ function QuestionPanel({
           )
         })}
       </ul>
+      <BookHint book={question.book} variant="compact" />
       {aside && <p className="text-[11px] leading-snug text-slate-400">Maneja hasta la letra de la respuesta correcta. Si te equivocas o se acaba el tiempo, pierdes una vida.</p>}
     </section>
   )
@@ -1117,6 +1119,7 @@ function QuestionIntro({
               </li>
             ))}
         </ul>
+        <BookHint book={question.book} variant="full" />
         <p className="mt-4 text-center text-[13px] leading-snug text-slate-300 [@media(max-height:520px)]:mt-2">
           Las letras están repartidas por el mapa: <b className="text-white">maneja hasta la correcta</b>. Si llegas a una equivocada, pierdes una vida.
           {timed && (

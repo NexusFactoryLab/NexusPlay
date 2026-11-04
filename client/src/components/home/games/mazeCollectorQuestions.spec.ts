@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { MAZE_LAYOUT_IDS } from './mazeCollectorTypes'
 import {
+  BOOK_PDF_OFFSET,
+  BOOK_TITLE,
   MAX_OPTION_LENGTH,
   MAX_QUESTION_LENGTH,
   MAX_QUESTION_OPTIONS,
@@ -8,6 +10,7 @@ import {
   MIN_QUESTION_OPTIONS,
   QUESTIONS_BY_MAP,
   SUSTAINABLE_CITY_QUESTIONS,
+  bookPdfPage,
   questionsForGame,
 } from './mazeCollectorQuestions'
 
@@ -46,5 +49,31 @@ describe('bancos de preguntas por mapa (issue #150)', () => {
   it('las preguntas que escribe el docente siguen teniendo prioridad sobre el banco del mapa', () => {
     const own = [{ question: '¿Propia?', options: ['Sí', 'No'], correctIndex: 0 }]
     expect(questionsForGame(own, 'AMAZON')).toEqual(own)
+  })
+})
+
+describe('pista del libro guía (issue #160)', () => {
+  it('toda pregunta de un banco fijo indica capítulo y página del libro', () => {
+    for (const name of MAZE_LAYOUT_IDS) {
+      for (const item of QUESTIONS_BY_MAP[name]) {
+        expect(item.book, item.question).toBeDefined()
+        // El libro impreso va de la 1 a la 184 (el PDF trae 186 páginas).
+        expect(Number.isInteger(item.book!.page), item.question).toBe(true)
+        expect(item.book!.page).toBeGreaterThanOrEqual(1)
+        expect(item.book!.page).toBeLessThanOrEqual(184)
+        expect(item.book!.chapter.trim().length).toBeGreaterThan(0)
+      }
+    }
+  })
+
+  it('la página del visor del PDF es la impresa más 2', () => {
+    expect(BOOK_PDF_OFFSET).toBe(2)
+    expect(bookPdfPage({ page: 22, chapter: 'x' })).toBe(24)
+    expect(BOOK_TITLE).toBe('Voces sobre Ciudades Sostenibles y Resilientes')
+  })
+
+  it('las preguntas del docente no necesitan la pista y se conservan tal cual', () => {
+    const own = [{ question: '¿Propia?', options: ['Sí', 'No'], correctIndex: 0 }]
+    expect(questionsForGame(own, 'OCEAN')[0].book).toBeUndefined()
   })
 })
