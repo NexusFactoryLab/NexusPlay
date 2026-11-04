@@ -6,7 +6,7 @@ import type { AuthUser } from '../../services/auth.service'
 import { ProfileMenu } from './ProfileMenu'
 import { NAV_ICONS, navIcon, navTileStyle } from './sidebarIcons'
 import { useTheme } from '../../hooks/useTheme'
-import { LogoGlyph } from '../BrandLogo'
+import { LogoMark } from '../BrandLogo'
 
 type SidebarProps = {
   user: AuthUser
@@ -161,7 +161,7 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
       <span className="sidebar-vine" aria-hidden="true">🌿</span>
 
       <div className="sidebar-header mb-4 flex items-center gap-2.5 px-1.5">
-        <LogoGlyph className="sidebar-logo block h-9 w-9 shrink-0" />
+        <LogoMark className="sidebar-logo h-9 w-9 shrink-0 object-contain" />
         {!collapsed && (
           <span className="sidebar-brand truncate text-[17px] font-semibold tracking-tight text-text-h">
             NexusPlay
