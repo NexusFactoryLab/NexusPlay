@@ -1,54 +1,18 @@
-import { useRef, type CSSProperties, type MouseEvent, type ReactNode } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { ArrowRight, BarChart3, Brain, Check, Crown, GraduationCap, Radio, Users } from 'lucide-react'
-import { AvatarCircle } from '../avatar/AvatarCircle'
+import { useRef, type CSSProperties, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
+import { ArrowRight, BarChart3, Brain, Check, GraduationCap, Radio, Users } from 'lucide-react'
 import { LogoMark, LogoWordmark } from '../BrandLogo'
-import { startPageWarp } from '../PageWarp'
-import { CountUp } from './CountUp'
-import { CHALLENGES, formatPoints, type Competitor, type LandingRanking } from './landingData'
+import { GoLink } from './GoLink'
+import { CHALLENGES, formatPoints } from './landingData'
 import { LiveMatchDemo } from './LiveMatchDemo'
-import { usePointerVars, useReducedMotion, useSeenOnce } from './useLandingMotion'
+import { RankingSection } from './RankingSection'
+import { usePointerVars, useReducedMotion } from './useLandingMotion'
 import { useLandingRanking } from './useLandingRanking'
 import './landing.css'
 import './landing-hero.css'
 
-/** Fondo de las fotos redondas sobre el cielo nocturno (el mismo de Fantasía/Oscuro en avatar.css). */
-const AVATAR_BG = { background: 'radial-gradient(circle at 50% 30%, #4b3c86 0%, #2b2259 70%, #1d1742 100%)' }
-
 /** Índice de la entrada escalonada del hero (ver `.lp-rise` en landing-hero.css). */
 const rise = (index: number) => ({ '--i': index }) as CSSProperties
-
-/** Con datos reales dice cuál es la ventana; con datos de ejemplo lo avisa. */
-const liveBadge = (isSample: boolean, live: string) => (isSample ? 'Vista previa' : live)
-
-function Face({ person, size = 36 }: { person: Competitor; size?: number }) {
-  return (
-    <AvatarCircle
-      config={person.avatar}
-      name={person.name}
-      className="text-[13px]"
-      style={{ ...AVATAR_BG, width: size, height: size }}
-    />
-  )
-}
-
-/**
- * Enlace a login/registro con transición (ver `PageWarp`). Con clic modificado
- * (nueva pestaña) o sin animaciones se comporta como un enlace normal.
- */
-function GoLink({ to, className, children }: { to: string; className: string; children: ReactNode }) {
-  const navigate = useNavigate()
-  const onClick = (event: MouseEvent<HTMLAnchorElement>) => {
-    if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
-    event.preventDefault()
-    if (!startPageWarp(to, { x: event.clientX, y: event.clientY })) navigate(to)
-  }
-  return (
-    <Link to={to} className={className} onClick={onClick}>
-      {children}
-    </Link>
-  )
-}
 
 /** Lleva a una sección con scroll suave dentro de la landing, sin tocar el historial del navegador. */
 function SectionLink({ id, children, className = 'lp-nav-link' }: { id: string; children: ReactNode; className?: string }) {
@@ -208,88 +172,6 @@ function HowItWorks() {
   )
 }
 
-function Ranking({ ranking }: { ranking: LandingRanking }) {
-  const { students, universities, studentsAreSample, universitiesAreSample } = ranking
-  const [first, second, third, ...rest] = students
-  // El podio se dibuja en orden visual 2 - 1 - 3 y solo con los puestos que existen.
-  const podium = [
-    { person: second, place: 2 },
-    { person: first, place: 1 },
-    { person: third, place: 3 },
-  ].filter((slot): slot is { person: Competitor; place: number } => slot.person !== undefined)
-
-  // Las cifras suben desde 0 la primera vez que el ranking entra en pantalla.
-  const gridRef = useRef<HTMLDivElement>(null)
-  const seen = useSeenOnce(gridRef)
-  const animate = !useReducedMotion() && typeof IntersectionObserver !== 'undefined'
-  const points = (value: number) => <CountUp value={value} start={seen} animate={animate} />
-
-  return (
-    <section id="ranking" className="lp-section">
-      <div className="lp-wrap">
-        <p className="lp-eyebrow">Ranking público</p>
-        <h2>Quién lidera esta semana</h2>
-        <p className="lp-lead">
-          Estudiantes e instituciones, ordenados por los puntos de sus partidas: se suma por jugar y por acertar, y hay
-          un tope diario por juego para que gane quien domina el tema, no quien más repite. Se actualiza cada día.
-        </p>
-        <div ref={gridRef} className="lp-rank-grid">
-          <div className="lp-card">
-            <h3 className="lp-card-title">
-              Mejores estudiantes <span className="lp-badge">{liveBadge(studentsAreSample, 'Esta semana')}</span>
-            </h3>
-            <div className="lp-podium">
-              {podium.map(({ person, place }) => (
-                <div key={person.id} className={`lp-pod lp-pod-${place}`}>
-                  <div className="lp-pod-avatar">
-                    {place === 1 && <Crown size={20} fill="currentColor" className="lp-pod-crown" aria-hidden="true" />}
-                    <Face person={person} size={46} />
-                  </div>
-                  <b>{person.name.split(' ')[0]}</b>
-                  {points(person.points)}
-                  <div className="lp-pod-bar">{place}</div>
-                </div>
-              ))}
-            </div>
-            {rest.map((person, index) => (
-              <div key={person.id} className="lp-row">
-                <span className="lp-pos">{index + 4}</span>
-                <Face person={person} />
-                <span className="lp-who">{person.name}</span>
-                <span className="lp-pts">{points(person.points)}</span>
-              </div>
-            ))}
-          </div>
-
-          <div className="lp-card">
-            <h3 className="lp-card-title">
-              Mejores instituciones <span className="lp-badge">{liveBadge(universitiesAreSample, 'Acumulado')}</span>
-            </h3>
-            {universities.map((uni, index) => (
-              <div key={uni.id} className={`lp-row ${index === 0 ? 'lp-row-top' : ''}`}>
-                <span className={`lp-pos ${index === 0 ? 'lp-medal-1' : ''}`}>
-                  {index === 0 ? <Crown size={20} aria-label="Puesto 1" /> : index + 1}
-                </span>
-                <span className="lp-who">
-                  {uni.name}
-                  <small>
-                    {formatPoints(uni.players)} jugadores · {formatPoints(uni.matches)} partidas
-                  </small>
-                </span>
-                <span className="lp-pts">{points(uni.points)}</span>
-              </div>
-            ))}
-            <p className="lp-note">
-              Puntaje de la institución = suma de los puntos de sus estudiantes.
-              {universitiesAreSample && ' Datos de ejemplo.'}
-            </p>
-          </div>
-        </div>
-      </div>
-    </section>
-  )
-}
-
 function Challenges() {
   return (
     <section id="retos" className="lp-section">
@@ -416,7 +298,7 @@ export function LandingPage() {
       <main>
         <Hero />
         <HowItWorks />
-        <Ranking ranking={ranking} />
+        <RankingSection ranking={ranking} />
         <Challenges />
         <Universities />
         <FinalCall />

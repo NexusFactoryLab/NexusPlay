@@ -1,0 +1,706 @@
+/*
+ * Sección «Ranking público» de la landing (RankingSection.tsx). Todo el
+ * movimiento usa solo transform y opacity. Las entradas solo esconden algo
+ * cuando la sección tiene `.lp-rk-animate` (hay animaciones y aún no se ha
+ * visto); sin ella —o con «reducir movimiento»— todo se ve en su estado final.
+ * Los bucles sutiles se pausan con `.is-paused` cuando nadie los ve.
+ */
+
+.lp-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.lp-rk {
+  --rk-gold: #ffc83d;
+  --rk-silver: #c9d1e6;
+  --rk-bronze: #e0a06a;
+  position: relative;
+}
+
+/* ---- Encabezado y pastilla «En vivo» ---- */
+.lp-rk-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px 32px;
+}
+
+.lp-rk-head > div {
+  min-width: 0;
+  flex: 1 1 520px;
+}
+
+.lp-rk-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 61, 127, 0.45);
+  background: rgba(255, 61, 127, 0.12);
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffd6e5;
+  font-variant-numeric: tabular-nums;
+}
+
+.lp-rk-live.is-sample {
+  border-color: rgba(166, 133, 245, 0.45);
+  background: rgba(123, 92, 255, 0.14);
+  color: #d9ceff;
+}
+
+/* ---- Controles: pestañas y filtros ---- */
+.lp-rk-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 30px;
+}
+
+.lp-rk-tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 14px;
+  border: 1px solid rgba(166, 133, 245, 0.35);
+  background: rgba(10, 6, 34, 0.45);
+}
+
+.lp-rk-tab,
+.lp-rk-filter {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 0;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  isolation: isolate;
+  transition: transform 0.15s, color 0.2s;
+}
+
+.lp-rk-tab {
+  padding: 9px 18px;
+  border-radius: 10px;
+  background: none;
+  font-family: var(--font-heading);
+  font-size: 15px;
+  color: var(--lp-text);
+}
+
+/* Fondo de la pestaña activa: aparece con opacidad, no repinta el botón. */
+.lp-rk-tab::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--lp-grad);
+  box-shadow: 0 8px 22px -10px rgba(255, 61, 127, 0.7);
+  opacity: 0;
+  transform: scale(0.94);
+  transition: opacity 0.25s, transform 0.25s;
+}
+
+.lp-rk-tab.is-active {
+  color: #fff;
+}
+
+.lp-rk-tab.is-active::before {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.lp-rk-tab:not(.is-active):hover {
+  color: var(--lp-text-h);
+}
+
+.lp-rk-filters {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lp-rk-filter {
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(166, 133, 245, 0.35);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 13px;
+  color: var(--lp-text);
+}
+
+.lp-rk-filter:hover {
+  color: var(--lp-text-h);
+  transform: translateY(-1px);
+}
+
+.lp-rk-filter.is-active {
+  border-color: rgba(255, 200, 61, 0.7);
+  background: rgba(255, 200, 61, 0.14);
+  color: #ffe3a1;
+}
+
+.lp-rk-tab:focus-visible,
+.lp-rk-filter:focus-visible,
+.lp-rk-panel:focus-visible {
+  outline: 2px solid var(--lp-gold);
+  outline-offset: 2px;
+}
+
+/* ---- Panel ---- */
+.lp-rk-panel {
+  margin-top: 16px;
+  padding: 26px;
+}
+
+.lp-rk-swap {
+  animation: lp-rk-swap 0.34s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes lp-rk-swap {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
+.lp-rk-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 28px;
+  align-items: end;
+}
+
+.lp-rk-side {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 12px;
+  align-self: stretch;
+  justify-content: flex-end;
+}
+
+.lp-rk-empty {
+  align-self: center;
+  padding: 26px 20px;
+  border-radius: 16px;
+  border: 1px dashed rgba(166, 133, 245, 0.4);
+  font-size: 15px;
+  text-align: center;
+  color: var(--lp-text-h);
+}
+
+/* ---- Chip de tipo de institución ---- */
+.lp-rk-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.lp-rk-chip-university { color: #d9ceff; background: rgba(123, 92, 255, 0.22); border-color: rgba(166, 133, 245, 0.45); }
+.lp-rk-chip-school { color: #b5f5e4; background: rgba(32, 201, 151, 0.16); border-color: rgba(32, 201, 151, 0.45); }
+.lp-rk-chip-other { color: #ffd0e1; background: rgba(255, 61, 127, 0.16); border-color: rgba(255, 61, 127, 0.45); }
+
+/* ---- Podio ---- */
+.lp-rk-podium {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+  gap: 12px;
+  padding-top: 34px;
+  list-style: none;
+  perspective: 900px;
+}
+
+.lp-rk-pod {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  text-align: center;
+}
+
+/* El DOM va 1-2-3 (lectura correcta); se ve 2-1-3. */
+.lp-rk-pod-1 { order: 2; --rk-medal: var(--rk-gold); }
+.lp-rk-pod-2 { order: 1; --rk-medal: var(--rk-silver); }
+.lp-rk-pod-3 { order: 3; --rk-medal: var(--rk-bronze); }
+
+.lp-rk-pod-figure {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 6px;
+}
+
+.lp-rk-pod-figure > .lp-rk-face,
+.lp-rk-pod-figure > .lp-rk-crest {
+  position: relative;
+  z-index: 1;
+  box-shadow: 0 0 0 3px var(--rk-medal), 0 10px 26px -8px rgba(0, 0, 0, 0.7);
+}
+
+/* Halo del color de la medalla detrás de cada foto. */
+.lp-rk-halo {
+  position: absolute;
+  inset: -22px;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--rk-medal) 55%, transparent) 0%, transparent 68%);
+  opacity: 0.75;
+}
+
+.lp-rk-pod-1 .lp-rk-halo {
+  inset: -30px;
+  animation: lp-rk-breathe 3.6s ease-in-out infinite;
+}
+
+@keyframes lp-rk-breathe {
+  0%, 100% { opacity: 0.6; transform: scale(0.94); }
+  50% { opacity: 0.95; transform: scale(1.06); }
+}
+
+.lp-rk-crown {
+  position: absolute;
+  z-index: 2;
+  top: -30px;
+  left: 50%;
+  display: flex;
+  margin-left: -13px;
+  color: var(--rk-gold);
+  filter: drop-shadow(0 0 8px rgba(255, 200, 61, 0.75));
+  animation: lp-rk-float 3.2s ease-in-out infinite;
+}
+
+@keyframes lp-rk-float {
+  0%, 100% { transform: translateY(0) rotate(-4deg); }
+  50% { transform: translateY(-4px) rotate(4deg); }
+}
+
+/* Chispas: una cruz de luz que aparece y se apaga, cada una a su ritmo. */
+.lp-rk-spark {
+  position: absolute;
+  z-index: 2;
+  top: var(--y);
+  left: var(--x);
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  background:
+    linear-gradient(90deg, transparent 40%, #fff3c4 50%, transparent 60%),
+    linear-gradient(0deg, transparent 40%, #fff3c4 50%, transparent 60%);
+  opacity: 0;
+  animation: lp-rk-twinkle 2.8s ease-in-out var(--d) infinite;
+}
+
+@keyframes lp-rk-twinkle {
+  0%, 100% { opacity: 0; transform: scale(0.3) rotate(0deg); }
+  45% { opacity: 1; transform: scale(1) rotate(45deg); }
+  70% { opacity: 0; transform: scale(0.5) rotate(90deg); }
+}
+
+.lp-rk-pod-name {
+  max-width: 100%;
+  font-family: var(--font-heading);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--lp-text-h);
+  overflow-wrap: anywhere;
+}
+
+.lp-rk-pod-line {
+  display: -webkit-box;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 12.5px;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
+}
+
+.lp-rk-pod-pts {
+  font-family: var(--font-heading);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--lp-text-h);
+  font-variant-numeric: tabular-nums;
+}
+
+.lp-rk-pod-1 .lp-rk-pod-pts {
+  color: var(--rk-gold);
+}
+
+.lp-rk-pod-pts span {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lp-text);
+}
+
+/* Bloque del podio con tapa en perspectiva (sensación de volumen). */
+.lp-rk-pod-bar {
+  position: relative;
+  display: flex;
+  width: 100%;
+  justify-content: center;
+  margin-top: 8px;
+  padding-top: 12px;
+  border-radius: 4px 4px 0 0;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--rk-medal) 92%, #fff) 0%, color-mix(in srgb, var(--rk-medal) 55%, #120d33) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 18px 30px -18px color-mix(in srgb, var(--rk-medal) 80%, transparent);
+  transform-origin: bottom;
+}
+
+.lp-rk-pod-bar::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  height: 14px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--rk-medal) 40%, #fff), var(--rk-medal));
+  transform: perspective(120px) rotateX(48deg);
+  transform-origin: bottom;
+}
+
+.lp-rk-pod-bar span {
+  font-family: var(--font-heading);
+  font-size: 30px;
+  font-weight: 700;
+  color: rgba(18, 13, 51, 0.62);
+}
+
+.lp-rk-pod-1 .lp-rk-pod-bar { height: 128px; }
+.lp-rk-pod-2 .lp-rk-pod-bar { height: 96px; }
+.lp-rk-pod-3 .lp-rk-pod-bar { height: 74px; }
+
+/* ---- Filas (puesto 4 en adelante) ---- */
+.lp-rk-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  list-style: none;
+}
+
+.lp-rk-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 26px auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px 10px 10px;
+  overflow: hidden;
+  border-radius: 14px;
+  border: 1px solid rgba(166, 133, 245, 0.2);
+  background: rgba(255, 255, 255, 0.035);
+  isolation: isolate;
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Luz que sigue al cursor (variables --sx/--sy de useSpotlight). */
+.lp-rk-row::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(166, 133, 245, 0.28), transparent 65%);
+  opacity: 0;
+  transform: translate(calc(var(--sx, 50%) - 110px), calc(var(--sy, 50%) - 110px));
+  transition: opacity 0.25s;
+  pointer-events: none;
+}
+
+/* Elevación: la sombra vive en una capa aparte que solo cambia de opacidad. */
+.lp-rk-row::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgba(166, 133, 245, 0.5), 0 14px 30px -16px rgba(123, 92, 255, 0.8);
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+
+.lp-rk-row:hover {
+  transform: translateY(-3px);
+}
+
+.lp-rk-row:hover::before,
+.lp-rk-row:hover::after {
+  opacity: 1;
+}
+
+.lp-rk-pos {
+  font-family: var(--font-heading);
+  font-size: 16px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--lp-text-h);
+}
+
+.lp-rk-who {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.lp-rk-name {
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--lp-text-h);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lp-rk-meta {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.lp-rk-detail {
+  min-width: 0;
+  font-size: 12.5px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.lp-rk-pts {
+  font-family: var(--font-heading);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--lp-text-h);
+  font-variant-numeric: tabular-nums;
+}
+
+.lp-rk-crest {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #fff;
+  background: radial-gradient(circle at 50% 30%, #5a49a0 0%, #2b2259 75%);
+  box-shadow: inset 0 0 0 1px rgba(166, 133, 245, 0.45);
+}
+
+/* ---- Tarjeta de gancho «¿Y tú?» ---- */
+.lp-rk-hook {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px dashed rgba(255, 200, 61, 0.55);
+  background: linear-gradient(135deg, rgba(255, 200, 61, 0.1), rgba(255, 61, 127, 0.08));
+}
+
+.lp-rk-hook-pos {
+  position: relative;
+  display: flex;
+  width: 42px;
+  height: 42px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-family: var(--font-heading);
+  font-size: 20px;
+  font-weight: 700;
+  color: #1d1742;
+  background: var(--rk-gold);
+}
+
+.lp-rk-hook-pos::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--rk-gold);
+  animation: lp-rk-pulse 2.2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes lp-rk-pulse {
+  0% { opacity: 0.8; transform: scale(1); }
+  80%, 100% { opacity: 0; transform: scale(1.7); }
+}
+
+.lp-rk-hook-title {
+  font-family: var(--font-heading);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--lp-text-h);
+}
+
+.lp-rk-hook-copy p:not(.lp-rk-hook-title) {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.lp-rk-hook-cta {
+  white-space: nowrap;
+}
+
+/* ---- Entradas (solo con animaciones y antes de verse) ---- */
+.lp-rk-animate:not(.is-seen) .lp-rk-pod-bar { transform: scaleY(0); }
+.lp-rk-animate:not(.is-seen) .lp-rk-pod-figure,
+.lp-rk-animate:not(.is-seen) .lp-rk-pod > :not(.lp-rk-pod-bar),
+.lp-rk-animate:not(.is-seen) .lp-rk-row,
+.lp-rk-animate:not(.is-seen) .lp-rk-hook { opacity: 0; }
+
+/* `backwards`: el estado inicial cubre la espera, y al terminar la animación deja
+   de aplicar, así el `transform` del hover de las filas vuelve a funcionar. */
+.lp-rk-animate.is-seen .lp-rk-pod-bar {
+  animation: lp-rk-rise 0.9s cubic-bezier(0.22, 1.2, 0.36, 1) calc(var(--i) * 140ms) backwards;
+}
+
+.lp-rk-animate.is-seen .lp-rk-pod > :not(.lp-rk-pod-bar) {
+  animation: lp-rk-drop 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) calc(var(--i) * 140ms + 380ms) backwards;
+}
+
+.lp-rk-animate.is-seen .lp-rk-row {
+  animation: lp-rk-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) calc(var(--i) * 60ms + 260ms) backwards;
+}
+
+.lp-rk-animate.is-seen .lp-rk-hook {
+  animation: lp-rk-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) 560ms backwards;
+}
+
+@keyframes lp-rk-rise {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+
+@keyframes lp-rk-drop {
+  from { opacity: 0; transform: translateY(-14px) scale(0.92); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes lp-rk-in {
+  from { opacity: 0; transform: translateX(18px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Nadie mira: los bucles se detienen. */
+.lp-rk.is-paused .lp-rk-halo,
+.lp-rk.is-paused .lp-rk-crown,
+.lp-rk.is-paused .lp-rk-spark,
+.lp-rk.is-paused .lp-rk-hook-pos::after,
+.lp-rk.is-paused .lp-live-dot::after {
+  animation-play-state: paused;
+}
+
+/* ---- Tablet y celular ---- */
+@media (max-width: 860px) {
+  .lp-rk-stage {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .lp-rk-controls,
+  .lp-rk-tabs,
+  .lp-rk-filters {
+    width: 100%;
+  }
+
+  .lp-rk-tab,
+  .lp-rk-filter {
+    flex: 1;
+  }
+
+  .lp-rk-tab {
+    padding: 9px 10px;
+  }
+
+  .lp-rk-filter {
+    padding: 7px 8px;
+  }
+
+  .lp-rk-panel {
+    padding: 18px 14px;
+  }
+
+  .lp-rk-podium {
+    gap: 8px;
+  }
+
+  .lp-rk-pod-name {
+    font-size: 14px;
+  }
+
+  .lp-rk-pod-line {
+    font-size: 11.5px;
+  }
+
+  .lp-rk-pod-1 .lp-rk-pod-bar { height: 100px; }
+  .lp-rk-pod-2 .lp-rk-pod-bar { height: 76px; }
+  .lp-rk-pod-3 .lp-rk-pod-bar { height: 58px; }
+
+  .lp-rk-row {
+    gap: 10px;
+    padding: 9px 10px 9px 6px;
+  }
+
+  .lp-rk-hook {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .lp-rk-hook-cta {
+    grid-column: 1 / -1;
+  }
+}
+
+/* «Reducir movimiento»: estado final estático, sin bucles ni transiciones. */
+@media (prefers-reduced-motion: reduce) {
+  .lp-rk *,
+  .lp-rk *::before,
+  .lp-rk *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .lp-rk-spark {
+    display: none;
+  }
+
+  .lp-rk-row:hover,
+  .lp-rk-filter:hover {
+    transform: none;
+  }
+}

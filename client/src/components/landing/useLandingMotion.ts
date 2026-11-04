@@ -63,6 +63,44 @@ export function usePointerVars(ref: RefObject<HTMLElement | null>, prefix: strin
   }, [ref, prefix, enabled])
 }
 
+/**
+ * Luz que sigue al cursor sobre las filas marcadas con `data-spot` dentro de
+ * `ref`: escribe `--sx`/`--sy` (px, relativos a la fila) en la fila bajo el
+ * cursor, como mucho una vez por fotograma. El CSS solo las usa en un
+ * `transform`. Un único oyente para todo el contenedor; nada en táctil ni con
+ * "reducir movimiento".
+ */
+export function useSpotlight(ref: RefObject<HTMLElement | null>, enabled: boolean) {
+  useEffect(() => {
+    const container = ref.current
+    if (!container || !enabled || !window.matchMedia?.(FINE_POINTER_QUERY).matches) return
+
+    let frame = 0
+    let pending: { row: HTMLElement; x: number; y: number } | null = null
+    const write = () => {
+      frame = 0
+      if (!pending) return
+      pending.row.style.setProperty('--sx', `${pending.x.toFixed(1)}px`)
+      pending.row.style.setProperty('--sy', `${pending.y.toFixed(1)}px`)
+      pending = null
+    }
+    const onMove = (event: PointerEvent) => {
+      if (event.pointerType === 'touch') return
+      const row = (event.target as Element | null)?.closest?.<HTMLElement>('[data-spot]')
+      if (!row || !container.contains(row)) return
+      const box = row.getBoundingClientRect()
+      pending = { row, x: event.clientX - box.left, y: event.clientY - box.top }
+      if (!frame) frame = requestAnimationFrame(write)
+    }
+
+    container.addEventListener('pointermove', onMove)
+    return () => {
+      container.removeEventListener('pointermove', onMove)
+      if (frame) cancelAnimationFrame(frame)
+    }
+  }, [ref, enabled])
+}
+
 /** true desde la primera vez que el elemento entra en pantalla (no vuelve a false). */
 export function useSeenOnce(ref: RefObject<HTMLElement | null>, threshold = 0.25): boolean {
   const [seen, setSeen] = useState(false)
