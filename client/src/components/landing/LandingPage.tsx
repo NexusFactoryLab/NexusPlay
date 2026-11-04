@@ -1,27 +1,21 @@
-import { type MouseEvent, type ReactNode } from 'react'
+import { useRef, type CSSProperties, type MouseEvent, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import {
-  ArrowRight,
-  Brain,
-  Check,
-  Crown,
-  GraduationCap,
-  Medal,
-  Swords,
-  Trophy,
-  Users,
-  Zap,
-} from 'lucide-react'
+import { ArrowRight, BarChart3, Brain, Check, Crown, GraduationCap, Radio, Users, Zap } from 'lucide-react'
 import { AvatarCircle } from '../avatar/AvatarCircle'
 import { startPageWarp } from '../PageWarp'
+import { CountUp } from './CountUp'
 import { CHALLENGES, formatPoints, type Competitor, type LandingRanking } from './landingData'
+import { LiveMatchDemo } from './LiveMatchDemo'
+import { usePointerVars, useReducedMotion, useSeenOnce } from './useLandingMotion'
 import { useLandingRanking } from './useLandingRanking'
 import './landing.css'
+import './landing-hero.css'
 
 /** Fondo de las fotos redondas sobre el cielo nocturno (el mismo de Fantasía/Oscuro en avatar.css). */
 const AVATAR_BG = { background: 'radial-gradient(circle at 50% 30%, #4b3c86 0%, #2b2259 70%, #1d1742 100%)' }
 
-const MEDAL_CLASS = ['lp-medal-1', 'lp-medal-2', 'lp-medal-3']
+/** Índice de la entrada escalonada del hero (ver `.lp-rise` en landing-hero.css). */
+const rise = (index: number) => ({ '--i': index }) as CSSProperties
 
 /** Con datos reales dice cuál es la ventana; con datos de ejemplo lo avisa. */
 const liveBadge = (isSample: boolean, live: string) => (isSample ? 'Vista previa' : live)
@@ -35,10 +29,6 @@ function Face({ person, size = 36 }: { person: Competitor; size?: number }) {
       style={{ ...AVATAR_BG, width: size, height: size }}
     />
   )
-}
-
-function affiliation(person: Competitor): string | null {
-  return [person.university, person.career].filter(Boolean).join(' · ') || null
 }
 
 /**
@@ -60,11 +50,11 @@ function GoLink({ to, className, children }: { to: string; className: string; ch
 }
 
 /** Lleva a una sección con scroll suave dentro de la landing, sin tocar el historial del navegador. */
-function SectionLink({ id, children }: { id: string; children: ReactNode }) {
+function SectionLink({ id, children, className = 'lp-nav-link' }: { id: string; children: ReactNode; className?: string }) {
   return (
     <button
       type="button"
-      className="lp-nav-link"
+      className={className}
       onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
     >
       {children}
@@ -101,71 +91,73 @@ function Header() {
   )
 }
 
-function Hero({ ranking }: { ranking: LandingRanking }) {
-  const { students, studentsAreSample } = ranking
+/**
+ * Cielo del hero: auroras y dos capas de estrellas a distinta profundidad. Cada capa
+ * se desplaza según `--px/--py` (cursor sobre el hero) multiplicado por su `--d`:
+ * las lejanas se mueven poco y las cercanas más, y eso da la sensación de volumen.
+ */
+function HeroSky() {
   return (
-    <header className="lp-hero">
+    <div className="lp-sky" aria-hidden="true">
+      <div className="lp-layer" style={{ '--d': 10 } as CSSProperties}>
+        <span className="lp-aurora lp-aurora-1" />
+        <span className="lp-aurora lp-aurora-2" />
+      </div>
+      <div className="lp-layer lp-stars lp-stars-far" style={{ '--d': 6 } as CSSProperties} />
+      <div className="lp-layer lp-stars lp-stars-near" style={{ '--d': 18 } as CSSProperties} />
+      <div className="lp-layer" style={{ '--d': 26 } as CSSProperties}>
+        <span className="lp-aurora lp-aurora-3" />
+      </div>
+      <div className="lp-horizon" />
+    </div>
+  )
+}
+
+function Hero() {
+  const heroRef = useRef<HTMLElement>(null)
+  const reduced = useReducedMotion()
+  usePointerVars(heroRef, 'p', !reduced)
+
+  return (
+    <header ref={heroRef} className="lp-hero">
+      <HeroSky />
       <div className="lp-wrap">
-        <div>
-          <h1>
-            Refuerza lo que sabes
-            <br />
-            <em>jugando con tu clase.</em>
-          </h1>
-          <p className="lp-sub">
-            Convierte tus apuntes en juegos multijugador, repasa cualquier tema con tus compañeros y comprueba cuánto
-            dominas. Para colegios, universidades y cualquier aula.
+        <div className="lp-hero-copy">
+          <p className="lp-pill lp-rise" style={rise(0)}>
+            <span className="lp-live-dot" aria-hidden="true" />
+            Partidas en vivo, creadas con IA desde tus apuntes
           </p>
-          <div className="lp-cta">
-            <GoLink to="/register" className="lp-btn lp-btn-main">
-              Crear mi cuenta gratis <ArrowRight size={16} aria-hidden="true" />
-            </GoLink>
-          </div>
-          <div className="lp-faces">
-            <div className="lp-faces-stack">
-              {students.map((person) => (
-                <Face key={person.id} person={person} size={38} />
-              ))}
-            </div>
-            <span>
-              <b style={{ color: 'var(--lp-text-h)' }}>Reta a tu clase</b> y a toda la comunidad
+          <h1 className="lp-title">
+            <span className="lp-rise" style={rise(1)}>
+              Domina cualquier tema.
             </span>
+            <em className="lp-rise" style={rise(2)}>
+              Demuéstralo <span className="lp-underline">en vivo.</span>
+            </em>
+          </h1>
+          <p className="lp-sub lp-rise" style={rise(3)}>
+            Sube tus apuntes, la IA los convierte en una partida y tu clase compite en tiempo real. Cada respuesta
+            cuenta.
+          </p>
+          <div className="lp-cta lp-rise" style={rise(4)}>
+            <GoLink to="/register" className="lp-btn lp-btn-main">
+              Crear cuenta gratis <ArrowRight size={16} aria-hidden="true" />
+            </GoLink>
+            <SectionLink id="como" className="lp-btn lp-btn-ghost">
+              Ver cómo funciona
+            </SectionLink>
           </div>
-          <div className="lp-facts">
-            <div>
-              <b>8</b>tipos de juego
-            </div>
-            <div>
-              <b>Tiempo real</b>multijugador
-            </div>
-            <div>
-              <b>Torneos</b>con podio
-            </div>
-          </div>
+          <p className="lp-trust lp-rise" style={rise(5)}>
+            Colegios <span aria-hidden="true">·</span> Universidades <span aria-hidden="true">·</span> Cualquier aula
+          </p>
         </div>
 
-        <aside className="lp-card" aria-label={studentsAreSample ? 'Vista previa del ranking' : 'Ranking de la semana'}>
-          <h3 className="lp-card-title">
-            Top de la semana <span className="lp-badge">{liveBadge(studentsAreSample, 'Últimos 7 días')}</span>
-          </h3>
-          {students.map((person, index) => (
-            <div key={person.id} className={`lp-row ${index === 0 ? 'lp-row-top' : ''}`}>
-              <span className={`lp-pos ${MEDAL_CLASS[index] ?? ''}`}>
-                {index < 3 ? <Medal size={20} aria-label={`Puesto ${index + 1}`} /> : index + 1}
-              </span>
-              <Face person={person} />
-              <span className="lp-who">
-                {person.name}
-                {affiliation(person) && <small>{affiliation(person)}</small>}
-              </span>
-              <span className="lp-pts">{formatPoints(person.points)}</span>
-            </div>
-          ))}
-          <p className="lp-note">
-            ¿Y tú en qué puesto estarás? Crea tu cuenta y entra al ranking.
-            {!studentsAreSample && ' Se actualiza cada día.'}
+        <div className="lp-hero-demo lp-rise" style={rise(3)}>
+          <LiveMatchDemo />
+          <p className="lp-demo-caption">
+            Demostración con jugadores ficticios: así se ve una partida en el aula.
           </p>
-        </aside>
+        </div>
       </div>
     </header>
   )
@@ -174,18 +166,18 @@ function Hero({ ranking }: { ranking: LandingRanking }) {
 const STEPS = [
   {
     icon: Brain,
-    title: 'Crea o elige un juego',
-    text: 'Sube tus apuntes y la IA arma el borrador, o explora los juegos que ya creó la comunidad.',
+    title: 'Sube tus apuntes',
+    text: 'La IA arma la partida a partir de tu material; la revisas y ajustas antes de publicarla. También puedes usar las que ya creó la comunidad.',
   },
   {
-    icon: Swords,
-    title: 'Reta a tu clase',
-    text: 'Comparte un código de sala y juega en vivo con compañeros, o entra a un torneo del profesor.',
+    icon: Radio,
+    title: 'Lanza la partida en vivo',
+    text: 'Comparte un código de sala y la clase entra desde cualquier dispositivo. O arma un torneo con eliminatorias y podio.',
   },
   {
-    icon: Trophy,
-    title: 'Sube en el ranking',
-    text: 'Cada partida suma puntos para ti y tu institución: repasar también te hace subir. El podio es público.',
+    icon: BarChart3,
+    title: 'Mide lo que se domina',
+    text: 'Cada respuesta suma puntos. El docente ve los resultados por clase y cada estudiante, su lugar en el ranking.',
   },
 ]
 
@@ -196,7 +188,7 @@ function HowItWorks() {
         <p className="lp-eyebrow">Cómo funciona</p>
         <h2>De tu apunte a una partida, en tres pasos</h2>
         <p className="lp-lead">
-          Sin instalar nada. Creas tu cuenta y juegas desde el navegador, en clase o por tu cuenta.
+          Sin instalar nada: todo corre en el navegador, en el aula o a distancia.
         </p>
         <div className="lp-steps">
           {STEPS.map(({ icon: Icon, title, text }, index) => (
@@ -227,15 +219,22 @@ function Ranking({ ranking }: { ranking: LandingRanking }) {
     { person: third, place: 3 },
   ].filter((slot): slot is { person: Competitor; place: number } => slot.person !== undefined)
 
+  // Las cifras suben desde 0 la primera vez que el ranking entra en pantalla.
+  const gridRef = useRef<HTMLDivElement>(null)
+  const seen = useSeenOnce(gridRef)
+  const animate = !useReducedMotion() && typeof IntersectionObserver !== 'undefined'
+  const points = (value: number) => <CountUp value={value} start={seen} animate={animate} />
+
   return (
     <section id="ranking" className="lp-section">
       <div className="lp-wrap">
-        <p className="lp-eyebrow">Competitividad</p>
-        <h2>Mira quién va de primero</h2>
+        <p className="lp-eyebrow">Ranking público</p>
+        <h2>Quién lidera esta semana</h2>
         <p className="lp-lead">
-          Ranking de estudiantes y de universidades. Se actualiza cada día: vuelve mañana y mira si subiste.
+          Estudiantes e instituciones, ordenados por los puntos que ganan respondiendo bien y rápido. Se actualiza
+          cada día.
         </p>
-        <div className="lp-rank-grid">
+        <div ref={gridRef} className="lp-rank-grid">
           <div className="lp-card">
             <h3 className="lp-card-title">
               Mejores estudiantes <span className="lp-badge">{liveBadge(studentsAreSample, 'Esta semana')}</span>
@@ -248,7 +247,7 @@ function Ranking({ ranking }: { ranking: LandingRanking }) {
                     <Face person={person} size={46} />
                   </div>
                   <b>{person.name.split(' ')[0]}</b>
-                  {formatPoints(person.points)}
+                  {points(person.points)}
                   <div className="lp-pod-bar">{place}</div>
                 </div>
               ))}
@@ -258,7 +257,7 @@ function Ranking({ ranking }: { ranking: LandingRanking }) {
                 <span className="lp-pos">{index + 4}</span>
                 <Face person={person} />
                 <span className="lp-who">{person.name}</span>
-                <span className="lp-pts">{formatPoints(person.points)}</span>
+                <span className="lp-pts">{points(person.points)}</span>
               </div>
             ))}
           </div>
@@ -278,7 +277,7 @@ function Ranking({ ranking }: { ranking: LandingRanking }) {
                     {formatPoints(uni.players)} jugadores · {formatPoints(uni.matches)} partidas
                   </small>
                 </span>
-                <span className="lp-pts">{formatPoints(uni.points)}</span>
+                <span className="lp-pts">{points(uni.points)}</span>
               </div>
             ))}
             <p className="lp-note">
@@ -297,9 +296,10 @@ function Challenges() {
     <section id="retos" className="lp-section">
       <div className="lp-wrap">
         <p className="lp-eyebrow">Comunidad</p>
-        <h2>Desafía a otras carreras y universidades</h2>
+        <h2>Retos entre carreras e instituciones</h2>
         <p className="lp-lead">
-          Los retos hacen que la comunidad se invite sola: cada victoria se comparte, cada derrota pide revancha.
+          Grupo contra grupo, con marcador abierto durante días. Cada resultado queda registrado y cada derrota pide
+          revancha.
         </p>
         <div className="lp-challenges">
           {CHALLENGES.map((challenge) => (
@@ -341,8 +341,8 @@ function Challenges() {
 }
 
 const UNI_POINTS = [
-  { title: 'Juegos desde tus propios apuntes', text: 'La IA genera el borrador; tú lo revisas antes de publicar.' },
-  { title: 'Clases y torneos en aula', text: 'Códigos de sala y podio para los mejores de cada partida.' },
+  { title: 'Partidas desde su propio material', text: 'La IA genera el borrador; el docente lo revisa antes de publicar.' },
+  { title: 'Clases y torneos en el aula', text: 'Códigos de sala, torneos eliminatorios y podio por partida.' },
   { title: 'Métricas por clase e institución', text: 'Puntajes, partidas y avance de cada grupo.' },
 ]
 
@@ -351,10 +351,11 @@ function Universities() {
     <section id="universidades" className="lp-section">
       <div className="lp-wrap lp-uni">
         <div>
-          <p className="lp-eyebrow">Para universidades</p>
-          <h2>Estudiar deja de ser un trámite</h2>
+          <p className="lp-eyebrow">Para instituciones</p>
+          <h2>Evidencia de lo que tu clase domina</h2>
           <p className="lp-lead">
-            Profesores crean la actividad, estudiantes compiten y la institución ve el progreso.
+            El docente crea la actividad, los estudiantes compiten y la institución ve el progreso. Sirve igual en un
+            colegio, una universidad o un curso libre.
           </p>
           <ul className="lp-checks">
             {UNI_POINTS.map((point) => (
@@ -374,12 +375,12 @@ function Universities() {
           <div className="lp-uni-mark" aria-hidden="true">
             <GraduationCap size={36} />
           </div>
-          <h3 style={{ fontSize: 24, margin: '10px 0 8px' }}>¿Tu universidad ya está?</h3>
+          <h3 style={{ fontSize: 24, margin: '10px 0 8px' }}>¿Tu institución ya está?</h3>
           <p style={{ marginBottom: 20 }}>
             Súmala al ranking y deja que sus estudiantes compitan por el primer lugar.
           </p>
           <GoLink to="/register" className="lp-btn lp-btn-main">
-            Registrar mi universidad
+            Registrar mi institución
           </GoLink>
         </div>
       </div>
@@ -392,11 +393,13 @@ function FinalCall() {
     <section className="lp-section">
       <div className="lp-wrap">
         <div className="lp-final">
-          <h2>¿Listo para subir de nivel?</h2>
-          <p className="lp-lead">Crea tu cuenta en un minuto y empieza a repasar jugando con tu clase.</p>
+          <h2>Tu próxima clase puede ser una final.</h2>
+          <p className="lp-lead">
+            Crea tu cuenta en un minuto, sube un apunte y lanza la primera partida hoy mismo.
+          </p>
           <div className="lp-cta">
             <GoLink to="/register" className="lp-btn lp-btn-main">
-              ¡Empezar a jugar!
+              Crear cuenta gratis <ArrowRight size={16} aria-hidden="true" />
             </GoLink>
           </div>
         </div>
@@ -411,7 +414,7 @@ export function LandingPage() {
     <div className="landing">
       <Header />
       <main>
-        <Hero ranking={ranking} />
+        <Hero />
         <HowItWorks />
         <Ranking ranking={ranking} />
         <Challenges />

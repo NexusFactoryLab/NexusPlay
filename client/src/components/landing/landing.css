@@ -224,28 +224,18 @@
   font-size: 14px;
 }
 
-/* ---- Hero ---- */
+/* ---- Hero (el cielo, la demo y las animaciones están en landing-hero.css) ---- */
 .lp-hero {
   position: relative;
   overflow: hidden;
-  padding: 56px 0 80px;
-}
-
-.lp-hero::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(circle at 75% 35%, rgba(255, 61, 127, 0.16), transparent 45%),
-    radial-gradient(circle at 15% 30%, rgba(123, 92, 255, 0.28), transparent 50%);
+  padding: 64px 0 88px;
 }
 
 .lp-hero .lp-wrap {
   position: relative;
   display: grid;
-  grid-template-columns: 1.1fr 0.9fr;
-  gap: 48px;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: 56px;
   align-items: center;
 }
 
@@ -289,41 +279,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: 14px;
-}
-
-.lp-faces {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-top: 30px;
-  font-size: 14px;
-}
-
-.lp-faces-stack {
-  display: flex;
-}
-
-.lp-faces-stack > * + * {
-  margin-left: -10px;
-}
-
-.lp-faces-stack > * {
-  box-shadow: 0 0 0 3px #1a1450;
-}
-
-.lp-facts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 28px;
-  margin-top: 26px;
-  font-size: 14px;
-}
-
-.lp-facts b {
-  display: block;
-  font-family: var(--font-heading);
-  font-size: 26px;
-  color: var(--lp-text-h);
 }
 
 /* ---- Tarjetas y filas de ranking ---- */
@@ -681,10 +636,6 @@
 
   .lp-cta .lp-btn {
     width: 100%;
-  }
-
-  .lp-faces {
-    flex-wrap: wrap;
   }
 
   .lp-podium {
