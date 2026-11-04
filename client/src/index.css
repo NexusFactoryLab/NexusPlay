@@ -5079,23 +5079,6 @@ code {
   height: 44px;
 }
 
-[data-theme='fantasy'] .sidebar-brand {
-  font-family: var(--fx-display);
-  font-size: 28px;
-  font-weight: 800;
-  line-height: 1.15;
-  letter-spacing: 0;
-  padding: 2px 3px;
-  background: linear-gradient(180deg, #fff3a6 0%, #ffd23f 45%, #ff9f1c 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  filter:
-    drop-shadow(1.5px 0 0 #3d1236) drop-shadow(-1.5px 0 0 #3d1236)
-    drop-shadow(0 1.5px 0 #3d1236) drop-shadow(0 -1.5px 0 #3d1236)
-    drop-shadow(0 3px 0 #2a0c26);
-}
-
 [data-theme='fantasy'] [data-tour='menu-toggle'] {
   top: 22px;
   right: -20px;
@@ -6230,19 +6213,6 @@ code {
   [data-theme='meadow'] .app-sidebar:not(.is-collapsed) {
     width: 272px;
   }
-}
-
-[data-theme='meadow'] .sidebar-brand {
-  font-family: var(--mw-display);
-  font-size: 26px;
-  font-weight: 800;
-  line-height: 1.15;
-  padding: 2px 3px;
-  background: linear-gradient(90deg, #ff7eb6 0%, #c58cff 45%, #6ec3ff 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  filter: drop-shadow(1.5px 0 0 #ffffff) drop-shadow(-1.5px 0 0 #ffffff) drop-shadow(0 1.5px 0 #ffffff) drop-shadow(0 -1.5px 0 #ffffff);
 }
 
 [data-theme='meadow'] [data-tour='menu-toggle'] {
