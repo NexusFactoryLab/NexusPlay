@@ -30,3 +30,18 @@ export function LogoTint({ color, className }: BrandLogoProps & { color: string 
     />
   )
 }
+
+/**
+ * Solo la N con el degradado violeta→rosa de la marca, sin el cuadro de fondo:
+ * se funde con superficies oscuras o de color donde el isotipo completo se vería pegado.
+ */
+export function LogoGlyph({ className }: BrandLogoProps) {
+  const mask = 'url(/brand/logo-n.svg) center / contain no-repeat'
+  return (
+    <span
+      aria-hidden="true"
+      className={className}
+      style={{ background: 'linear-gradient(135deg, #7f2cff, #ff3590)', mask, WebkitMask: mask }}
+    />
+  )
+}
