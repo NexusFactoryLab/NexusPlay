@@ -1,0 +1,278 @@
+/* ---- Cómo funciona: pasos seleccionables con vista previa ---- */
+.lp-how {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 24px;
+  margin-top: 32px;
+}
+
+.lp-how-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lp-how-tab {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--lp-border);
+  border-radius: 14px;
+  background: transparent;
+  color: var(--lp-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.lp-how-tab:hover {
+  border-color: rgba(166, 133, 245, 0.6);
+}
+
+.lp-how-tab:focus-visible,
+.lp-how-panel:focus-visible {
+  outline: 2px solid var(--lp-gold);
+  outline-offset: 2px;
+}
+
+.lp-how-tab[aria-selected='true'] {
+  border-color: var(--lp-accent);
+  background: rgba(123, 92, 255, 0.16);
+  color: var(--lp-text-h);
+}
+
+.lp-how-num {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--lp-accent-2);
+}
+
+.lp-how-tab-text {
+  display: flex;
+  flex-direction: column;
+  font-weight: 600;
+}
+
+.lp-how-tab-text small {
+  font-size: 12.5px;
+  font-weight: 400;
+  opacity: 0.75;
+}
+
+.lp-how-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
+  padding: 28px;
+  border: 1px solid var(--lp-border);
+  border-radius: 20px;
+  background: var(--lp-surface);
+}
+
+.lp-how-copy h3 {
+  margin-bottom: 8px;
+  font-size: 22px;
+}
+
+.lp-how-actions {
+  margin-top: 16px;
+}
+
+.lp-how-view {
+  align-self: center;
+  animation: lp-how-in 0.35s ease both;
+}
+
+@keyframes lp-how-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.lp-pv {
+  padding: 18px;
+  border: 1px solid var(--lp-border);
+  border-radius: 14px;
+  background: rgba(18, 13, 51, 0.6);
+  font-size: 14px;
+}
+
+.lp-pv-label {
+  margin: 12px 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #c4b5ff;
+}
+
+.lp-pv > .lp-pv-label:first-child {
+  margin-top: 0;
+}
+
+.lp-pv-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--lp-text-h);
+}
+
+.lp-pv-file em {
+  margin-left: auto;
+  font-style: normal;
+  opacity: 0.7;
+}
+
+.lp-pv-tag {
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(255, 61, 127, 0.2);
+  font-size: 11px;
+  font-weight: 700;
+  color: #ff8fb8;
+}
+
+.lp-pv-list,
+.lp-pv-rank,
+.lp-pv-chips {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lp-pv-list li,
+.lp-pv-rank li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 0;
+  border-top: 1px solid var(--lp-border);
+}
+
+.lp-pv-list b {
+  flex: none;
+  font-size: 12px;
+  color: #7be0b0;
+}
+
+.lp-pv-list .is-pending b {
+  color: var(--lp-gold);
+}
+
+.lp-pv-code {
+  margin: 0 0 12px;
+  font-family: var(--font-heading);
+  font-size: 34px;
+  letter-spacing: 0.18em;
+  color: var(--lp-text-h);
+}
+
+.lp-pv-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lp-pv-chips li {
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(123, 92, 255, 0.2);
+  color: var(--lp-text-h);
+}
+
+.lp-pv-q {
+  margin: 0 0 12px;
+  color: var(--lp-text-h);
+  font-weight: 600;
+}
+
+.lp-pv-opts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.lp-pv-opts span {
+  padding: 10px 12px;
+  border: 1px solid var(--lp-border);
+  border-radius: 10px;
+}
+
+.lp-pv-opts .is-right {
+  border-color: #7be0b0;
+  background: rgba(123, 224, 176, 0.14);
+  color: var(--lp-text-h);
+}
+
+.lp-pv-foot {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: var(--lp-gold);
+}
+
+.lp-pv-rank li {
+  justify-content: flex-start;
+}
+
+.lp-pv-rank b {
+  margin-left: auto;
+  color: var(--lp-text-h);
+}
+
+.lp-pv-pos {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 200, 61, 0.18);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--lp-gold);
+}
+
+.lp-pv-note {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  opacity: 0.7;
+}
+
+@media (max-width: 860px) {
+  .lp-how {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .lp-how-tabs {
+    flex-direction: row;
+    overflow-x: auto;
+  }
+
+  .lp-how-tab {
+    flex: none;
+  }
+
+  .lp-how-tab-text small {
+    display: none;
+  }
+
+  .lp-how-panel {
+    grid-template-columns: 1fr;
+    padding: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-how-view {
+    animation: none;
+  }
+
+  .lp-how-tab {
+    transition: none;
+  }
+}

@@ -1,8 +1,9 @@
 import { useRef, type CSSProperties, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, BarChart3, Brain, Check, GraduationCap, Radio, Users } from 'lucide-react'
+import { ArrowRight, Check, GraduationCap, Users } from 'lucide-react'
 import { LogoMark, LogoWordmark } from '../BrandLogo'
 import { GoLink } from './GoLink'
+import { HowItWorks } from './HowItWorks'
 import { CHALLENGES, formatPoints } from './landingData'
 import { LiveMatchDemo } from './LiveMatchDemo'
 import { RankingSection } from './RankingSection'
@@ -123,52 +124,6 @@ function Hero() {
         </div>
       </div>
     </header>
-  )
-}
-
-const STEPS = [
-  {
-    icon: Brain,
-    title: 'Sube tus apuntes',
-    text: 'La IA arma la partida a partir de tu material; la revisas y ajustas antes de publicarla. También puedes usar las que ya creó la comunidad.',
-  },
-  {
-    icon: Radio,
-    title: 'Lanza la partida en vivo',
-    text: 'Comparte un código de sala y la clase entra desde cualquier dispositivo. O arma un torneo con eliminatorias y podio.',
-  },
-  {
-    icon: BarChart3,
-    title: 'Mide lo que se domina',
-    text: 'Cada respuesta suma puntos. El docente ve los resultados por clase y cada estudiante, su lugar en el ranking.',
-  },
-]
-
-function HowItWorks() {
-  return (
-    <section id="como" className="lp-section">
-      <div className="lp-wrap">
-        <p className="lp-eyebrow">Cómo funciona</p>
-        <h2>De tu apunte a una partida, en tres pasos</h2>
-        <p className="lp-lead">
-          Sin instalar nada: todo corre en el navegador, en el aula o a distancia.
-        </p>
-        <div className="lp-steps">
-          {STEPS.map(({ icon: Icon, title, text }, index) => (
-            <div key={title} className="lp-step">
-              <div className="lp-step-tile">
-                <Icon size={28} aria-hidden="true" />
-              </div>
-              <h3>
-                <span>{String(index + 1).padStart(2, '0')}</span>
-                {title}
-              </h3>
-              <p>{text}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
   )
 }
 

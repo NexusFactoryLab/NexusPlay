@@ -1,5 +1,28 @@
 import { describe, expect, it } from 'vitest'
-import { SAMPLE_STUDENTS, SAMPLE_UNIVERSITIES, buildLandingRanking } from './landingData'
+import { HOW_STEPS, SAMPLE_STUDENTS, SAMPLE_UNIVERSITIES, buildLandingRanking, nextStepIndex } from './landingData'
+
+describe('HOW_STEPS', () => {
+  it('tiene pasos con id único y contenido completo', () => {
+    expect(new Set(HOW_STEPS.map((s) => s.id)).size).toBe(HOW_STEPS.length)
+    for (const step of HOW_STEPS) {
+      expect(step.title.length).toBeGreaterThan(0)
+      expect(step.actions.length).toBeGreaterThan(0)
+    }
+  })
+})
+
+describe('nextStepIndex', () => {
+  it('avanza y retrocede de forma circular', () => {
+    expect(nextStepIndex('ArrowRight', 3, 4)).toBe(0)
+    expect(nextStepIndex('ArrowLeft', 0, 4)).toBe(3)
+  })
+  it('Inicio y Fin saltan a los extremos; otras teclas no navegan', () => {
+    expect(nextStepIndex('Home', 2, 4)).toBe(0)
+    expect(nextStepIndex('End', 0, 4)).toBe(3)
+    expect(nextStepIndex('a', 0, 4)).toBeNull()
+    expect(nextStepIndex('ArrowRight', 0, 0)).toBeNull()
+  })
+})
 
 const student = {
   rank: 1,
