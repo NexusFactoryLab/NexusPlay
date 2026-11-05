@@ -80,7 +80,7 @@ export function TournamentGamePicker({ games, loading, picks, onToggle, onLevel 
 
       {loading && <p className="text-[13px]">Cargando juegos…</p>}
       {!loading && games.length === 0 && (
-        <p className="tsu-box text-[13px]">No hay juegos publicados de ¿Quién Es?, Dominó o Laberinto V/F. Publica alguno para armar el torneo.</p>
+        <p className="tsu-box text-[13px]">No hay juegos publicados de ¿Quién Es?, Dominó, Laberinto V/F o Salvando el mundo. Publica alguno para armar el torneo.</p>
       )}
       {!loading && games.length > 0 && visible.length === 0 && (
         <div className="tsu-box flex flex-col items-center gap-2 py-8 text-center">

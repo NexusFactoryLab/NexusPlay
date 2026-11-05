@@ -36,6 +36,8 @@ export type PointsHistory = {
  * terminada con ganador suma 1 punto a esa persona (igual que en el servidor);
  * las partidas en curso o cerradas sin ganador no suman. Al estar la ronda
  * actual incluida, la línea sube en vivo apenas termina cada partida.
+ * (Salvando el mundo da puntos variables en el servidor — aquí la gráfica
+ * solo cuenta +1 por ronda sin perder vidas, para no reconstruir el cálculo.)
  */
 export function buildPointsHistory(tournament: Pick<TournamentStateView, 'participants' | 'rounds'>): PointsHistory {
   const lastRound = tournament.rounds.reduce((max, round) => Math.max(max, round.round), 0)

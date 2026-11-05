@@ -106,6 +106,17 @@ function MatchStatus({ match }: { match: TournamentLiveMatch }) {
       </div>
     )
   }
+  if (match.gameType === 'MAZE_COLLECTOR') {
+    if (match.phase === 'FINISHED') {
+      return (
+        <p className="flex items-center gap-1.5 text-[11.5px] text-text">
+          <Trophy className="h-3 w-3 shrink-0 text-accent" strokeWidth={2} />
+          {match.winnerUserId ? 'Terminó sin perder vidas' : 'Terminó con vidas perdidas'}
+        </p>
+      )
+    }
+    return <p className="text-[11.5px] text-text">Jugando…</p>
+  }
   if (match.phase === 'FINISHED') {
     const winner = nameOf(match.winnerUserId)
     return (
@@ -213,7 +224,7 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
               <button
                 type="button"
                 className="flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-2 text-[13px] font-semibold text-text-h transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/50"
-                title="Detiene los relojes de Identidad Oculta y Dominó. El Laberinto es a ritmo propio y no se pausa."
+                title="Detiene los relojes de Identidad Oculta y Dominó. El Laberinto y Salvando el mundo van a ritmo propio y no se pausan."
                 onClick={() => onPause(!tournament.paused)}
               >
                 {tournament.paused ? <Play className="h-4 w-4" strokeWidth={2} /> : <Pause className="h-4 w-4" strokeWidth={2} />}
@@ -259,7 +270,7 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
 
         {tournament.paused && (
           <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[13px] text-text-h" role="status">
-            <strong>Ronda en pausa.</strong> Identidad Oculta y Dominó están detenidos; el Laberinto sigue a su ritmo. Pulsa «Reanudar ronda» para seguir.
+            <strong>Ronda en pausa.</strong> Identidad Oculta y Dominó están detenidos; el Laberinto y Salvando el mundo siguen a su ritmo. Pulsa «Reanudar ronda» para seguir.
           </p>
         )}
 

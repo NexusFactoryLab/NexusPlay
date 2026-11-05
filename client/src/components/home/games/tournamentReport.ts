@@ -32,6 +32,12 @@ function describeMatch(match: TournamentRoundMatchSummary, selfUserId: string, n
       result: match.winnerUserId === selfUserId ? 'Todo bien: +1 punto' : match.phase === 'FINISHED' ? 'Sin punto' : 'En curso',
     }
   }
+  if (match.gameType === 'MAZE_COLLECTOR') {
+    return {
+      rival: 'Juegas solo',
+      result: match.winnerUserId === selfUserId ? 'Sin perder vidas: puntos extra' : match.phase === 'FINISHED' ? 'Con vidas perdidas' : 'En curso',
+    }
+  }
   const rivalId = match.playerUserIds.find((id) => id !== selfUserId)
   const rival = rivalId && !rivalId.startsWith('bot:') ? nameOf(rivalId) : BOT_NAME
   if (match.winnerUserId === selfUserId) return { rival, result: 'Ganaste: +1 punto' }

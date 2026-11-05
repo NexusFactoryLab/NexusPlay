@@ -68,7 +68,7 @@ export class SaveTournamentSettingsUseCase implements UseCase<SaveTournamentSett
         throw new InvalidGameStateError(`"${game.title}" no está publicado, no puede entrar al torneo.`);
       }
       if (!(TOURNAMENT_GAME_TYPES as readonly string[]).includes(game.gameType.getName())) {
-        throw new InvalidGameStateError('por ahora solo "¿Quién Es?", Dominó y el Laberinto Verdadero o Falso admiten torneos.');
+        throw new InvalidGameStateError('por ahora solo "¿Quién Es?", Dominó, el Laberinto Verdadero o Falso y Salvando el mundo admiten torneos.');
       }
     }
 

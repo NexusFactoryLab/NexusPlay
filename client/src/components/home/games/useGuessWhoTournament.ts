@@ -106,6 +106,11 @@ export function useGuessWhoTournament(token: string | null) {
     socketRef.current?.emit('tournament:maze-finish')
   }, [])
 
+  /** Salvando el mundo (issue #166): terminó su partida; el servidor convierte esto en puntos. */
+  const sendMazeCollectorFinish = useCallback((result: { answeredCorrect: number; livesLost: number; playedMs: number }) => {
+    socketRef.current?.emit('tournament:maze-collector-finish', result)
+  }, [])
+
   const clearError = useCallback(() => setError(null), [])
 
   const startTournament = useCallback(() => {
@@ -204,6 +209,7 @@ export function useGuessWhoTournament(token: string | null) {
     createTournament,
     sendMazeAnswer,
     sendMazeFinish,
+    sendMazeCollectorFinish,
     clearError,
     joinTournament,
     startTournament,

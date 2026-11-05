@@ -1,4 +1,4 @@
-import { CircleHelp, Layers, Rocket } from 'lucide-react'
+import { CircleHelp, Globe, Layers, Rocket } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { TOURNAMENT_GAME_LABEL, TOURNAMENT_LEVEL_INFO } from './tournamentLevels'
 import type { TournamentGameType, TournamentLevel } from './tournamentLevels'
@@ -9,6 +9,7 @@ const GAME_ICON: Record<TournamentGameType, LucideIcon> = {
   GUESS_WHO: CircleHelp,
   DOMINO: Layers,
   TRUE_FALSE_MAZE: Rocket,
+  MAZE_COLLECTOR: Globe,
 }
 
 export type RevealedGame = { title: string; level: TournamentLevel; gameType: TournamentGameType }

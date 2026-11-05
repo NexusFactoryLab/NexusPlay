@@ -63,6 +63,9 @@ const TrueFalseMazeTournamentPage = lazy(() =>
 const TrueFalseMazeDemoPage = lazy(() =>
   import('./components/home/games/true-false-maze/TrueFalseMazeDemoPage').then((m) => ({ default: m.TrueFalseMazeDemoPage })),
 )
+const MazeCollectorTournamentPage = lazy(() =>
+  import('./components/home/games/MazeCollectorTournamentPage').then((m) => ({ default: m.MazeCollectorTournamentPage })),
+)
 
 function App() {
   const { user, status } = useAuth()
@@ -145,6 +148,15 @@ function App() {
         <Route path="/escaleras-serpientes/sala/:code?" element={<SnakesLaddersRoomPage />} />
         <Route path="/jugar/memoria/:slug" element={<MemoryMatchPlayPage />} />
         <Route path="/jugar/laberinto/:slug" element={<MazeCollectorPlayPage />} />
+        {/* Una ronda de Salvando el mundo dentro de un torneo (issue #166): cada persona juega sola. */}
+        <Route
+          path="/jugar/laberinto/torneo/:code"
+          element={
+            <Suspense fallback={<main className="flex flex-1 items-center justify-center">Cargando el territorio…</main>}>
+              <MazeCollectorTournamentPage />
+            </Suspense>
+          }
+        />
         <Route
           path="/jugar/laberinto-vf/:slug"
           element={
