@@ -1,36 +1,47 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useAuth } from '../../hooks/useAuth'
+import { useTheme } from '../../hooks/useTheme'
 import type { AuthUser } from '../../services/auth.service'
 import { isKidsMode } from '../../utils/kidsMode'
-import { resetGreetedThisSession, welcomeStorageKey } from '../home/welcomeTourSteps'
-import { ThemesSection } from '../home/ThemesSection'
-import { ThemeStepBackdrop } from './ThemeStepBackdrop'
+import { markMandatoryTutorialPending, resetGreetedThisSession, welcomeStorageKey } from '../home/welcomeTourSteps'
 import { randomAvatar } from './avatarConfig'
 import { AvatarEditorPage } from './AvatarEditorPage'
 import { hasSkippedAvatarOnboarding, markAvatarOnboardingSkipped, needsAvatarOnboarding } from './avatarOnboarding'
 
 /**
- * Primer inicio de sesión, después de elegir rol y antes de la guía:
- * 1. Elegir el tema (no aplica a menores de 10 años, el Modo Kids).
- * 2. Personalizar el avatar, con el editor de fondo desenfocado y un aviso
- *    corto encima. Quien salta el paso (o es un menor de 10 años) recibe un
- *    avatar al azar: nadie se queda sin avatar.
+ * Primer inicio de sesión, después de elegir rol y antes de la guía: se
+ * personaliza el avatar, con el editor de fondo desenfocado y un aviso
+ * corto encima. Quien salta el paso (o es un menor de 10 años) recibe un
+ * avatar al azar: nadie se queda sin avatar.
+ *
+ * Cuentas nuevas (issue #171) no eligen tema aquí: queda Fantasía por
+ * defecto (se puede cambiar después desde Configuración) y, al salir de
+ * este paso, el tutorial de bienvenida se vuelve obligatorio con su
+ * elección de Tutorial Rápido o Completo (ver `WelcomeTour` y
+ * `markMandatoryTutorialPending`).
  */
 export function AvatarOnboardingGate({ user, children }: { user: AuthUser; children: ReactNode }) {
   const { saveAvatar } = useAuth()
+  const { setTheme } = useTheme()
   const [skipped, setSkipped] = useState(() => hasSkippedAvatarOnboarding(user.id))
-  const [themeDone, setThemeDone] = useState(false)
   const [started, setStarted] = useState(false)
   const [busy, setBusy] = useState(false)
   const kids = isKidsMode(user)
   const needed = needsAvatarOnboarding(user, skipped)
   const autoAssigned = useRef(false)
+  const onboardingStarted = useRef(false)
 
   // Al terminar (guardar o saltar) debe salir la tarjeta de bienvenida del inicio.
+  // Cuenta nueva no-Kids: tema Fantasía por defecto y tutorial obligatorio al llegar al inicio.
   useEffect(() => {
-    if (needed) resetGreetedThisSession(welcomeStorageKey(user.id, user.role))
-  }, [needed, user.id, user.role])
+    if (!needed) return
+    resetGreetedThisSession(welcomeStorageKey(user.id, user.role))
+    if (kids || onboardingStarted.current) return
+    onboardingStarted.current = true
+    setTheme('fantasy')
+    markMandatoryTutorialPending(user.id)
+  }, [needed, kids, user.id, user.role, setTheme])
 
   // Menores de 10 años: sin pasos, el avatar se genera solo.
   useEffect(() => {
@@ -52,25 +63,6 @@ export function AvatarOnboardingGate({ user, children }: { user: AuthUser; child
   }
 
   if (!needed || kids) return <>{children}</>
-
-  if (!themeDone) {
-    return (
-      <main className="fixed inset-0 flex overflow-y-auto p-4 sm:p-6">
-        <ThemeStepBackdrop />
-        <div className="nx-stage-in m-auto flex w-full max-w-6xl flex-col gap-4">
-          <h1 className="text-2xl font-extrabold text-text-h sm:text-4xl">Elige cómo se ve tu experiencia</h1>
-          <ThemesSection compact />
-          <button
-            type="button"
-            onClick={() => setThemeDone(true)}
-            className="avatar-chip-btn avatar-skip self-end"
-          >
-            Continuar
-          </button>
-        </div>
-      </main>
-    )
-  }
 
   return (
     <main className="app-main nx-stage-in fixed inset-0 overflow-y-auto">
