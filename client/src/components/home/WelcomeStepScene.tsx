@@ -140,7 +140,7 @@ export function WelcomeStepScene({ target }: { target: string }) {
           ) : (
             <>
               <div className="rounded-lg border border-border p-1.5" style={{ background: 'color-mix(in srgb, var(--accent) 10%, var(--bg))' }}>
-                <p className="text-[7.5px] leading-tight font-bold text-text-h">Convierte cualquier tema en un juego</p>
+                <p className="text-[7.5px] leading-tight font-bold text-text-h">Estudiar no debe ser aburrido</p>
                 <div className="mt-1.5 flex gap-1">
                   <MiniButton lit={target === 'create'} background="linear-gradient(135deg, var(--accent), var(--accent-2))">
                     <Plus className="h-2 w-2" strokeWidth={3} /> Crear un juego nuevo
