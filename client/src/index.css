@@ -4646,6 +4646,12 @@ code {
 
 .app-main {
   --main-pad-x: 24px;
+  /* El banco de nubes de Fantasía sangra --main-pad-x hacia los lados (ver
+   * .fx-cloudbank-wrap) para llegar al borde de la pantalla: sin esto, ese
+   * sangrado quedaba como contenido real y el <main> (overflow-y: auto, que
+   * por norma también vuelve «auto» el eje horizontal) ganaba una barra de
+   * desplazamiento horizontal (issue #174). */
+  overflow-x: hidden;
 }
 
 @media (min-width: 640px) {
@@ -5722,8 +5728,12 @@ code {
   pointer-events: none;
 }
 
+/* Las dos capas van DETRÁS de la tarjeta de juegos (issue #174): en ventanas
+ * normales (sin pantalla completa) hay poco margen bajo el carrusel y el
+ * degradado de nubes alcanzaba a taparle el marco inferior. Puesto detrás,
+ * solo se ve en los huecos y bajo las tarjetas, nunca encima. */
 [data-theme='fantasy'] .fx-cloudbank-back {
-  z-index: -1;
+  z-index: -2;
   height: 170px;
   opacity: 0.9;
   background:
@@ -5732,7 +5742,7 @@ code {
 }
 
 [data-theme='fantasy'] .fx-cloudbank-front {
-  z-index: 6;
+  z-index: -1;
   height: 48px;
   background:
     var(--fx-puff) 0 calc(100% + 32px) / 190px 78px repeat-x,
