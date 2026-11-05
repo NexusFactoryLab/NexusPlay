@@ -108,3 +108,34 @@ Mongo, y su forma la garantiza el validador.
 - Un usuario que no sea el tuyo puede crear contenido de ese tipo desde la interfaz y publicarlo.
 - El juego publicado aparece en el catálogo junto a los demás, sin sección aparte.
 - Un ADMIN puede despublicarlo.
+
+## Acuerdo de confidencialidad del torneo (issue #173)
+
+Quien entra a un torneo por el **QR o el enlace de invitación** firma, de forma virtual, un acuerdo de
+confidencialidad y una autorización de tratamiento de datos (Ley 1581 de 2012, Decreto 1377 de 2013 / Decreto
+1074 de 2015, Ley 527 de 1999, Decreto 2364 de 2012). El moderador y quien teclea el código a mano no lo ven.
+
+**Cómo funciona**
+
+- El enlace del QR (`invitationUrlFor`, `tournamentInvitation.ts`) lleva `?origen=qr`. `invitationDestination`
+  lo conserva si la persona tiene que iniciar sesión antes.
+- `TournamentRoomPage` manda `tournament:join` con `via: 'qr'`. El **servidor** (`rooms.gateway.ts`) busca una
+  firma vigente (mismo usuario, mismo torneo, misma versión del texto); si no hay, no une a la persona y emite
+  `tournament:signature-required`. Entonces el cliente muestra `TournamentAgreementModal`, que firma por
+  `POST /tournament-agreement/:code/sign` y reintenta la entrada.
+- El servidor vuelve a validar todo al firmar: versión y hash del texto, las dos casillas (separadas), nombre
+  completo = firma, y para menores de 18 años los datos y la aceptación del representante legal.
+- Limitación asumida: el servidor no puede distinguir una entrada por QR de una por código a mano más allá de lo
+  que declara el cliente (ambas usan el mismo código). Quitar `origen=qr` equivale a teclear el código.
+- Respaldo: `GET /tournament-agreement/:code/signatures` (`?format=csv` descarga CSV) para el moderador del
+  torneo o un ADMIN. El moderador ve el documento enmascarado y sin IP; el ADMIN ve la evidencia completa.
+- La tabla `tournament_confidentiality_signatures` es de solo anexar (un trigger bloquea UPDATE y DELETE) y no
+  tiene clave foránea a `users`, para que la prueba no se borre con la cuenta.
+
+**Cómo subir la versión del texto**
+
+1. Edita `server/src/domain/legal/tournament-confidentiality-agreement.ts` (único lugar del texto).
+2. Cambia `TOURNAMENT_AGREEMENT_VERSION` (por ejemplo `2026-12-01.1`). El hash SHA-256 se calcula solo.
+3. Quienes firmaron la versión anterior volverán a ver el acuerdo la próxima vez que entren por QR.
+4. Los datos pendientes del responsable (identificación, domicilio, correo, plazo de retención, vigencia de la
+   confidencialidad, consecuencias) están en `AGREEMENT_CONFIG`; completarlos también exige subir la versión.
