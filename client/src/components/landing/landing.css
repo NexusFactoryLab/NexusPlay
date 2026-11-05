@@ -56,7 +56,7 @@
 }
 
 .lp-section {
-  padding: 72px 0;
+  padding: 48px 0;
 }
 
 .lp-eyebrow {
@@ -244,14 +244,14 @@
 .lp-hero {
   position: relative;
   overflow: hidden;
-  padding: 64px 0 88px;
+  padding: 40px 0 56px;
 }
 
 .lp-hero .lp-wrap {
   position: relative;
   display: grid;
   grid-template-columns: 1.05fr 0.95fr;
-  gap: 56px;
+  gap: 40px;
   align-items: center;
 }
 
@@ -481,7 +481,7 @@
 /* ---- Cierre y pie ---- */
 .lp-final {
   position: relative;
-  padding: 56px 24px;
+  padding: 40px 24px;
   border-radius: 26px;
   border: 1px solid rgba(166, 133, 245, 0.5);
   background: linear-gradient(135deg, rgba(123, 92, 255, 0.35), rgba(255, 61, 127, 0.3));
@@ -519,7 +519,7 @@
   }
 
   .lp-section {
-    padding: 52px 0;
+    padding: 36px 0;
   }
 }
 
