@@ -27,6 +27,13 @@ export class InvalidGoogleTokenError extends ApplicationError {
   }
 }
 
+/** Issue #173: no existe una sala de torneo abierta con ese código. */
+export class TournamentNotFoundError extends ApplicationError {
+  constructor(code: string) {
+    super(`No existe un torneo abierto con el código "${code}".`);
+  }
+}
+
 export class UserNotFoundError extends ApplicationError {
   constructor(userId: string) {
     super(`No se encontró un usuario con id "${userId}".`);

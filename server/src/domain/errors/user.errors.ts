@@ -48,6 +48,12 @@ export class RankingConsentNotAllowedError extends DomainError {
   }
 }
 
+export class InvalidTournamentSignatureError extends DomainError {
+  constructor(reason: string) {
+    super(`Firma inválida: ${reason}`);
+  }
+}
+
 export class InvalidUserStateError extends DomainError {
   constructor(reason: string) {
     super(`Operación inválida sobre el usuario: ${reason}`);

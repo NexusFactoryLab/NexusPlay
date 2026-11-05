@@ -19,6 +19,11 @@ import {
   TOURNAMENT_SETTINGS_REPOSITORY,
   type TournamentSettingsRepository,
 } from '../../domain/ports/tournament-settings.repository.port.js';
+import {
+  TOURNAMENT_CONFIDENTIALITY_SIGNATURE_REPOSITORY,
+  type TournamentConfidentialitySignatureRepository,
+} from '../../domain/ports/tournament-confidentiality-signature.repository.port.js';
+import { TOURNAMENT_AGREEMENT_VERSION } from '../../domain/legal/tournament-confidentiality-agreement.js';
 import { USER_REPOSITORY, type UserRepository } from '../../domain/ports/user.repository.port.js';
 import { ROOM_STORE, type RoomStore, type RoomState } from '../../domain/ports/room-store.port.js';
 import {
@@ -771,6 +776,10 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     @Optional() @Inject(GUESS_WHO_FREE_ANSWERER) freeAnswerer?: GuessWhoFreeAnswerer,
     // Al final y opcional para no mover los argumentos de las pruebas; solo lo usa `tournament:create`.
     @Optional() @Inject(TOURNAMENT_SETTINGS_REPOSITORY) private readonly tournamentSettings?: TournamentSettingsRepository,
+    // Issue #173: firma del acuerdo al entrar por QR. Opcional por el mismo motivo; en producción siempre está.
+    @Optional()
+    @Inject(TOURNAMENT_CONFIDENTIALITY_SIGNATURE_REPOSITORY)
+    private readonly tournamentSignatures?: TournamentConfidentialitySignatureRepository,
   ) {
     this.botRunner = new GuessWhoBotRunner(
       {
@@ -1873,12 +1882,36 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     });
   }
 
+  /**
+   * Issue #173: `via: 'qr'` es lo que manda el cliente cuando entra por el QR o el enlace de invitación
+   * (`?origen=qr`). En ese caso el servidor exige la firma vigente del acuerdo ANTES de unir a la persona; si
+   * falta, avisa con `tournament:signature-required` y no la une. El moderador y quien teclea el código a mano
+   * no pasan por aquí. Limitación asumida: el servidor no puede distinguir una entrada por QR de una por código
+   * a mano más allá de lo que declara el cliente, porque ambas son el mismo código de torneo.
+   */
   @SubscribeMessage('tournament:join')
   handleTournamentJoin(
     @ConnectedSocket() socket: AuthenticatedSocket,
-    @MessageBody() body: { code: string },
-  ) {
+    @MessageBody() body: { code: string; via?: string },
+  ): Promise<void> | void {
     const code = body.code?.trim().toUpperCase();
+    const tournament = this.tournamentStore.get(code);
+    const isModerator = tournament?.creatorUserId === socket.data.userId;
+    if (body.via === 'qr' && tournament && !isModerator && this.tournamentSignatures) {
+      return this.tournamentSignatures
+        .findValid(socket.data.userId, code, TOURNAMENT_AGREEMENT_VERSION)
+        .then((signed) => {
+          if (!signed) {
+            socket.emit('tournament:signature-required', { code, version: TOURNAMENT_AGREEMENT_VERSION });
+            return;
+          }
+          this.joinTournament(socket, code);
+        });
+    }
+    this.joinTournament(socket, code);
+  }
+
+  private joinTournament(socket: AuthenticatedSocket, code: string) {
     const tournament = this.tournamentStore.get(code);
     if (!tournament) throw new Error('No existe una sala grupal con ese código.');
 
