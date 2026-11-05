@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { getWelcomeSteps, initialWelcomePhase, phaseAfterGreeting } from './welcomeTourSteps'
+import {
+  clearMandatoryTutorialPending,
+  getWelcomeSteps,
+  initialWelcomePhase,
+  isMandatoryTutorialPending,
+  markMandatoryTutorialPending,
+  phaseAfterGreeting,
+} from './welcomeTourSteps'
 
 describe('initialWelcomePhase', () => {
   it('saluda al entrar al inicio, sea la cuenta nueva o antigua, si aún no ha saludado en esta sesión', () => {
@@ -55,5 +62,29 @@ describe('getWelcomeSteps (recorrido interactivo)', () => {
 
   it('en Kids siempre está el paso de Volver a los mundos (el primer paso hace entrar a uno)', () => {
     expect(getWelcomeSteps('STUDENT', true).map((step) => step.target)).toEqual(['worlds', 'worlds', 'worlds-back', 'profile'])
+  })
+
+  it('"quick" (issue #171) usa el mismo recorrido con texto más corto, sin perder tareas ni targets', () => {
+    const complete = getWelcomeSteps('TEACHER', false, {}, 'complete')
+    const quick = getWelcomeSteps('TEACHER', false, {}, 'quick')
+    expect(quick.map((step) => step.target)).toEqual(complete.map((step) => step.target))
+    complete.forEach((step, i) => {
+      expect(quick[i].text.length, step.target).toBeLessThanOrEqual(step.text.length)
+    })
+  })
+
+  it('sin indicar "mode" se comporta como "complete" (reabrir la guía manualmente)', () => {
+    expect(getWelcomeSteps('STUDENT', false)).toEqual(getWelcomeSteps('STUDENT', false, {}, 'complete'))
+  })
+})
+
+describe('tutorial obligatorio pendiente (issue #171)', () => {
+  it('se marca, se detecta y se borra por cuenta', () => {
+    const userId = `test-${Math.random()}`
+    expect(isMandatoryTutorialPending(userId)).toBe(false)
+    markMandatoryTutorialPending(userId)
+    expect(isMandatoryTutorialPending(userId)).toBe(true)
+    clearMandatoryTutorialPending(userId)
+    expect(isMandatoryTutorialPending(userId)).toBe(false)
   })
 })

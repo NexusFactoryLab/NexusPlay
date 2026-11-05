@@ -3,11 +3,24 @@ import { createPortal } from 'react-dom'
 import { Check, Compass, Gamepad2, Hand, Keyboard, Plus, UserRound, X } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { AuthUser } from '../../services/auth.service'
-import { getWelcomeSteps, hasGreetedThisSession, hasSeenWelcome, initialWelcomePhase, markGreetedThisSession, markWelcomeSeen, phaseAfterGreeting, welcomeStorageKey } from './welcomeTourSteps'
-import type { WelcomeOptions, WelcomePhase, WelcomeStep } from './welcomeTourSteps'
+import {
+  clearMandatoryTutorialPending,
+  getWelcomeSteps,
+  hasGreetedThisSession,
+  hasSeenWelcome,
+  initialWelcomePhase,
+  isMandatoryTutorialPending,
+  markGreetedThisSession,
+  markWelcomeSeen,
+  phaseAfterGreeting,
+  welcomeStorageKey,
+} from './welcomeTourSteps'
+import type { TutorialMode, WelcomeOptions, WelcomePhase, WelcomeStep } from './welcomeTourSteps'
 import { WelcomeCard } from './WelcomeCard'
 import { TourSpotlight } from './TourSpotlight'
 import { WelcomeStepScene } from './WelcomeStepScene'
+import { TutorialTrackChoice } from './TutorialTrackChoice'
+import { TutorialCreateGameDemo } from './TutorialCreateGameDemo'
 import { pickCardCorner, tourCardBounds, useSpotlightRect } from './tourSpotlightLayout'
 import { getTourAway, setTourAway, useTourAway } from './tourProgress'
 import { isKidsMode } from '../../utils/kidsMode'
@@ -85,6 +98,14 @@ function isActionClick(target: HTMLElement, event: Event) {
  * el paso la lleva a otra página, el progreso queda en `tourProgress` y
  * `TourReturnBar` (en toda la app) le explica la página y la obliga a
  * "Volver a la guía", que la trae de nuevo aquí, al paso siguiente.
+ *
+ * Cuenta nueva (issue #171, bandera `isMandatoryTutorialPending`): se salta
+ * la tarjeta y la invitación de siempre y va directo a elegir Tutorial
+ * Rápido o Completo (`TutorialTrackChoice`); el recorrido elegido no tiene X
+ * ni Escape, y el Completo termina con una simulación de crear un juego
+ * (`TutorialCreateGameDemo`) para quien puede crear juegos. Solo al terminar
+ * todo eso se borra la bandera y la cuenta queda igual que cualquier otra,
+ * con la guía opcional de siempre.
  */
 export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds, onBusyChange }: { user: AuthUser, /** Avisa si la bienvenida o el recorrido están abiertos, para no apilar otras ventanas encima. */ onBusyChange?: (busy: boolean) => void } & WelcomeOptions) {
   const location = useLocation()
@@ -94,16 +115,20 @@ export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds, on
   // No interrumpir enlaces a juegos, salas ni otras secciones.
   const atHome = location.pathname === '/' && !location.search
   const buildSteps = useCallback(
-    () => getWelcomeSteps(user.role, isKids, { canAccessOrganization, canGoBackToWorlds }),
+    (trackMode: TutorialMode = 'complete') => getWelcomeSteps(user.role, isKids, { canAccessOrganization, canGoBackToWorlds }, trackMode),
     [user.role, isKids, canAccessOrganization, canGoBackToWorlds],
   )
+  // Cuenta nueva que aún no eligió ni terminó su tutorial obligatorio (issue #171):
+  // ver `AvatarOnboardingGate`, que marca esta bandera al terminar el onboarding de avatar.
+  const mandatory = isMandatoryTutorialPending(user.id)
+  const [mode, setMode] = useState<TutorialMode>(() => (getTourAway()?.owner === storageKey ? getTourAway()?.mode ?? 'complete' : 'complete'))
   // Volver de otra página en mitad del recorrido lo retoma donde iba (sin saludo de por medio).
-  const [phase, setPhase] = useState<WelcomePhase>(() =>
-    getTourAway()?.owner === storageKey && getTourAway()?.status === 'resume' && atHome
-      ? 'tour'
-      : initialWelcomePhase(atHome, hasSeenWelcome(storageKey), hasGreetedThisSession(storageKey)),
-  )
-  const [steps, setSteps] = useState(buildSteps)
+  const [phase, setPhase] = useState<WelcomePhase>(() => {
+    if (getTourAway()?.owner === storageKey && getTourAway()?.status === 'resume' && atHome) return 'tour'
+    if (mandatory) return atHome ? 'choose-track' : 'closed'
+    return initialWelcomePhase(atHome, hasSeenWelcome(storageKey), hasGreetedThisSession(storageKey))
+  })
+  const [steps, setSteps] = useState(() => buildSteps(mode))
   const [index, setIndex] = useState(0)
   // El paso actual ya se hizo (abrió el menú, buscó…): ahora toca "Siguiente".
   const [stepDone, setStepDone] = useState(false)
@@ -135,6 +160,9 @@ export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds, on
   const visible = atHome && phase !== 'closed'
   // Momento obligatorio: solo antes de que la persona inicie el recorrido.
   const forcedInvite = visible && phase === 'invite'
+  // Solo quien puede crear juegos ve la simulación, y solo en el tutorial obligatorio Completo.
+  const demoEligible = mandatory && !isKids && (user.role === 'TEACHER' || user.role === 'ADMIN')
+  const includesDemo = demoEligible && mode === 'complete'
   useEffect(() => { onBusyChange?.(visible) }, [visible, onBusyChange])
 
   // Al volver al inicio desde la barra "Volver a la guía" (o con el botón
@@ -143,10 +171,12 @@ export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds, on
   const resumeFrom = away?.owner === storageKey && away.status === 'resume' && atHome ? away.resumeIndex : null
   useEffect(() => {
     if (resumeFrom === null) return
+    const resumedMode = away?.mode ?? 'complete'
     setTourAway(null)
     markGreetedThisSession(storageKey)
     markWelcomeSeen(storageKey)
-    const fresh = buildSteps()
+    setMode(resumedMode)
+    const fresh = buildSteps(resumedMode)
     setSteps(fresh)
     setStepDone(false)
     if (resumeFrom >= fresh.length) {
@@ -155,7 +185,16 @@ export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds, on
     }
     setIndex(resumeFrom)
     setPhase('tour')
-  }, [resumeFrom, storageKey, buildSteps])
+  }, [resumeFrom, storageKey, buildSteps, away?.mode])
+
+  // El tutorial obligatorio no abre la invitación ni la tarjeta de bienvenida:
+  // si vuelve al inicio sin haber elegido aún (y sin un progreso a medias
+  // pendiente de "Volver a la guía"), se le vuelve a preguntar.
+  useEffect(() => {
+    if (!mandatory || !atHome || phase !== 'closed') return
+    if (getTourAway()?.owner === storageKey) return
+    setPhase('choose-track')
+  }, [mandatory, atHome, phase, storageKey])
 
   if (previousRoute !== location.key) {
     setPreviousRoute(location.key)
@@ -176,10 +215,11 @@ export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds, on
         explanation: step.away ?? GENERIC_AWAY,
         stepTitle: step.title,
         status: 'away',
+        mode,
       })
     }
     setPhase('closed')
-  }, [leftHomeInTour, storageKey, index, steps.length, step])
+  }, [leftHomeInTour, storageKey, index, steps.length, step, mode])
 
   const close = useCallback((restoreFocus = true) => {
     tidyAfterStep(stepRef.current.step, stepRef.current.done)
@@ -189,18 +229,54 @@ export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds, on
     if (restoreFocus) triggerRef.current?.focus()
   }, [storageKey])
 
+  // Fin del tutorial obligatorio (recorrido y, si aplica, la simulación):
+  // libera la cuenta para siempre (ver `markMandatoryTutorialPending`).
+  const finishMandatory = useCallback(() => {
+    tidyAfterStep(stepRef.current.step, stepRef.current.done)
+    markWelcomeSeen(storageKey)
+    clearMandatoryTutorialPending(user.id)
+    setTourAway(null)
+    setPhase('closed')
+    triggerRef.current?.focus()
+  }, [storageKey, user.id])
+
+  // Al terminar el último paso del recorrido: si es obligatorio, sigue a la
+  // simulación (cuando aplica) o se libera de una vez; si no, cierra como siempre.
+  const finishTour = useCallback(() => {
+    if (!mandatory) {
+      close()
+      return
+    }
+    if (includesDemo) {
+      setPhase('demo')
+      return
+    }
+    finishMandatory()
+  }, [mandatory, includesDemo, close, finishMandatory])
+
+  function chooseTrack(nextMode: TutorialMode) {
+    setMode(nextMode)
+    markGreetedThisSession(storageKey)
+    setTourAway(null)
+    setSteps(buildSteps(nextMode))
+    setIndex(0)
+    setStepDone(false)
+    setPhase('tour')
+  }
+
   useEffect(() => {
     // El paso obligatorio (fase "invite") no se puede saltar con Escape;
     // dentro del recorrido sí, salvo justo después de abrir un menú o una
-    // ventana: ahí Escape es para cerrar eso, no la guía.
-    if (!visible || phase !== 'tour' || stepDone) return
+    // ventana (ahí Escape es para cerrar eso, no la guía) o si el tutorial es
+    // obligatorio (issue #171): ahí tampoco hay salida con Escape.
+    if (!visible || phase !== 'tour' || stepDone || mandatory) return
     function onEscape(event: KeyboardEvent) {
       // El Escape que manda la propia guía para cerrar ventanas no la cierra a ella.
       if (event.key === 'Escape' && event.isTrusted) close()
     }
     document.addEventListener('keydown', onEscape)
     return () => document.removeEventListener('keydown', onEscape)
-  }, [visible, phase, stepDone, close])
+  }, [visible, phase, stepDone, close, mandatory])
 
   // Lo que la persona tiene que hacer en el paso: se escucha en el propio
   // elemento señalado, sin impedir que funcione como siempre.
@@ -243,6 +319,7 @@ export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds, on
         explanation: step.away,
         stepTitle: step.title,
         status: 'away',
+        mode,
       })
       timer = window.setTimeout(() => {
         if (!mountedRef.current || window.location.pathname !== '/') return
@@ -260,7 +337,7 @@ export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds, on
       target.removeEventListener('submit', onSubmit)
       window.clearTimeout(timer)
     }
-  }, [visible, phase, step, index, stepDone, steps.length, storageKey])
+  }, [visible, phase, step, index, stepDone, steps.length, storageKey, mode])
 
   function dismissGreeting() {
     markGreetedThisSession(storageKey)
@@ -271,7 +348,8 @@ export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds, on
     markGreetedThisSession(storageKey)
     markWelcomeSeen(storageKey)
     setTourAway(null)
-    setSteps(buildSteps())
+    setMode('complete')
+    setSteps(buildSteps('complete'))
     setIndex(0)
     setStepDone(false)
     setPhase('tour')
@@ -379,13 +457,23 @@ export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds, on
       <WelcomeCard onClose={dismissGreeting} onQuickGuide={start} />, document.body,
     )}
 
+    {visible && phase === 'choose-track' && createPortal(
+      <TutorialTrackChoice includesDemo={demoEligible} onChoose={chooseTrack} />, document.body,
+    )}
+
+    {visible && phase === 'demo' && createPortal(
+      <TutorialCreateGameDemo onFinish={finishMandatory} />, document.body,
+    )}
+
     {inTour && createPortal(
       // Con el paso hecho, la tarjeta va por encima de la ventana o el menú que se abrió: así "Siguiente" siempre se puede tocar.
       <section ref={setCardNode} style={cardPosition} data-compact={compact ? '' : undefined} aria-label="Recorrido de NexusPlay" className={`welcome-tour-card fixed ${stepDone ? 'z-[80]' : 'z-[45]'} w-[min(360px,calc(100vw-24px))] rounded-3xl border border-border bg-surface p-5 text-left text-text shadow-[var(--shadow)]`}>
         <div className="mb-3 flex items-center justify-between gap-3">
           <span key={`icon-${index}`} className="tour-step-icon flex h-10 w-10 items-center justify-center rounded-2xl text-white shadow-md" style={{ background: 'linear-gradient(135deg, var(--accent), var(--color-accent-2, var(--accent)))' }}><Icon className="h-6 w-6" aria-hidden="true" /></span>
           <span className="flex-1 text-xs font-semibold text-accent">Paso {index + 1} de {steps.length} · Hazlo tú</span>
-          <button type="button" onClick={() => close()} aria-label="Cerrar recorrido" className="rounded-full p-2 text-text hover:bg-code-bg focus-visible:outline-2 focus-visible:outline-accent"><X className="h-5 w-5" /></button>
+          {!mandatory && (
+            <button type="button" onClick={() => close()} aria-label="Cerrar recorrido" className="rounded-full p-2 text-text hover:bg-code-bg focus-visible:outline-2 focus-visible:outline-accent"><X className="h-5 w-5" /></button>
+          )}
         </div>
         <div key={index} className="tour-step-in" aria-live="polite" aria-atomic="true">
           {/* El "video" del paso: muestra cómo se hace; debajo, la persona lo hace. En el celular sale un poco más chico. */}
@@ -420,8 +508,8 @@ export function WelcomeTour({ user, canAccessOrganization, canGoBackToWorlds, on
         <div className="mt-4 flex items-center justify-between gap-2">
           <button type="button" disabled={index === 0} onClick={() => goTo(index - 1)} className="rounded-lg px-2 py-2 text-sm hover:bg-code-bg disabled:opacity-40">Atrás</button>
           {canAdvance ? (
-            <button type="button" onClick={() => last ? close() : goTo(index + 1)} className="rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90">
-              {last ? '¡Listo! 🎉' : 'Siguiente →'}
+            <button type="button" onClick={() => last ? finishTour() : goTo(index + 1)} className="rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90">
+              {last ? (includesDemo ? 'Seguir →' : '¡Listo! 🎉') : 'Siguiente →'}
             </button>
           ) : stuck ? (
             <button type="button" onClick={() => (last ? close() : goTo(index + 1))} className="rounded-lg px-2 py-2 text-xs font-semibold text-text/70 underline hover:text-accent">

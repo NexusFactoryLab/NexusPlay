@@ -22,6 +22,8 @@ export type TourAway = {
   stepTitle: string
   /** `away`: está fuera del inicio; `resume`: pidió volver y el inicio debe retomar. */
   status: 'away' | 'resume'
+  /** Rápido o Completo elegido (issue #171): se guarda para no perderlo si la navegación desmontó la guía. */
+  mode?: 'quick' | 'complete'
 }
 
 const STORAGE_KEY = 'nexusplay-tour-away-v1'
