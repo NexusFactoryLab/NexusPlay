@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ANSWER_FEEDBACK_MS, EXTRA_CLOUD_EVERY_MS, QUESTION_TIME_MS, __engineForTests as engine } from './useMazeCollectorGame'
+import { ANSWER_FEEDBACK_MS, answerPointsFor, POINTS_ANSWER, POINTS_SPEED_BONUS, EXTRA_CLOUD_EVERY_MS, QUESTION_TIME_MS, __engineForTests as engine } from './useMazeCollectorGame'
 import type { MazeScenario } from './useMazeCollectorGame'
 import { DEFAULT_MAZE_CONFIG, MAZE_LAYOUTS } from './mazeCollectorTypes'
 import type { CellPosition, MazeLayout, MazeLayoutDef } from './mazeCollectorTypes'
@@ -187,6 +187,27 @@ describe('Camión Reciclador: preguntas de opción múltiple', () => {
     expect(state.question!.id).toBe(first.id + 1)
     expect(state.answerFeedback?.kind).toBe('correct')
     expect(state.lives).toBe(config.lives)
+  })
+
+  it('responder más rápido da más puntos (200 base + hasta 600 de bono)', () => {
+    expect(answerPointsFor(QUESTION_TIME_MS)).toBe(POINTS_ANSWER + POINTS_SPEED_BONUS)
+    expect(answerPointsFor(QUESTION_TIME_MS / 2)).toBe(POINTS_ANSWER + POINTS_SPEED_BONUS / 2)
+    expect(answerPointsFor(0)).toBe(POINTS_ANSWER)
+    expect(answerPointsFor(-500)).toBe(POINTS_ANSWER)
+    expect(answerPointsFor(QUESTION_TIME_MS * 2)).toBe(POINTS_ANSWER + POINTS_SPEED_BONUS)
+    expect(answerPointsFor(12000)).toBeGreaterThan(answerPointsFor(4000))
+  })
+
+  it('la respuesta correcta inmediata suma más que la base y lo informa en el aviso', () => {
+    const state = engine.createInitialState(city, [], config, null, SUSTAINABLE_CITY_QUESTIONS)
+    state.ghosts = []
+    const first = state.question!
+    const correct = first.answers.find((answer) => answer.correct)!
+    first.answers.forEach((answer) => (answer.wrong = !answer.correct))
+    drive(state, () => correct.pos, (s) => s.answeredCorrect > 0)
+    expect(state.answerFeedback?.points).toBeGreaterThan(POINTS_ANSWER)
+    expect(state.answerFeedback?.points).toBeLessThanOrEqual(POINTS_ANSWER + POINTS_SPEED_BONUS)
+    expect(state.score).toBeGreaterThanOrEqual(state.answerFeedback!.points!)
   })
 
   it('la respuesta incorrecta quita una vida y desaparece del mapa', () => {

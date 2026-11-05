@@ -52,6 +52,11 @@ describe('validatePlayResult', () => {
     expect(validatePlayResult(maze({ timePlayedMs: 300_000, score: 20_000 }))).toBeNull();
   });
 
+  it('Laberinto: acepta una partida rápida con bono de velocidad (respuestas de hasta 800 puntos)', () => {
+    // 10 respuestas de ~700 puntos en 40 s = 175 pts/s, más de lo que permitía el tope anterior (150/s).
+    expect(validatePlayResult(maze({ timePlayedMs: 40_000, correctCount: 10, incorrectCount: 0, score: 7_000 }))).toBeNull();
+  });
+
   it('no caben más respuestas que dos por segundo', () => {
     expect(validatePlayResult(maze({ timePlayedMs: 10_000, correctCount: 40, incorrectCount: 0, score: 100 }))).toMatch(/respuestas/);
     expect(validatePlayResult(maze({ timePlayedMs: 10_000, correctCount: 20, incorrectCount: 0, score: 100 }))).toBeNull();
