@@ -1,0 +1,41 @@
+# Producción en una VM (AWS EC2): API de NexusPlay + Caddy (HTTPS automático).
+# Las bases de datos (Neon, Atlas) y las imágenes (Cloudinary) siguen siendo servicios externos.
+#
+# Uso (desde esta carpeta, en la VM):  docker compose -f docker-compose.prod.yml up -d --build
+# Variables: archivo `.env` en esta misma carpeta (plantilla: env.example).
+
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PORT: '3000'
+      NODE_ENV: production
+      # Una sala de Dúo Lógico mantiene el heap en ~90 MB; este tope hace que Node recolecte antes.
+      NODE_OPTIONS: --max-old-space-size=768
+    # Solo Caddy lo alcanza, por la red interna de Docker: el puerto 3000 no se publica.
+    expose:
+      - '3000'
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?Falta API_DOMAIN en .env (ej. api.nexusplaygames.com)}
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

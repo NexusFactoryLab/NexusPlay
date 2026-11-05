@@ -1,0 +1,6 @@
+# Caddy pide y renueva solo el certificado de Let's Encrypt para este dominio.
+# Los WebSockets de Socket.IO pasan por reverse_proxy sin configuración extra.
+# No se activa `encode`: la API ya comprime sus respuestas (compression en main.ts).
+{$API_DOMAIN} {
+	reverse_proxy api:3000
+}
