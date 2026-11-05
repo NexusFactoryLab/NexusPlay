@@ -1,4 +1,4 @@
-# Producción en una VM (Oracle Cloud Always Free): API de NexusPlay + Caddy (HTTPS automático).
+# Producción en una VM (AWS EC2): API de NexusPlay + Caddy (HTTPS automático).
 # Las bases de datos (Neon, Atlas) y las imágenes (Cloudinary) siguen siendo servicios externos.
 #
 # Uso (desde esta carpeta, en la VM):  docker compose -f docker-compose.prod.yml up -d --build
