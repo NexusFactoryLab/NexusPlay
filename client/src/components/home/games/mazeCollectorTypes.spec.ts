@@ -61,12 +61,14 @@ describe('MAZE_LAYOUTS — puertas de teletransporte', () => {
     expect(MAZE_LAYOUTS.CITY.tunnelRows).toEqual([6, 13])
   })
 
-  it('en Ciudad Sostenible cada calle mide una sola celda (nunca dos filas o columnas de calle seguidas dentro de la ciudad)', () => {
-    const { grid, rows, cols } = MAZE_LAYOUTS.CITY
-    for (let row = 1; row < rows - 2; row++) {
-      for (let col = 1; col < cols - 2; col++) {
-        const square = [grid[row][col], grid[row + 1][col], grid[row][col + 1], grid[row + 1][col + 1]]
-        expect(square.some((cell) => cell === 1)).toBe(true)
+  it('en los 4 mapas cada calle mide una sola celda (nunca dos filas o columnas de calle seguidas)', () => {
+    for (const name of MAZE_LAYOUT_IDS) {
+      const { grid, rows, cols } = MAZE_LAYOUTS[name]
+      for (let row = 1; row < rows - 2; row++) {
+        for (let col = 1; col < cols - 2; col++) {
+          const square = [grid[row][col], grid[row + 1][col], grid[row][col + 1], grid[row + 1][col + 1]]
+          expect(square.some((cell) => cell === 1), `${name} ${row}:${col}`).toBe(true)
+        }
       }
     }
   })
@@ -78,27 +80,69 @@ describe('MAZE_LAYOUTS — puertas de teletransporte', () => {
   })
 })
 
-describe('mapas temáticos (issue #148)', () => {
-  it('Amazonia, Océano y Páramo tienen la avenida central como único túnel', () => {
-    for (const name of ['AMAZON', 'OCEAN', 'PARAMO'] as const) {
-      expect(MAZE_LAYOUTS[name].tunnelRows).toEqual([18])
+const THEMED = ['AMAZON', 'OCEAN', 'PARAMO'] as const
+
+describe('mapas temáticos (issues #148 y #162)', () => {
+  it('Amazonia, Océano y Páramo son de 24x19 como la Ciudad: su fondo de 1152x912 tiene 48 px por celda', () => {
+    for (const name of THEMED) {
+      expect(MAZE_LAYOUTS[name].cols).toBe(MAZE_LAYOUTS.CITY.cols)
+      expect(MAZE_LAYOUTS[name].rows).toBe(MAZE_LAYOUTS.CITY.rows)
+      expect([MAZE_LAYOUTS[name].cols * 48, MAZE_LAYOUTS[name].rows * 48]).toEqual([1152, 912])
     }
   })
 
-  it('el jugador y las 4 esquinas de enemigos caen en calle transitable en los 4 mapas', () => {
+  it('Amazonia, Océano y Páramo tienen la avenida central (fila 9) como único túnel', () => {
+    for (const name of THEMED) {
+      expect(MAZE_LAYOUTS[name].tunnelRows).toEqual([9])
+    }
+  })
+
+  it('el contorno es pared salvo las dos bocas del túnel', () => {
+    for (const name of THEMED) {
+      const { grid, rows, cols, tunnelRows } = MAZE_LAYOUTS[name]
+      for (let col = 0; col < cols; col++) expect(grid[0][col] + grid[rows - 1][col]).toBe(2)
+      for (let row = 0; row < rows; row++) {
+        const open = tunnelRows.includes(row) ? 0 : 1
+        expect(grid[row][0]).toBe(open)
+        expect(grid[row][cols - 1]).toBe(open)
+      }
+    }
+  })
+
+  it('no hay callejones sin salida: cada celda de camino sigue al menos por dos lados', () => {
+    for (const name of THEMED) {
+      const { grid, rows, cols } = MAZE_LAYOUTS[name]
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+          if (grid[row][col] !== 0) continue
+          // Por el túnel, salir de un borde es entrar por el otro.
+          const neighbors = [grid[row - 1]?.[col], grid[row + 1]?.[col], grid[row][(col + 1) % cols], grid[row][(col - 1 + cols) % cols]]
+          expect(neighbors.filter((cell) => cell === 0).length, `${name} ${row}:${col}`).toBeGreaterThanOrEqual(2)
+        }
+      }
+    }
+  })
+
+  it('el jugador y las 4 esquinas de enemigos caen en calle transitable (nunca en una pared) y no se repiten', () => {
     for (const name of MAZE_LAYOUT_IDS) {
       const layout = MAZE_LAYOUTS[name]
       expect(layout.grid[layout.playerStart.row][layout.playerStart.col]).toBe(0)
       for (const spawn of layout.enemySpawns) expect(layout.grid[spawn.row][spawn.col]).toBe(0)
+      const cells = [layout.playerStart, ...layout.enemySpawns].map((cell) => `${cell.row}:${cell.col}`)
+      expect(new Set(cells).size).toBe(5)
     }
   })
 
-  it('los mapas de celda fina escalan velocidad y sprites; la ciudad no', () => {
-    expect(MAZE_LAYOUTS.CITY.speedScale).toBeUndefined()
-    for (const name of ['AMAZON', 'OCEAN', 'PARAMO'] as const) {
-      expect(MAZE_LAYOUTS[name].speedScale).toBeGreaterThan(1)
-      expect(MAZE_LAYOUTS[name].spriteScale).toBeGreaterThan(1)
+  it('con celdas del tamaño de la Ciudad ningún mapa escala velocidad ni sprites', () => {
+    for (const name of MAZE_LAYOUT_IDS) {
+      expect(MAZE_LAYOUTS[name].speedScale ?? 1).toBe(1)
+      expect(MAZE_LAYOUTS[name].spriteScale ?? 1).toBe(1)
     }
+  })
+
+  it('Amazonia, Océano y Páramo usan muñeco por dirección; la Ciudad gira el camión', () => {
+    expect(MAZE_MAPS.CITY.directional).toBe(false)
+    for (const name of THEMED) expect(MAZE_MAPS[name].directional).toBe(true)
   })
 
   it('cada mapa tiene su tema y los valores retirados (CLASSIC, CROSS, SPIRAL) se leen como Ciudad', () => {

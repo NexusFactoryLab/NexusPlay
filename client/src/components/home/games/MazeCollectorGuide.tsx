@@ -137,7 +137,7 @@ function SceneMission() {
         <SpriteStrip name="item-power" frames={4} size="12cqw" durationMs={800} />
       </At>
       <Tag tone="good" style={{ left: '50%', bottom: '6%', transform: 'translateX(-50%)' }}>
-        ♻ ¡Limpia la ciudad!
+        ♻ ¡Salva el territorio!
       </Tag>
     </Scene>
   )
@@ -374,11 +374,11 @@ function CloudName({ strip, children }: { strip: string; children: ReactNode }) 
 const STEPS: Step[] = [
   {
     id: 'mision',
-    title: '¡Limpia la ciudad!',
+    title: '¡Salva el territorio!',
     art: <SceneMission />,
     body: (
       <>
-        <p className="text-[1.15em] text-white">Recoge las botellas, responde y esquiva las nubes.</p>
+        <p className="text-[1.15em] text-white">Recoge las botellas, responde y esquiva los obstáculos.</p>
         <div className="flex items-center gap-3">
           <ArrowKeys size="clamp(1.9rem, 5.2dvh, 2.7rem)" />
           <span className="font-bold text-white">Muévete con las flechas</span>
@@ -419,14 +419,14 @@ const STEPS: Step[] = [
           Incorrecta o <b className="text-white">{QUESTION_TIME_MS / 1000} s</b>: −1 vida
         </Item>
         <Item icon={<CloudFog className="h-4 w-4" />} tone="amber">
-          Si tardas, llegan <b className="text-white">más nubes</b>
+          Si tardas, llegan <b className="text-white">más obstáculos</b>
         </Item>
       </ul>
     ),
   },
   {
     id: 'nubes',
-    title: 'Esquiva las nubes',
+    title: 'Esquiva los obstáculos',
     art: <SceneClouds />,
     body: (
       <>
@@ -449,7 +449,7 @@ const STEPS: Step[] = [
     body: (
       <ul className="flex flex-col gap-2.5">
         <Item icon={<Zap className="h-4 w-4" />} tone="emerald">
-          Las nubes se asustan <b className="text-white">{POWER_MODE_MS / 1000} s</b>
+          Los obstáculos se asustan <b className="text-white">{POWER_MODE_MS / 1000} s</b>
         </Item>
         <Item icon={<Check className="h-4 w-4" strokeWidth={3} />} tone="sky">
           ¡Atrápalas! <b className="text-white">+{COMBO_POINTS[0]}</b>

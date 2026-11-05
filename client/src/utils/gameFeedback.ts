@@ -132,6 +132,35 @@ export function signalMismatch(): void {
   vibrate([40, 60, 40])
 }
 
+/** Sale una pregunta: arpegio de arcade que sube. */
+export function playArcadeQuestion(): void {
+  const ctx = getAudioContext()
+  if (!ctx) return
+  playWhenReady(ctx, (readyCtx) => {
+    ;[523.25, 659.25, 783.99, 1046.5].forEach((frequency, index) => playTone(readyCtx, frequency, index * 0.07, 0.11, 'square', 0.05))
+  })
+}
+
+/** «¡A buscarla!»: dos notas rápidas de arranque. */
+export function playArcadeStart(): void {
+  const ctx = getAudioContext()
+  if (!ctx) return
+  playWhenReady(ctx, (readyCtx) => {
+    playTone(readyCtx, 659.25, 0, 0.08, 'square', 0.05)
+    playTone(readyCtx, 987.77, 0.08, 0.16, 'square', 0.05)
+  })
+}
+
+/** Pausa para buscar en el libro: baja al detener y sube al seguir. */
+export function playArcadePause(paused: boolean): void {
+  const ctx = getAudioContext()
+  if (!ctx) return
+  const notes = paused ? [587.33, 392] : [392, 587.33]
+  playWhenReady(ctx, (readyCtx) => {
+    notes.forEach((frequency, index) => playTone(readyCtx, frequency, index * 0.09, 0.12, 'triangle', 0.09))
+  })
+}
+
 /** Silencia únicamente los efectos y la ambientación de Identidad Oculta. */
 export function setGuessWhoSoundMuted(muted: boolean): void {
   guessWhoMuted = muted

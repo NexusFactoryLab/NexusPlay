@@ -711,9 +711,9 @@ function wrappedDistance(a: { row: number; col: number }, b: { row: number; col:
 
 function resolveGhostCollisions(state: InternalState, layout: MazeLayoutDef) {
   const playerPoint = interpolated(state.player, layout.cols)
-  // El contacto crece con los sprites: en los mapas de celda fina (spriteScale
-  // 2.4) el muñeco ya se ve encima del contaminante mucho antes de estar a 0.6
-  // celdas, y se lo atravesaba sin comerlo. Así se siente igual que en la Ciudad.
+  // El contacto crece con los sprites (`spriteScale`): si un mapa los agranda,
+  // el muñeco se ve encima del contaminante antes de estar a 0.6 celdas. Hoy
+  // los 4 mapas son de 24x19 y ninguno escala (issue #162).
   const collisionRadius = COLLISION_RADIUS * (layout.spriteScale ?? 1)
 
   for (const ghost of state.ghosts) {
