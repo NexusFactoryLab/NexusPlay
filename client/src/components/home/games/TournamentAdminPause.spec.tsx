@@ -80,7 +80,7 @@ describe('pausa y tiempo extra en el panel del administrador (#147)', () => {
     expect(html).toContain('Reanudar ronda')
     expect(html).not.toContain('Pausar ronda')
     expect(html).toContain('Ronda en pausa.')
-    expect(html).toContain('el Laberinto sigue a su ritmo')
+    expect(html).toContain('el Laberinto y Salvando el mundo siguen a su ritmo')
   })
 
   it('no hay botones sin los comandos, con el torneo terminado ni antes de que empiece', () => {

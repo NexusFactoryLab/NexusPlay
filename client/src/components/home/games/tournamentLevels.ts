@@ -2,18 +2,20 @@
 export type TournamentLevel = 'EASY' | 'MEDIUM' | 'HARD'
 
 /**
- * Juegos que tienen torneo. `TRUE_FALSE_MAZE` (Misión Galáctica) no es un duelo:
- * en su ronda cada persona juega sola y suma un punto si responde todo bien.
+ * Juegos que tienen torneo. `TRUE_FALSE_MAZE` (Misión Galáctica) y
+ * `MAZE_COLLECTOR` (Salvando el mundo) no son un duelo: en su ronda cada
+ * persona juega sola y suma puntos según cómo le fue.
  */
-export type TournamentGameType = 'GUESS_WHO' | 'DOMINO' | 'TRUE_FALSE_MAZE'
+export type TournamentGameType = 'GUESS_WHO' | 'DOMINO' | 'TRUE_FALSE_MAZE' | 'MAZE_COLLECTOR'
 
 /** Tipos de juego que admiten torneo (debe coincidir con TOURNAMENT_GAME_TYPES del servidor). */
-export const TOURNAMENT_GAME_TYPES: readonly TournamentGameType[] = ['GUESS_WHO', 'DOMINO', 'TRUE_FALSE_MAZE']
+export const TOURNAMENT_GAME_TYPES: readonly TournamentGameType[] = ['GUESS_WHO', 'DOMINO', 'TRUE_FALSE_MAZE', 'MAZE_COLLECTOR']
 
 export const TOURNAMENT_GAME_LABEL: Record<TournamentGameType, string> = {
   GUESS_WHO: '¿Quién Es?',
   DOMINO: 'Dominó',
   TRUE_FALSE_MAZE: 'Laberinto V/F',
+  MAZE_COLLECTOR: 'Salvando el mundo',
 }
 
 /** Qué cambia cada nivel en cada juego (el texto corto que ve el administrador al elegirlo). */
@@ -32,6 +34,11 @@ export const TOURNAMENT_LEVEL_DETAIL: Record<TournamentGameType, Record<Tourname
     EASY: 'Pocas medusas y lentas · las salas se mueven cada 30 s',
     MEDIUM: 'Tal como lo configuró su autor',
     HARD: 'Más medusas y rápidas · las salas se mueven cada 12 s',
+  },
+  MAZE_COLLECTOR: {
+    EASY: 'Más vidas y nubes lentas · gana quien responda bien sin perder vidas',
+    MEDIUM: 'Tal como lo configuró su autor',
+    HARD: 'Menos vidas y nubes rápidas · entre menos se demore, más puntos',
   },
 }
 

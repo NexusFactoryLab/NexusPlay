@@ -221,6 +221,17 @@ function TournamentSession() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mazeMatch?.matchCode, showStandings])
 
+  // Salvando el mundo (issue #166): también se juega solo, en su propia pantalla.
+  const mazeCollectorMatch =
+    tournament?.myMatch?.gameType === 'MAZE_COLLECTOR' && tournament.myMatch.phase === 'PLAYING' ? tournament.myMatch : null
+  useEffect(() => {
+    if (!mazeCollectorMatch || !tournament || showStandings) return
+    const target = `/jugar/laberinto/torneo/${encodeURIComponent(tournament.code)}`
+    const timeout = setTimeout(() => navigate(target), MAZE_ENTRY_DELAY_MS)
+    return () => clearTimeout(timeout)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mazeCollectorMatch?.matchCode, showStandings])
+
   useEffect(() => {
     if (!matchAccusationFailedMessage) return
     const timeout = setTimeout(clearMatchAccusationFailedMessage, 3500)

@@ -49,6 +49,17 @@ export const DEFAULT_MAZE_CONFIG: MazeCollectorConfig = {
 export const MIN_MAZE_ITEMS = 4
 export const MAX_MAZE_ITEMS = 16
 
+/**
+ * Complejidad de un torneo (issue #166) sobre el `config` del juego: Fácil
+ * baja la presión, Difícil la sube, y Medio lo deja como lo configuró su
+ * autor. En el torneo cuenta responder bien y rápido, sin perder vidas.
+ */
+export function applyMazeCollectorTournamentLevel(config: MazeCollectorConfig, level: 'EASY' | 'MEDIUM' | 'HARD'): MazeCollectorConfig {
+  if (level === 'EASY') return { ...config, lives: Math.max(config.lives, 5), enemySpeed: 1 }
+  if (level === 'HARD') return { ...config, lives: Math.min(config.lives, 2), enemySpeed: 3 }
+  return config
+}
+
 export type CellPosition = { row: number; col: number }
 
 export type MazeLayoutDef = {

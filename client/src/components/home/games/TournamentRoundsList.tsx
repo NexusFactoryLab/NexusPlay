@@ -12,6 +12,11 @@ export function TournamentRoundsList({ tournament }: { tournament: Pick<Tourname
               Misión Galáctica: {round.matches.filter((match) => match.winnerUserId).length} de {round.matches.length} respondieron todo bien
               {round.matches.some((match) => match.phase !== 'FINISHED') ? ' (en curso)' : ''}
             </p>
+          ) : round.matches[0]?.gameType === 'MAZE_COLLECTOR' ? (
+            <p>
+              Salvando el mundo: {round.matches.filter((match) => match.winnerUserId).length} de {round.matches.length} terminaron sin perder vidas
+              {round.matches.some((match) => match.phase !== 'FINISHED') ? ' (en curso)' : ''}
+            </p>
           ) : (
             round.matches.map((match) => (
               <p key={match.matchCode}>

@@ -9,13 +9,14 @@ export type TournamentPhase = 'WAITING' | 'RUNNING' | 'FINISHED';
 export type TournamentLevel = 'EASY' | 'MEDIUM' | 'HARD';
 
 /**
- * Juegos con motor de torneo. `TRUE_FALSE_MAZE` (Misión Galáctica) no es un
- * duelo: en su ronda cada persona juega sola y suma un punto si responde todo bien.
+ * Juegos con motor de torneo. `TRUE_FALSE_MAZE` (Misión Galáctica) y
+ * `MAZE_COLLECTOR` (Salvando el mundo) no son un duelo: en su ronda cada
+ * persona juega sola y suma puntos según cómo le fue.
  */
-export type TournamentGameType = 'GUESS_WHO' | 'DOMINO' | 'TRUE_FALSE_MAZE';
+export type TournamentGameType = 'GUESS_WHO' | 'DOMINO' | 'TRUE_FALSE_MAZE' | 'MAZE_COLLECTOR';
 
 /** Tipos de juego que admiten torneo (el servidor y el cliente deben coincidir). */
-export const TOURNAMENT_GAME_TYPES: readonly TournamentGameType[] = ['GUESS_WHO', 'DOMINO', 'TRUE_FALSE_MAZE'];
+export const TOURNAMENT_GAME_TYPES: readonly TournamentGameType[] = ['GUESS_WHO', 'DOMINO', 'TRUE_FALSE_MAZE', 'MAZE_COLLECTOR'];
 
 /** Avance de una persona en una ronda de Misión Galáctica; el servidor lleva la cuenta de sus respuestas. */
 export interface TournamentMazeProgress {
@@ -25,6 +26,21 @@ export interface TournamentMazeProgress {
   answeredIds: string[];
   correct: number;
   wrong: number;
+}
+
+/**
+ * Resultado final de una ronda de Salvando el mundo (issue #166): el
+ * navegador reporta una sola vez cómo le fue y el servidor convierte eso en
+ * puntos (ver `mazeCollectorPoints` en rooms.gateway.ts) — entre menos se
+ * demoró y menos vidas perdió, más puntos.
+ */
+export interface TournamentMazeCollectorResult {
+  answeredCorrect: number;
+  livesLost: number;
+  playedMs: number;
+  /** Sin perder ninguna vida: lo más parecido a "ganar" esta ronda. */
+  passed: boolean;
+  points: number;
 }
 
 export const TOURNAMENT_LEVELS: Record<
@@ -100,6 +116,8 @@ export interface TournamentMatch extends PausableGame {
   dominoRoomCode?: string;
   /** Solo en Misión Galáctica: el match es de una sola persona y esto es su avance. */
   maze?: TournamentMazeProgress;
+  /** Solo en Salvando el mundo: el match es de una sola persona; esto llega recién al terminar. */
+  mazeCollector?: TournamentMazeCollectorResult;
   /** Segundos por turno de este match (los fija la complejidad del juego de la ronda). */
   turnDurationSeconds?: number;
   phase: 'WAITING' | 'PLAYING' | 'FINISHED';

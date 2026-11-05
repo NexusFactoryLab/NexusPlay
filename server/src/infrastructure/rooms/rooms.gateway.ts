@@ -210,6 +210,30 @@ function mazeStatementKey(content: unknown): Map<string, string> {
   return statements;
 }
 
+/** Cuánto dura una ronda rápida de Salvando el mundo por nivel (issue #166): la referencia para el puntaje por velocidad. */
+const MAZE_COLLECTOR_TIME_BUDGET_MS: Record<TournamentLevel, number> = {
+  EASY: 240_000,
+  MEDIUM: 180_000,
+  HARD: 140_000,
+};
+
+/**
+ * Puntos de una ronda de Salvando el mundo (issue #166): 1 por pregunta
+ * acertada (crédito parcial aunque no termine), +2 si terminó sin perder
+ * ninguna vida, y hasta +3 más por lo rápido que lo hizo (solo si no perdió
+ * vidas — la velocidad no compensa haber chocado).
+ */
+export function mazeCollectorPoints(answeredCorrect: number, livesLost: number, playedMs: number, level: TournamentLevel): number {
+  const passed = livesLost === 0 && answeredCorrect > 0;
+  let points = answeredCorrect;
+  if (!passed) return points;
+  points += 2;
+  const budget = MAZE_COLLECTOR_TIME_BUDGET_MS[level];
+  const speedRatio = Math.max(0, Math.min(1, 1 - playedMs / budget));
+  points += Math.round(speedRatio * 3);
+  return points;
+}
+
 /** Suma un intento (y un fallo, si lo hubo) a un concepto o afirmación del torneo. */
 function recordInsight(tournament: TournamentState, key: string, kind: 'DOMINO' | 'MAZE', label: string, missed: boolean) {
   const insights = (tournament.insights ??= {});
@@ -339,7 +363,7 @@ function liveConnection(
   userId: string,
   dominoLookup?: (code: string) => DominoRoomState | undefined,
 ): { state: 'connected' | 'waiting' | 'away' } | null {
-  if (userId.startsWith('bot:') || match.maze) return null;
+  if (userId.startsWith('bot:') || match.maze || match.gameType === 'MAZE_COLLECTOR') return null;
   if (match.dominoRoomCode) {
     const player = dominoLookup?.(match.dominoRoomCode)?.players.find((p) => p.userId === userId);
     if (!player) return null;
@@ -404,6 +428,8 @@ function toMatchClientView(match: TournamentMatch, tournament: TournamentState, 
     dominoRoomCode: match.dominoRoomCode ?? null,
     // Misión Galáctica: su avance (nunca las respuestas correctas).
     maze: match.maze ? { total: match.maze.total, answered: match.maze.answeredIds.length, wrong: match.maze.wrong } : null,
+    // Salvando el mundo: solo llega al terminar (issue #166); mientras juega, null.
+    mazeCollector: match.mazeCollector ?? null,
     cards: match.cards,
     maxAccusationCount: tournament.maxAccusationCount,
     turnDurationSeconds: match.turnDurationSeconds ?? tournament.turnDurationSeconds,
@@ -1829,6 +1855,8 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       } else if (type === 'TRUE_FALSE_MAZE') {
         this.tournamentMazeGames.set(g.id, mazeAnswerKey(g.content));
         this.tournamentMazeStatements.set(g.id, mazeStatementKey(g.content));
+      } else if (type === 'MAZE_COLLECTOR') {
+        // Salvando el mundo se autocalifica en el navegador (issue #166): no hay contenido que precargar aquí.
       } else {
         this.lastCreatedGameCards.set(g.id, g.content as GuessWhoCard[]);
       }
@@ -2194,12 +2222,14 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     const shuffledIds = shuffle(userIds);
     const roundGame = this.gameForRound(tournament, tournament.currentRound);
 
-    // Misión Galáctica no es un duelo: cada persona juega sola, sin pareja ni bot,
-    // y suma un punto si responde todo bien. Nadie queda fuera por fallar.
-    if (roundGame.gameType === 'TRUE_FALSE_MAZE') {
+    // Misión Galáctica y Salvando el mundo no son un duelo: cada persona juega sola,
+    // sin pareja ni bot, y suma puntos según cómo le fue. Nadie queda fuera por fallar.
+    if (roundGame.gameType === 'TRUE_FALSE_MAZE' || roundGame.gameType === 'MAZE_COLLECTOR') {
       tournament.matches.push(
         ...shuffledIds.map((userId, index) =>
-          this.buildMazeMatch(tournament, `${tournament.code}-R${tournament.currentRound}-S${index + 1}`, tournament.currentRound, userId, roundGame),
+          roundGame.gameType === 'MAZE_COLLECTOR'
+            ? this.buildMazeCollectorMatch(tournament, `${tournament.code}-R${tournament.currentRound}-S${index + 1}`, tournament.currentRound, userId, roundGame)
+            : this.buildMazeMatch(tournament, `${tournament.code}-R${tournament.currentRound}-S${index + 1}`, tournament.currentRound, userId, roundGame),
         ),
       );
       this.tournamentStore.set(tournament);
@@ -2391,6 +2421,48 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
     };
   }
 
+  /** Match de una sola persona para una ronda de Salvando el mundo (issue #166). */
+  private buildMazeCollectorMatch(
+    tournament: TournamentState,
+    matchCode: string,
+    round: number,
+    userId: string,
+    roundGame: { gameId: string; title: string; level: TournamentLevel },
+  ): TournamentMatch {
+    return {
+      matchCode,
+      round,
+      playerUserIds: [userId],
+      isBye: false,
+      gameId: roundGame.gameId,
+      gameTitle: roundGame.title,
+      level: roundGame.level,
+      gameType: 'MAZE_COLLECTOR',
+      phase: 'PLAYING',
+      cards: [],
+      players: [{ userId, secretCardId: null, discardedCardIds: [] }],
+      winnerUserId: null,
+      activePlayerUserId: null,
+      turnDeadline: null,
+    };
+  }
+
+  private requireActiveMazeCollectorMatch(socket: AuthenticatedSocket): { tournament: TournamentState; match: TournamentMatch } {
+    const tournament = this.tournamentStore.findBySocketId(socket.id);
+    if (!tournament) throw new Error('No estás en ninguna sala grupal.');
+    const match = tournament.matches.find(
+      (m) =>
+        m.round === tournament.currentRound &&
+        m.gameType === 'MAZE_COLLECTOR' &&
+        m.playerUserIds.includes(socket.data.userId) &&
+        m.phase === 'PLAYING',
+    );
+    if (tournament.phase !== 'RUNNING' || !match) {
+      throw new Error('No tienes una partida de Salvando el mundo activa en esta ronda.');
+    }
+    return { tournament, match };
+  }
+
   private requireActiveMazeMatch(socket: AuthenticatedSocket): { tournament: TournamentState; match: TournamentMatch } {
     const tournament = this.tournamentStore.findBySocketId(socket.id);
     if (!tournament) throw new Error('No estás en ninguna sala grupal.');
@@ -2464,6 +2536,41 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
       } else {
         participant.losses = (participant.losses ?? 0) + 1;
       }
+    }
+    this.tournamentStore.set(tournament);
+    this.broadcastTournamentState(tournament);
+    this.maybeAdvanceTournamentRound(tournament);
+  }
+
+  /**
+   * La persona terminó su partida de Salvando el mundo (issue #166): ganó, perdió
+   * sus vidas, o abandonó. El navegador autocalifica (no hay respuestas que
+   * validar como en Misión Galáctica); el servidor solo decide cuánto vale
+   * según `mazeCollectorPoints` — entre menos se demoró y menos vidas perdió,
+   * más puntos.
+   */
+  @SubscribeMessage('tournament:maze-collector-finish')
+  handleTournamentMazeCollectorFinish(
+    @ConnectedSocket() socket: AuthenticatedSocket,
+    @MessageBody() body: { answeredCorrect?: unknown; livesLost?: unknown; playedMs?: unknown },
+  ) {
+    const { tournament, match } = this.requireActiveMazeCollectorMatch(socket);
+    const answeredCorrect = Math.max(0, Math.round(Number(body?.answeredCorrect) || 0));
+    const livesLost = Math.max(0, Math.round(Number(body?.livesLost) || 0));
+    const playedMs = Math.max(0, Math.round(Number(body?.playedMs) || 0));
+    const userId = match.playerUserIds[0];
+    const passed = livesLost === 0 && answeredCorrect > 0;
+    const points = mazeCollectorPoints(answeredCorrect, livesLost, playedMs, match.level ?? 'MEDIUM');
+
+    match.phase = 'FINISHED';
+    match.winnerUserId = passed ? userId : null;
+    match.mazeCollector = { answeredCorrect, livesLost, playedMs, passed, points };
+    const participant = tournament.participants.find((p) => p.userId === userId);
+    if (participant) {
+      participant.points += points;
+      if (passed) participant.wins = (participant.wins ?? 0) + 1;
+      else participant.losses = (participant.losses ?? 0) + 1;
+      participant.correctAnswers = (participant.correctAnswers ?? 0) + answeredCorrect;
     }
     this.tournamentStore.set(tournament);
     this.broadcastTournamentState(tournament);
@@ -2963,6 +3070,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
         m.round === tournament.currentRound &&
         m.gameType !== 'DOMINO' &&
         m.gameType !== 'TRUE_FALSE_MAZE' &&
+        m.gameType !== 'MAZE_COLLECTOR' &&
         m.playerUserIds.includes(socket.data.userId) &&
         m.phase === 'PLAYING',
     );

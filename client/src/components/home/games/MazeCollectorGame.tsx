@@ -85,6 +85,12 @@ type MazeCollectorGameProps = {
   skipGuide?: boolean
   /** Quien monta el juego sigue en pantalla completa al salir de él (las estaciones de la expedición). */
   keepFullscreen?: boolean
+  /**
+   * Ronda de torneo (issue #166): una sola ronda, sin guía automática ni
+   * «¿más tiempo?» (ver `useInTournamentPlay`). El navegador solo reporta
+   * cómo le fue; el servidor decide los puntos.
+   */
+  tournament?: { onFinish: (result: { answeredCorrect: number; livesLost: number; playedMs: number }) => void }
 }
 
 /** Celda mínima: por debajo de esto los sprites dejan de leerse (en ese caso el tablero se desplaza). */
@@ -163,7 +169,8 @@ export function MazeCollectorGame(props: MazeCollectorGameProps) {
   const [inTutorial, setInTutorial] = useState(false)
   const [round, setRound] = useState(0)
   // Rondas elegidas en la pantalla de inicio: se recuerdan al jugar otra vez.
-  const [rounds, setRounds] = useState<number>(DEFAULT_ROUNDS)
+  // Una ronda de torneo siempre es una sola vuelta (issue #166).
+  const [rounds, setRounds] = useState<number>(props.tournament ? 1 : DEFAULT_ROUNDS)
   // Vive aquí y no en la sesión: «Jugar otra vez» monta una sesión nueva y no debe sacar de pantalla completa.
   const leavesFullscreen = !props.tutorial && !props.keepFullscreen
   useEffect(() => () => {
@@ -218,6 +225,7 @@ function MazeCollectorSession({
   questions,
   onWon,
   wonActionLabel,
+  tournament,
   guideOpen,
   onOpenGuide,
   onCloseGuide,
@@ -257,6 +265,14 @@ function MazeCollectorSession({
     reportResult()
     exitGame()
   }
+  // Ronda de torneo: se reporta una sola vez, apenas se gana o se pierde (issue #166).
+  const tournamentReportedRef = useRef(false)
+  useEffect(() => {
+    if (!tournament || tournamentReportedRef.current) return
+    if (game.phase !== 'won' && game.phase !== 'lost') return
+    tournamentReportedRef.current = true
+    tournament.onFinish({ answeredCorrect: game.answeredCorrect, livesLost: game.livesLost, playedMs: game.playedMs })
+  }, [tournament, game.phase, game.answeredCorrect, game.livesLost, game.playedMs])
   const mapTheme = MAZE_MAPS[normalizeMazeLayout(config.layout)]
   const spriteScale = layout.spriteScale ?? 1
   // La primera y la última fila son solo borde decorativo: no se muestran y ese
@@ -860,7 +876,7 @@ function MazeCollectorSession({
               </>
             )}
           </p>
-          <RoundPicker value={rounds} onChange={onRoundsChange} />
+          {!tournament && <RoundPicker value={rounds} onChange={onRoundsChange} />}
           {canFullscreen && !compact && (
             <FullscreenChoice wanted={wantFullscreen} onChange={chooseFullscreen} />
           )}
@@ -922,7 +938,7 @@ function MazeCollectorSession({
               Preguntas acertadas: <b className="text-white">{game.answeredCorrect}</b>
             </p>
           )}
-          <EndButtons onPlayAgain={onPlayAgain} onExit={onExit} />
+          {tournament ? <TournamentExitButton onExit={onExit} /> : <EndButtons onPlayAgain={onPlayAgain} onExit={onExit} />}
         </Overlay>
       )}
 
@@ -953,6 +969,8 @@ function MazeCollectorSession({
                 Salir
               </button>
             </div>
+          ) : tournament ? (
+            <TournamentExitButton onExit={onExit} />
           ) : (
             <EndButtons onPlayAgain={onPlayAgain} onExit={onExit} />
           )}
@@ -1117,6 +1135,15 @@ function RoundPicker({ value, onChange }: { value: number; onChange: (rounds: nu
       </div>
       <p className="mt-1.5 text-[11.5px] leading-snug text-slate-400">Cada ronda es limpiar toda la ciudad: recoger todas las botellas.</p>
     </div>
+  )
+}
+
+/** Ronda de torneo: nada de «Jugar otra vez» (el servidor ya guardó el resultado). */
+function TournamentExitButton({ onExit }: { onExit: () => void }) {
+  return (
+    <button type="button" autoFocus className="rounded-2xl border border-white/15 px-5 py-2.5 text-[14px] font-medium text-slate-200 hover:bg-white/5" onClick={onExit}>
+      Volver al torneo
+    </button>
   )
 }
 
