@@ -6,7 +6,7 @@
 set -euo pipefail
 
 REPO_URL="${REPO_URL:-https://github.com/NexusFactoryLab/NexusPlay.git}"
-BRANCH="${BRANCH:-deploy-aws}" # tras mergear esta rama a main, cambiar el valor por defecto a main
+BRANCH="${BRANCH:-main}"
 DEST="${DEST:-$HOME/NexusPlay}"
 
 echo "== 1/3 Docker =="

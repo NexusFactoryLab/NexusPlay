@@ -4,7 +4,7 @@
 # Salida: /tmp/actualizar.log (ejecutar con: bash actualizar.sh 2>&1 | tee /tmp/actualizar.log)
 set -euo pipefail
 
-BRANCH="${BRANCH:-deploy-aws}" # tras mergear esta rama a main, cambiar el valor por defecto a main
+BRANCH="${BRANCH:-main}"
 cd "$(dirname "$0")/../.."
 git fetch origin "$BRANCH"
 git checkout "$BRANCH"
