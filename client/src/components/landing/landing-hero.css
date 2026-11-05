@@ -728,7 +728,7 @@
 /* ---- Responsive ---- */
 @media (max-width: 860px) {
   .lp-hero {
-    padding: 40px 0 64px;
+    padding: 28px 0 40px;
   }
 
   .lp-hero-copy {

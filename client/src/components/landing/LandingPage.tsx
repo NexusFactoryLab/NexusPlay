@@ -104,7 +104,7 @@ function Hero() {
           </p>
           <div className="lp-cta lp-rise" style={rise(4)}>
             <GoLink to="/register" className="lp-btn lp-btn-main">
-              Crear cuenta gratis <ArrowRight size={16} aria-hidden="true" />
+              Crear cuenta<ArrowRight size={16} aria-hidden="true" />
             </GoLink>
             <SectionLink id="como" className="lp-btn lp-btn-ghost">
               Ver cómo funciona
@@ -281,7 +281,7 @@ function FinalCall() {
           </p>
           <div className="lp-cta">
             <GoLink to="/register" className="lp-btn lp-btn-main">
-              Crear cuenta gratis <ArrowRight size={16} aria-hidden="true" />
+              Crear cuenta<ArrowRight size={16} aria-hidden="true" />
             </GoLink>
           </div>
         </div>
