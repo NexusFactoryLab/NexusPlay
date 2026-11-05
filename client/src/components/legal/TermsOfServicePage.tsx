@@ -3,7 +3,7 @@ import { PublicPageLayout } from './PublicPageLayout'
 export function TermsOfServicePage() {
   return (
     <PublicPageLayout title="Términos de Servicio">
-      <p className="text-[13px] text-text">Última actualización: septiembre de 2026.</p>
+      <p className="text-[13px] text-text">Última actualización: noviembre de 2026.</p>
 
       <p>
         Al usar NexusPlay ("la aplicación") aceptas los siguientes términos. Si no estás de acuerdo,
@@ -17,11 +17,22 @@ export function TermsOfServicePage() {
         de buena fe, sin intentar vulnerar su seguridad ni afectar la experiencia de otros usuarios.
       </p>
 
+      <h2 className="mt-4 font-heading text-lg font-semibold text-text-h">Fase de prueba</h2>
+      <p>
+        NexusPlay se encuentra en fase de prueba (beta cerrada). Quienes participan no pueden
+        divulgar, contar ni compartir nada de la plataforma (funcionalidades, juegos, contenido,
+        diseño, código, marca, preguntas, resultados, capturas o grabaciones), y no pueden hacer
+        ingeniería inversa ni extraer contenido de forma automatizada. Quien entra a un torneo por
+        invitación lo confirma firmando el acuerdo de confidencialidad. La vigencia de esa
+        confidencialidad es [POR DEFINIR: plazo]. El incumplimiento puede llevar a la exclusión de
+        la prueba y a las acciones legales que correspondan [POR DEFINIR por el abogado].
+      </p>
+
       <h2 className="mt-4 font-heading text-lg font-semibold text-text-h">
         Contenido y propiedad intelectual
       </h2>
       <p>
-        Los juegos, materiales y diseños de NexusPlay son propiedad de sus creadores. El contenido
+        Todos los derechos sobre NexusPlay quedan reservados (Ley 23 de 1982, Decisión Andina 351 de 1993, Ley 1915 de 2018 y, para marcas, Decisión Andina 486 de 2000). Los juegos, materiales y diseños de NexusPlay son propiedad de sus creadores, y el uso de la plataforma no cede ni licencia derecho alguno más allá de usarla. Los comentarios y sugerencias que envíes pasan a NexusPlay. El contenido
         que profesores u organizaciones creen dentro de la plataforma (juegos personalizados,
         áreas, clases) permanece bajo su responsabilidad y pueden gestionarlo o eliminarlo en
         cualquier momento.
