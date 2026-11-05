@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700&family=Baloo+2:wght@500;600;700;800&family=Quicksand:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700&family=Baloo+2:wght@500;600;700;800&family=Lilita+One&family=Quicksand:wght@400;500;600;700&display=swap');
 @import 'tailwindcss';
 
 /* Toggle manual de tema: dark: se activa por [data-theme=dark] en <html>,
@@ -7608,20 +7608,30 @@ code {
   }
 }
 
-/* Título del banner en dorado en todos los temas (issue #182): mismo degradado
- * que Fantasía, con contorno oscuro para que se lea también sobre fondos claros. */
-.home-hero-title {
+/* Título del banner (issue #190): Lilita One con efecto 3D plano en todos los
+ * temas. La extrusión son sombras de 1px apiladas hacia abajo (sin inclinar la
+ * letra ni dibujar contorno), más una sombra de apoyo suave. Se hace con
+ * drop-shadow porque la cara es un degradado recortado al texto, donde
+ * text-shadow se vería a través de la letra. */
+.app-main .home-hero-title {
+  font-family: 'Lilita One', var(--fx-display, var(--font-heading), sans-serif);
+  font-weight: 400;
+  letter-spacing: 0.02em;
   filter:
-    drop-shadow(1.5px 0 0 #3d1236) drop-shadow(-1.5px 0 0 #3d1236)
-    drop-shadow(0 1.5px 0 #3d1236) drop-shadow(0 -1.5px 0 #3d1236)
-    drop-shadow(0 3px 0 #6e1f3f) drop-shadow(0 6px 8px rgba(50, 0, 50, 0.35));
+    drop-shadow(0 1px 0 #c9780b) drop-shadow(0 1px 0 #c9780b) drop-shadow(0 1px 0 #b8680a)
+    drop-shadow(0 1px 0 #a85d08) drop-shadow(0 1px 0 #8f4c06) drop-shadow(0 1px 0 #6b3a04)
+    drop-shadow(0 7px 5px rgba(20, 0, 30, 0.4));
 }
 
-.home-hero-title-text {
-  background: linear-gradient(180deg, #fffbd6 0%, #ffe066 38%, #ffc12e 64%, #ff961f 100%);
+.app-main .home-hero-title .home-hero-title-text {
+  /* Cara dorada con una franja de brillo en la parte alta. */
+  background: linear-gradient(180deg, #fff7c4 0%, #ffe066 42%, #ffc21f 50%, #f59e0b 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  /* Algunos temas (Fantasía) ponen un halo de texto al título: aquí no va. */
+  text-shadow: none;
+  text-transform: none;
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
 }
@@ -7707,4 +7717,14 @@ code {
   .app-main .home-fit .home-hero-actions {
     margin-top: 8px;
   }
+}
+
+/* Fantasía: el banner es rosa y morado, así que la extrusión es más profunda y
+ * oscura (vino) para que el dorado destaque. */
+[data-theme='fantasy'] .app-main .home-hero-title {
+  filter:
+    drop-shadow(0 1px 0 #b8560a) drop-shadow(0 1px 0 #9c3f10) drop-shadow(0 1px 0 #822f18)
+    drop-shadow(0 1px 0 #6a2220) drop-shadow(0 1px 0 #55173a) drop-shadow(0 1px 0 #43103c)
+    drop-shadow(0 1px 0 #340c3a) drop-shadow(0 1px 0 #2a0a36)
+    drop-shadow(0 9px 6px rgba(30, 0, 50, 0.5));
 }
