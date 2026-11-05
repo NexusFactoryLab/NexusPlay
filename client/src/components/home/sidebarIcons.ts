@@ -1,24 +1,24 @@
 import { createElement } from 'react'
-import { Bot, Building2, ChartColumn, Gamepad2, GraduationCap, House, LibraryBig, SquarePen, Swords, Users, UserRoundCog } from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
+import { TiBook, TiBriefcase, TiChartBarOutline, TiCogOutline, TiContacts, TiEdit, TiFlagOutline, TiGroupOutline, TiHomeOutline, TiMortarBoard, TiPuzzleOutline } from 'react-icons/ti'
+import type { IconType } from 'react-icons'
 import type { Theme } from '../../hooks/useTheme'
 
 /**
  * Icono de cada opción del menú: es el mismo en todos los temas (métricas siempre
  * es una gráfica, juegos siempre un control) y lo que cambia con el tema es la ficha.
  */
-export const NAV_ICONS: Record<string, LucideIcon> = {
-  'nav-home': House,
-  'nav-subjects': LibraryBig,
-  'nav-community': Users,
-  'nav-classes': GraduationCap,
-  'nav-my-metrics': ChartColumn,
-  'nav-own-games': Gamepad2,
-  'nav-users': UserRoundCog,
-  'nav-edition': SquarePen,
-  'nav-tournaments': Swords,
-  'nav-ai-providers': Bot,
-  'nav-organization': Building2,
+export const NAV_ICONS: Record<string, IconType> = {
+  'nav-home': TiHomeOutline,
+  'nav-subjects': TiBook,
+  'nav-community': TiGroupOutline,
+  'nav-classes': TiMortarBoard,
+  'nav-my-metrics': TiChartBarOutline,
+  'nav-own-games': TiPuzzleOutline,
+  'nav-users': TiContacts,
+  'nav-edition': TiEdit,
+  'nav-tournaments': TiFlagOutline,
+  'nav-ai-providers': TiCogOutline,
+  'nav-organization': TiBriefcase,
 }
 
 /**
@@ -40,6 +40,7 @@ export function navTileStyle(theme: Theme) {
   }
 }
 
-export function navIcon(entry: LucideIcon) {
-  return createElement(entry, { className: 'h-[18px] w-[18px] shrink-0', strokeWidth: 2.25 })
+/** Typicons (react-icons/ti) son glifos rellenos: se dibujan un poco más grandes que los de trazo. */
+export function navIcon(entry: IconType) {
+  return createElement(entry, { className: 'h-5 w-5 shrink-0', 'aria-hidden': true })
 }
