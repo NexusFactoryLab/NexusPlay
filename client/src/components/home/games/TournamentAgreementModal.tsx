@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { Modal } from './Modal'
 import {
   getTournamentAgreement,
@@ -40,16 +40,19 @@ export function TournamentAgreementModal({ code, token, onSigned, onCancel }: Pr
   const [sending, setSending] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
+  const [loadAttempt, setLoadAttempt] = useState(0)
+  const formRef = useRef<HTMLFormElement>(null)
 
   useEffect(() => {
     let alive = true
+    setLoadError(null)
     getTournamentAgreement()
       .then((value) => alive && setAgreement(value))
       .catch(() => alive && setLoadError('No se pudo cargar el acuerdo. Revisa tu conexión e intenta de nuevo.'))
     return () => {
       alive = false
     }
-  }, [])
+  }, [loadAttempt])
 
   const errors = validateAgreementForm(values)
   const minor = (ageFromBirthDate(values.birthDate) ?? 18) < 18
@@ -66,7 +69,16 @@ export function TournamentAgreementModal({ code, token, onSigned, onCancel }: Pr
     event.preventDefault()
     setSubmitted(true)
     setServerError(null)
-    if (!agreement || Object.keys(errors).length > 0) return
+    if (!agreement) return
+    if (Object.keys(errors).length > 0) {
+      // Los errores quedan en campos que pueden estar fuera de vista: se lleva a la persona al primero.
+      window.requestAnimationFrame(() => {
+        const first = formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"], [data-field-error]')
+        first?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+        first?.focus({ preventScroll: true })
+      })
+      return
+    }
     setSending(true)
     try {
       await signTournamentAgreement(token, code, buildSignPayload(values, agreement))
@@ -81,7 +93,7 @@ export function TournamentAgreementModal({ code, token, onSigned, onCancel }: Pr
 
   return (
     <Modal onClose={onCancel} dismissible={false} ariaLabelledBy={titleId} maxWidthClassName="max-w-[560px]" maxHeightClassName="max-h-[92vh]">
-      <form onSubmit={submit} noValidate className="flex flex-col gap-4 p-4 sm:p-6">
+      <form ref={formRef} onSubmit={submit} noValidate className="flex flex-col gap-4 p-4 sm:p-6">
         <div>
           <h2 id={titleId} className="font-heading text-xl font-semibold text-text-h">
             Acuerdo de confidencialidad del torneo {code}
@@ -92,9 +104,12 @@ export function TournamentAgreementModal({ code, token, onSigned, onCancel }: Pr
         </div>
 
         {loadError ? (
-          <p role="alert" className="text-[14px] text-danger">
-            {loadError}
-          </p>
+          <div role="alert" className="flex flex-col items-start gap-2 text-[14px] text-danger">
+            <p>{loadError}</p>
+            <button type="button" onClick={() => setLoadAttempt((n) => n + 1)} className="rounded-lg border border-border px-3 py-1.5 text-[13px] text-text-h hover:border-accent/50">
+              Reintentar
+            </button>
+          </div>
         ) : !agreement ? (
           <p role="status" className="text-[14px] text-text">
             Cargando el acuerdo...
@@ -136,7 +151,7 @@ export function TournamentAgreementModal({ code, token, onSigned, onCancel }: Pr
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="text-[13px] text-text">
               Tipo de documento (opcional)
-              <select className={inputClass} value={values.documentType} onChange={(e) => set('documentType', e.target.value)}>
+              <select className={inputClass} value={values.documentType} aria-invalid={submitted && !!errors.documentType} onChange={(e) => set('documentType', e.target.value)}>
                 <option value="">Sin indicar</option>
                 {DOCUMENT_TYPES.map((t) => (
                   <option key={t.value} value={t.value}>
@@ -164,13 +179,13 @@ export function TournamentAgreementModal({ code, token, onSigned, onCancel }: Pr
             <p className="text-[12px] text-text">Sin la autorización de tu madre, padre o tutor no puedes entrar al torneo.</p>
             <label className="text-[13px] text-text">
               Nombre completo del representante
-              <input className={inputClass} value={values.guardianFullName} onChange={(e) => set('guardianFullName', e.target.value)} />
+              <input className={inputClass} value={values.guardianFullName} aria-invalid={submitted && !!errors.guardianFullName} onChange={(e) => set('guardianFullName', e.target.value)} />
               {err('guardianFullName')}
             </label>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label className="text-[13px] text-text">
                 Tipo de documento
-                <select className={inputClass} value={values.guardianDocumentType} onChange={(e) => set('guardianDocumentType', e.target.value)}>
+                <select className={inputClass} value={values.guardianDocumentType} aria-invalid={submitted && !!errors.guardianDocumentType} onChange={(e) => set('guardianDocumentType', e.target.value)}>
                   <option value="">Elige uno</option>
                   {DOCUMENT_TYPES.map((t) => (
                     <option key={t.value} value={t.value}>
@@ -182,17 +197,17 @@ export function TournamentAgreementModal({ code, token, onSigned, onCancel }: Pr
               </label>
               <label className="text-[13px] text-text">
                 Número de documento
-                <input className={inputClass} inputMode="numeric" value={values.guardianDocumentNumber} onChange={(e) => set('guardianDocumentNumber', e.target.value)} />
+                <input className={inputClass} inputMode="numeric" value={values.guardianDocumentNumber} aria-invalid={submitted && !!errors.guardianDocumentNumber} onChange={(e) => set('guardianDocumentNumber', e.target.value)} />
                 {err('guardianDocumentNumber')}
               </label>
             </div>
             <label className="text-[13px] text-text">
               Relación contigo (madre, padre, tutor...)
-              <input className={inputClass} value={values.guardianRelationship} onChange={(e) => set('guardianRelationship', e.target.value)} />
+              <input className={inputClass} value={values.guardianRelationship} aria-invalid={submitted && !!errors.guardianRelationship} onChange={(e) => set('guardianRelationship', e.target.value)} />
               {err('guardianRelationship')}
             </label>
             <label className="flex items-start gap-2 text-[13px] text-text">
-              <input type="checkbox" className="mt-0.5 h-5 w-5 shrink-0" checked={values.guardianAccepted} onChange={(e) => set('guardianAccepted', e.target.checked)} />
+              <input type="checkbox" className="mt-0.5 h-5 w-5 shrink-0" checked={values.guardianAccepted} aria-invalid={submitted && !!errors.guardianAccepted} onChange={(e) => set('guardianAccepted', e.target.checked)} />
               <span>Soy el representante legal y autorizo el tratamiento de los datos del menor y su participación, según el acuerdo.</span>
             </label>
             {err('guardianAccepted')}
@@ -202,12 +217,12 @@ export function TournamentAgreementModal({ code, token, onSigned, onCancel }: Pr
         <fieldset className="flex flex-col gap-2" disabled={sending || done}>
           <legend className="mb-1 text-[13px] font-semibold text-text-h">Aceptaciones (por separado)</legend>
           <label className="flex items-start gap-2 text-[13px] text-text">
-            <input type="checkbox" className="mt-0.5 h-5 w-5 shrink-0" checked={values.acceptedConfidentiality} onChange={(e) => set('acceptedConfidentiality', e.target.checked)} />
+            <input type="checkbox" className="mt-0.5 h-5 w-5 shrink-0" checked={values.acceptedConfidentiality} aria-invalid={submitted && !!errors.acceptedConfidentiality} onChange={(e) => set('acceptedConfidentiality', e.target.checked)} />
             <span>He leído y acepto el acuerdo de confidencialidad y la reserva de derechos de NexusPlay.</span>
           </label>
           {err('acceptedConfidentiality')}
           <label className="flex items-start gap-2 text-[13px] text-text">
-            <input type="checkbox" className="mt-0.5 h-5 w-5 shrink-0" checked={values.acceptedDataProcessing} onChange={(e) => set('acceptedDataProcessing', e.target.checked)} />
+            <input type="checkbox" className="mt-0.5 h-5 w-5 shrink-0" checked={values.acceptedDataProcessing} aria-invalid={submitted && !!errors.acceptedDataProcessing} onChange={(e) => set('acceptedDataProcessing', e.target.checked)} />
             <span>Autorizo de forma previa, expresa e informada el tratamiento de mis datos personales según este acuerdo (Ley 1581 de 2012).</span>
           </label>
           {err('acceptedDataProcessing')}
@@ -219,6 +234,11 @@ export function TournamentAgreementModal({ code, token, onSigned, onCancel }: Pr
           {err('signatureName')}
         </label>
 
+        {submitted && !done && !serverError && Object.keys(errors).length > 0 && (
+          <p role="alert" className="rounded-lg border border-danger/40 p-2 text-[13px] text-danger">
+            Falta completar {Object.keys(errors).length === 1 ? 'un dato' : `${Object.keys(errors).length} datos`} para poder firmar. Revisa los campos marcados en rojo.
+          </p>
+        )}
         {serverError && (
           <p role="alert" className="rounded-lg border border-danger/40 p-2 text-[13px] text-danger">
             {serverError}
