@@ -1906,6 +1906,12 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect, O
             return;
           }
           this.joinTournament(socket, code);
+        })
+        .catch((error: unknown) => {
+          // Sin esto el cliente se queda cargando sin saber qué pasó (falla de BD, torneo ya cerrado, cupo lleno…).
+          socket.emit('room:error', {
+            message: error instanceof Error && error.message ? error.message : 'No pudimos verificar tu firma. Intenta de nuevo.',
+          });
         });
     }
     this.joinTournament(socket, code);
