@@ -3,6 +3,9 @@ import { describe, expect, it, vi } from 'vitest'
 import type { TournamentParticipantView, TournamentStateView } from './guessWhoTypes'
 
 // El panel pide el tema y los avatares: aquí se simulan igual que en su prueba principal.
+// El botón de firmas del acuerdo (issue #173) lee la sesión; aquí no hay proveedor.
+vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ token: null }) }))
+
 vi.mock('../../../hooks/useTheme', () => ({
   useTheme: () => ({ theme: 'light' }),
   isDarkTheme: () => false,

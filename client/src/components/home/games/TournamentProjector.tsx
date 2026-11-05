@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
+import { invitationUrlFor } from './tournamentInvitation'
 import { createPortal } from 'react-dom'
 import { Crown, X } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
@@ -22,10 +23,8 @@ const LOBBY_AVATARS = 40
 /** Quiénes se listan debajo del podio. */
 const BELOW_PODIUM = 5
 
-/** Enlace para unirse; lo mismo que la sala de espera del administrador. */
-export function invitationUrlFor(code: string): string {
-  return new URL(`/quien-es/torneo/${encodeURIComponent(code)}`, window.location.origin).href
-}
+/** Enlace para unirse (con `origen=qr`, issue #173); lo mismo que la sala de espera del administrador. */
+export { invitationUrlFor }
 
 /**
  * Modo proyector del administrador (issue #147): una pantalla completa, oscura y legible a

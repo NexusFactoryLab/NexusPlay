@@ -15,6 +15,9 @@ export function useGuessWhoTournament(token: string | null) {
   const socketRef = useRef<Socket | null>(null)
   const [messages, setMessages] = useState<GuessWhoChatMessage[]>([])
   const waitingCodeRef = useRef<string | null>(null)
+  // Issue #173: la entrada vino del QR o del enlace de invitación; se repite al reconectar.
+  const viaRef = useRef<string | undefined>(undefined)
+  const [signatureRequiredCode, setSignatureRequiredCode] = useState<string | null>(null)
   const [tournament, setTournament] = useState<TournamentStateView | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [connecting, setConnecting] = useState(true)
@@ -38,7 +41,7 @@ export function useGuessWhoTournament(token: string | null) {
       setConnecting(false)
       // Volver a la sala tras reconectar: en la espera el servidor exige confirmar
       // de nuevo; con el torneo en marcha, la partida propia sigue (issue #120).
-      if (waitingCodeRef.current) socket.emit('tournament:join', { code: waitingCodeRef.current })
+      if (waitingCodeRef.current) socket.emit('tournament:join', { code: waitingCodeRef.current, via: viaRef.current })
     })
     socket.on('disconnect', () => setConnecting(true))
     socket.on('tournament:state', (state: TournamentStateView) => {
@@ -52,6 +55,8 @@ export function useGuessWhoTournament(token: string | null) {
       setTournament(null)
       setClosed(true)
     })
+    // El servidor exige firmar el acuerdo antes de unir a quien entra por el QR (issue #173).
+    socket.on('tournament:signature-required', (payload: { code: string }) => setSignatureRequiredCode(payload.code))
     socket.on('room:error', (payload: { message: string }) => setError(payload.message))
     // Anuncio de emparejamiento al arrancar una ronda: se muestra brevemente
     // "Tu compañero es: [nombre]" antes de que el match arranque de lleno.
@@ -145,10 +150,15 @@ export function useGuessWhoTournament(token: string | null) {
     socketRef.current?.emit('tournament:close')
   }, [])
 
-  const joinTournament = useCallback((code: string) => {
+  /** `via: 'qr'` cuando la persona llegó por el QR o el enlace de invitación (el servidor entonces exige la firma). */
+  const joinTournament = useCallback((code: string, via?: 'qr') => {
     waitingCodeRef.current = code
-    if (socketRef.current?.connected) socketRef.current.emit('tournament:join', { code })
+    viaRef.current = via
+    setSignatureRequiredCode(null)
+    if (socketRef.current?.connected) socketRef.current.emit('tournament:join', { code, via })
   }, [])
+
+  const clearSignatureRequired = useCallback(() => setSignatureRequiredCode(null), [])
 
   const sendChatMessage = useCallback((text: string) => {
     if (socketRef.current?.connected && text.trim()) socketRef.current.emit('tournament:chat', { text: text.trim() })
@@ -212,6 +222,8 @@ export function useGuessWhoTournament(token: string | null) {
     sendMazeCollectorFinish,
     clearError,
     joinTournament,
+    signatureRequiredCode,
+    clearSignatureRequired,
     startTournament,
     closeTournament,
     endRound,

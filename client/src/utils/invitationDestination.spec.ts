@@ -20,6 +20,11 @@ describe('destino de invitación al autenticar', () => {
     expect(invitationDestination(target)).toBe(`/${route}/ABC234`)
     expect(invitationAuthPath('/register', target)).toContain('returnTo=')
   })
+  it('conserva origen=qr solo en el torneo (issue #173) y no deja pasar otros parámetros', () => {
+    expect(invitationDestination('/quien-es/torneo/abc234?origen=qr&x=1')).toBe('/quien-es/torneo/ABC234?origen=qr')
+    expect(invitationDestination('/quien-es/torneo/abc234?origen=otro')).toBe('/quien-es/torneo/ABC234')
+    expect(invitationDestination('/domino/sala/abc234?origen=qr')).toBe('/domino/sala/ABC234')
+  })
   it('conserva códigos genéricos sin parámetros ajenos', () => {
     expect(invitationDestination('/?sala=abc234&otra=cosa')).toBe(
       '/?sala=ABC234',
