@@ -1050,13 +1050,9 @@ export function GamesSection({
               <h2 className="home-hero-title text-[22px] leading-[1.15] font-bold tracking-tight text-text-h">
                 {/* El salto de línea solo se usa en Fantasía, para partir el título como en la referencia. */}
                 <span className="home-hero-title-text">
-                  Convierte cualquier<br className="home-hero-title-break" /> tema en un juego
+                  Estudiar no debe<br className="home-hero-title-break" /> ser aburrido
                 </span>
               </h2>
-              <p className="home-hero-desc mt-2 text-[13px] leading-relaxed text-text">
-                Matemáticas, biología, geografía, medicina — arma retos, invita a tu equipo y
-                compite en tiempo real.
-              </p>
               <div className="home-hero-actions mt-3 flex flex-wrap items-center gap-2.5">
                 <button
                   type="button"

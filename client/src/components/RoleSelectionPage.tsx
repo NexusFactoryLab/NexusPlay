@@ -3,7 +3,6 @@ import { GraduationCap, Presentation } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { ApiError } from '../utils/http'
 import { RoleCharacterIllustration } from './RoleCharacterIllustration'
-import { ThemeToggle } from './ThemeToggle'
 
 type RoleOption = 'STUDENT' | 'TEACHER'
 
@@ -68,10 +67,6 @@ export function RoleSelectionPage() {
             'radial-gradient(circle at 15% 20%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 55%), radial-gradient(circle at 85% 80%, color-mix(in srgb, var(--accent-2) 18%, transparent), transparent 50%)',
         }}
       />
-
-      <div className="absolute top-5 right-5 z-10 sm:top-8 sm:right-8">
-        <ThemeToggle />
-      </div>
 
       <div className="relative mx-auto my-auto flex min-h-full w-full flex-col items-center justify-center gap-8 py-10">
 

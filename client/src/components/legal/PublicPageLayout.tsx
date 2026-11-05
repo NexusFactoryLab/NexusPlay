@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { ThemeToggle } from '../ThemeToggle'
 import { LogoMark, LogoWordmark } from '../BrandLogo'
 
 type PublicPageLayoutProps = {
@@ -16,7 +15,6 @@ export function PublicPageLayout({ title, children }: PublicPageLayoutProps) {
           <LogoMark className="h-9 w-9" />
           <LogoWordmark className="h-5 w-auto" />
         </Link>
-        <ThemeToggle />
       </header>
 
       <main className="mx-auto w-full max-w-3xl flex-1 shrink-0 px-5 py-10 sm:px-8 sm:py-14">
