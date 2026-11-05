@@ -20,7 +20,7 @@ import {
 import { FitScale } from './true-false-maze/FitScale'
 import { SpriteStrip, mazeSpriteUrl, useMazeSpriteTheme } from './mazeSpriteStrip'
 import { COMBO_POINTS, POINTS_BONUS, POINTS_PET, POWER_MODE_MS } from './mazeEngine'
-import { POINTS_ANSWER, QUESTION_TIME_MS } from './useMazeCollectorGame'
+import { POINTS_ANSWER, POINTS_SPEED_BONUS, QUESTION_TIME_MS } from './useMazeCollectorGame'
 import { ArtTruckQuestion } from './tutorial/tutorialArt'
 import './true-false-maze/trueFalseMazeGuide.css'
 import './mazeCollectorGuide.css'
@@ -413,7 +413,7 @@ const STEPS: Step[] = [
     body: (
       <ul className="flex flex-col gap-2.5">
         <Item icon={<Check className="h-4 w-4" strokeWidth={3} />} tone="emerald">
-          Correcta: <b className="text-white">+{POINTS_ANSWER}</b>
+          Correcta: <b className="text-white">+{POINTS_ANSWER}</b> y hasta <b className="text-white">+{POINTS_SPEED_BONUS}</b> más si respondes rápido
         </Item>
         <Item icon={<Heart className="h-4 w-4" />} tone="rose">
           Incorrecta o <b className="text-white">{QUESTION_TIME_MS / 1000} s</b>: −1 vida

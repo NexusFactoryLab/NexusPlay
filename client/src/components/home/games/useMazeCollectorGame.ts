@@ -59,8 +59,10 @@ const COLLISION_RADIUS = 0.6
 /** Nunca dejar que un frame con lag (pestaña en segundo plano, etc.) mueva a alguien varias celdas de un salto. */
 const MAX_DELTA_SECONDS = 0.05
 const LEVELUP_PAUSE_MS = 1600
-/** Puntos por llegar a la respuesta correcta (issue #103). */
+/** Puntos base por llegar a la respuesta correcta (issue #103). */
 export const POINTS_ANSWER = 200
+/** Bono máximo por responder de inmediato; baja linealmente hasta 0 al agotarse el tiempo (issue #180). */
+export const POINTS_SPEED_BONUS = 600
 /** Distancia mínima (en pasos por la calle) entre el camión y una respuesta recién puesta. */
 const ANSWER_MIN_DISTANCE = 6
 
@@ -68,7 +70,7 @@ const ANSWER_MIN_DISTANCE = 6
 export type MazeAnswer = { letter: string; text: string; correct: boolean; pos: CellPosition; wrong: boolean }
 export type ActiveQuestion = { id: number; question: string; answers: MazeAnswer[]; book?: MazeQuestionBook }
 /** Lo último que pasó con una respuesta, para el aviso en pantalla (`id` cambia con cada intento). */
-export type AnswerFeedback = { id: number; kind: 'correct' | 'wrong' | 'timeout'; letter: string }
+export type AnswerFeedback = { id: number; kind: 'correct' | 'wrong' | 'timeout'; letter: string; points?: number }
 /** Por qué se perdió la última vida (se muestra en la pantalla final, no en un aviso aparte). */
 export type LostReason = 'wrong' | 'timeout' | 'caught'
 /** Tiempo para llegar a la respuesta correcta; solo corre mientras se juega (no en pausa ni con la pregunta en pantalla). */
@@ -402,6 +404,12 @@ function scenarioQuestion(scenario: MazeScenario | null): ActiveQuestion | null 
   return scenario?.question ? buildQuestion(scenario.question.question, scenario.question.positions, 1, false) : null
 }
 
+/** Puntos de una respuesta correcta: base + bono proporcional al tiempo que sobraba (redondeado a decenas). */
+export function answerPointsFor(remainingMs: number, totalMs: number = QUESTION_TIME_MS): number {
+  const ratio = Math.min(1, Math.max(0, remainingMs / totalMs))
+  return POINTS_ANSWER + Math.round((POINTS_SPEED_BONUS * ratio) / 10) * 10
+}
+
 /** El camión llegó a la celda de una respuesta. */
 function resolveAnswer(state: InternalState, layout: MazeLayoutDef, answer: MazeAnswer, now: number) {
   const feedbackId = (state.answerFeedback?.id ?? 0) + 1
@@ -409,7 +417,10 @@ function resolveAnswer(state: InternalState, layout: MazeLayoutDef, answer: Maze
   if (!state.scenario) state.feedbackUntil = now + ANSWER_FEEDBACK_MS
   if (answer.correct) {
     celebrateMatch()
-    state.score += POINTS_ANSWER
+    const remainingMs = state.questionDeadline === null ? QUESTION_TIME_MS : state.questionDeadline - now
+    const points = state.scenario ? POINTS_ANSWER : answerPointsFor(remainingMs)
+    state.score += points
+    state.answerFeedback = { id: feedbackId, kind: 'correct', letter: answer.letter, points }
     state.answeredCorrect += 1
     if (state.scenario) state.scenarioDone = true
     else nextQuestion(state, layout)

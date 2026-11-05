@@ -1334,7 +1334,7 @@ function AnswerToast({ feedback }: { feedback: AnswerFeedback }) {
           correct ? 'border-emerald-300 bg-emerald-600/95' : 'border-rose-300 bg-rose-600/95'
         }`}
       >
-        {correct ? '¡Correcto! +200' : feedback.kind === 'timeout' ? '¡Se acabó el tiempo!' : `¡Incorrecto! La ${feedback.letter} no era`}
+        {correct ? `¡Correcto! +${feedback.points ?? 200}` : feedback.kind === 'timeout' ? '¡Se acabó el tiempo!' : `¡Incorrecto! La ${feedback.letter} no era`}
         {!correct && <span className="block text-[13px] font-semibold text-rose-100">Pierdes una vida</span>}
       </p>
     </div>
