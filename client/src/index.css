@@ -7542,7 +7542,8 @@ code {
   .app-main .home-fit .home-hero {
     flex: 1 1 0;
     min-height: 0;
-    padding: 1.2vh 28px;
+    /* Mismo espacio a ambos lados: el trofeo (absoluto) no tapa el texto y el texto queda centrado. */
+    padding: 1.2vh max(28px, 16vh);
   }
 
   .app-main .home-fit .home-hero-inner {
@@ -7588,7 +7589,8 @@ code {
   .app-main .home-fit .home-hero-trophy {
     position: absolute;
     top: 50%;
-    right: 0;
+    /* Dentro del margen reservado del banner (16vh), no sobre el texto. */
+    right: -15vh;
     width: 13vh;
     height: 13vh;
     margin: 0;
@@ -7622,4 +7624,87 @@ code {
   color: transparent;
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
+}
+
+/* Tablet y celular (issue #182): el Inicio se desplaza, así que el banner solo
+ * se centra y se compacta para que los juegos aparezcan pronto. El trofeo es
+ * decorativo y se oculta para no gastar alto. */
+@media (max-width: 1023px) {
+  .app-main .home-fit .home-hero {
+    padding: 14px 16px;
+  }
+
+  [data-theme='fantasy'] .app-main .home-fit .home-hero {
+    padding: 16px 22px;
+  }
+
+  .app-main .home-fit .home-hero-inner {
+    justify-content: center;
+  }
+
+  .app-main .home-fit .home-hero-copy {
+    max-width: none;
+    width: 100%;
+    text-align: center;
+  }
+
+  .app-main .home-fit .home-hero-eyebrow {
+    justify-content: center;
+  }
+
+  .app-main .home-fit .home-hero-title {
+    font-size: clamp(20px, 6vw, 32px);
+  }
+
+  .app-main .home-fit .home-hero-title-break {
+    display: none;
+  }
+
+  .app-main .home-fit .home-hero-actions {
+    justify-content: center;
+    margin-top: 12px;
+  }
+
+  .app-main .home-fit .home-hero-tournament {
+    margin-top: 10px;
+  }
+
+  .app-main .home-fit .home-hero-trophy {
+    display: none;
+  }
+}
+
+@media (max-width: 479px) {
+  .app-main .home-fit .home-hero-eyebrow {
+    display: none;
+  }
+
+  .app-main .home-fit .home-hero-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .app-main .home-fit .home-hero [data-tour='create'],
+  .app-main .home-fit .home-hero [data-tour='join'] {
+    justify-content: center;
+  }
+}
+
+/* Celular horizontal: el alto es muy poco, el banner se queda con lo esencial. */
+@media (max-width: 1023px) and (max-height: 480px) {
+  .app-main .home-fit .home-hero {
+    padding: 10px 16px;
+  }
+
+  .app-main .home-fit .home-hero-eyebrow {
+    display: none;
+  }
+
+  .app-main .home-fit .home-hero-title {
+    font-size: 20px;
+  }
+
+  .app-main .home-fit .home-hero-actions {
+    margin-top: 8px;
+  }
 }
