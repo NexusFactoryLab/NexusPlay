@@ -1015,13 +1015,13 @@ export function GamesSection({
     <section
       className={
         mode === 'all'
-          ? 'home-fit relative flex flex-col gap-5 lg:h-full lg:min-h-[420px]'
+          ? 'home-fit relative flex flex-col gap-3 lg:h-full lg:min-h-[420px]'
           : 'flex flex-col gap-10'
       }
     >
       {mode === 'all' && (
         <div
-          className="home-hero relative shrink-0 overflow-hidden rounded-3xl border border-border p-8 sm:p-10"
+          className="home-hero relative shrink-0 overflow-hidden rounded-3xl border border-border p-5 sm:p-6"
           style={{
             background:
               'radial-gradient(circle at 15% 20%, color-mix(in srgb, var(--accent) 35%, transparent), transparent 55%), radial-gradient(circle at 85% 85%, color-mix(in srgb, var(--accent-2) 30%, transparent), transparent 50%), var(--surface)',
@@ -1041,26 +1041,26 @@ export function GamesSection({
 
           <FantasyHeroDecor />
 
-          <div className="home-hero-inner relative flex flex-wrap items-center justify-between gap-8">
+          <div className="home-hero-inner relative flex flex-wrap items-center justify-between gap-4">
             <div className="home-hero-copy min-w-0 max-w-[560px]">
-              <p className="home-hero-eyebrow mb-3 flex items-center gap-2 text-[12px] font-semibold tracking-wide text-accent uppercase">
+              <p className="home-hero-eyebrow mb-2 flex items-center gap-2 text-[11px] font-semibold tracking-wide text-accent uppercase">
                 <Sparkles className="h-3.5 w-3.5" strokeWidth={2.5} />
                 Modo creación · Cualquier área
               </p>
-              <h2 className="home-hero-title text-[30px] leading-[1.1] font-bold tracking-tight text-text-h">
+              <h2 className="home-hero-title text-[22px] leading-[1.15] font-bold tracking-tight text-text-h">
                 {/* El salto de línea solo se usa en Fantasía, para partir el título como en la referencia. */}
                 <span className="home-hero-title-text">
                   Convierte cualquier<br className="home-hero-title-break" /> tema en un juego
                 </span>
               </h2>
-              <p className="home-hero-desc mt-3 text-[14.5px] leading-relaxed text-text">
+              <p className="home-hero-desc mt-2 text-[13px] leading-relaxed text-text">
                 Matemáticas, biología, geografía, medicina — arma retos, invita a tu equipo y
                 compite en tiempo real.
               </p>
-              <div className="home-hero-actions mt-6 flex flex-wrap items-center gap-3">
+              <div className="home-hero-actions mt-3 flex flex-wrap items-center gap-2.5">
                 <button
                   type="button"
-                  className="flex items-center gap-2 rounded-xl px-5 py-3 text-[14px] font-semibold text-white shadow-[0_10px_28px_-10px_var(--accent)] transition-transform hover:-translate-y-0.5"
+                  className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-[13.5px] font-semibold text-white shadow-[0_10px_28px_-10px_var(--accent)] transition-transform hover:-translate-y-0.5"
                   style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
                   onClick={() => navigate('/juegos/crear')}
                   data-tour="create"
@@ -1071,7 +1071,7 @@ export function GamesSection({
                 </button>
                 <button
                   type="button"
-                  className="join-code-glow-btn relative flex items-center gap-2 rounded-xl px-5 py-3 text-[14px] font-bold text-white transition-transform hover:-translate-y-0.5"
+                  className="join-code-glow-btn relative flex items-center gap-2 rounded-xl px-4 py-2.5 text-[13.5px] font-bold text-white transition-transform hover:-translate-y-0.5"
                   style={{ background: 'linear-gradient(135deg, var(--accent-2), #c81d63)' }}
                   onClick={() => setJoinByCodeOpen(true)}
                   data-tour="join"
@@ -1084,7 +1084,7 @@ export function GamesSection({
               {/* Torneo: una sola franja compacta bajo las acciones principales, para que no compita con ellas por espacio. */}
               {tournamentOpen && (
                 <div
-                  className="home-hero-tournament mt-3 inline-flex max-w-full flex-wrap items-center gap-1.5 rounded-full border border-border bg-surface p-1"
+                  className="home-hero-tournament mt-2.5 inline-flex max-w-full flex-wrap items-center gap-1.5 rounded-full border border-border bg-surface p-1"
                   role="group"
                   aria-label="Torneo"
                 >
@@ -1117,10 +1117,10 @@ export function GamesSection({
             {/* En Fantasía el ícono se cambia por un trofeo dorado con destellos (solo CSS + emoji, ver .home-hero-trophy en index.css). */}
             <div
               aria-hidden="true"
-              className="home-hero-trophy relative flex h-[130px] w-[130px] shrink-0 items-center justify-center rounded-3xl border border-border"
+              className="home-hero-trophy relative flex h-[84px] w-[84px] shrink-0 items-center justify-center rounded-3xl border border-border"
               style={{ background: 'var(--bg)' }}
             >
-              <Trophy className="home-hero-trophy-icon h-14 w-14 text-accent-2" strokeWidth={1.5} />
+              <Trophy className="home-hero-trophy-icon h-9 w-9 text-accent-2" strokeWidth={1.5} />
               <span className="home-hero-trophy-emoji">🏆</span>
               <span className="home-hero-spark home-hero-spark-1">⭐</span>
               <span className="home-hero-spark home-hero-spark-2">✨</span>

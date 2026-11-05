@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom'
 import { LogoWordmark } from './BrandLogo'
 import { RegisterForm } from './RegisterForm'
-import { ThemeToggle } from './ThemeToggle'
 
 type RegisterPageProps = {
   onSwitchToLogin: () => void
@@ -18,10 +17,6 @@ export function RegisterPage({ onSwitchToLogin }: RegisterPageProps) {
             'radial-gradient(circle at 15% 20%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 55%), radial-gradient(circle at 85% 80%, color-mix(in srgb, var(--accent-2) 18%, transparent), transparent 50%)',
         }}
       />
-
-      <div className="absolute top-5 right-5 sm:top-8 sm:right-8">
-        <ThemeToggle />
-      </div>
 
       <div
         className="relative w-full max-w-[420px] rounded-2xl border border-border bg-surface p-6 text-left shadow-[var(--shadow)] sm:p-8"
