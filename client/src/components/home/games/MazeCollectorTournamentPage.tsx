@@ -6,8 +6,9 @@ import { useGuessWhoTournament } from './useGuessWhoTournament'
 import type { TournamentLevel } from './tournamentLevels'
 import { MazeCollectorGame } from './MazeCollectorGame'
 import { TournamentPlay } from './tournamentPlay'
-import { DEFAULT_MAZE_CONFIG, MAZE_LAYOUTS, applyMazeCollectorTournamentLevel, normalizeMazeLayout } from './mazeCollectorTypes'
-import type { MazeCollectorConfig, MazeCollectorItem } from './mazeCollectorTypes'
+import { DEFAULT_MAZE_CONFIG, MAZE_LAYOUTS, MAZE_LAYOUT_IDS, applyMazeCollectorTournamentLevel, normalizeMazeLayout } from './mazeCollectorTypes'
+import { MAZE_MAPS } from './mazeMaps'
+import type { MazeCollectorConfig, MazeLayout, MazeCollectorItem } from './mazeCollectorTypes'
 import { questionsForGame } from './mazeCollectorQuestions'
 
 type Run = { matchCode: string; gameId: string; level: TournamentLevel; title: string }
@@ -32,6 +33,8 @@ export function MazeCollectorTournamentPage() {
   const [game, setGame] = useState<GameDetail | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [roundClosed, setRoundClosed] = useState(false)
+  /** Mapa que elige la persona antes de jugar su ronda. */
+  const [chosenLayout, setChosenLayout] = useState<MazeLayout | null>(null)
   const finishedRef = useRef(false)
 
   const backToTournament = useCallback(
@@ -70,9 +73,9 @@ export function MazeCollectorTournamentPage() {
   const config = useMemo<MazeCollectorConfig>(() => {
     const base: MazeCollectorConfig = { ...DEFAULT_MAZE_CONFIG, ...(game?.config as Partial<MazeCollectorConfig> | undefined) }
     // La expedición por estaciones no aplica a una ronda de torneo: siempre un mapa, un intento (issue #166).
-    const single = { ...base, stations: undefined }
+    const single = { ...base, stations: undefined, layout: chosenLayout ?? normalizeMazeLayout(base.layout) }
     return run ? applyMazeCollectorTournamentLevel(single, run.level) : single
-  }, [game, run])
+  }, [game, run, chosenLayout])
   const layout = MAZE_LAYOUTS[normalizeMazeLayout(config.layout)]
   const questions = useMemo(() => questionsForGame((game?.config as { questions?: unknown } | null)?.questions, normalizeMazeLayout(config.layout)), [game, config.layout])
 
@@ -151,6 +154,27 @@ export function MazeCollectorTournamentPage() {
     return (
       <main className="flex flex-1 items-center justify-center">
         <p className="text-[14px] text-text">{connecting ? 'Conectando al torneo…' : 'Preparando el territorio…'}</p>
+      </main>
+    )
+  }
+
+  if (!chosenLayout) {
+    return (
+      <main className="flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center">
+        <h1 className="text-[18px] font-bold text-text-h">¿Qué territorio quieres salvar?</h1>
+        <div className="grid w-full max-w-[560px] grid-cols-1 gap-3 sm:grid-cols-2">
+          {MAZE_LAYOUT_IDS.map((id) => (
+            <button
+              key={id}
+              type="button"
+              className="rounded-xl border border-border px-4 py-3 text-left hover:border-accent/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              onClick={() => setChosenLayout(id)}
+            >
+              <span className="block text-[15px] font-semibold text-text-h">{MAZE_MAPS[id].label}</span>
+              <span className="block text-[13px] text-text">{MAZE_MAPS[id].description}</span>
+            </button>
+          ))}
+        </div>
       </main>
     )
   }
