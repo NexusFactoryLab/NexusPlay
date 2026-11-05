@@ -59,19 +59,21 @@ export function RoleSelectionPage() {
   }
 
   return (
-    <main className="relative flex min-h-svh flex-col items-center justify-center gap-8 overflow-hidden p-5 sm:p-8">
+    <main className="relative h-svh w-full overflow-x-hidden overflow-y-auto p-5 sm:p-8">
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0"
+        className="pointer-events-none fixed inset-0"
         style={{
           background:
             'radial-gradient(circle at 15% 20%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 55%), radial-gradient(circle at 85% 80%, color-mix(in srgb, var(--accent-2) 18%, transparent), transparent 50%)',
         }}
       />
 
-      <div className="absolute top-5 right-5 sm:top-8 sm:right-8">
+      <div className="absolute top-5 right-5 z-10 sm:top-8 sm:right-8">
         <ThemeToggle />
       </div>
+
+      <div className="relative mx-auto my-auto flex min-h-full w-full flex-col items-center justify-center gap-8 py-10">
 
       <header className="relative max-w-xl text-center">
         <h1 className="mb-2 text-[28px] tracking-tight text-text-h">¿Cómo quieres usar NexusPlay?</h1>
@@ -149,6 +151,7 @@ export function RoleSelectionPage() {
       >
         {submitting ? 'Guardando…' : 'Continuar'}
       </button>
+      </div>
     </main>
   )
 }
