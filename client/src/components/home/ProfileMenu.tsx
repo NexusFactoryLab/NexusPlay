@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown, LogOut, Shirt } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
+import { TiArrowSortedDown, TiBrush, TiPower } from 'react-icons/ti'
 import type { AuthUser } from '../../services/auth.service'
 import { AvatarCircle } from '../avatar/AvatarCircle'
 import { AvatarPortrait } from '../avatar/AvatarPortrait'
@@ -153,9 +154,9 @@ export function ProfileMenu({ user, onSignOut, placement = 'header', collapsed =
               <span className="profile-name line-clamp-2 text-[14px] font-semibold break-words text-text-h">{user.displayName}</span>
               {roleLabel && <span className="profile-role mt-0.5 text-[11.5px] text-text">{roleLabel}</span>}
             </span>
-            <ChevronDown
-              className={`h-3.5 w-3.5 shrink-0 text-text transition-transform ${open ? 'rotate-180' : ''}`}
-              strokeWidth={2.5}
+            <TiArrowSortedDown
+              className={`profile-chevron h-4 w-4 shrink-0 text-text transition-transform ${open ? 'rotate-180' : ''}`}
+              aria-hidden="true"
             />
           </>
         )}
@@ -205,7 +206,7 @@ function ProfileDropdown({
           navigate('/avatar')
         }}
       >
-        <Shirt className="h-4 w-4 text-accent" strokeWidth={2} />
+        <TiBrush className="h-4 w-4 text-accent" aria-hidden="true" />
         Configurar avatar
       </button>
       <button
@@ -217,7 +218,7 @@ function ProfileDropdown({
           onSignOut()
         }}
       >
-        <LogOut className="h-4 w-4" strokeWidth={2} />
+        <TiPower className="h-4 w-4" aria-hidden="true" />
         Cerrar sesión
       </button>
     </div>

@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { ChevronLeft, Plus } from 'lucide-react'
+import { TiChevronLeft, TiPlus } from 'react-icons/ti'
 import type { AuthUser } from '../../services/auth.service'
 import { ProfileMenu } from './ProfileMenu'
 import { NAV_ICONS, navIcon, navTileStyle } from './sidebarIcons'
@@ -150,9 +150,9 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
         aria-label={isMobile ? 'Cerrar menú' : collapsed ? 'Expandir menú' : 'Contraer menú'}
         className="absolute top-6 -right-3 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-surface text-text shadow-[var(--shadow)] transition-transform hover:text-text-h"
       >
-        <ChevronLeft
-          className={`h-3.5 w-3.5 transition-transform ${collapsed ? 'rotate-180' : ''}`}
-          strokeWidth={2.5}
+        <TiChevronLeft
+          className={`h-4 w-4 transition-transform ${collapsed ? 'rotate-180' : ''}`}
+          aria-hidden="true"
         />
       </button>
 
@@ -178,7 +178,7 @@ export function Sidebar({ user, onSignOut, userRole, canManageUsers, canAccessOr
           style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
           onClick={() => navigate('/juegos/crear')}
         >
-          <Plus className="h-[18px] w-[18px] shrink-0" strokeWidth={2.5} />
+          <TiPlus className="h-5 w-5 shrink-0" aria-hidden="true" />
           {!collapsed && <span className="truncate">Crear actividad</span>}
         </button>
       )}
