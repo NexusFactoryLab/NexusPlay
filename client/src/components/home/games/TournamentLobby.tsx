@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import { invitationUrlFor } from './tournamentInvitation'
+import { TournamentSignaturesButton } from './TournamentSignaturesButton'
 import { CircleHelp, Copy, Link, LogOut, MonitorPlay, Play, Users } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { AvatarCircle } from '../../avatar/AvatarCircle'
@@ -30,7 +32,7 @@ export function TournamentLobby({ tournament, error, onStart, onClose, onExit }:
   const [projecting, setProjecting] = useState(false)
   const avatars = usePlayersAvatars(useMemo(() => tournament.participants.map((p) => p.userId), [tournament.participants]))
 
-  const invitationUrl = new URL(`/quien-es/torneo/${encodeURIComponent(tournament.code)}`, window.location.origin).href
+  const invitationUrl = invitationUrlFor(tournament.code)
   const canStart = tournament.participants.length >= 2
 
   async function copy(value: string, label: string) {
@@ -89,6 +91,7 @@ export function TournamentLobby({ tournament, error, onStart, onClose, onExit }:
                 <MonitorPlay className="h-4 w-4" strokeWidth={2} />
                 Modo proyector
               </button>
+              <TournamentSignaturesButton code={tournament.code} />
             </div>
             <div className="rounded-xl bg-white p-2 shadow-[0_8px_24px_-12px_var(--accent)] transition-transform duration-300 hover:scale-105">
               <QRCodeSVG value={invitationUrl} size={112} />

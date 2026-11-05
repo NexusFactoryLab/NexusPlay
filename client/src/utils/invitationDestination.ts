@@ -13,7 +13,12 @@ export function invitationDestination(value: string | null): string | null {
     const room = url.pathname.match(
       /^\/(quien-es\/(?:sala|torneo)|domino\/sala|escaleras-serpientes\/sala|dual-quest-pixi\/sala)\/([a-z0-9]{6})\/?$/i,
     )
-    if (room) return `/${room[1].toLowerCase()}/${room[2].toUpperCase()}`
+    if (room) {
+      const path = `/${room[1].toLowerCase()}/${room[2].toUpperCase()}`
+      // Issue #173: el enlace del QR del torneo conserva su origen para que, tras iniciar sesión, se pida la firma.
+      const byQr = room[1].toLowerCase() === 'quien-es/torneo' && url.searchParams.get('origen') === 'qr'
+      return byQr ? `${path}?origen=qr` : path
+    }
     // Enlaces antiguos y entrada mediante código genérico, resueltos por GamesSection.
     const code = url.searchParams.get('sala')?.trim().toUpperCase()
     if (url.pathname === '/' && code && /^[A-Z0-9]{6}$/.test(code))

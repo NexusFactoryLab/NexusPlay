@@ -25,10 +25,20 @@ import { loadGuessWhoBotPolicy } from './bots/load-guess-who-bot-policy.js';
 import { GUESS_WHO_FREE_ANSWERER } from '../domain/ports/guess-who-free-answerer.port.js';
 import { AiGuessWhoFreeAnswerer } from './bots/ai-free-answerer.js';
 import { AiCoreModule } from './ai-core.module.js';
+import { TOURNAMENT_CONFIDENTIALITY_SIGNATURE_REPOSITORY } from '../domain/ports/tournament-confidentiality-signature.repository.port.js';
+import { PrismaTournamentConfidentialitySignatureRepository } from './persistence/prisma/prisma-tournament-confidentiality-signature.repository.js';
+import { SignTournamentConfidentialityUseCase } from '../application/use-cases/sign-tournament-confidentiality.use-case.js';
+import { ListTournamentSignaturesUseCase } from '../application/use-cases/list-tournament-signatures.use-case.js';
+import { TournamentAgreementController } from './http/controllers/tournament-agreement.controller.js';
 
 @Module({
   imports: [UserModule, AnalyticsModule, AiCoreModule],
+  controllers: [TournamentAgreementController],
   providers: [
+    // Issue #173: firmas del acuerdo de torneo (comparten el TOURNAMENT_STORE vivo de este módulo).
+    { provide: TOURNAMENT_CONFIDENTIALITY_SIGNATURE_REPOSITORY, useClass: PrismaTournamentConfidentialitySignatureRepository },
+    SignTournamentConfidentialityUseCase,
+    ListTournamentSignaturesUseCase,
     MongoService,
     { provide: GAME_REPOSITORY, useClass: MongoGameRepository },
     // Con caché (issue #147): la sala lee el torneo habilitado al abrirse; las escrituras del HTTP lo descartan.

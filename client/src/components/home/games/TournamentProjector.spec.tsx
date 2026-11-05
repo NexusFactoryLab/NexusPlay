@@ -112,6 +112,6 @@ describe('TournamentProjector (#147)', () => {
   })
 
   it('el enlace de invitación es el de la sala del torneo', () => {
-    expect(invitationUrlFor('ABC123')).toBe('https://nexus.test/quien-es/torneo/ABC123')
+    expect(invitationUrlFor('ABC123')).toBe('https://nexus.test/quien-es/torneo/ABC123?origen=qr')
   })
 })

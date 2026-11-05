@@ -558,3 +558,38 @@ model TournamentParticipantModel {
   @@index([userId])
   @@map("tournament_participants")
 }
+
+/// Firma del acuerdo de confidencialidad y autorización de tratamiento de datos de un torneo (issue #173).
+/// Solo de anexar (también lo impone un trigger en la migración). Guarda quién firmó, cuándo (UTC), la versión
+/// y el hash SHA-256 del texto aceptado y la evidencia mínima (IP y user-agent, declarados en el texto).
+/// Sin relación con `users` a propósito: la prueba no se borra en cascada con la cuenta.
+model TournamentConfidentialitySignatureModel {
+  id                      String   @id @default(uuid())
+  userId                  String   @map("user_id")
+  tournamentCode          String   @map("tournament_code")
+  /// Quién moderaba el torneo al firmar; permite que siga viendo el respaldo aunque la sala ya se haya cerrado.
+  tournamentCreatorUserId String?  @map("tournament_creator_user_id")
+  fullName                String   @map("full_name")
+  documentType            String?  @map("document_type")
+  documentNumber          String?  @map("document_number")
+  contactEmail            String?  @map("contact_email")
+  birthDate               DateTime @map("birth_date") @db.Date
+  isMinor                 Boolean  @map("is_minor")
+  guardianFullName        String?  @map("guardian_full_name")
+  guardianDocumentType    String?  @map("guardian_document_type")
+  guardianDocumentNumber  String?  @map("guardian_document_number")
+  guardianRelationship    String?  @map("guardian_relationship")
+  acceptedConfidentiality Boolean  @map("accepted_confidentiality")
+  acceptedDataProcessing  Boolean  @map("accepted_data_processing")
+  guardianAccepted        Boolean? @map("guardian_accepted")
+  signatureName           String   @map("signature_name")
+  textVersion             String   @map("text_version")
+  textHash                String   @map("text_hash")
+  ipAddress               String?  @map("ip_address")
+  userAgent               String?  @map("user_agent")
+  signedAt                DateTime @map("signed_at") @db.Timestamptz(6)
+
+  @@index([userId, tournamentCode, textVersion], map: "tcs_user_tournament_version_idx")
+  @@index([tournamentCode, signedAt], map: "tcs_tournament_signed_idx")
+  @@map("tournament_confidentiality_signatures")
+}

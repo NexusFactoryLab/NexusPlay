@@ -3,6 +3,8 @@ import { ChatPanel } from './ChatPanel'
 import { TournamentLobby } from './TournamentLobby'
 import { TournamentModeratorPanel } from './TournamentModeratorPanel'
 import { TournamentCodeEntry } from './TournamentCodeEntry'
+import { TournamentAgreementModal } from './TournamentAgreementModal'
+import { INVITATION_ORIGIN_PARAM, INVITATION_ORIGIN_QR } from './tournamentInvitation'
 import { TournamentCreateConfirm } from './TournamentCreateConfirm'
 import { invalidateTournamentHistory } from '../../../services/tournament-history.service'
 import { TournamentConfirmModal } from './TournamentConfirmModal'
@@ -93,6 +95,8 @@ function TournamentSession() {
   const [searchParams] = useSearchParams()
   // `?crear=1` (botón "Abrir sala del torneo" del Inicio): el administrador abre la sala con el torneo habilitado.
   const wantsToCreate = searchParams.get('crear') === '1'
+  // Issue #173: solo el enlace del QR trae `origen=qr`; con él el servidor pide la firma del acuerdo.
+  const enteredByQr = searchParams.get(INVITATION_ORIGIN_PARAM) === INVITATION_ORIGIN_QR
   const navigate = useNavigate()
   const { token, user } = useAuth()
   const {
@@ -112,6 +116,8 @@ function TournamentSession() {
     clearMatchAbandonedMessage,
     createTournament,
     joinTournament,
+    signatureRequiredCode,
+    clearSignatureRequired,
     startTournament,
     closeTournament,
     endRound,
@@ -149,7 +155,7 @@ function TournamentSession() {
     if (connecting || startedRef.current) return
     if (codeFromUrl) {
       startedRef.current = true
-      joinTournament(codeFromUrl.toUpperCase())
+      joinTournament(codeFromUrl.toUpperCase(), enteredByQr ? INVITATION_ORIGIN_QR : undefined)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connecting, codeFromUrl])
@@ -340,6 +346,21 @@ function TournamentSession() {
           startedRef.current = true
           createTournament(name)
         }}
+      />
+    )
+  }
+
+  // Entró por el QR sin tener firmado el acuerdo vigente: el servidor no lo une hasta que firme (issue #173).
+  if (signatureRequiredCode && token && !tournament) {
+    return (
+      <TournamentAgreementModal
+        code={signatureRequiredCode}
+        token={token}
+        onCancel={() => {
+          clearSignatureRequired()
+          handleExit()
+        }}
+        onSigned={() => joinTournament(signatureRequiredCode, INVITATION_ORIGIN_QR)}
       />
     )
   }

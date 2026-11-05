@@ -4,6 +4,9 @@ import type { TournamentLiveMatch, TournamentParticipantView, TournamentStateVie
 
 // El tema viene de un proveedor que este render de servidor no monta: se simula.
 const theme = vi.hoisted(() => ({ current: 'light' as string }))
+// El botón de firmas del acuerdo (issue #173) lee la sesión; aquí no hay proveedor.
+vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ token: null }) }))
+
 vi.mock('../../../hooks/useTheme', () => ({
   useTheme: () => ({ theme: theme.current }),
   isDarkTheme: (value: string) => value === 'dark' || value === 'fantasy',

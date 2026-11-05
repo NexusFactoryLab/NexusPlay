@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { TournamentSignaturesButton } from './TournamentSignaturesButton'
 import type { ReactNode } from 'react'
 import { Bot, Crown, Layers, LogOut, Medal, MonitorPlay, Pause, Play, Radio, Swords, Timer, Trophy, UserX, Users } from 'lucide-react'
 import { AvatarCircle } from '../../avatar/AvatarCircle'
@@ -364,6 +365,8 @@ export function TournamentModeratorPanel({ tournament, error, onClose, onEndRoun
             )}
           </div>
         )}
+
+        <div><TournamentSignaturesButton code={tournament.code} /></div>
 
         <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
           <section className={`stagger-in ${CARD}`} style={stagger(6)} aria-labelledby="podio-titulo">
