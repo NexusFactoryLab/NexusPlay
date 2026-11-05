@@ -139,6 +139,91 @@ export const CHALLENGES: Challenge[] = [
   { id: 'der-eco', status: 'Nuevo · empieza el lunes', left: 'Derecho', right: 'Economía', leftShare: 50, players: null },
 ]
 
+/** Qué vista previa se dibuja en cada paso de "Cómo funciona". */
+export type HowStepPreview = 'material' | 'sala' | 'partida' | 'resultados'
+
+export type HowStep = {
+  id: HowStepPreview
+  /** Texto corto de la pestaña. */
+  label: string
+  /** Quién actúa en este paso. */
+  actor: string
+  title: string
+  text: string
+  /** Lo que se hace concretamente, una acción por línea. */
+  actions: string[]
+}
+
+export const HOW_STEPS: HowStep[] = [
+  {
+    id: 'material',
+    label: 'Material',
+    actor: 'Docente',
+    title: 'Sube el material y revisa el borrador',
+    text: 'Cargas tus apuntes y el asistente de IA propone preguntas y un juego. Nada se publica hasta que lo apruebes.',
+    actions: [
+      'Elige el tipo de juego: dominó, serpientes y escaleras, laberinto, ¿Quién es? y otros.',
+      'Corrige o borra las preguntas que no te sirvan.',
+      'O parte de una actividad que ya publicó otro docente.',
+    ],
+  },
+  {
+    id: 'sala',
+    label: 'Sala',
+    actor: 'Docente y estudiantes',
+    title: 'Abre una sala y comparte el código',
+    text: 'Al crear la partida se genera un código. Los estudiantes lo escriben y aparecen en la sala al instante.',
+    actions: [
+      'Funciona desde el navegador, sin instalar nada.',
+      'Ves quién entró antes de empezar.',
+      'Para varias rondas, arma un torneo con eliminatorias.',
+    ],
+  },
+  {
+    id: 'partida',
+    label: 'Partida',
+    actor: 'Estudiantes',
+    title: 'La clase juega y responde en tiempo real',
+    text: 'Cada estudiante responde en su pantalla. Los puntos y las posiciones se actualizan mientras la partida sigue.',
+    actions: [
+      'Cada respuesta correcta suma puntos.',
+      'El marcador se mueve en vivo para todos.',
+      'El docente sigue la partida desde su propia vista.',
+    ],
+  },
+  {
+    id: 'resultados',
+    label: 'Resultados',
+    actor: 'Docente y estudiantes',
+    title: 'Revisa quién dominó qué',
+    text: 'Al terminar queda el podio de la partida. El docente consulta los puntajes de su clase y cada estudiante, su lugar en el ranking.',
+    actions: [
+      'Podio al cierre de cada partida.',
+      'Puntajes por clase para decidir qué repasar.',
+      'Ranking de estudiantes e instituciones.',
+    ],
+  },
+]
+
+/** Siguiente pestaña según la tecla (flechas, Inicio y Fin); null si la tecla no navega. */
+export function nextStepIndex(key: string, current: number, total: number): number | null {
+  if (total <= 0) return null
+  switch (key) {
+    case 'ArrowRight':
+    case 'ArrowDown':
+      return (current + 1) % total
+    case 'ArrowLeft':
+    case 'ArrowUp':
+      return (current - 1 + total) % total
+    case 'Home':
+      return 0
+    case 'End':
+      return total - 1
+    default:
+      return null
+  }
+}
+
 export type LandingRanking = {
   students: Competitor[]
   universities: UniversityEntry[]
