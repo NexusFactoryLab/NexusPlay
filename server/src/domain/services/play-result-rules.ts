@@ -30,8 +30,11 @@ const MEMORY_MAX_COMBO = 1.5;
 const MEMORY_DEFAULT_TIME_PER_ZONE_S = 90;
 const MEMORY_MAX_TIME_PER_ZONE_S = 3_600;
 
-/** Laberinto: techo generoso de puntos por segundo jugado (pellets, bonus y combos de nubes). */
-const MAZE_MAX_SCORE_PER_SECOND = 150;
+/**
+ * Laberinto: techo generoso de puntos por segundo jugado (pellets, bonus, combos de nubes y
+ * respuestas correctas de hasta 800 puntos por rapidez, issue #180).
+ */
+const MAZE_MAX_SCORE_PER_SECOND = 300;
 /** Cualquier otro tipo de juego, mientras no tenga su propia regla. */
 const DEFAULT_MAX_SCORE_PER_SECOND = 200;
 const SCORE_SLACK = 1_000;
