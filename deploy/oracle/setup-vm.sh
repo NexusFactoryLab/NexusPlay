@@ -16,16 +16,17 @@ sudo usermod -aG docker "$USER"
 echo "docker: $(sudo docker --version)"
 
 echo "== 2/4 Firewall interno (80 y 443) =="
-# Las imágenes de Oracle traen reglas iptables que rechazan todo salvo SSH: se abren 80/443 antes del REJECT.
+# Las imágenes de Oracle traen reglas iptables que rechazan todo salvo SSH; en AWS la cadena está vacía.
+# Insertar al inicio (posición 1) sirve en ambos casos y siempre queda antes de cualquier REJECT.
 for port in 80 443; do
   if ! sudo iptables -C INPUT -p tcp --dport "$port" -j ACCEPT 2>/dev/null; then
-    sudo iptables -I INPUT 5 -p tcp --dport "$port" -j ACCEPT
+    sudo iptables -I INPUT 1 -p tcp --dport "$port" -j ACCEPT
   fi
 done
 if ! sudo iptables -C INPUT -p udp --dport 443 -j ACCEPT 2>/dev/null; then
-  sudo iptables -I INPUT 5 -p udp --dport 443 -j ACCEPT
+  sudo iptables -I INPUT 1 -p udp --dport 443 -j ACCEPT
 fi
-sudo apt-get install -y iptables-persistent >/dev/null
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y iptables-persistent >/dev/null
 sudo netfilter-persistent save
 sudo iptables -L INPUT -n --line-numbers | head -12
 
