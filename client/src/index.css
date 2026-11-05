@@ -7605,3 +7605,21 @@ code {
     --home-bottom-gap: 30px;
   }
 }
+
+/* Título del banner en dorado en todos los temas (issue #182): mismo degradado
+ * que Fantasía, con contorno oscuro para que se lea también sobre fondos claros. */
+.home-hero-title {
+  filter:
+    drop-shadow(1.5px 0 0 #3d1236) drop-shadow(-1.5px 0 0 #3d1236)
+    drop-shadow(0 1.5px 0 #3d1236) drop-shadow(0 -1.5px 0 #3d1236)
+    drop-shadow(0 3px 0 #6e1f3f) drop-shadow(0 6px 8px rgba(50, 0, 50, 0.35));
+}
+
+.home-hero-title-text {
+  background: linear-gradient(180deg, #fffbd6 0%, #ffe066 38%, #ffc12e 64%, #ff961f 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
