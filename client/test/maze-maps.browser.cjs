@@ -10,8 +10,9 @@ const base = process.env.DEMO_TEST_URL || 'http://127.0.0.1:5173'
 const fixture = (layout, guide) => `<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><div id="root"></div><script type="module">
 import RefreshRuntime from '/@react-refresh';
 RefreshRuntime.injectIntoGlobalHook(window); window.$RefreshReg$=()=>{}; window.$RefreshSig$=()=>type=>type; window.__vite_plugin_react_preamble_installed__=true;
-const reactModule=await import('/node_modules/.vite/deps/react.js'); const React=reactModule.default??reactModule;
-const domModule=await import('/node_modules/.vite/deps/react-dom_client.js'); const {createRoot}=domModule.default??domModule;
+const mainCode=await (await fetch('/src/main.tsx')).text(); const depUrl=(name)=>{const at=mainCode.indexOf('/node_modules/.vite/deps/'+name+'?v=');return mainCode.slice(at,mainCode.indexOf('"',at))};
+const reactModule=await import(depUrl('react.js')); const React=reactModule.default??reactModule;
+const domModule=await import(depUrl('react-dom_client.js')); const {createRoot}=domModule.default??domModule;
 await import('/src/index.css');
 const {AuthProvider}=await import('/src/hooks/useAuth.tsx'); const {ThemeProvider}=await import('/src/hooks/useTheme.tsx');
 const T=await import('/src/components/home/games/mazeCollectorTypes.ts');

@@ -7,7 +7,6 @@ import { POWER_MODE_MS } from './mazeEngine'
 import {
   ANSWER_FEEDBACK_MS,
   DEFAULT_ROUNDS,
-  EXTRA_CLOUD_EVERY_MS,
   QUESTION_TIME_MS,
   ROUND_OPTIONS,
   useMazeCollectorGame,
@@ -32,6 +31,19 @@ import { isDarkTheme, useTheme } from '../../../hooks/useTheme'
 import { ArrowKeysInline } from './tutorial/ArrowKeysInline'
 import { FitScale } from './true-false-maze/FitScale'
 import { MazeEffectsLayer, useMazeEffects } from './mazeEffects'
+import { MazeAmbienceBack, MazeAmbienceOver } from './mazeAmbience'
+import { BookSpeech, BookSpeechDetail, MazeCoach, MoreTimeButton, MoreTimeCard, PlayerAvatar } from './MazeCoach'
+import {
+  enterMazeFullscreen,
+  fullscreenSupported,
+  isFullscreen,
+  leaveMazeFullscreen,
+  readFullscreenPreference,
+  saveFullscreenPreference,
+  subscribeFullscreen,
+  useIsFullscreen,
+} from './mazeFullscreen'
+import { playArcadePause, playArcadeQuestion, playArcadeStart } from '../../../utils/gameFeedback'
 
 /**
  * Una parte del tutorial jugable (issue #93): la misma ciudad y el mismo
@@ -71,6 +83,8 @@ type MazeCollectorGameProps = {
   wonActionLabel?: string
   /** No abrir la guía al empezar (las estaciones 2, 3 y 4 de una expedición). */
   skipGuide?: boolean
+  /** Quien monta el juego sigue en pantalla completa al salir de él (las estaciones de la expedición). */
+  keepFullscreen?: boolean
 }
 
 /** Celda mínima: por debajo de esto los sprites dejan de leerse (en ese caso el tablero se desplaza). */
@@ -100,6 +114,8 @@ const DOCK_HEIGHT = 176
  * carril; las botellas van más chicas para que la vista se quede en el camión.
  */
 const TRUCK_SCALE = 2
+/** Los muñecos por dirección son más altos que el camión: así no se montan sobre las paredes del camino. */
+const WALKER_SCALE = 1.7
 const GHOST_SCALE = 1.35
 const PET_SCALE = 0.62
 const POWER_SCALE = 1
@@ -114,29 +130,6 @@ const BAG_SCALE = 0.8
 const BONUS_SCALE = 1
 /** Tope de crecimiento de botellas y bolsas: van casi en cada celda y, más grandes, se amontonan. */
 const PICKUP_MAX_SCALE = 1.4
-const FULLSCREEN_PREF_KEY = 'nexusplay-maze-collector-fullscreen'
-
-/**
- * "Jugar en pantalla completa": viene activado y se recuerda lo último que
- * eligió el jugador. El navegador solo deja pasar a pantalla completa dentro
- * de un gesto (clic, tecla, toque), así que se aplica al empezar.
- * (Misma estructura que el Laberinto Verdadero o Falso.)
- */
-function readFullscreenPreference(): boolean {
-  try {
-    return window.localStorage.getItem(FULLSCREEN_PREF_KEY) !== 'off'
-  } catch {
-    return true
-  }
-}
-
-function saveFullscreenPreference(value: boolean) {
-  try {
-    window.localStorage.setItem(FULLSCREEN_PREF_KEY, value ? 'on' : 'off')
-  } catch {
-    // Sin almacenamiento (modo privado): la elección vale solo para esta partida.
-  }
-}
 
 /** `window.matchMedia` como estado de React (se actualiza al girar el teléfono o cambiar de pantalla). */
 function useMediaQuery(query: string): boolean {
@@ -171,6 +164,11 @@ export function MazeCollectorGame(props: MazeCollectorGameProps) {
   const [round, setRound] = useState(0)
   // Rondas elegidas en la pantalla de inicio: se recuerdan al jugar otra vez.
   const [rounds, setRounds] = useState<number>(DEFAULT_ROUNDS)
+  // Vive aquí y no en la sesión: «Jugar otra vez» monta una sesión nueva y no debe sacar de pantalla completa.
+  const leavesFullscreen = !props.tutorial && !props.keepFullscreen
+  useEffect(() => () => {
+    if (leavesFullscreen) leaveMazeFullscreen()
+  }, [leavesFullscreen])
   if (inTutorial) {
     return (
       <MazeCollectorTutorial
@@ -260,23 +258,23 @@ function MazeCollectorSession({
     exitGame()
   }
   const mapTheme = MAZE_MAPS[normalizeMazeLayout(config.layout)]
-  const isCity = mapTheme.id === 'CITY'
   const spriteScale = layout.spriteScale ?? 1
-  // En Ciudad, la primera y la última fila son franjas verdes decorativas: se
-  // muestra solo media de cada una y ese alto se le da al resto del mapa.
-  const trimmedRows = isCity ? 1 : 0
-  const rootRef = useRef<HTMLDivElement>(null)
+  // La primera y la última fila son solo borde decorativo: no se muestran y ese
+  // alto se le da al resto del mapa, que así se ve más de un 10 % más grande.
+  // El tutorial conserva su encuadre.
+  const trimmedRows = tutorial ? 1 : 2
+  const playerScale = (mapTheme.directional ? WALKER_SCALE : TRUCK_SCALE) * spriteScale
   const stageRef = useRef<HTMLDivElement>(null)
   const [cellSize, setCellSize] = useState(24)
   const [cameraMode, setCameraMode] = useState(false)
   const [view, setView] = useState({ width: 0, height: 0 })
   const swipeStart = useRef<{ x: number; y: number } | null>(null)
-  // Puede llegar ya en pantalla completa (la que dejó puesta el tutorial).
-  const [fullscreen, setFullscreen] = useState(() => typeof document !== 'undefined' && Boolean(document.fullscreenElement))
+  // Puede llegar ya en pantalla completa (la del tutorial o la de la expedición).
+  const fullscreen = useIsFullscreen()
   const [wantFullscreen, setWantFullscreen] = useState(readFullscreenPreference)
   const [fullscreenHintClosed, setFullscreenHintClosed] = useState(false)
   // En el tutorial la pantalla completa la maneja el tutorial (entra al jugar y sale para explicar).
-  const canFullscreen = !tutorial && typeof document !== 'undefined' && document.fullscreenEnabled
+  const canFullscreen = !tutorial && fullscreenSupported()
   // La cruceta aparece en cualquier pantalla táctil, no según el ancho.
   const coarsePointer = useMediaQuery('(pointer: coarse)')
   // Pantalla chica: teléfono en vertical o en horizontal (poco alto). Ahí el encabezado se compacta.
@@ -305,13 +303,15 @@ function MazeCollectorSession({
   const mapBorder = isDarkTheme(theme) ? 'rgba(255,255,255,0.6)' : '#000000'
 
   function enterFullscreen() {
-    const root = rootRef.current
-    if (!canFullscreen || !root || document.fullscreenElement) return
-    void root.requestFullscreen?.({ navigationUI: 'hide' }).catch(() => {})
+    if (canFullscreen) enterMazeFullscreen()
   }
 
+  // Salir con el botón o con F es una decisión del jugador: no abre el menú de pausa.
+  const chosenLeave = useRef(false)
   function leaveFullscreen() {
-    if (document.fullscreenElement) void document.exitFullscreen().catch(() => {})
+    if (!isFullscreen()) return
+    chosenLeave.current = true
+    leaveMazeFullscreen()
   }
 
   /** Elección explícita del jugador (interruptor, botón o tecla F): se aplica ya y se recuerda. */
@@ -323,7 +323,7 @@ function MazeCollectorSession({
   }
 
   function toggleFullscreen() {
-    chooseFullscreen(!document.fullscreenElement)
+    chooseFullscreen(!isFullscreen())
   }
 
   /** Empezar es un gesto del jugador: ahí se puede pasar a pantalla completa sin que tenga que buscar el botón. */
@@ -379,7 +379,9 @@ function MazeCollectorSession({
     game.question && game.phase === 'playing' && !game.feedbackActive && game.question.id !== seenQuestionId ? game.question : null
   const introId = questionIntro?.id
   useEffect(() => {
-    if (introId !== undefined) pause()
+    if (introId === undefined) return
+    pause()
+    playArcadeQuestion()
   }, [introId, pause])
 
   // Al cerrar la pregunta el juego espera un momento quieto para que el jugador
@@ -399,39 +401,53 @@ function MazeCollectorSession({
     previousExtras.current = game.extraClouds
   }, [game.extraClouds])
 
-  function startSearching() {
-    if (!game.question) return
-    setSeenQuestionId(game.question.id)
+  function backToTheMap() {
     resume()
     game.hold(LOCATE_MS)
     setLocating(true)
   }
 
-  useEffect(() => {
-    const onChange = () => {
-      const active = !!document.fullscreenElement
-      setFullscreen(active)
-      // Al salir (con Esc, por ejemplo) la pantalla cambia de tamaño de golpe: la partida se pausa para no perder el hilo.
-      // En el tutorial salir de pantalla completa es parte del recorrido (para explicar), no una pausa.
-      if (!active && !tutorialRef.current) pause()
-    }
-    document.addEventListener('fullscreenchange', onChange)
-    return () => document.removeEventListener('fullscreenchange', onChange)
-  }, [pause])
+  function startSearching() {
+    if (!game.question) return
+    setSeenQuestionId(game.question.id)
+    playArcadeStart()
+    backToTheMap()
+  }
 
-  // Al salir del juego no se deja la pantalla completa puesta (en el tutorial sigue: la maneja el tutorial).
-  const partOfTutorial = Boolean(tutorial)
+  // «¿Necesitas más tiempo?»: solo en la partida normal (en un torneo sería una ventaja) y sin límite de usos.
+  const offerMoreTime = Boolean(game.question) && !tutorial && !inTournament
+  const [bookPause, setBookPause] = useState(false)
+
+  function pauseForBook() {
+    if (game.phase !== 'playing' || game.paused) return
+    pause()
+    setBookPause(true)
+    playArcadePause(true)
+  }
+
+  function continueFromBook() {
+    setBookPause(false)
+    playArcadePause(false)
+    backToTheMap()
+  }
+
   useEffect(
-    () => () => {
-      if (!partOfTutorial && document.fullscreenElement) void document.exitFullscreen().catch(() => {})
-    },
-    [partOfTutorial],
+    () =>
+      subscribeFullscreen(() => {
+        const leftByChoice = chosenLeave.current
+        chosenLeave.current = false
+        // Al salir con Esc la pantalla cambia de tamaño de golpe: la partida se pausa para no perder el hilo.
+        // En el tutorial salir de pantalla completa es parte del recorrido (para explicar), no una pausa.
+        if (!isFullscreen() && !leftByChoice && !tutorialRef.current) pause()
+      }),
+    [pause],
   )
 
   // El manejador de teclas vive entre renders: lee siempre la versión más reciente.
-  const keysRef = useRef({ toggleFullscreen, enterFullscreen, phase: game.phase, paused: game.paused, wantFullscreen, intro: false })
+  const resumeFromKey = bookPause ? continueFromBook : resume
+  const keysRef = useRef({ toggleFullscreen, enterFullscreen, resumeFromKey, phase: game.phase, paused: game.paused, wantFullscreen, intro: false })
   useEffect(() => {
-    keysRef.current = { toggleFullscreen, enterFullscreen, phase: game.phase, paused: game.paused, wantFullscreen, intro: Boolean(questionIntro) }
+    keysRef.current = { toggleFullscreen, enterFullscreen, resumeFromKey, phase: game.phase, paused: game.paused, wantFullscreen, intro: Boolean(questionIntro) }
   })
   useEffect(() => {
     if (guideOpen) return
@@ -439,11 +455,12 @@ function MazeCollectorSession({
       if (event.ctrlKey || event.metaKey || event.altKey) return
       const keys = keysRef.current
       if (event.key === 'f' || event.key === 'F') {
-        keys.toggleFullscreen()
+        // Dejar la tecla apretada repite el evento: entraría y saldría sin parar.
+        if (!event.repeat) keys.toggleFullscreen()
       } else if (event.key === 'p' || event.key === 'P' || event.key === 'Escape') {
         // Con la pregunta en pantalla la pausa no se quita con P/Esc: se sale con «¡A buscarla!».
         if (keys.intro) return
-        if (keys.paused) resume()
+        if (keys.paused) keys.resumeFromKey()
         else pause()
       } else if (keys.phase === 'ready' && keys.wantFullscreen && event.key.startsWith('Arrow')) {
         keys.enterFullscreen()
@@ -451,7 +468,7 @@ function MazeCollectorSession({
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [pause, resume, guideOpen])
+  }, [pause, guideOpen])
 
   const width = layout.cols * cellSize
   const height = layout.rows * cellSize
@@ -473,6 +490,8 @@ function MazeCollectorSession({
   const cellByHeight = Math.min(MAX_CELL_SIZE, Math.floor((rowSize.height - 2 * STAGE_PADDING) / (layout.rows - trimmedRows)))
   const asideWidth = Math.max(ASIDE_MIN_WIDTH, Math.min(ASIDE_MAX_WIDTH, rowSize.width - layout.cols * cellByHeight - 2 * STAGE_PADDING))
   const boardHeight = height - trimmedRows * cellSize
+  // Si ni con la celda mínima cabe el mapa, el escenario se desplaza con barras.
+  const mapFits = boardHeight <= view.height && width <= view.width
   const windowWidth = cameraMode ? Math.min(boardWidth, view.width) : boardWidth
   const windowHeight = cameraMode ? Math.min(boardHeight, view.height) : boardHeight
   const trimShift = (trimmedRows * cellSize) / 2
@@ -515,8 +534,8 @@ function MazeCollectorSession({
 
   return (
     <div
-      ref={rootRef}
-      className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-[#0d141d] text-slate-100"
+      // overflow-clip y no hidden: los muñecos sobresalen del mapa y un contenedor con hidden se puede desplazar al enfocar un botón.
+      className="maze-shell fixed inset-0 z-50 flex flex-col overflow-clip text-slate-100"
       style={{
         paddingTop: 'env(safe-area-inset-top)',
         paddingBottom: 'env(safe-area-inset-bottom)',
@@ -524,6 +543,7 @@ function MazeCollectorSession({
         paddingRight: 'env(safe-area-inset-right)',
       }}
     >
+      <MazeAmbienceBack map={mapTheme.id} />
       <header className="relative z-10 flex items-center gap-2 px-2 pt-2 sm:px-3">
         <button
           type="button"
@@ -531,14 +551,14 @@ function MazeCollectorSession({
           aria-keyshortcuts={pauseKey === 'Esc' ? 'Escape P' : 'P'}
           title={`Pausar el juego (${pauseKey})`}
           disabled={!playing}
-          className="flex h-11 shrink-0 items-center gap-1.5 rounded-2xl border border-emerald-300/55 bg-emerald-500/20 px-3.5 text-[14px] font-bold text-white backdrop-blur transition-colors hover:bg-emerald-500/35 disabled:cursor-not-allowed disabled:opacity-40 sm:h-10"
+          className="flex h-11 shrink-0 items-center gap-1.5 maze-chip rounded-2xl px-3.5 text-[14px] font-bold text-white backdrop-blur transition-colors disabled:cursor-not-allowed disabled:opacity-40 sm:h-10"
           onClick={pause}
         >
           <Pause className="h-4 w-4" fill="currentColor" strokeWidth={1.5} />
           Pausa
         </button>
 
-        <div className="flex min-h-11 min-w-0 flex-1 items-center justify-between gap-x-3 rounded-2xl border border-white/10 bg-slate-950/60 px-2.5 py-1 backdrop-blur sm:justify-start sm:gap-x-4 sm:px-3 sm:py-1.5">
+        <div className="flex min-h-11 min-w-0 flex-1 items-center justify-between gap-x-3 maze-card rounded-2xl px-2.5 py-1 backdrop-blur sm:justify-start sm:gap-x-4 sm:px-3 sm:py-1.5">
           {!compact && (
             <p className="hidden min-w-0 items-center gap-1.5 truncate text-[13px] font-semibold md:flex">
               <CollectorIcon className="h-4 w-4 shrink-0" style={{ color: primaryColor }} strokeWidth={2} />
@@ -587,12 +607,12 @@ function MazeCollectorSession({
             className={`flex h-10 shrink-0 items-center gap-1.5 rounded-2xl border px-3 text-[13px] font-bold backdrop-blur transition-colors max-sm:hidden ${
               fullscreen
                 ? 'border-white/10 bg-slate-950/70 text-slate-200 hover:bg-white/10'
-                : 'border-emerald-300/60 bg-emerald-500/25 text-white shadow-[0_0_20px_-6px_rgba(52,211,153,0.9)] hover:bg-emerald-500/40'
+                : 'maze-chip text-white'
             }`}
             onClick={toggleFullscreen}
           >
             {fullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
-            {!compact && <span className="max-sm:hidden">{fullscreen ? 'Salir' : 'Pantalla completa'}</span>}
+            {!compact && <span className="max-sm:hidden">{fullscreen ? 'Minimizar' : 'Pantalla completa'}</span>}
           </button>
         )}
 
@@ -605,20 +625,35 @@ function MazeCollectorSession({
 
       <div ref={rowRef} className={`relative flex min-h-0 flex-1 ${questionAside ? 'flex-row' : 'flex-col'}`}>
       {game.question && !questionAside && (
-        <QuestionPanel question={game.question} feedback={game.answerFeedback} remainingMs={game.questionRemainingMs} layout="bar" />
+        <QuestionPanel
+          question={game.question}
+          feedback={game.answerFeedback}
+          remainingMs={game.questionRemainingMs}
+          layout="bar"
+          showAvatar={!tutorial}
+          moreTime={offerMoreTime ? <MoreTimeButton compact active={bookPause} onPause={pauseForBook} onContinue={continueFromBook} /> : undefined}
+        />
       )}
       <div
         ref={stageRef}
-        className={`relative min-h-0 min-w-0 flex-1 p-1.5 sm:p-2 ${cameraMode ? 'overflow-hidden' : 'overflow-auto'} ${coarsePointer ? 'touch-none select-none' : ''}`}
+        className={`relative min-h-0 min-w-0 flex-1 p-1.5 sm:p-2 ${cameraMode ? 'overflow-hidden' : mapFits ? 'overflow-visible' : 'overflow-auto'} ${coarsePointer ? 'touch-none select-none' : ''}`}
         onPointerDown={coarsePointer ? handleSwipeDown : undefined}
         onPointerMove={coarsePointer ? handleSwipeMove : undefined}
         onPointerUp={coarsePointer ? () => (swipeStart.current = null) : undefined}
         onPointerCancel={coarsePointer ? () => (swipeStart.current = null) : undefined}
       >
+        <MazeAmbienceOver map={mapTheme.id} paused={game.paused} />
+        {bookPause && (
+          <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#0e0b1c]/55">
+            <p role="status" className="maze-panel rounded-2xl px-5 py-2.5 text-[20px] font-black text-white">
+              Juego en pausa
+            </p>
+          </div>
+        )}
         {/* Barra del purificador: flota sobre el mapa para no quitarle alto. */}
         {energized && (
           <div className="pointer-events-none absolute left-1/2 top-3 z-20 flex w-[min(80%,420px)] -translate-x-1/2 items-center gap-2 rounded-full border border-emerald-300/50 bg-slate-950/85 px-3 py-1 shadow-lg">
-            <Zap className="h-4 w-4 shrink-0 text-emerald-300" strokeWidth={2.5} />
+            <Zap className="h-4 w-4 shrink-0 maze-accent-text" strokeWidth={2.5} />
             <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/10">
               <div
                 className="h-full rounded-full bg-emerald-400 transition-[width] duration-100 ease-linear"
@@ -629,12 +664,16 @@ function MazeCollectorSession({
           </div>
         )}
         <div
-          className="relative mx-auto overflow-hidden rounded-xl shadow-[0_18px_40px_-12px_rgba(0,0,0,0.7)]"
+          data-maze-window
+          className={`relative mx-auto rounded-xl shadow-[0_18px_40px_-12px_rgba(0,0,0,0.7)] ${cameraMode ? 'overflow-hidden' : ''}`}
           style={{
             width: windowWidth,
             height: windowHeight,
             marginTop: cameraMode ? Math.max(0, (view.height - windowHeight) / 2) : undefined,
             outline: `2px solid ${mapBorder}`,
+            // Sin cámara los muñecos de la primera y la última fila sobresalen arriba y abajo (no se les corta la
+            // cabeza); a los lados sí se recortan, para que no se vean fuera del mapa al cruzar el túnel.
+            clipPath: cameraMode ? undefined : `inset(${-cellSize}px -3px)`,
           }}
         >
         <div
@@ -651,7 +690,9 @@ function MazeCollectorSession({
           {/* Capa 1: laberinto estático (sin costo por frame). Ciudad usa el mapa
               en sprites, armado sobre la misma cuadrícula; los demás layouts
               (abstractos, sin arte propio) siguen con paredes/calles por color. */}
-          <MapBackground name={mapTheme.background} />
+          <div className="absolute inset-0" style={cameraMode ? undefined : { clipPath: `inset(${trimShift}px 0 round 12px)` }}>
+            <MapBackground name={mapTheme.background} />
+          </div>
 
           {/* Capa 2: coleccionables — solo los que quedan, cada uno en su celda lógica (no interpolan, no se mueven). */}
           <PickupsLayer pickups={game.pickups} bags={game.bags} count={game.pickups.length + game.bags.length} cellSize={cellSize} spriteScale={Math.min(spriteScale, PICKUP_MAX_SCALE)} />
@@ -692,7 +733,7 @@ function MazeCollectorSession({
             </CenteredSprite>
           ))}
 
-          <CenteredSprite row={game.player.row} col={game.player.col} cellSize={cellSize} scale={TRUCK_SCALE * spriteScale} zIndex={20}>
+          <CenteredSprite row={game.player.row} col={game.player.col} cellSize={cellSize} scale={playerScale} zIndex={20}>
             {/* Mientras se ubica, un aro late alrededor del camión. */}
             {locating && (
               <span
@@ -708,7 +749,7 @@ function MazeCollectorSession({
             >
               <EcoTruckSprite
                 facing={game.player.facing}
-                size={cellSize * TRUCK_SCALE * spriteScale}
+                size={cellSize * playerScale}
                 prefix={mapTheme.spritePrefix}
                 directional={mapTheme.directional}
                 energized={energized}
@@ -717,7 +758,7 @@ function MazeCollectorSession({
             </div>
           </CenteredSprite>
 
-          <MazeEffectsLayer effects={effects} cellSize={cellSize} truckScale={TRUCK_SCALE * spriteScale} />
+          <MazeEffectsLayer effects={effects} cellSize={cellSize} truckScale={playerScale} />
 
           {/* Respuestas de la pregunta: encima de botellas y nubes, debajo del camión. */}
           {game.question?.answers
@@ -758,22 +799,23 @@ function MazeCollectorSession({
         </div>
         {game.answerFeedback && game.phase !== 'lost' && <AnswerToast key={`answer-${game.answerFeedback.id}`} feedback={game.answerFeedback} />}
         {cloudAlert > 0 && <CloudAlert key={`cloud-${cloudAlert}`} emoji={mapTheme.text.emoji} enemyAnother={mapTheme.text.enemyAnother} />}
-        {locating && (
+        {locating && !bookPause && (
           <p
             role="status"
             className="pointer-events-none absolute left-1/2 top-4 z-40 -translate-x-1/2 rounded-full border-2 border-amber-300 bg-slate-950/90 px-5 py-2 text-[16px] font-black text-amber-200 shadow-xl"
           >
-            ¡Ubícate! Busca {mapTheme.text.player} y las letras
+            ¡Ubícate!
           </p>
         )}
       </div>
       {game.question && questionAside && (
         // Tiempo y vidas arriba, la pregunta debajo. Sin scroll: si no cabe, el contenido se reduce.
-        <aside className="shrink-0 overflow-hidden border-l border-white/10 bg-slate-950/50 p-3" style={{ width: asideWidth }}>
-          <FitScale className="h-full" align="top" minScale={0.6} fitKey={game.question.id} contentClassName="flex flex-col gap-3">
+        <aside className="maze-aside relative flex shrink-0 flex-col gap-3 overflow-hidden p-3" style={{ width: asideWidth }}>
+          <FitScale className="flex-1" align="top" minScale={0.6} fitKey={game.question.id} contentClassName="flex flex-col gap-3">
             <GameStatusCard lives={game.lives} score={game.score} remainingMs={game.questionRemainingMs} />
-            <QuestionPanel question={game.question} feedback={game.answerFeedback} remainingMs={game.questionRemainingMs} layout="aside" />
+            <QuestionPanel question={game.question} feedback={game.answerFeedback} remainingMs={game.questionRemainingMs} layout="aside" showAvatar={!tutorial} />
           </FitScale>
+          {offerMoreTime && <MoreTimeCard active={bookPause} onPause={pauseForBook} onContinue={continueFromBook} />}
         </aside>
       )}
       </div>
@@ -808,32 +850,25 @@ function MazeCollectorSession({
             <SpriteStrip name={`${mapTheme.spritePrefix}cloud-chaser`} frames={4} size={64} durationMs={900} />
           </div>
           <h2 className="mt-2 text-[22px] font-bold tracking-tight text-white [@media(max-height:520px)]:mt-0">{mapTheme.text.startTitle}</h2>
-          <p className="mx-auto mt-1.5 max-w-[400px] text-[13.5px] leading-relaxed text-slate-300">
-            Para salvar {mapTheme.text.place}, <b className="text-white">recoge todas las botellas PET</b> con el {config.collectorLabel.toLowerCase()} y esquiva {mapTheme.text.enemies}.{' '}
-            {game.question && (
-              <>
-                Lee la pregunta y <b className="text-white">maneja hasta la respuesta correcta</b> antes de que se acabe el tiempo: una equivocada te quita una vida.{' '}
-              </>
-            )}
+          <p className="mx-auto mt-1.5 max-w-[400px] text-[15px] leading-relaxed text-slate-200">
+            <b className="text-white">Recoge las botellas</b>{game.question ? ' y responde' : ''}.{' '}
             {coarsePointer ? (
-              <>
-                Muévete con la <b className="text-white">cruceta</b> o <b className="text-white">deslizando el dedo</b> sobre el mapa.
-              </>
+              'Muévete con la cruceta.'
             ) : (
               <>
-                Muévete con las <b className="text-white">flechas del teclado</b> <ArrowKeysInline />.
+                Muévete con <ArrowKeysInline />
               </>
             )}
           </p>
           <RoundPicker value={rounds} onChange={onRoundsChange} />
           {canFullscreen && !compact && (
-            <FullscreenChoice wanted={wantFullscreen} active={fullscreen} onChange={chooseFullscreen} />
+            <FullscreenChoice wanted={wantFullscreen} onChange={chooseFullscreen} />
           )}
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
             <button
               type="button"
               autoFocus
-              className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 px-6 py-3 text-[15px] font-bold text-white shadow-[0_12px_30px_-10px_rgba(52,211,153,0.7)] transition-transform hover:-translate-y-0.5"
+              className="inline-flex items-center gap-2 rounded-2xl maze-cta px-6 py-3 text-[15px] font-bold text-white transition-transform hover:-translate-y-0.5"
               onClick={() => move('RIGHT')}
             >
               <Play className="h-4 w-4" fill="currentColor" /> Empezar
@@ -853,13 +888,9 @@ function MazeCollectorSession({
               <ArrowLeft className="h-4 w-4" /> Salir
             </button>
           </div>
-          {coarsePointer ? (
+          {!coarsePointer && (
             <p className="mt-2 text-[11.5px] text-slate-400">
-              ¿Necesitas parar? Toca <b className="text-slate-200">Pausa</b> (arriba a la izquierda).
-            </p>
-          ) : (
-            <p className="mt-2 text-[11.5px] text-slate-400">
-              o presiona cualquier flecha · <b className="text-slate-200">P</b> pausa · <b className="text-slate-200">F</b> pantalla completa
+              <b className="text-slate-200">P</b> pausa · <b className="text-slate-200">F</b> pantalla completa
             </p>
           )}
         </Overlay>
@@ -869,10 +900,7 @@ function MazeCollectorSession({
         <Overlay celebrate>
           <img src={mazeSpriteUrl('ui-trophy')} alt="" className="mx-auto h-20 w-20 animate-[maze-levelup-pop_0.4s_cubic-bezier(0.16,1,0.3,1)]" />
           <h2 className="mt-1 text-[22px] font-bold text-white">¡Ronda {game.level} superada!</h2>
-          <p className="text-[14px] text-slate-300">
-            {game.targetRounds - game.level === 1 ? 'Falta 1 ronda' : `Faltan ${game.targetRounds - game.level} rondas`} para salvar {mapTheme.text.place}: los obstáculos vienen más
-            rápido…
-          </p>
+          <p className="text-[14px] text-slate-300">{game.targetRounds - game.level === 1 ? 'Falta 1 ronda' : `Faltan ${game.targetRounds - game.level} rondas`}</p>
         </Overlay>
       )}
 
@@ -902,9 +930,6 @@ function MazeCollectorSession({
         <Overlay celebrate>
           <img src={mazeSpriteUrl('ui-trophy')} alt="" className="mx-auto h-20 w-20 animate-[maze-levelup-pop_0.4s_cubic-bezier(0.16,1,0.3,1)]" />
           <h2 className="mt-1 text-[24px] font-bold text-white">¡Salvaste {mapTheme.text.place}!</h2>
-          <p className="mt-1 text-[14px] text-slate-300">
-            Lo lograste {game.targetRounds === 1 ? 'en 1 ronda' : `en las ${game.targetRounds} rondas`}. ¡Gracias por cuidar {mapTheme.text.place}!
-          </p>
           <p className="mt-3 mb-1 flex items-center justify-center gap-1.5 text-[14px] text-slate-300">
             <img src={mazeSpriteUrl('ui-star')} alt="" className="h-5 w-5" />
             Puntaje final: <b className="text-white">{game.score.toLocaleString('es')}</b>
@@ -919,7 +944,7 @@ function MazeCollectorSession({
               <button
                 type="button"
                 autoFocus
-                className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2.5 text-[14px] font-bold text-white"
+                className="inline-flex items-center gap-2 rounded-2xl maze-cta px-5 py-2.5 text-[14px] font-bold text-white"
                 onClick={() => onWon({ score: game.score, answeredCorrect: game.answeredCorrect })}
               >
                 <Play className="h-4 w-4" fill="currentColor" /> {wonActionLabel ?? 'Continuar'}
@@ -935,10 +960,10 @@ function MazeCollectorSession({
       )}
 
       {questionIntro && !guideOpen && (
-        <QuestionIntro question={questionIntro} number={game.answeredCorrect + 1} timed={!tutorial} onGo={startSearching} enemyOne={mapTheme.text.enemyOne} />
+        <QuestionIntro question={questionIntro} number={game.answeredCorrect + 1} showAvatar={!tutorial} onGo={startSearching} />
       )}
 
-      {game.paused && !guideOpen && !questionIntro && (
+      {game.paused && !guideOpen && !questionIntro && !bookPause && (
         <PauseOverlay
           fullscreen={fullscreen}
           onGuide={onOpenGuide}
@@ -996,12 +1021,18 @@ function QuestionPanel({
   feedback,
   remainingMs,
   layout,
+  showAvatar,
+  moreTime,
 }: {
   question: ActiveQuestion
   feedback: AnswerFeedback | null
   /** 0 = sin reloj (tutorial). */
   remainingMs: number
   layout: 'aside' | 'bar'
+  /** El avatar del jugador da la instrucción del libro (en el tutorial no). */
+  showAvatar: boolean
+  /** Botón «¿Más tiempo?» de la franja de pantallas angostas. */
+  moreTime?: ReactNode
 }) {
   const aside = layout === 'aside'
   return (
@@ -1010,7 +1041,7 @@ function QuestionPanel({
       aria-live="polite"
       className={
         aside
-          ? 'flex flex-col gap-2.5 rounded-2xl border border-white/15 bg-slate-900/80 p-3 shadow-[0_12px_30px_-18px_rgba(0,0,0,0.9)]'
+          ? 'maze-card flex flex-col gap-2.5 rounded-2xl p-3'
           : 'z-10 mx-1.5 mt-1.5 shrink-0 rounded-2xl border border-white/10 bg-slate-950/80 px-3 py-2 sm:mx-2 sm:mt-2 [@media(max-height:520px)]:py-1'
       }
     >
@@ -1018,7 +1049,7 @@ function QuestionPanel({
         key={question.id}
         className={`flex items-start gap-2 font-bold text-white animate-[fade-in-up_0.35s_ease-out] ${aside ? 'text-[15px] leading-snug' : 'text-[14px] leading-tight sm:text-[15px]'}`}
       >
-        <CircleHelp className={`shrink-0 text-emerald-300 ${aside ? 'mt-0.5 h-5 w-5' : 'h-4 w-4'}`} aria-hidden="true" />
+        <CircleHelp className={`shrink-0 maze-accent-text ${aside ? 'mt-0.5 h-5 w-5' : 'h-4 w-4'}`} aria-hidden="true" />
         <span className="min-w-0 flex-1">{question.question}</span>
         {remainingMs > 0 && !aside && <QuestionClock remainingMs={remainingMs} compact />}
       </p>
@@ -1043,8 +1074,19 @@ function QuestionPanel({
           )
         })}
       </ul>
-      <BookHint book={question.book} variant="compact" />
-      {aside && <p className="text-[11px] leading-snug text-slate-400">Maneja hasta la letra de la respuesta correcta. Si te equivocas o se acaba el tiempo, pierdes una vida.</p>}
+      {aside && showAvatar ? (
+        <MazeCoach>
+          <BookSpeechDetail book={question.book} />
+        </MazeCoach>
+      ) : (
+        <div className="mt-1 flex items-center gap-2">
+          {showAvatar && <PlayerAvatar className="h-7 w-7 text-[11px]" />}
+          <div className="min-w-0 flex-1">
+            <BookHint book={question.book} variant="compact" />
+          </div>
+          {moreTime}
+        </div>
+      )}
     </section>
   )
 }
@@ -1084,7 +1126,7 @@ function EndButtons({ onPlayAgain, onExit }: { onPlayAgain: () => void; onExit: 
       <button
         type="button"
         autoFocus
-        className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2.5 text-[14px] font-bold text-white"
+        className="inline-flex items-center gap-2 rounded-2xl maze-cta px-5 py-2.5 text-[14px] font-bold text-white"
         onClick={onPlayAgain}
       >
         <Play className="h-4 w-4" fill="currentColor" /> Jugar otra vez
@@ -1097,39 +1139,23 @@ function EndButtons({ onPlayAgain, onExit }: { onPlayAgain: () => void; onExit: 
 }
 
 /** La pregunta en grande antes de salir a buscar la respuesta (el juego queda en pausa). */
-function QuestionIntro({
-  question,
-  number,
-  timed,
-  onGo,
-  enemyOne,
-}: {
-  question: ActiveQuestion
-  number: number
-  timed: boolean
-  onGo: () => void
-  /** "una nube", "un contaminante"…: lo que llega si se demora (ver mazeMaps.ts). */
-  enemyOne: string
-}) {
+function QuestionIntro({ question, number, showAvatar, onGo }: { question: ActiveQuestion; number: number; showAvatar: boolean; onGo: () => void }) {
   return (
-    <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#0b1220]/75 p-2 backdrop-blur-[2px] sm:p-6">
-      <section
-        role="dialog"
-        aria-modal="true"
-        aria-label="Pregunta"
-        className="max-h-full w-full max-w-[600px] animate-[maze-levelup-pop_0.45s_cubic-bezier(0.16,1,0.3,1)] overflow-y-auto rounded-3xl border-2 border-emerald-300/50 bg-slate-950/95 p-4 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.8)] sm:p-6"
-      >
-        <p className="flex items-center gap-2 text-[12px] font-bold tracking-[0.14em] text-emerald-300 uppercase">
-          <CircleHelp className="h-4 w-4" aria-hidden="true" /> Pregunta {number}
-        </p>
-        <h2 className="mt-2 text-[19px] leading-snug font-bold text-white sm:text-[23px]">{question.question}</h2>
-        <ul className="mt-4 grid gap-2 sm:grid-cols-2 [@media(max-height:520px)]:mt-2 [@media(max-height:520px)]:grid-cols-2">
+    <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#0e0b1c]/75 p-2 backdrop-blur-[3px] sm:p-5">
+      <section role="dialog" aria-modal="true" aria-label="Pregunta" className="maze-question-pop maze-panel max-h-full w-full max-w-[780px] overflow-y-auto rounded-3xl p-4 sm:p-6">
+        <p className="maze-question-badge text-center font-heading text-[clamp(1.8rem,5.4vh,3rem)] leading-none font-bold uppercase">Pregunta {number}</p>
+        <h2 className="mt-3 text-center text-[clamp(1.25rem,3.3vh,1.8rem)] leading-snug font-bold text-white">{question.question}</h2>
+        <ul className="mt-4 grid gap-2.5 sm:grid-cols-2 [@media(max-height:520px)]:mt-2 [@media(max-height:520px)]:grid-cols-2">
           {question.answers
             .filter((answer) => !answer.wrong)
-            .map((answer) => (
-              <li key={answer.letter} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-[15px] text-slate-100 [@media(max-height:520px)]:py-1.5">
+            .map((answer, index) => (
+              <li
+                key={answer.letter}
+                className="maze-card maze-option-pop flex items-center gap-3 rounded-2xl px-3 py-3 text-[clamp(1.05rem,2.5vh,1.3rem)] font-semibold text-white [@media(max-height:520px)]:py-1.5"
+                style={{ animationDelay: `${0.18 + index * 0.07}s` }}
+              >
                 <span
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-white text-[17px] font-black text-slate-950"
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-white text-[22px] font-black text-slate-950"
                   style={{ background: ANSWER_COLORS[answer.letter] }}
                 >
                   {answer.letter}
@@ -1138,25 +1164,23 @@ function QuestionIntro({
               </li>
             ))}
         </ul>
-        <BookHint book={question.book} variant="full" />
-        <p className="mt-4 text-center text-[13px] leading-snug text-slate-300 [@media(max-height:520px)]:mt-2">
-          Las letras están repartidas por el mapa: <b className="text-white">maneja hasta la correcta</b>. Si llegas a una equivocada, pierdes una vida.
-          {timed && (
-            <>
-              {' '}
-              Tienes <b className="text-amber-300">{QUESTION_TIME_MS / 1000} segundos</b>: si se acaban, también pierdes una vida. Y cada{' '}
-              {EXTRA_CLOUD_EVERY_MS / 1000} segundos sin responder <b className="text-rose-300">llega {enemyOne} más</b>.
-            </>
+        <div className="mt-4 [@media(max-height:520px)]:mt-2">
+          {showAvatar ? (
+            <MazeCoach size="large">
+              <BookSpeech book={question.book} />
+            </MazeCoach>
+          ) : (
+            <BookHint book={question.book} variant="compact" />
           )}
-        </p>
+        </div>
         <div className="mt-4 flex justify-center [@media(max-height:520px)]:mt-2">
           <button
             type="button"
             autoFocus
-            className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 px-6 py-3 text-[15px] font-bold text-white shadow-[0_12px_30px_-10px_rgba(52,211,153,0.7)] transition-transform hover:-translate-y-0.5"
+            className="maze-cta inline-flex items-center gap-2 rounded-2xl px-8 py-3.5 text-[18px] font-bold text-white transition-transform hover:-translate-y-0.5"
             onClick={onGo}
           >
-            <Play className="h-4 w-4" fill="currentColor" /> ¡A buscarla!
+            <Play className="h-5 w-5" fill="currentColor" /> ¡A buscarla!
           </button>
         </div>
       </section>
@@ -1191,7 +1215,7 @@ function OffscreenAnswer({ answer, x, y, width, height }: { answer: MazeAnswer; 
 /** Recuadro de la partida en la columna derecha: tiempo (con reloj), vidas y puntos. */
 function GameStatusCard({ lives, score, remainingMs }: { lives: number; score: number; remainingMs: number }) {
   return (
-    <section aria-label="Estado de la partida" className="flex flex-col gap-2 rounded-2xl border border-white/15 bg-slate-900/80 p-3">
+    <section aria-label="Estado de la partida" className="maze-card flex flex-col gap-2 rounded-2xl p-3">
       {remainingMs > 0 && (
         <div className="flex items-center gap-3">
           <CartoonClock className="h-11 w-11 shrink-0" />
@@ -1357,7 +1381,7 @@ function Overlay({ children, celebrate }: { children: ReactNode; celebrate?: boo
   return (
     <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#0b1220]/60 p-2 sm:p-6">
       {celebrate && <ConfettiBurst trigger="won" />}
-      <div className="max-h-full w-full max-w-[520px] animate-[maze-levelup-pop_0.45s_cubic-bezier(0.16,1,0.3,1)] overflow-y-auto rounded-3xl border border-white/15 bg-slate-950/85 p-4 text-center shadow-[0_24px_60px_-20px_rgba(0,0,0,0.8)] backdrop-blur-md sm:p-6">
+      <div className="max-h-full w-full max-w-[520px] animate-[maze-levelup-pop_0.45s_cubic-bezier(0.16,1,0.3,1)] overflow-y-auto maze-panel rounded-3xl p-4 text-center backdrop-blur-md sm:p-6">
         {children}
       </div>
     </div>
@@ -1373,9 +1397,9 @@ function FullscreenHint({ onEnter, onClose }: { onEnter: () => void; onClose: ()
         className="flex min-w-0 items-center gap-2 rounded-l-2xl py-2 pl-3 pr-2 text-left font-semibold leading-snug text-slate-100 transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-emerald-300"
         onClick={onEnter}
       >
-        <Maximize className="h-4 w-4 shrink-0 text-emerald-300" />
+        <Maximize className="h-4 w-4 shrink-0 maze-accent-text" />
         <span>
-          Ver toda la ciudad: <b className="text-emerald-200">pantalla completa</b>
+          Volver a <b className="maze-accent-text">pantalla completa</b>
         </span>
       </button>
       <button
@@ -1391,29 +1415,21 @@ function FullscreenHint({ onEnter, onClose }: { onEnter: () => void; onClose: ()
   )
 }
 
-type FullscreenChoiceProps = { wanted: boolean; active: boolean; onChange: (value: boolean) => void }
+type FullscreenChoiceProps = { wanted: boolean; onChange: (value: boolean) => void }
 
 /**
  * Interruptor "Jugar en pantalla completa" de la pantalla de inicio. Al
  * activarlo se aplica en el momento (el clic es el gesto que el navegador
  * pide); si se deja activado, se aplica al empezar.
  */
-function FullscreenChoice({ wanted, active, onChange }: FullscreenChoiceProps) {
-  const detail = active
-    ? 'Activada: ves toda la ciudad más grande.'
-    : wanted
-      ? 'Se activa al empezar. Así ves toda la ciudad más grande.'
-      : 'Jugarás en ventana: el mapa se verá más pequeño.'
+function FullscreenChoice({ wanted, onChange }: FullscreenChoiceProps) {
   return (
     <label className="mx-auto mt-4 flex max-w-[440px] cursor-pointer items-center gap-3 rounded-2xl border border-emerald-300/30 bg-emerald-400/[0.07] px-3.5 py-3 text-left transition-colors hover:bg-emerald-400/[0.12] has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-emerald-300">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-400/15 text-emerald-300">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-400/15 maze-accent-text">
         <Maximize className="h-5 w-5" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[14.5px] font-bold leading-tight text-white">
-          Jugar en pantalla completa <span className="font-medium text-emerald-300">(recomendado)</span>
-        </span>
-        <span className="mt-0.5 block text-[12.5px] leading-snug text-slate-300">{detail}</span>
+        <span className="block text-[14.5px] font-bold leading-tight text-white">Jugar en pantalla completa</span>
       </span>
       <input
         type="checkbox"
@@ -1448,22 +1464,21 @@ function PauseOverlay({
 }) {
   return (
     <div className="absolute inset-0 z-40 flex items-center justify-center bg-[#0b1220]/75 p-3 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="maze-pause-title">
-      <div className="max-h-full w-full max-w-[420px] animate-[maze-levelup-pop_0.35s_cubic-bezier(0.16,1,0.3,1)] overflow-y-auto rounded-3xl border border-white/15 bg-slate-950/90 p-5 text-left shadow-[0_24px_60px_-20px_rgba(0,0,0,0.8)]">
+      <div className="max-h-full w-full max-w-[420px] animate-[maze-levelup-pop_0.35s_cubic-bezier(0.16,1,0.3,1)] overflow-y-auto maze-panel rounded-3xl p-5 text-left">
         <div className="flex items-center gap-3">
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-400/15 text-emerald-300">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-400/15 maze-accent-text">
             <Pause className="h-6 w-6" fill="currentColor" strokeWidth={1.5} />
           </span>
           <div className="min-w-0">
             <h2 id="maze-pause-title" className="text-[22px] font-bold leading-tight text-white">
               Juego en pausa
             </h2>
-            <p className="text-[13px] text-slate-300">Todo está detenido. Continúa cuando quieras.</p>
           </div>
         </div>
         <button
           type="button"
           autoFocus
-          className="mt-4 flex w-full items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-3.5 text-[16px] font-bold text-white transition-transform hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+          className="mt-4 flex w-full items-center justify-center gap-2.5 rounded-2xl maze-cta px-5 py-3.5 text-[16px] font-bold text-white transition-transform hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           onClick={onResume}
         >
           <Play className="h-5 w-5" fill="currentColor" /> Continuar jugando
@@ -1491,7 +1506,7 @@ function MenuButton({ icon: Icon, label, onClick }: { icon: typeof Play; label: 
       className="flex items-center gap-2.5 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-[14px] font-semibold text-slate-100 transition-colors hover:bg-white/10"
       onClick={onClick}
     >
-      <Icon className="h-4 w-4 shrink-0 text-emerald-300" />
+      <Icon className="h-4 w-4 shrink-0 maze-accent-text" />
       {label}
     </button>
   )
