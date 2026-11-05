@@ -131,6 +131,18 @@ export function TrueFalseMazeTournamentPage() {
     )
   }
 
+  // El torneo ya no existe (lo cerraron mientras entrabas): sin esto se quedaba en "Preparando…" para siempre.
+  if (error && !tournament && !run) {
+    return (
+      <main className="flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center">
+        <p className="text-[14px] text-danger">{error}</p>
+        <button type="button" className="rounded-lg border border-border px-4 py-2.5 text-[14px] font-medium text-text-h" onClick={() => navigate('/', { replace: true })}>
+          Volver al inicio
+        </button>
+      </main>
+    )
+  }
+
   if (!run || !game || questions.length === 0) {
     return (
       <main className="flex flex-1 items-center justify-center">
